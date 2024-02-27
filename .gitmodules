@@ -1,0 +1,9 @@
+[submodule "build"]
+	path = build
+	url = https://gitee.com/zhong-luping/build.git
+[submodule "buildtools"]
+	path = buildtools
+	url = https://gitee.com/zhong-luping/buildtools.git
+[submodule "tools"]
+	path = tools
+	url = https://gitee.com/zhong-luping/tools.git

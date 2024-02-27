@@ -214,6 +214,9 @@ config("common_inherited_config") {
       "WEBRTC_IOS",
     ]
   }
+  if (is_ohos) {
+    defines += [ "WEBRTC_OHOS", "WEBRTC_LINUX" ]
+  }
   if (is_linux || is_chromeos) {
     defines += [ "WEBRTC_LINUX" ]
   }
