@@ -85,6 +85,11 @@ if (!build_with_chromium) {
         # see bugs.webrtc.org/11027#c5.
         deps += [ ":webrtc_lib_link_test" ]
       }
+      if (is_ohos) {
+        deps += [
+          "modules/audio_device:ohos_test",
+        ]
+      }
       if (is_ios) {
         deps += [
           "examples:apprtcmobile_tests",

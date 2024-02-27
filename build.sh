@@ -1,4 +1,15 @@
-
+# Copyright (c) 2023 Huawei Device Co., Ltd.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 #!/bin/sh
 
 function check_depot_tools(){
@@ -18,7 +29,7 @@ function downlaod_thirdparty() {
         return 0
     fi
 
-    git clone git@gitee.com:zhong-luping/webrtc_third_party.git
+    git clone https://gitee.com/zhong-luping/webrtc_third_party.git
     if [ $? -ne 0 ]
     then
         echo "git clone webrtc third_party failed!!"
@@ -62,8 +73,7 @@ fi
 arguments="target_cpu=\"arm64\" \
     target_os=\"ohos\" \
     ohos_sdk_native_root=\"$OHOS_SDK_NATIVE_PATH\" \
-    is_clang=true \
-    rtc_use_dummy_audio_file_devices=true"
+    is_clang=true"
 
 gn gen out/webrtc --args="$arguments"
 if [ $? -ne 0 ]
