@@ -40,6 +40,7 @@ class AudioDeviceModuleImpl : public AudioDeviceModuleForTest {
     // `CreatePlatformSpecificObjects()` call will fail unless usable
     // implementation will be provided by the user.
     kPlatformFuchsia = 7,
+    kPlatformOhos = 8,
   };
 
   int32_t CheckPlatform();

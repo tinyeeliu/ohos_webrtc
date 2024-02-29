@@ -13,6 +13,14 @@ if (is_android) {
   import("//build/config/android/rules.gni")
 }
 
+if (is_ohos) {
+  import("//build/config/sysroot.gni")
+
+config("audio_device_ohos_config") {
+  include_dirs = [" ${sysroot}/usr/include" ]
+}
+}
+
 config("audio_device_warnings_config") {
   if (is_win && is_clang) {
     cflags = [
@@ -390,6 +398,28 @@ rtc_library("audio_device_impl") {
           "../third_party/portaudio:mac_portaudio",
         ]
       }
+
+      if (is_ohos) {
+        sources += [
+          "ohos/audio_device_module.h",
+          "ohos/audio_device_template.h",
+          "ohos/ohaudio_player.cc",
+          "ohos/ohaudio_player.h",
+          "ohos/ohaudio_player_wrapper.cc",
+          "ohos/ohaudio_player_wrapper.h",
+          "ohos/ohaudio_recorder.cc",
+          "ohos/ohaudio_recorder.h",
+          "ohos/ohaudio_recorder_wrapper.cc",
+          "ohos/ohaudio_recorder_wrapper.h",
+        ]
+        include_dirs = [ 
+          "${sysroot}/usr/include",
+          "//modules/audio_device",
+          "//modules/audio_device/ohos",
+        ]
+        libs = [ "ohaudio" ]
+      }
+
       if (is_win) {
         sources += [
           "win/audio_device_core_win.cc",
@@ -455,6 +485,44 @@ rtc_source_set("mock_audio_device") {
   ]
 }
 
+if (is_ohos) {
+  executable("ohos_test") {
+    testonly = true
+    sources = [
+      "ohos/ohaudio_test.cc",
+    ]
+    deps = [
+      ":audio_device",
+      ":audio_device_buffer",
+      ":audio_device_generic",
+      ":audio_device_impl",
+      ":mock_audio_device",
+      ":test_audio_device_module",
+      "../../api:array_view",
+      "../../api:scoped_refptr",
+      "../../api:sequence_checker",
+      "../../api/task_queue",
+      "../../api/task_queue:default_task_queue_factory",
+      "../../api/units:time_delta",
+      "../../api/units:timestamp",
+      "../../common_audio",
+      "../../rtc_base:buffer",
+      "../../rtc_base:checks",
+      "../../rtc_base:logging",
+      "../../rtc_base:macromagic",
+      "../../rtc_base:race_checker",
+      "../../rtc_base:rtc_event",
+      "../../rtc_base:safe_conversions",
+      "../../rtc_base:timeutils",
+      "../../rtc_base/synchronization:mutex",
+      "../../system_wrappers",
+      "../../test:fileutils",
+      "../../test:test_support",
+      "../../test/time_controller",
+    ]
+  }
+}
+
 if (rtc_include_tests && !build_with_chromium) {
   rtc_library("audio_device_unittests") {
     testonly = true
@@ -498,7 +566,7 @@ if (rtc_include_tests && !build_with_chromium) {
       "//third_party/abseil-cpp/absl/strings",
       "//third_party/abseil-cpp/absl/types:optional",
     ]
-    if (is_linux || is_chromeos || is_mac || is_win) {
+    if (is_linux || is_chromeos || is_mac || is_win || is_ohos) {
       sources += [ "audio_device_unittest.cc" ]
     }
     if (is_win) {

@@ -27,6 +27,10 @@
 #elif defined(WEBRTC_ANDROID)
 #include <stdlib.h>
 #include "sdk/android/native_api/audio_device_module/audio_device_android.h"
+#elif defined(WEBRTC_OHOS)
+#include "modules/audio_device/ohos/audio_device_template.h"
+#include "modules/audio_device/ohos/ohaudio_recorder.h"
+#include "modules/audio_device/ohos/ohaudio_player.h"
 #elif defined(WEBRTC_LINUX)
 #if defined(WEBRTC_ENABLE_LINUX_ALSA)
 #include "modules/audio_device/linux/audio_device_alsa_linux.h"
@@ -141,6 +145,9 @@ int32_t AudioDeviceModuleImpl::CheckPlatform() {
 #elif defined(WEBRTC_ANDROID)
   platform = kPlatformAndroid;
   RTC_LOG(LS_INFO) << "current platform is Android";
+#elif defined(WEBRTC_OHOS)
+  platform = kPlatformOhos;
+  RTC_LOG(LS_INFO) << "current platform is OHOS";
 #elif defined(WEBRTC_LINUX)
   platform = kPlatformLinux;
   RTC_LOG(LS_INFO) << "current platform is Linux";
@@ -205,7 +212,7 @@ int32_t AudioDeviceModuleImpl::CreatePlatformSpecificObjects() {
 // 'rtc_include_pulse_audio' build flag.
 // TODO(bugs.webrtc.org/9127): improve support and make it more clear that
 // PulseAudio is the default selection.
-#if !defined(WEBRTC_ANDROID) && defined(WEBRTC_LINUX)
+#if !defined(WEBRTC_ANDROID) && !defined(WEBRTC_OHOS) && defined(WEBRTC_LINUX)
 #if !defined(WEBRTC_ENABLE_LINUX_PULSE)
   // Build flag 'rtc_include_pulse_audio' is set to false. In this mode:
   // - kPlatformDefaultAudio => ALSA, and
@@ -235,6 +242,18 @@ int32_t AudioDeviceModuleImpl::CreatePlatformSpecificObjects() {
   }
 #endif  // #if !defined(WEBRTC_ENABLE_LINUX_PULSE)
 #endif  // #if defined(WEBRTC_LINUX)
+
+#if defined(WEBRTC_OHOS)
+    static const int default_sample_rates = 48000;
+    static const int default_frames_per_buff = 240;
+    static const int default_channels = 2;
+    if (audio_layer == kPlatformDefaultAudio) {
+        AudioParameters audio_parameters(default_sample_rates, default_channels, default_frames_per_buff);
+        audio_device_.reset(new AudioDeviceTemplate<OHAudioRecorder, OHAudioPlayer>(
+                            audio_layer, audio_parameters));
+        RTC_LOG(LS_INFO) << "OHOS Audio APIs will be utilized.";
+    }
+#endif
 
 // iOS ADM implementation.
 #if defined(WEBRTC_IOS)

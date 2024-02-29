@@ -53,13 +53,13 @@ class TestAudioDeviceModuleImpl : public AudioDeviceModuleImpl {
       std::unique_ptr<TestAudioDeviceModule::Renderer> renderer,
       float speed = 1)
       : AudioDeviceModuleImpl(
-            AudioLayer::kDummyAudio,
-            std::make_unique<TestAudioDevice>(task_queue_factory,
+            AudioLayer::kPlatformDefaultAudio,
+            /*std::make_unique<TestAudioDevice>(task_queue_factory,
                                               std::move(capturer),
                                               std::move(renderer),
-                                              speed),
-            task_queue_factory,
-            /*create_detached=*/true) {}
+                                              speed),*/
+            task_queue_factory/*,
+            true*/) {}
 
   ~TestAudioDeviceModuleImpl() override = default;
 };
