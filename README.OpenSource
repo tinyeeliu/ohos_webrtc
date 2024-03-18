@@ -1,0 +1,11 @@
+[
+    {
+        "Name": "webrtc",
+        "License": "BSD-3-Clause",
+        "License File": "LICENSE",
+        "Version Number": "m120",
+        "Owner": "xiafeng@huaewi.com",
+        "Upstream URL": "https://webrtc.googlesource.com/src",
+        "Description": "WebRTC is a free, open software project that provides browsers and mobile applications with Real-Time Communications (RTC) capabilities via simple APIs. The WebRTC components have been optimized to best serve this purpose."
+    }
+]
