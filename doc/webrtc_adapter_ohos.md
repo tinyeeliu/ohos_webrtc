@@ -745,10 +745,6 @@ ninja -C ../out/ohos_webrtc -v -j32                 # -v 查看编译的具体�
 ![test](./pic/audio_unit_test1.png)
 ![test](./pic/audio_unit_test2.png)
 
-## 总结
+## 编译/使用中遇到问题总结
 
-通过当前方案可使用OpenHarmony的SDK编译出基本功能的webrtc，但由于采用了部分规避手段，故本方案还有几点需要注意：
-
-1. 音频采集需要适配ohos平台。
-2. 大部分的分支走linux，未精确分析。
-3. 未对所有模块对ohos平台分析，当前只修改了影响编译的部分，原则上需要对所有模块进行分析。
+[常见问题总结](./webrtc_adapter_questions.md)
