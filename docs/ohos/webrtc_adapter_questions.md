@@ -57,7 +57,7 @@ ninja -C ../out/webrtc -v -j32
 以上配置是使用`ffmpeg_branding`的默认配置，如果配置`ffmpeg_branding="Chrome"`的话，依赖头文件目录是`third_party/ffmpeg/chromium/config/Chrome/ohos/arm64`，故需拷贝`Chrome`下的配置：
 
 ```shell
-cd third_party/ffmpeg/chrome/config/Chromium/
+cd third_party/ffmpeg/chromium/config/Chrome/
 cp -arf linux ohos
 ```
 
