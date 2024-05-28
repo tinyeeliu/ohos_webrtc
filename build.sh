@@ -54,8 +54,6 @@ then
     exit 1
 fi
 
-git submodule update --init --recursive            ## git clone submodules
-
 check_depot_tools
 if [ $? -ne 0 ]
 then
