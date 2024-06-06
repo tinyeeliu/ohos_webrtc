@@ -51,7 +51,7 @@ using namespace webrtc;
 #define TEST_PLAY_RECORD    2
 
 static int g_testMode = TEST_PLAY;
-static int g_playing = 0;
+static int g_playing = 1;
 
 namespace {
 
