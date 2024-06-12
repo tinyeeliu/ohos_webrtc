@@ -4,6 +4,59 @@
         <filefilterlist>
             <filefilter name="binaryFileTypePolicyFilter" desc="Filters for resources files policies">
                 <filteritem type="filename" name="*.png" desc="指导文档需要的png图片"/>
+                <filteritem type="filename" name="*.apk" desc="原上游软件的文件，保持一致"/>
+                <filteritem type="filename" name="*.woff2" desc="原上游软件的文件，保持一致"/>
+                <filteritem type="filename" name="*.dat" desc="原上游软件的文件，保持一致"/>
+                <filteritem type="filename" name="*.jar" desc="原上游软件的文件，保持一致"/>
+                <filteritem type="filename" name="*.gif" desc="原上游软件的文件，保持一致"/>
+                <filteritem type="filename" name="*.pak" desc="原上游软件的文件，保持一致"/>
+                <filteritem type="filename" name="*.so" desc="原上游软件的文件，保持一致"/>
+                <filteritem type="filename" name="*.a" desc="原上游软件的文件，保持一致"/>
+                <filteritem type="filename" name="gn" desc="原上游软件的文件，保持一致"/>
+                <filteritem type="filename" name="*.sha1" desc="原上游软件的文件，保持一致"/>
+                <filteritem type="filename" name="*.gpg" desc="原上游软件的文件，保持一致"/>
+                <filteritem type="filename" name="*.dex" desc="原上游软件的文件，保持一致"/>
+                <filteritem type="filename" name="*.key" desc="原上游软件的文件，保持一致"/>
+                <filteritem type="filename" name="*.keystore" desc="原上游软件的文件，保持一致"/>
+                <filteritem type="filename" name="eu-strip" desc="原上游软件的文件，保持一致"/>
+                <filteritem type="filename" name="*.pem" desc="原上游软件的文件，保持一致"/>
+                <filteritem type="filename" name="*.o" desc="原上游软件的文件，保持一致"/>
+                <filteritem type="filename" name="clang-format" desc="原上游软件的文件，保持一致"/>
+                <filteritem type="filename" name="*.snk" desc="原上游软件的文件，保持一致"/>
+                <filteritem type="filename" name="*.mp3" desc="原上游软件的文件，保持一致"/>
+                <filteritem type="filename" name="result_adapter" desc="原上游软件的文件，保持一致"/>
+            </filefilter>
+            <filefilter
+                desc="Filters for compatibility，license header policies"
+                name="copyrightPolicyFilter">
+                <filteritem
+                        desc="上游库信息，不修改"
+                        name="buildtools/.*"
+                        type="filepath"/>
+                <filteritem
+                        desc="上游库信息，不修改"
+                        name="build/.*"
+                        type="filepath"/>
+                <filteritem
+                        desc="上游库信息，不修改"
+                        name="tools/.*"
+                        type="filepath"/>
+            </filefilter>
+            <filefilter
+                desc="Filters for compatibility，license header policies"
+                name="defaultPolicyFilter">
+                <filteritem
+                        desc="上游库信息，不修改"
+                        name="buildtools/.*"
+                        type="filepath"/>
+                <filteritem
+                        desc="上游库信息，不修改"
+                        name="build/.*"
+                        type="filepath"/>
+                <filteritem
+                        desc="上游库信息，不修改"
+                        name="tools/.*"
+                        type="filepath"/>
             </filefilter>
         </filefilterlist>
     </oatconfig>
