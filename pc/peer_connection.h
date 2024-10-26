@@ -51,7 +51,6 @@
 #include "api/transport/enums.h"
 #include "api/turn_customizer.h"
 #include "call/call.h"
-#include "modules/rtp_rtcp/source/rtp_packet_received.h"
 #include "p2p/base/ice_transport_internal.h"
 #include "p2p/base/port.h"
 #include "p2p/base/port_allocator.h"
@@ -80,6 +79,7 @@
 #include "rtc_base/rtc_certificate.h"
 #include "rtc_base/ssl_certificate.h"
 #include "rtc_base/ssl_stream_adapter.h"
+#include "rtc_base/third_party/sigslot/sigslot.h"
 #include "rtc_base/thread.h"
 #include "rtc_base/thread_annotations.h"
 #include "rtc_base/weak_ptr.h"
@@ -264,7 +264,9 @@ class PeerConnection : public PeerConnectionInternal,
   }
   rtc::Thread* worker_thread() const final { return context_->worker_thread(); }
 
-  std::string session_id() const override { return session_id_; }
+  std::string session_id() const override {
+    return session_id_;
+  }
 
   bool initial_offerer() const override {
     RTC_DCHECK_RUN_ON(signaling_thread());
@@ -281,6 +283,11 @@ class PeerConnection : public PeerConnectionInternal,
     return rtp_manager()->transceivers()->List();
   }
 
+  sigslot::signal1<SctpDataChannel*>& SignalSctpDataChannelCreated() override {
+    RTC_DCHECK_RUN_ON(signaling_thread());
+    return data_channel_controller_.SignalSctpDataChannelCreated();
+  }
+
   std::vector<DataChannelStats> GetDataChannelStats() const override;
 
   absl::optional<std::string> sctp_transport_name() const override;
@@ -290,8 +297,6 @@ class PeerConnection : public PeerConnectionInternal,
   std::map<std::string, cricket::TransportStats> GetTransportStatsByNames(
       const std::set<std::string>& transport_names) override;
   Call::Stats GetCallStats() override;
-
-  absl::optional<AudioDeviceModule::Stats> GetAudioDeviceStats() override;
 
   bool GetLocalCertificate(
       const std::string& transport_name,
@@ -312,11 +317,9 @@ class PeerConnection : public PeerConnectionInternal,
            sdp_handler_->signaling_state() == PeerConnectionInterface::kClosed;
   }
   // Get current SSL role used by SCTP's underlying transport.
-  absl::optional<rtc::SSLRole> GetSctpSslRole_n() override;
-
-  void OnSctpDataChannelStateChanged(
-      int channel_id,
-      DataChannelInterface::DataState state) override;
+  bool GetSctpSslRole(rtc::SSLRole* role) override;
+  // Handler for the "channel closed" signal
+  void OnSctpDataChannelClosed(DataChannelInterface* channel) override;
 
   bool ShouldFireNegotiationNeededEvent(uint32_t event_id) override;
 
@@ -394,8 +397,14 @@ class PeerConnection : public PeerConnectionInternal,
       const std::map<std::string, const cricket::ContentGroup*>&
           bundle_groups_by_mid) override;
 
-  bool CreateDataChannelTransport(absl::string_view mid) override;
-  void DestroyDataChannelTransport(RTCError error) override;
+  // Returns the MID for the data section associated with the
+  // SCTP data channel, if it has been set. If no data
+  // channels are configured this will return nullopt.
+  absl::optional<std::string> GetDataMid() const override;
+
+  void SetSctpDataMid(const std::string& mid) override;
+
+  void ResetSctpDataMid() override;
 
   // Asynchronously calls SctpTransport::Start() on the network thread for
   // `sctp_mid()` if set. Called as part of setting the local description.
@@ -423,10 +432,9 @@ class PeerConnection : public PeerConnectionInternal,
   // this session.
   bool SrtpRequired() const override;
 
-  absl::optional<std::string> SetupDataChannelTransport_n(absl::string_view mid)
+  bool SetupDataChannelTransport_n(const std::string& mid) override
       RTC_RUN_ON(network_thread());
-  void TeardownDataChannelTransport_n(RTCError error)
-      RTC_RUN_ON(network_thread());
+  void TeardownDataChannelTransport_n() override RTC_RUN_ON(network_thread());
 
   const FieldTrialsView& trials() const override { return *trials_; }
 
@@ -559,8 +567,7 @@ class PeerConnection : public PeerConnectionInternal,
 
   // Invoked when TransportController connection completion is signaled.
   // Reports stats for all transports in use.
-  void ReportTransportStats(std::vector<RtpTransceiverProxyRefPtr> transceivers)
-      RTC_RUN_ON(network_thread());
+  void ReportTransportStats() RTC_RUN_ON(network_thread());
 
   // Gather the usage of IPv4/IPv6 as best connection.
   static void ReportBestConnectionState(const cricket::TransportStats& stats);
@@ -588,14 +595,9 @@ class PeerConnection : public PeerConnectionInternal,
       rtc::scoped_refptr<DtlsTransport> dtls_transport,
       DataChannelTransportInterface* data_channel_transport) override;
 
-  void SetSctpTransportName(std::string sctp_transport_name);
-
   std::function<void(const rtc::CopyOnWriteBuffer& packet,
                      int64_t packet_time_us)>
   InitializeRtcpCallback();
-
-  std::function<void(const RtpPacketReceived& parsed_packet)>
-  InitializeUnDemuxablePacketHandler();
 
   const rtc::scoped_refptr<ConnectionContext> context_;
   // Field trials active for this PeerConnection is the first of:

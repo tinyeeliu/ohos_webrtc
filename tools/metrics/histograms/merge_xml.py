@@ -11,10 +11,10 @@ import sys
 import xml.dom.minidom
 
 import expand_owners
+import extract_histograms
 import histogram_configuration_model
 import histogram_paths
 import populate_enums
-import xml_utils
 
 
 def GetElementsByTagName(trees, tag, depth=2):
@@ -28,34 +28,35 @@ def GetElementsByTagName(trees, tag, depth=2):
   Returns:
     A list of DOM nodes with the specified tag.
   """
-  iterator = xml_utils.IterElementsWithTag
+  iterator = extract_histograms.IterElementsWithTag
   return list(e for t in trees for e in iterator(t, tag, depth))
 
 
-def CombineEnumsSections(doc, trees):
-  """Combines multiple <enums> from the passed in DOM trees into one.
+def GetEnumsNodes(doc, trees):
+  """Gets all enums from a set of DOM trees.
 
   If trees contain ukm events, populates a list of ints to the
   "UkmEventNameHash" enum where each value is a ukm event name hash truncated
   to 31 bits and each label is the corresponding event name.
 
   Args:
-    doc: The document where the new single <enums> section will be created.
+    doc: The document to create the node in.
     trees: A list of DOM trees.
 
   Returns:
-    A single <enums> DOM node.
+    A list of enums DOM nodes.
   """
-  enums_node = doc.createElement('enums')
-  # Pass depth=3 as default depth=2 won't find enum tags that are 3 levels deep.
-  for enum in GetElementsByTagName(trees, 'enum', depth=3):
-    xml.dom.minidom._append_child(enums_node, enum)
-
+  enums_list = GetElementsByTagName(trees, 'enums')
   ukm_events = GetElementsByTagName(
       GetElementsByTagName(trees, 'ukm-configuration'), 'event')
-  if ukm_events:
-    populate_enums.PopulateEnumsWithUkmEvents(doc, enums_node, ukm_events)
-  return enums_node
+  # Early return if there are no ukm events provided. MergeFiles have callers
+  # that do not pass ukm events so, in that case, we don't need to iterate
+  # through the enum list.
+  if not ukm_events:
+    return enums_list
+  for enums in enums_list:
+    populate_enums.PopulateEnumsWithUkmEvents(doc, enums, ukm_events)
+  return enums_list
 
 
 def CombineHistogramsSorted(doc, trees):
@@ -148,7 +149,9 @@ def MergeTrees(trees, should_expand_owners):
       MakeNodeWithChildren(
           doc,
           'histogram-configuration',
-          [CombineEnumsSections(doc, trees)] +
+          # This can result in the merged document having multiple <enums> and
+          # similar sections, but scripts ignore these anyway.
+          GetEnumsNodes(doc, trees) +
           # Sort the <histogram> and <histogram_suffixes> nodes by name and
           # return the combined nodes.
           CombineHistogramsSorted(doc, trees)))
@@ -200,7 +203,7 @@ def _AddComponentFromMetadataFile(tree, filename):
   if component:
     histograms = tree.getElementsByTagName('histograms')
     if histograms:
-      iter_matches = xml_utils.IterElementsWithTag
+      iter_matches = extract_histograms.IterElementsWithTag
       for histogram in iter_matches(histograms[0], 'histogram'):
         expand_owners.AddHistogramComponent(histogram, component)
   return tree

@@ -11,7 +11,7 @@
 #include "api/array_view.h"
 #include "api/video/encoded_frame.h"
 #include "api/video/frame_buffer.h"
-#include "rtc_base/numerics/sequence_number_unwrapper.h"
+#include "rtc_base/numerics/sequence_number_util.h"
 #include "test/fuzzers/fuzz_data_helper.h"
 #include "test/scoped_key_value_config.h"
 
@@ -64,7 +64,7 @@ void FuzzOneInput(const uint8_t* data, size_t size) {
       }
       case 5: {
         auto frame = std::make_unique<FuzzyFrameObject>();
-        frame->SetRtpTimestamp(helper.ReadOrDefaultValue<uint32_t>(0));
+        frame->SetTimestamp(helper.ReadOrDefaultValue<uint32_t>(0));
         int64_t wire_id =
             helper.ReadOrDefaultValue<uint16_t>(0) & (kFrameIdLength - 1);
         frame->SetId(unwrapper.Unwrap(wire_id));

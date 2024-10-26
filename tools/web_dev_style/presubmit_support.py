@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 
+from . import css_checker
 from . import html_checker
 from . import js_checker
 from . import resource_checker
@@ -17,6 +18,7 @@ def CheckStyle(input_api, output_api, file_filter=lambda f: True):
   apis = input_api, output_api
   wrapped_filter = lambda f: file_filter(f) and IsResource(f)
   checkers = [
+      css_checker.CSSChecker(*apis, file_filter=wrapped_filter),
       html_checker.HtmlChecker(*apis, file_filter=wrapped_filter),
       js_checker.JSChecker(*apis, file_filter=wrapped_filter),
       resource_checker.ResourceChecker(*apis, file_filter=wrapped_filter),

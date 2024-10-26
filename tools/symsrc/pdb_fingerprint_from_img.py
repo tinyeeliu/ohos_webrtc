@@ -12,13 +12,17 @@ We can retrieve the same information from the .PDB file itself, but this file
 format is much more difficult and undocumented.  Instead, we can look at the
 DLL's reference to the PDB, and use that to retrieve the information."""
 
+from __future__ import print_function
+
 import os
 import sys
 
 # Assume this script is under tools/symsrc/
 _SCRIPT_DIR = os.path.dirname(__file__)
 _ROOT_DIR = os.path.join(_SCRIPT_DIR, os.pardir, os.pardir)
-_PEFILE_DIR = os.path.join(_ROOT_DIR, 'third_party', 'pefile_py3')
+_PEFILE_DIR = os.path.join(
+    _ROOT_DIR, 'third_party', 'pefile_py3' if sys.version_info >=
+    (3, 0) else 'pefile')
 
 sys.path.insert(1, _PEFILE_DIR)
 

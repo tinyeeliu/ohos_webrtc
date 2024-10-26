@@ -282,8 +282,7 @@ static size_t kBufferHeight = 200;
   OCMVerifyAllWithDelay(delegateMock, 1);
 }
 
-// TODO(b/298960678): Fix test expectations.
-- (void)DISABLED_testSetContentMode {
+- (void)testSetContentMode {
   OCMStub([self.classMock isMetalAvailable]).andReturn(YES);
   id metalKitView = OCMClassMock([MTKView class]);
   [[[[self.classMock stub] ignoringNonObjectArgs] andReturn:metalKitView]
@@ -293,7 +292,7 @@ static size_t kBufferHeight = 200;
   RTC_OBJC_TYPE(RTCMTLVideoView) *realView = [[RTC_OBJC_TYPE(RTCMTLVideoView) alloc] init];
   [realView setVideoContentMode:UIViewContentModeScaleAspectFill];
 
-  OCMVerifyAll(metalKitView);
+  OCMVerify(metalKitView);
 }
 
 @end

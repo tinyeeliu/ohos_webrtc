@@ -105,17 +105,6 @@ class RTC_EXPORT DesktopCaptureOptions {
     detect_updated_region_ = detect_updated_region;
   }
 
-  // Indicates that the capturer should try to include the cursor in the frame.
-  // If it is able to do so it will set `DesktopFrame::may_contain_cursor()`.
-  // Not all capturers will support including the cursor. If this value is false
-  // or the cursor otherwise cannot be included in the frame, then cursor
-  // metadata will be sent, though the capturer may choose to always send cursor
-  // metadata.
-  bool prefer_cursor_embedded() const { return prefer_cursor_embedded_; }
-  void set_prefer_cursor_embedded(bool prefer_cursor_embedded) {
-    prefer_cursor_embedded_ = prefer_cursor_embedded;
-  }
-
 #if defined(WEBRTC_WIN)
   // Enumerating windows owned by the current process on Windows has some
   // complications due to |GetWindowText*()| APIs potentially causing a
@@ -135,6 +124,12 @@ class RTC_EXPORT DesktopCaptureOptions {
     enumerate_current_process_windows_ = enumerate_current_process_windows;
   }
 
+  bool allow_use_magnification_api() const {
+    return allow_use_magnification_api_;
+  }
+  void set_allow_use_magnification_api(bool allow) {
+    allow_use_magnification_api_ = allow;
+  }
   // Allowing directx based capturer or not, this capturer works on windows 7
   // with platform update / windows 8 or upper.
   bool allow_directx_capturer() const { return allow_directx_capturer_; }
@@ -159,24 +154,15 @@ class RTC_EXPORT DesktopCaptureOptions {
   }
 
 #if defined(RTC_ENABLE_WIN_WGC)
-  // This flag enables the WGC capturer for capturing the screen.
+  // This flag enables the WGC capturer for both window and screen capture.
   // This capturer should offer similar or better performance than the cropping
   // capturer without the disadvantages listed above. However, the WGC capturer
   // is only available on Windows 10 version 1809 (Redstone 5) and up. This flag
   // will have no affect on older versions.
   // If set, and running a supported version of Win10, this flag will take
   // precedence over the cropping, directx, and magnification flags.
-  bool allow_wgc_screen_capturer() const { return allow_wgc_screen_capturer_; }
-  void set_allow_wgc_screen_capturer(bool allow) {
-    allow_wgc_screen_capturer_ = allow;
-  }
-
-  // This flag has the same effect as allow_wgc_screen_capturer but it only
-  // enables or disables WGC for window capturing (not screen).
-  bool allow_wgc_window_capturer() const { return allow_wgc_window_capturer_; }
-  void set_allow_wgc_window_capturer(bool allow) {
-    allow_wgc_window_capturer_ = allow;
-  }
+  bool allow_wgc_capturer() const { return allow_wgc_capturer_; }
+  void set_allow_wgc_capturer(bool allow) { allow_wgc_capturer_ = allow; }
 
   // This flag enables the WGC capturer for fallback capturer.
   // The flag is useful when the first capturer (eg. WindowCapturerWinGdi) is
@@ -188,11 +174,6 @@ class RTC_EXPORT DesktopCaptureOptions {
   void set_allow_wgc_capturer_fallback(bool allow) {
     allow_wgc_capturer_fallback_ = allow;
   }
-
-  // This flag enables 0Hz mode in combination with the WGC capturer.
-  // The flag has no effect if the allow_wgc_capturer flag is false.
-  bool allow_wgc_zero_hertz() const { return allow_wgc_zero_hertz_; }
-  void set_allow_wgc_zero_hertz(bool allow) { allow_wgc_zero_hertz_ = allow; }
 #endif  // defined(RTC_ENABLE_WIN_WGC)
 #endif  // defined(WEBRTC_WIN)
 
@@ -241,13 +222,12 @@ class RTC_EXPORT DesktopCaptureOptions {
 
 #if defined(WEBRTC_WIN)
   bool enumerate_current_process_windows_ = true;
+  bool allow_use_magnification_api_ = false;
   bool allow_directx_capturer_ = false;
   bool allow_cropping_window_capturer_ = false;
 #if defined(RTC_ENABLE_WIN_WGC)
-  bool allow_wgc_screen_capturer_ = false;
-  bool allow_wgc_window_capturer_ = false;
+  bool allow_wgc_capturer_ = false;
   bool allow_wgc_capturer_fallback_ = false;
-  bool allow_wgc_zero_hertz_ = false;
 #endif
 #endif
 #if defined(WEBRTC_USE_X11)
@@ -257,7 +237,6 @@ class RTC_EXPORT DesktopCaptureOptions {
 #endif
   bool disable_effects_ = true;
   bool detect_updated_region_ = false;
-  bool prefer_cursor_embedded_ = false;
 #if defined(WEBRTC_USE_PIPEWIRE)
   bool allow_pipewire_ = false;
   bool pipewire_use_damage_region_ = true;

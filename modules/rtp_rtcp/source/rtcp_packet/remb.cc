@@ -67,15 +67,15 @@ bool Remb::Parse(const CommonHeader& packet) {
   }
 
   ParseCommonFeedback(payload);
-  uint8_t exponent = payload[13] >> 2;
+  uint8_t exponenta = payload[13] >> 2;
   uint64_t mantissa = (static_cast<uint32_t>(payload[13] & 0x03) << 16) |
                       ByteReader<uint16_t>::ReadBigEndian(&payload[14]);
-  bitrate_bps_ = (mantissa << exponent);
+  bitrate_bps_ = (mantissa << exponenta);
   bool shift_overflow =
-      (static_cast<uint64_t>(bitrate_bps_) >> exponent) != mantissa;
-  if (bitrate_bps_ < 0 || shift_overflow) {
+      (static_cast<uint64_t>(bitrate_bps_) >> exponenta) != mantissa;
+  if (shift_overflow) {
     RTC_LOG(LS_ERROR) << "Invalid remb bitrate value : " << mantissa << "*2^"
-                      << static_cast<int>(exponent);
+                      << static_cast<int>(exponenta);
     return false;
   }
 

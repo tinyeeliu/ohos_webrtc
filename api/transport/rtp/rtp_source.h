@@ -16,7 +16,6 @@
 #include "absl/types/optional.h"
 #include "api/rtp_headers.h"
 #include "api/units/time_delta.h"
-#include "api/units/timestamp.h"
 #include "rtc_base/checks.h"
 
 namespace webrtc {
@@ -45,12 +44,12 @@ class RtpSource {
 
   RtpSource() = delete;
 
-  RtpSource(Timestamp timestamp,
+  RtpSource(int64_t timestamp_ms,
             uint32_t source_id,
             RtpSourceType source_type,
             uint32_t rtp_timestamp,
             const RtpSource::Extensions& extensions)
-      : timestamp_(timestamp),
+      : timestamp_ms_(timestamp_ms),
         source_id_(source_id),
         source_type_(source_type),
         extensions_(extensions),
@@ -60,7 +59,11 @@ class RtpSource {
   RtpSource& operator=(const RtpSource&) = default;
   ~RtpSource() = default;
 
-  Timestamp timestamp() const { return timestamp_; }
+  int64_t timestamp_ms() const { return timestamp_ms_; }
+  void update_timestamp_ms(int64_t timestamp_ms) {
+    RTC_DCHECK_LE(timestamp_ms_, timestamp_ms);
+    timestamp_ms_ = timestamp_ms;
+  }
 
   // The identifier of the source can be the CSRC or the SSRC.
   uint32_t source_id() const { return source_id_; }
@@ -87,7 +90,7 @@ class RtpSource {
   }
 
   bool operator==(const RtpSource& o) const {
-    return timestamp_ == o.timestamp() && source_id_ == o.source_id() &&
+    return timestamp_ms_ == o.timestamp_ms() && source_id_ == o.source_id() &&
            source_type_ == o.source_type() &&
            extensions_.audio_level == o.extensions_.audio_level &&
            extensions_.absolute_capture_time ==
@@ -96,7 +99,7 @@ class RtpSource {
   }
 
  private:
-  Timestamp timestamp_;
+  int64_t timestamp_ms_;
   uint32_t source_id_;
   RtpSourceType source_type_;
   RtpSource::Extensions extensions_;

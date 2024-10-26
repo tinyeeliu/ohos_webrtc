@@ -25,13 +25,6 @@ typedef HRESULT(WINAPI* RTC_SetThreadDescription)(HANDLE hThread,
                                                   PCWSTR lpThreadDescription);
 #endif
 
-#if defined(WEBRTC_FUCHSIA)
-#include <string.h>
-#include <zircon/syscalls.h>
-
-#include "rtc_base/checks.h"
-#endif
-
 namespace rtc {
 
 PlatformThreadId CurrentThreadId() {
@@ -40,7 +33,7 @@ PlatformThreadId CurrentThreadId() {
 #elif defined(WEBRTC_POSIX)
 #if defined(WEBRTC_MAC) || defined(WEBRTC_IOS)
   return pthread_mach_thread_np(pthread_self());
-#elif defined(WEBRTC_ANDROID)
+#elif defined(WEBRTC_ANDROID) || defined(WEBRTC_OHOS)
   return gettid();
 #elif defined(WEBRTC_FUCHSIA)
   return zx_thread_self();
@@ -116,10 +109,6 @@ void SetCurrentThreadName(const char* name) {
   prctl(PR_SET_NAME, reinterpret_cast<unsigned long>(name));  // NOLINT
 #elif defined(WEBRTC_MAC) || defined(WEBRTC_IOS)
   pthread_setname_np(name);
-#elif defined(WEBRTC_FUCHSIA)
-  zx_status_t status = zx_object_set_property(zx_thread_self(), ZX_PROP_NAME,
-                                              name, strlen(name));
-  RTC_DCHECK_EQ(status, ZX_OK);
 #endif
 }
 

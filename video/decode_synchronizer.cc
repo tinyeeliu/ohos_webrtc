@@ -20,7 +20,6 @@
 #include "api/units/timestamp.h"
 #include "rtc_base/checks.h"
 #include "rtc_base/logging.h"
-#include "rtc_base/trace_event.h"
 #include "video/frame_decode_scheduler.h"
 #include "video/frame_decode_timing.h"
 
@@ -67,7 +66,6 @@ DecodeSynchronizer::SynchronizedFrameDecodeScheduler::ScheduledRtpTimestamp() {
 
 DecodeSynchronizer::ScheduledFrame
 DecodeSynchronizer::SynchronizedFrameDecodeScheduler::ReleaseNextFrame() {
-  RTC_DCHECK(!stopped_);
   RTC_DCHECK(next_frame_);
   auto res = std::move(*next_frame_);
   next_frame_.reset();
@@ -84,7 +82,6 @@ void DecodeSynchronizer::SynchronizedFrameDecodeScheduler::ScheduleFrame(
     uint32_t rtp,
     FrameDecodeTiming::FrameSchedule schedule,
     FrameReleaseCallback cb) {
-  RTC_DCHECK(!stopped_);
   RTC_DCHECK(!next_frame_) << "Can not schedule two frames at once.";
   next_frame_ = ScheduledFrame(rtp, std::move(schedule), std::move(cb));
   sync_->OnFrameScheduled(this);
@@ -95,9 +92,6 @@ void DecodeSynchronizer::SynchronizedFrameDecodeScheduler::CancelOutstanding() {
 }
 
 void DecodeSynchronizer::SynchronizedFrameDecodeScheduler::Stop() {
-  if (stopped_) {
-    return;
-  }
   CancelOutstanding();
   stopped_ = true;
   sync_->RemoveFrameScheduler(this);
@@ -113,12 +107,11 @@ DecodeSynchronizer::DecodeSynchronizer(Clock* clock,
 
 DecodeSynchronizer::~DecodeSynchronizer() {
   RTC_DCHECK_RUN_ON(worker_queue_);
-  RTC_CHECK(schedulers_.empty());
+  RTC_DCHECK(schedulers_.empty());
 }
 
 std::unique_ptr<FrameDecodeScheduler>
 DecodeSynchronizer::CreateSynchronizedFrameScheduler() {
-  TRACE_EVENT0("webrtc", __func__);
   RTC_DCHECK_RUN_ON(worker_queue_);
   auto scheduler = std::make_unique<SynchronizedFrameDecodeScheduler>(this);
   auto [it, inserted] = schedulers_.emplace(scheduler.get());
@@ -159,7 +152,6 @@ void DecodeSynchronizer::OnFrameScheduled(
 
 void DecodeSynchronizer::RemoveFrameScheduler(
     SynchronizedFrameDecodeScheduler* scheduler) {
-  TRACE_EVENT0("webrtc", __func__);
   RTC_DCHECK_RUN_ON(worker_queue_);
   RTC_DCHECK(scheduler);
   auto it = schedulers_.find(scheduler);
@@ -175,18 +167,12 @@ void DecodeSynchronizer::RemoveFrameScheduler(
 
 void DecodeSynchronizer::ScheduleNextTick() {
   RTC_DCHECK_RUN_ON(worker_queue_);
-  if (tick_scheduled_) {
-    return;
-  }
-  tick_scheduled_ = true;
   metronome_->RequestCallOnNextTick(
       SafeTask(safety_.flag(), [this] { OnTick(); }));
 }
 
 void DecodeSynchronizer::OnTick() {
-  TRACE_EVENT0("webrtc", __func__);
   RTC_DCHECK_RUN_ON(worker_queue_);
-  tick_scheduled_ = false;
   expected_next_tick_ = clock_->CurrentTime() + metronome_->TickPeriod();
 
   for (auto* scheduler : schedulers_) {

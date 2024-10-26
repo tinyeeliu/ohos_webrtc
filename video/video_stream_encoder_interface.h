@@ -15,9 +15,7 @@
 
 #include "api/adaptation/resource.h"
 #include "api/fec_controller_override.h"
-#include "api/rtc_error.h"
 #include "api/rtp_parameters.h"  // For DegradationPreference.
-#include "api/rtp_sender_interface.h"
 #include "api/scoped_refptr.h"
 #include "api/units/data_rate.h"
 #include "api/video/video_bitrate_allocator.h"
@@ -133,9 +131,6 @@ class VideoStreamEncoderInterface {
   // packetization for H.264.
   virtual void ConfigureEncoder(VideoEncoderConfig config,
                                 size_t max_data_payload_length) = 0;
-  virtual void ConfigureEncoder(VideoEncoderConfig config,
-                                size_t max_data_payload_length,
-                                SetParametersCallback callback) = 0;
 
   // Permanently stop encoding. After this method has returned, it is
   // guaranteed that no encoded frames will be delivered to the sink.

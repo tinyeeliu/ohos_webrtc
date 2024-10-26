@@ -157,9 +157,8 @@ class StreamScheduler {
 
   // The `mtu` parameter represents the maximum SCTP packet size, which should
   // be the same as `DcSctpOptions::mtu`.
-  StreamScheduler(absl::string_view log_prefix, size_t mtu)
-      : log_prefix_(log_prefix),
-        max_payload_bytes_(mtu - SctpPacket::kHeaderSize -
+  explicit StreamScheduler(size_t mtu)
+      : max_payload_bytes_(mtu - SctpPacket::kHeaderSize -
                            IDataChunk::kHeaderSize) {}
 
   std::unique_ptr<Stream> CreateStream(StreamProducer* producer,
@@ -199,7 +198,6 @@ class StreamScheduler {
 
   bool IsConsistent() const;
 
-  const absl::string_view log_prefix_;
   const size_t max_payload_bytes_;
 
   // The current virtual time, as defined in the WFQ algorithm.

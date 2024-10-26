@@ -44,9 +44,6 @@ RtcpFeedback::RtcpFeedback(RtcpFeedbackType type,
 RtcpFeedback::RtcpFeedback(const RtcpFeedback& rhs) = default;
 RtcpFeedback::~RtcpFeedback() = default;
 
-RtpCodec::RtpCodec() = default;
-RtpCodec::RtpCodec(const RtpCodec&) = default;
-RtpCodec::~RtpCodec() = default;
 RtpCodecCapability::RtpCodecCapability() = default;
 RtpCodecCapability::~RtpCodecCapability() = default;
 

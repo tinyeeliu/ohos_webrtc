@@ -13,6 +13,7 @@
 #include <algorithm>
 
 #include "api/neteq/tick_timer.h"
+#include "modules/include/module_common_types_public.h"
 
 namespace webrtc {
 
@@ -61,7 +62,7 @@ void PacketArrivalHistory::Reset() {
   history_.clear();
   min_packet_arrival_ = nullptr;
   max_packet_arrival_ = nullptr;
-  timestamp_unwrapper_.Reset();
+  timestamp_unwrapper_ = TimestampUnwrapper();
   newest_rtp_timestamp_ = absl::nullopt;
 }
 
@@ -69,7 +70,8 @@ int PacketArrivalHistory::GetDelayMs(uint32_t rtp_timestamp,
                                      int64_t time_ms) const {
   RTC_DCHECK(sample_rate_khz_ > 0);
   int64_t unwrapped_rtp_timestamp_ms =
-      timestamp_unwrapper_.PeekUnwrap(rtp_timestamp) / sample_rate_khz_;
+      timestamp_unwrapper_.UnwrapWithoutUpdate(rtp_timestamp) /
+      sample_rate_khz_;
   PacketArrival packet(unwrapped_rtp_timestamp_ms, time_ms);
   return GetPacketArrivalDelayMs(packet);
 }
@@ -86,7 +88,7 @@ bool PacketArrivalHistory::IsNewestRtpTimestamp(uint32_t rtp_timestamp) const {
     return false;
   }
   int64_t unwrapped_rtp_timestamp =
-      timestamp_unwrapper_.PeekUnwrap(rtp_timestamp);
+      timestamp_unwrapper_.UnwrapWithoutUpdate(rtp_timestamp);
   return unwrapped_rtp_timestamp == *newest_rtp_timestamp_;
 }
 

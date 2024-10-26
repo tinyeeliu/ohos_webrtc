@@ -8,7 +8,7 @@ import os
 CHROMIUM_SRC_DIR = os.path.realpath(
     os.path.join(os.path.dirname(__file__), '..', '..'))
 SRC_INTERNAL_DIR = os.path.realpath(
-    os.path.join(CHROMIUM_SRC_DIR, 'internal'))
+    os.path.join(CHROMIUM_SRC_DIR, '..', 'src-internal'))
 
 
 # pylint: disable=useless-object-inheritance

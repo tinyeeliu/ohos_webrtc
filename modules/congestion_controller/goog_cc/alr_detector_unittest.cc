@@ -10,9 +10,6 @@
 
 #include "modules/congestion_controller/goog_cc/alr_detector.h"
 
-#include <cstdint>
-
-#include "absl/types/optional.h"
 #include "api/transport/field_trial_based_config.h"
 #include "rtc_base/checks.h"
 #include "rtc_base/experiments/alr_experiment.h"

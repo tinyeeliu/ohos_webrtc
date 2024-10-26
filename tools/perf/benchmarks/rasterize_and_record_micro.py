@@ -45,13 +45,14 @@ class _RasterizeAndRecordMicro(perf_benchmark.PerfBenchmark):
 
 @benchmark.Info(
     emails=['pdr@chromium.org',
-             'wangxianzhu@chromium.org'],
+             'wangxianzhu@chromium.org',
+             'vmpstr@chromium.org'],
     component='Internals>Compositing>Rasterization',
     documentation_url='https://bit.ly/rasterize-and-record-benchmark')
 class RasterizeAndRecordMicroTop25(_RasterizeAndRecordMicro):
   """Measures rasterize and record performance on the top 25 web pages.
 
-  https://chromium.googlesource.com/chromium/src/+/HEAD/docs/speed/benchmark/harnesses/rendering.md"""
+  http://www.chromium.org/developers/design-documents/rendering-benchmarks"""
   page_set = page_sets.StaticTop25PageSet
 
   @classmethod

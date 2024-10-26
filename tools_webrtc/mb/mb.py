@@ -53,9 +53,8 @@ class WebRTCMetaBuildWrapper(mb.MetaBuildWrapper):
 
     is_android = 'target_os="android"' in vals['gn_args']
     is_fuchsia = 'target_os="fuchsia"' in vals['gn_args']
-    is_ios = 'target_os="ios"' in vals['gn_args']
     is_linux = self.platform.startswith('linux') and not is_android
-    is_win = self.platform.startswith('win')
+    is_ios = 'target_os="ios"' in vals['gn_args']
 
     if test_type == 'nontest':
       self.WriteFailureAndRaise('We should not be isolating %s.' % target,
@@ -82,17 +81,21 @@ class WebRTCMetaBuildWrapper(mb.MetaBuildWrapper):
       ]
     elif is_android:
       cmdline += [
-          'luci-auth', 'context', '--', vpython_exe,
-          '../../build/android/test_wrapper/logdog_wrapper.py', '--target',
-          target, '--logdog-bin-cmd',
-          '../../.task_template_packages/logdog_butler', '--logcat-output-file',
-          '${ISOLATED_OUTDIR}/logcats', '--store-tombstones'
+          vpython_exe, '../../build/android/test_wrapper/logdog_wrapper.py',
+          '--target', target, '--logdog-bin-cmd', '../../bin/logdog_butler',
+          '--logcat-output-file', '${ISOLATED_OUTDIR}/logcats',
+          '--store-tombstones'
       ]
-    elif is_ios or is_fuchsia or test_type == 'raw':
-      if is_win:
-        cmdline += ['bin\\run_{}.bat'.format(target)]
-      else:
-        cmdline += ['bin/run_{}'.format(target)]
+    elif is_ios or is_fuchsia:
+      cmdline += [
+          vpython_exe, '../../tools_webrtc/flags_compatibility.py',
+          'bin/run_%s' % target
+      ]
+      extra_files.append('../../tools_webrtc/flags_compatibility.py')
+    elif test_type == 'raw':
+      cmdline += [vpython_exe, '../../tools_webrtc/flags_compatibility.py']
+      extra_files.append('../../tools_webrtc/flags_compatibility.py')
+      cmdline.append(_GetExecutable(target, self.platform))
     else:
       if isolate_map[target].get('use_webcam', False):
         cmdline += [
@@ -119,10 +122,16 @@ class WebRTCMetaBuildWrapper(mb.MetaBuildWrapper):
           '../../tools_webrtc/gtest-parallel-wrapper.py',
       ]
       output_dir = '${ISOLATED_OUTDIR}/test_logs'
+      timeout = isolate_map[target].get('timeout', 900)
       cmdline += [
           '../../tools_webrtc/gtest-parallel-wrapper.py',
           '--output_dir=%s' % output_dir,
           '--gtest_color=no',
+          # We tell gtest-parallel to interrupt the test after 900
+          # seconds, so it can exit cleanly and report results,
+          # instead of being interrupted by swarming and not
+          # reporting anything.
+          '--timeout=%s' % timeout,
       ]
       if test_type == 'non_parallel_console_test_launcher':
         # Still use the gtest-parallel-wrapper.py script since we

@@ -85,8 +85,8 @@ class PeerConnectionFactory : public PeerConnectionFactoryInterface {
       const cricket::AudioOptions& options) override;
 
   rtc::scoped_refptr<VideoTrackInterface> CreateVideoTrack(
-      rtc::scoped_refptr<VideoTrackSourceInterface> video_source,
-      absl::string_view id) override;
+      const std::string& id,
+      VideoTrackSourceInterface* video_source) override;
 
   rtc::scoped_refptr<AudioTrackInterface> CreateAudioTrack(
       const std::string& id,
@@ -136,10 +136,8 @@ class PeerConnectionFactory : public PeerConnectionFactoryInterface {
   bool IsTrialEnabled(absl::string_view key) const;
 
   std::unique_ptr<RtcEventLog> CreateRtcEventLog_w();
-  std::unique_ptr<Call> CreateCall_w(
-      RtcEventLog* event_log,
-      const FieldTrialsView& field_trials,
-      const PeerConnectionInterface::RTCConfiguration& configuration);
+  std::unique_ptr<Call> CreateCall_w(RtcEventLog* event_log,
+                                     const FieldTrialsView& field_trials);
 
   rtc::scoped_refptr<ConnectionContext> context_;
   PeerConnectionFactoryInterface::Options options_

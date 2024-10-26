@@ -9,7 +9,6 @@
  */
 
 #include "modules/desktop_capture/full_screen_application_handler.h"
-
 #include "rtc_base/logging.h"
 
 namespace webrtc {

@@ -50,11 +50,9 @@ using ::webrtc::SafeTask;
 using ::webrtc::TimeDelta;
 
 // List of MAC addresses of known VPN (for windows).
-constexpr uint8_t kVpns[3][6] = {
-    // Cisco AnyConnect SSL VPN Client.
+constexpr uint8_t kVpns[2][6] = {
+    // Cisco AnyConnect.
     {0x0, 0x5, 0x9A, 0x3C, 0x7A, 0x0},
-    // Cisco AnyConnect IPSEC VPN Client.
-    {0x0, 0x5, 0x9A, 0x3C, 0x78, 0x0},
     // GlobalProtect Virtual Ethernet.
     {0x2, 0x50, 0x41, 0x0, 0x0, 0x1},
 };
@@ -154,19 +152,16 @@ bool IsIgnoredIPv6(bool allow_mac_based_ipv6, const InterfaceAddress& ip) {
   // However, our IPAddress structure doesn't carry that so the
   // information is lost and causes binding failure.
   if (IPIsLinkLocal(ip)) {
-    RTC_LOG(LS_VERBOSE) << "Ignore link local IP:" << ip.ToSensitiveString();
     return true;
   }
 
   // Any MAC based IPv6 should be avoided to prevent the MAC tracking.
   if (IPIsMacBased(ip) && !allow_mac_based_ipv6) {
-    RTC_LOG(LS_INFO) << "Ignore Mac based IP:" << ip.ToSensitiveString();
     return true;
   }
 
   // Ignore deprecated IPv6.
   if (ip.ipv6_flags() & IPV6_ADDRESS_FLAG_DEPRECATED) {
-    RTC_LOG(LS_INFO) << "Ignore deprecated IP:" << ip.ToSensitiveString();
     return true;
   }
 
@@ -186,21 +181,20 @@ bool ShouldAdapterChangeTriggerNetworkChange(rtc::AdapterType old_type,
   return true;
 }
 
-#if defined(WEBRTC_WIN)
-bool IpAddressAttributesEnabled(const webrtc::FieldTrialsView* field_trials) {
+bool PreferGlobalIPv6Address(const webrtc::FieldTrialsView* field_trials) {
+  // Bug fix to prefer global IPv6 address over link local.
   // Field trial key reserved in bugs.webrtc.org/14334
   if (field_trials &&
       field_trials->IsEnabled("WebRTC-IPv6NetworkResolutionFixes")) {
-    webrtc::FieldTrialParameter<bool> ip_address_attributes_enabled(
-        "IpAddressAttributesEnabled", false);
+    webrtc::FieldTrialParameter<bool> prefer_global_ipv6_address_enabled(
+        "PreferGlobalIPv6Address", false);
     webrtc::ParseFieldTrial(
-        {&ip_address_attributes_enabled},
+        {&prefer_global_ipv6_address_enabled},
         field_trials->Lookup("WebRTC-IPv6NetworkResolutionFixes"));
-    return ip_address_attributes_enabled;
+    return prefer_global_ipv6_address_enabled;
   }
   return false;
 }
-#endif  // WEBRTC_WIN
 
 }  // namespace
 
@@ -322,22 +316,12 @@ NetworkManagerBase::enumeration_permission() const {
   return enumeration_permission_;
 }
 
-std::unique_ptr<Network> NetworkManagerBase::CreateNetwork(
-    absl::string_view name,
-    absl::string_view description,
-    const IPAddress& prefix,
-    int prefix_length,
-    AdapterType type) const {
-  return std::make_unique<Network>(name, description, prefix, prefix_length,
-                                   type);
-}
-
 std::vector<const Network*> NetworkManagerBase::GetAnyAddressNetworks() {
   std::vector<const Network*> networks;
   if (!ipv4_any_address_network_) {
     const rtc::IPAddress ipv4_any_address(INADDR_ANY);
-    ipv4_any_address_network_ =
-        CreateNetwork("any", "any", ipv4_any_address, 0, ADAPTER_TYPE_ANY);
+    ipv4_any_address_network_ = std::make_unique<Network>(
+        "any", "any", ipv4_any_address, 0, ADAPTER_TYPE_ANY, field_trials_);
     ipv4_any_address_network_->set_default_local_address_provider(this);
     ipv4_any_address_network_->set_mdns_responder_provider(this);
     ipv4_any_address_network_->AddIP(ipv4_any_address);
@@ -346,8 +330,8 @@ std::vector<const Network*> NetworkManagerBase::GetAnyAddressNetworks() {
 
   if (!ipv6_any_address_network_) {
     const rtc::IPAddress ipv6_any_address(in6addr_any);
-    ipv6_any_address_network_ =
-        CreateNetwork("any", "any", ipv6_any_address, 0, ADAPTER_TYPE_ANY);
+    ipv6_any_address_network_ = std::make_unique<Network>(
+        "any", "any", ipv6_any_address, 0, ADAPTER_TYPE_ANY, field_trials_);
     ipv6_any_address_network_->set_default_local_address_provider(this);
     ipv6_any_address_network_->set_mdns_responder_provider(this);
     ipv6_any_address_network_->AddIP(ipv6_any_address);
@@ -547,15 +531,14 @@ bool NetworkManagerBase::IsVpnMacAddress(
 BasicNetworkManager::BasicNetworkManager(
     NetworkMonitorFactory* network_monitor_factory,
     SocketFactory* socket_factory,
-    const webrtc::FieldTrialsView* field_trials_view)
-    : NetworkManagerBase(field_trials_view),
-      field_trials_(field_trials_view),
+    const webrtc::FieldTrialsView* field_trials)
+    : field_trials_(field_trials),
       network_monitor_factory_(network_monitor_factory),
       socket_factory_(socket_factory),
       allow_mac_based_ipv6_(
-          field_trials()->IsEnabled("WebRTC-AllowMACBasedIPv6")),
+          field_trials_->IsEnabled("WebRTC-AllowMACBasedIPv6")),
       bind_using_ifname_(
-          !field_trials()->IsDisabled("WebRTC-BindUsingInterfaceName")) {
+          !field_trials_->IsDisabled("WebRTC-BindUsingInterfaceName")) {
   RTC_DCHECK(socket_factory_);
 }
 
@@ -619,6 +602,10 @@ void BasicNetworkManager::ConvertIfAddrs(
     if (!cursor->ifa_addr || !cursor->ifa_netmask) {
       continue;
     }
+    // Skip ones which are down.
+    if (!(cursor->ifa_flags & IFF_RUNNING)) {
+      continue;
+    }
     // Skip unknown family.
     if (cursor->ifa_addr->sa_family != AF_INET &&
         cursor->ifa_addr->sa_family != AF_INET6) {
@@ -627,12 +614,6 @@ void BasicNetworkManager::ConvertIfAddrs(
     // Convert to InterfaceAddress.
     // TODO(webrtc:13114): Convert ConvertIfAddrs to use rtc::Netmask.
     if (!ifaddrs_converter->ConvertIfAddrsToIPAddress(cursor, &ip, &mask)) {
-      continue;
-    }
-    // Skip ones which are down.
-    if (!(cursor->ifa_flags & IFF_RUNNING)) {
-      RTC_LOG(LS_INFO) << "Skip interface because of not IFF_RUNNING: "
-                       << ip.ToSensitiveString();
       continue;
     }
 
@@ -687,8 +668,9 @@ void BasicNetworkManager::ConvertIfAddrs(
       if_info.adapter_type = ADAPTER_TYPE_VPN;
     }
 
-    auto network = CreateNetwork(cursor->ifa_name, cursor->ifa_name, prefix,
-                                 prefix_length, if_info.adapter_type);
+    auto network = std::make_unique<Network>(
+        cursor->ifa_name, cursor->ifa_name, prefix, prefix_length,
+        if_info.adapter_type, field_trials_.get());
     network->set_default_local_address_provider(this);
     network->set_scope_id(scope_id);
     network->AddIP(ip);
@@ -819,27 +801,12 @@ bool BasicNetworkManager::CreateNetworks(
             sockaddr_in6* v6_addr =
                 reinterpret_cast<sockaddr_in6*>(address->Address.lpSockaddr);
             scope_id = v6_addr->sin6_scope_id;
+            ip = IPAddress(v6_addr->sin6_addr);
 
-            // From http://technet.microsoft.com/en-us/ff568768(v=vs.60).aspx,
-            // the way to identify a temporary IPv6 Address is to check if
-            // PrefixOrigin is equal to IpPrefixOriginRouterAdvertisement and
-            // SuffixOrigin equal to IpSuffixOriginRandom.
-            int ip_address_attributes = IPV6_ADDRESS_FLAG_NONE;
-            if (IpAddressAttributesEnabled(field_trials_.get())) {
-              if (address->PrefixOrigin == IpPrefixOriginRouterAdvertisement &&
-                  address->SuffixOrigin == IpSuffixOriginRandom) {
-                ip_address_attributes |= IPV6_ADDRESS_FLAG_TEMPORARY;
-              }
-              if (address->PreferredLifetime == 0) {
-                ip_address_attributes |= IPV6_ADDRESS_FLAG_DEPRECATED;
-              }
-            }
-            if (IsIgnoredIPv6(allow_mac_based_ipv6_,
-                              InterfaceAddress(v6_addr->sin6_addr,
-                                               ip_address_attributes))) {
+            if (IsIgnoredIPv6(allow_mac_based_ipv6_, InterfaceAddress(ip))) {
               continue;
             }
-            ip = InterfaceAddress(v6_addr->sin6_addr, ip_address_attributes);
+
             break;
           }
           default: {
@@ -888,14 +855,12 @@ bool BasicNetworkManager::CreateNetworks(
                   reinterpret_cast<const uint8_t*>(
                       adapter_addrs->PhysicalAddress),
                   adapter_addrs->PhysicalAddressLength))) {
-            // With MAC-based detection we do not know the
-            // underlying adapter type.
-            underlying_type_for_vpn = ADAPTER_TYPE_UNKNOWN;
+            underlying_type_for_vpn = adapter_type;
             adapter_type = ADAPTER_TYPE_VPN;
           }
 
-          auto network = CreateNetwork(name, description, prefix, prefix_length,
-                                       adapter_type);
+          auto network = std::make_unique<Network>(name, description, prefix,
+                                                   prefix_length, adapter_type);
           network->set_underlying_type_for_vpn(underlying_type_for_vpn);
           network->set_default_local_address_provider(this);
           network->set_mdns_responder_provider(this);
@@ -1000,7 +965,7 @@ void BasicNetworkManager::StartNetworkMonitor() {
   }
   if (!network_monitor_) {
     network_monitor_.reset(
-        network_monitor_factory_->CreateNetworkMonitor(*field_trials()));
+        network_monitor_factory_->CreateNetworkMonitor(*field_trials_));
     if (!network_monitor_) {
       return;
     }
@@ -1116,8 +1081,10 @@ Network::Network(absl::string_view name,
                  absl::string_view desc,
                  const IPAddress& prefix,
                  int prefix_length,
-                 AdapterType type)
-    : name_(name),
+                 AdapterType type,
+                 const webrtc::FieldTrialsView* field_trials)
+    : field_trials_(field_trials),
+      name_(name),
       description_(desc),
       prefix_(prefix),
       prefix_length_(prefix_length),
@@ -1161,13 +1128,15 @@ IPAddress Network::GetBestIP() const {
   }
 
   InterfaceAddress selected_ip, link_local_ip, ula_ip;
+  const bool prefer_global_ipv6_to_link_local =
+      PreferGlobalIPv6Address(field_trials_);
 
   for (const InterfaceAddress& ip : ips_) {
     // Ignore any address which has been deprecated already.
     if (ip.ipv6_flags() & IPV6_ADDRESS_FLAG_DEPRECATED)
       continue;
 
-    if (IPIsLinkLocal(ip)) {
+    if (prefer_global_ipv6_to_link_local && IPIsLinkLocal(ip)) {
       link_local_ip = ip;
       continue;
     }
@@ -1186,7 +1155,7 @@ IPAddress Network::GetBestIP() const {
   }
 
   if (IPIsUnspec(selected_ip)) {
-    if (!IPIsUnspec(link_local_ip)) {
+    if (prefer_global_ipv6_to_link_local && !IPIsUnspec(link_local_ip)) {
       // No proper global IPv6 address found, use link local address instead.
       selected_ip = link_local_ip;
     } else if (!IPIsUnspec(ula_ip)) {

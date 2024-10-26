@@ -35,65 +35,90 @@
       }
     }
   },
-  'crosshatch': {
+  'ios-device-15.7': {
     'swarming': {
       'dimensions': {
-        'device_type': 'crosshatch',
-        'os': 'Android',
+        'os': 'iOS-15.7',
+        'pool': 'chrome.tests',
       },
     },
-  },
-  # Hack to use the test-launcher-summary-output flag + emulator folders for gtest-output
-  # but it's currently the only way to get the file out of the emulator.
-  'fuchsia-gtest-output': {
-    'args': [
-      '--test-launcher-summary-output=${ISOLATED_OUTDIR}/gtest_output.json',
-      '--test-arg=--gtest_output=json:/custom_artifacts/gtest_output.json',
-      '--test-arg=--undefok=test_launcher_summary_output'
-    ],
-  },
-  'ios-device-16.6': {
-    'swarming': {
-      'dimensions': {
-        'os': 'iOS-16.6',
-        'pool': 'chrome.tests',
-        'device_status': 'available'
-      }
-    }
   },
   'ios-device-perf': {
     'swarming': {
       'idempotent': False,
       'dimensions': {
-        'os': 'iOS-15.7.8',
+        'os': 'iOS-12.4.1',
         'pool': 'WebRTC',
-        'id': 'mac-254-e504',
-        'device_status': 'available'
+        'id': 'build15-a7',
       },
     },
   },
-  'ios_runtime_cache_14_5': {
-    'swarming': {
-      'named_caches': [{
-        'name': 'runtime_ios_14_5',
-        'path': 'Runtime-ios-14.5'
-      }]
+  'ios-simulator-12.4': {
+    '$mixin_append': {
+      'args': [
+        '--platform',
+        'iPhone X',
+        '--version',
+        '12.4',
+        '--undefok=write-compiled-tests-json-to-writable-path',
+      ],
+      'swarming': {
+        'named_caches': [
+          {
+            'name': 'runtime_ios_12_4',
+            'path': 'Runtime-ios-12.4',
+          },
+        ],
+      },
     }
   },
-  'ios_runtime_cache_16_2': {
-    'swarming': {
-      'named_caches': [{
-        'name': 'runtime_ios_16_2',
-        'path': 'Runtime-ios-16.2'
-      }]
+  'ios-simulator-13.6': {
+    '$mixin_append': {
+      'args': [
+        '--platform',
+        'iPhone X',
+        '--version',
+        '13.6',
+        '--undefok=write-compiled-tests-json-to-writable-path',
+      ],
+      'swarming': {
+        'named_caches': [
+          {
+            'name': 'runtime_ios_13_6',
+            'path': 'Runtime-ios-13.6',
+          },
+        ],
+      },
     }
   },
-  'limited-capacity': {
-    # Sometimes there are multiple tests that can be run only on one machine.
-    # We need to increase timeouts so the tests dont expire before the machine is freed.
-    # Using 3h expiration timeout to align with `timeout-3h` mixin used for per tests.
+  'ios-simulator-14.5': {
+    '$mixin_append': {
+      'args': [
+        '--platform',
+        'iPhone X',
+        '--version',
+        '14.5',
+        '--undefok=write-compiled-tests-json-to-writable-path',
+      ],
+      'swarming': {
+        'named_caches': [
+          {
+            'name': 'runtime_ios_14_5',
+            'path': 'Runtime-ios-14.5',
+          },
+        ],
+      },
+    }
+  },
+  'logdog-butler': {
     'swarming': {
-      'expiration': 10800,
+      'cipd_packages': [
+        {
+          "cipd_package": 'infra/tools/luci/logdog/butler/${platform}',
+          'location': 'bin',
+          'revision': 'git_revision:ff387eadf445b24c935f1cf7d6ddd279f8a6b04c',
+        },
+      ],
     },
   },
   'mac-m1-cpu': {
@@ -110,17 +135,18 @@
       }
     }
   },
-  'linux-bionic': {
-    'swarming': {
-      'dimensions': {
-        'os': 'Ubuntu-18.04',
-      }
-    }
+  'perf-low-bandwidth-audio-perf-test': {
+    'merge': {
+      'script': '//tools_webrtc/perf/process_perf_results.py',
+      'args': ['--test-suite', 'low_bandwidth_audio_perf_test'],
+    },
   },
   'perf-output': {
-    'args': [
-      '--isolated-script-test-perf-output=${ISOLATED_OUTDIR}/perftest-output.pb',
-    ],
+    '$mixin_append': {
+      'args': [
+        '--isolated-script-test-perf-output=${ISOLATED_OUTDIR}/perftest-output.pb',
+      ],
+    },
   },
   'perf-pool': {
     'swarming': {
@@ -130,16 +156,6 @@
       'idempotent': False,
       'dimensions': {
         'pool': 'WebRTC-perf',
-        'gce': '0',
-      },
-    },
-  },
-  'perf-pool-vm': {
-    'swarming': {
-      'idempotent': False,
-      'dimensions': {
-        'pool': 'WebRTC-perf',
-        'gce': '1',
       },
     },
   },
@@ -148,19 +164,17 @@
       'script': '//tools_webrtc/perf/process_perf_results.py',
       'args': ['--test-suite', 'webrtc_perf_tests'],
     },
-    'args': ['--nologs']
-  },
-  'perf-video-codec-perf-tests': {
-    'merge': {
-      'script': '//tools_webrtc/perf/process_perf_results.py',
-      'args': ['--test-suite', 'video_codec_perf_tests'],
-    },
+    '$mixin_append': {
+      'args': ['--nologs']
+    }
   },
   'quick-perf-tests': {
-    'args': [
-      '--webrtc_quick_perf_test',
-      '--nologs',
-    ],
+    '$mixin_append': {
+      'args': [
+        '--force_fieldtrials=WebRTC-QuickPerfTest/Enabled/',
+        '--nologs',
+      ],
+    }
   },
   'redfin': {
     'swarming': {
@@ -170,10 +184,17 @@
       }
     }
   },
+  'fuchsia': {
+    '$mixin_append': {
+      'args': ['--', '--undefok=use-vulkan']
+    }
+  },
   'resultdb-gtest-json-format': {
-    'args': [
-      '--gtest_output=json:${ISOLATED_OUTDIR}/gtest_output.json',
-    ],
+    '$mixin_append': {
+      'args': [
+        '--gtest_output=json:${ISOLATED_OUTDIR}/gtest_output.json',
+      ],
+    },
     'resultdb': {
       'result_format': 'gtest_json',
       'result_file': '${ISOLATED_OUTDIR}/gtest_output.json',
@@ -183,6 +204,14 @@
     'resultdb': {
       'result_format': 'json'
     }
+  },
+  'shamu': {
+    'swarming': {
+      'dimensions': {
+        'device_type': 'shamu',
+        'os': 'Android',
+      },
+    },
   },
   'shards-2': {
     'swarming': {
@@ -199,11 +228,6 @@
       'shards': 6,
     },
   },
-  'shards-8': {
-    'swarming': {
-      'shards': 8,
-    },
-  },
   'timeout-2h': {
     'swarming': {
       'hard_timeout': 7200,
@@ -217,24 +241,31 @@
     },
   },
   'webrtc-xctest': {
-    'args': [
-      '--xctest',
-    ],
+    '$mixin_append': {
+      'args': [
+        '--xctest',
+        '--undefok=enable-run-ios-unittests-with-xctest',
+      ],
+    },
+  },
+  'xcode_12d4e': {
+    '$mixin_append': {
+      'args': ['--xcode-build-version', '12d4e'],
+      'swarming': {
+        'named_caches': [{
+          'name': 'xcode_ios_12d4e',
+          'path': 'Xcode.app'
+        }]
+      }
+    }
   },
   'xcode_13_main': {
-    'args': ['--xcode-build-version', '13c100'],
+    '$mixin_append': {
+      'args': ['--xcode-build-version', '13c100']
+    },
     'swarming': {
       'named_caches': [{
         'name': 'xcode_ios_13c100',
-        'path': 'Xcode.app'
-      }]
-    }
-  },
-  'xcode_14_main': {
-    'args': ['--xcode-build-version', '14c18'],
-    'swarming': {
-      'named_caches': [{
-        'name': 'xcode_ios_14c18',
         'path': 'Xcode.app'
       }]
     }

@@ -1,7 +1,7 @@
-diff -uprN src/build/config/BUILDCONFIG.gn src_ohos/build/config/BUILDCONFIG.gn
---- src/build/config/BUILDCONFIG.gn	2023-12-15 19:46:40.000000000 -0800
-+++ src_ohos/build/config/BUILDCONFIG.gn	2024-04-10 03:30:13.799546278 -0700
-@@ -235,6 +235,8 @@ _default_toolchain = ""
+diff -Naur src/build/config/BUILDCONFIG.gn src_ohos/build/config/BUILDCONFIG.gn
+--- src/build/config/BUILDCONFIG.gn	2024-10-24 09:22:02.223442391 +0800
++++ src_ohos/build/config/BUILDCONFIG.gn	2024-10-24 14:05:49.277571954 +0800
+@@ -235,6 +235,8 @@
  if (target_os == "android") {
    assert(host_os == "linux", "Android builds are only supported on Linux.")
    _default_toolchain = "//build/toolchain/android:android_clang_$target_cpu"
@@ -10,7 +10,7 @@ diff -uprN src/build/config/BUILDCONFIG.gn src_ohos/build/config/BUILDCONFIG.gn
  } else if (target_os == "chromeos" || target_os == "linux") {
    # See comments in build/toolchain/cros/BUILD.gn about board compiles.
    if (is_clang) {
-@@ -298,6 +300,7 @@ if (custom_toolchain != "") {
+@@ -298,6 +300,7 @@
  # aix or one of the BSDs. If you need to check these, just check the
  # current_os value directly.
  
@@ -18,7 +18,7 @@ diff -uprN src/build/config/BUILDCONFIG.gn src_ohos/build/config/BUILDCONFIG.gn
  is_android = current_os == "android"
  is_chromeos = current_os == "chromeos"
  is_fuchsia = current_os == "fuchsia"
-@@ -384,6 +387,10 @@ if (is_android) {
+@@ -381,6 +384,10 @@
        [ "//build/config/android:default_orderfile_instrumentation" ]
  }
  
@@ -29,10 +29,10 @@ diff -uprN src/build/config/BUILDCONFIG.gn src_ohos/build/config/BUILDCONFIG.gn
  if (is_clang && !is_nacl) {
    default_compiler_configs += [
      "//build/config/clang:find_bad_constructs",
-diff -uprN src/build/config/clang/BUILD.gn src_ohos/build/config/clang/BUILD.gn
---- src/build/config/clang/BUILD.gn	2023-12-15 19:46:40.000000000 -0800
-+++ src_ohos/build/config/clang/BUILD.gn	2024-04-10 04:33:21.744433183 -0700
-@@ -16,38 +16,38 @@ config("find_bad_constructs") {
+diff -Naur src/build/config/clang/BUILD.gn src_ohos/build/config/clang/BUILD.gn
+--- src/build/config/clang/BUILD.gn	2024-10-24 09:22:02.252202058 +0800
++++ src_ohos/build/config/clang/BUILD.gn	2024-10-24 14:55:59.145429642 +0800
+@@ -11,15 +11,15 @@
      # The plugin is built directly into clang, so there's no need to load it
      # dynamically.
      cflags += [
@@ -45,63 +45,38 @@ diff -uprN src/build/config/clang/BUILD.gn src_ohos/build/config/clang/BUILD.gn
 -      "-plugin-arg-find-bad-constructs",
 -      "-Xclang",
 -      "raw-ref-template-as-trivial-member",
--
--      "-Xclang",
--      "-plugin-arg-find-bad-constructs",
--      "-Xclang",
--      "check-stack-allocated",
--
--      "-Xclang",
--      "-plugin-arg-find-bad-constructs",
--      "-Xclang",
--      "check-raw-ptr-to-stack-allocated",
-+      #"-Xclang",
-+      #"-add-plugin",
-+      #"-Xclang",
-+      #"find-bad-constructs",
++    #  "-Xclang",
++    #  "-add-plugin",
++    #  "-Xclang",
++    #  "find-bad-constructs",
 +
-+      #"-Xclang",
-+      #"-plugin-arg-find-bad-constructs",
-+      #"-Xclang",
-+      #"raw-ref-template-as-trivial-member",
-+
-+      #"-Xclang",
-+      #"-plugin-arg-find-bad-constructs",
-+      #"-Xclang",
-+      #"check-stack-allocated",
-+
-+      #"-Xclang",
-+      #"-plugin-arg-find-bad-constructs",
-+      #"-Xclang",
-+      #"check-raw-ptr-to-stack-allocated",
- 
-       # TODO(https://crbug.com/1449812): This option should be removed after
-       #   next clang roll.
--      "-Xclang",
--      "-plugin-arg-find-bad-constructs",
--      "-Xclang",
--      "raw-ptr-fix-crbug-1449812",
-+      #"-Xclang",
-+      #"-plugin-arg-find-bad-constructs",
-+      #"-Xclang",
-+      #"raw-ptr-fix-crbug-1449812",
- 
-       # TODO(https://crbug.com/1504043): Remove when raw_ptr check has been enabled for the dawn repo.
--      "-Xclang",
--      "-plugin-arg-find-bad-constructs",
--      "-Xclang",
--      "raw-ptr-exclude-path=/third_party/dawn/",
-+      #"-Xclang",
-+      #"-plugin-arg-find-bad-constructs",
-+      #"-Xclang",
-+      #"raw-ptr-exclude-path=/third_party/dawn/",
++    #  "-Xclang",
++    #  "-plugin-arg-find-bad-constructs",
++    #  "-Xclang",
++    #  "raw-ref-template-as-trivial-member",
      ]
  
      if (is_linux || is_chromeos || is_android || is_fuchsia) {
-diff -uprN src/build/config/clang/clang.gni src_ohos/build/config/clang/clang.gni
---- src/build/config/clang/clang.gni	2023-12-15 19:46:40.000000000 -0800
-+++ src_ohos/build/config/clang/clang.gni	2024-04-10 03:33:59.814928675 -0700
-@@ -7,14 +7,25 @@ import("//build/toolchain/toolchain.gni"
+@@ -37,12 +37,12 @@
+ # compile with these so may want to remove this config.
+ config("extra_warnings") {
+   cflags = [
+-    "-Wheader-hygiene",
++  #  "-Wheader-hygiene",
+ 
+     # Warns when a const char[] is converted to bool.
+-    "-Wstring-conversion",
++  #  "-Wstring-conversion",
+ 
+-    "-Wtautological-overlap-compare",
++  #  "-Wtautological-overlap-compare",
+   ]
+ }
+ 
+diff -Naur src/build/config/clang/clang.gni src_ohos/build/config/clang/clang.gni
+--- src/build/config/clang/clang.gni	2024-10-24 09:22:02.253193770 +0800
++++ src_ohos/build/config/clang/clang.gni	2024-10-24 14:07:45.506620083 +0800
+@@ -6,13 +6,25 @@
  
  default_clang_base_path = "//third_party/llvm-build/Release+Asserts"
  
@@ -120,57 +95,47 @@ diff -uprN src/build/config/clang/clang.gni src_ohos/build/config/clang/clang.gn
 -  clang_use_chrome_plugins =
 -      is_clang && !is_nacl && current_os != "zos" &&
 -      default_toolchain != "//build/toolchain/cros:target"
--
-+  if (is_ohos) {
++   if (is_ohos) {
 +    clang_use_chrome_plugins = false
 +  } else {
 +    clang_use_chrome_plugins =
 +        is_clang && !is_nacl && current_os != "zos" &&
 +        default_toolchain != "//build/toolchain/cros:target"
 +  }
-   enable_check_raw_ptr_fields =
-       build_with_chromium && !is_official_build &&
-       ((is_linux && !is_castos) || (is_android && !is_cast_android) || is_mac ||
-diff -uprN src/build/config/compiler/BUILD.gn src_ohos/build/config/compiler/BUILD.gn
---- src/build/config/compiler/BUILD.gn	2023-12-15 19:46:40.000000000 -0800
-+++ src_ohos/build/config/compiler/BUILD.gn	2024-04-10 04:05:02.628445145 -0700
-@@ -605,14 +605,14 @@ config("compiler") {
+ 
+   clang_base_path = default_clang_base_path
+ }
+diff -Naur src/build/config/compiler/BUILD.gn src_ohos/build/config/compiler/BUILD.gn
+--- src/build/config/compiler/BUILD.gn	2024-10-24 09:22:02.256168908 +0800
++++ src_ohos/build/config/compiler/BUILD.gn	2024-10-24 15:24:35.827554893 +0800
+@@ -530,14 +530,14 @@
      # TODO(hans): Remove this once Clang generates better optimized debug info
      # by default. https://crbug.com/765793
      cflags += [
 -      "-mllvm",
 -      "-instcombine-lower-dbg-declare=0",
-+     # "-mllvm",
-+     # "-instcombine-lower-dbg-declare=0",
++    #  "-mllvm",
++    #  "-instcombine-lower-dbg-declare=0",
      ]
      if (!is_debug && use_thin_lto && is_a_target_toolchain) {
        if (is_win) {
          ldflags += [ "-mllvm:-instcombine-lower-dbg-declare=0" ]
        } else {
 -        ldflags += [ "-Wl,-mllvm,-instcombine-lower-dbg-declare=0" ]
-+        # ldflags += [ "-Wl,-mllvm,-instcombine-lower-dbg-declare=0" ]
++      #  ldflags += [ "-Wl,-mllvm,-instcombine-lower-dbg-declare=0" ]
        }
      }
  
-@@ -622,14 +622,14 @@ config("compiler") {
-     if (default_toolchain != "//build/toolchain/cros:target" &&
-         !llvm_android_mainline) {
-       cflags += [
--        "-mllvm",
--        "-split-threshold-for-reg-with-hint=0",
-+        #"-mllvm",
-+        #"-split-threshold-for-reg-with-hint=0",
-       ]
-       if (use_thin_lto && is_a_target_toolchain) {
-         if (is_win) {
-           ldflags += [ "-mllvm:-split-threshold-for-reg-with-hint=0" ]
-         } else {
--          ldflags += [ "-Wl,-mllvm,-split-threshold-for-reg-with-hint=0" ]
-+          #ldflags += [ "-Wl,-mllvm,-split-threshold-for-reg-with-hint=0" ]
-         }
+@@ -703,7 +703,7 @@
+         import_instr_limit = 5
        }
+ 
+-      ldflags += [ "-Wl,-mllvm,-import-instr-limit=$import_instr_limit" ]
++      # ldflags += [ "-Wl,-mllvm,-import-instr-limit=$import_instr_limit" ]
      }
-@@ -1576,9 +1576,13 @@ config("compiler_deterministic") {
+ 
+     # TODO(https://crbug.com/1211155): investigate why this isn't effective on
+@@ -1334,9 +1334,13 @@
  config("clang_revision") {
    if (is_clang && clang_base_path == default_clang_base_path) {
      update_args = [
@@ -186,24 +151,58 @@ diff -uprN src/build/config/compiler/BUILD.gn src_ohos/build/config/compiler/BUI
      if (llvm_force_head_revision) {
        update_args += [ "--llvm-force-head-revision" ]
      }
-@@ -1707,12 +1711,12 @@ config("treat_warnings_as_errors") {
-   if (is_win) {
-     cflags = [ "/WX" ]
+@@ -1643,12 +1647,12 @@
    } else {
--    cflags = [ "-Werror" ]
-+    # cflags = [ "-Werror" ]
+     cflags = [ "-Wall" ]
+     if (treat_warnings_as_errors) {
+-      cflags += [ "-Werror" ]
++     # cflags += [ "-Werror" ]
  
-     # The compiler driver can sometimes (rarely) emit warnings before calling
-     # the actual linker.  Make sure these warnings are treated as errors as
-     # well.
--    ldflags = [ "-Werror" ]
-+    # ldflags = [ "-Werror" ]
+       # The compiler driver can sometimes (rarely) emit warnings before calling
+       # the actual linker.  Make sure these warnings are treated as errors as
+       # well.
+-      ldflags = [ "-Werror" ]
++     # ldflags = [ "-Werror" ]
+     }
+     if (is_clang) {
+       # Enable extra warnings for chromium_code when we control the compiler.
+@@ -1732,8 +1736,8 @@
+     # GCC may emit unsuppressible warnings so don't add -Werror for no chromium
+     # code. crbug.com/589724
+     if (treat_warnings_as_errors && is_clang) {
+-      cflags += [ "-Werror" ]
+-      ldflags = [ "-Werror" ]
++     # cflags += [ "-Werror" ]
++     # ldflags = [ "-Werror" ]
+     }
+     if (is_clang && !is_nacl) {
+       # TODO(thakis): Remove !is_nacl once
+@@ -1872,6 +1876,11 @@
+   } else if (is_win && use_lld) {
+     arflags = [ "/llvmlibthin" ]
    }
++  if (is_ohos) {
++    cflags = [ "-fPIC" ]
++    cflags_cc = [ "-fPIC" ]
++    ldflags = [ "-fPIC" ]
++  }
+ }
  
-   # Turn rustc warnings into the "deny" lint level, which produce compiler
-diff -uprN src/build/config/ohos/BUILD.gn src_ohos/build/config/ohos/BUILD.gn
---- src/build/config/ohos/BUILD.gn	1969-12-31 16:00:00.000000000 -0800
-+++ src_ohos/build/config/ohos/BUILD.gn	2024-04-10 03:55:45.794213055 -0700
+ # exceptions -------------------------------------------------------------------
+@@ -2082,8 +2091,8 @@
+ 
+       if (use_ml_inliner && is_a_target_toolchain) {
+         cflags += [
+-          "-mllvm",
+-          "-enable-ml-inliner=release",
++        #  "-mllvm",
++        #  "-enable-ml-inliner=release",
+         ]
+       }
+     } else {
+diff -Naur src/build/config/ohos/BUILD.gn src_ohos/build/config/ohos/BUILD.gn
+--- src/build/config/ohos/BUILD.gn	1970-01-01 08:00:00.000000000 +0800
++++ src_ohos/build/config/ohos/BUILD.gn	2024-10-24 14:43:51.380571596 +0800
 @@ -0,0 +1,79 @@
 +import("//build/config/sysroot.gni")
 +import("//build/config/clang/clang.gni")
@@ -284,10 +283,10 @@ diff -uprN src/build/config/ohos/BUILD.gn src_ohos/build/config/ohos/BUILD.gn
 +  # to the assembler.
 +  asmflags = cflags
 +}
-diff -uprN src/build/config/sysroot.gni src_ohos/build/config/sysroot.gni
---- src/build/config/sysroot.gni	2023-12-15 19:46:40.000000000 -0800
-+++ src_ohos/build/config/sysroot.gni	2024-04-10 03:37:00.789174817 -0700
-@@ -34,6 +34,9 @@ if (sysroot == "") {
+diff -Naur src/build/config/sysroot.gni src_ohos/build/config/sysroot.gni
+--- src/build/config/sysroot.gni	2024-10-24 09:22:02.337489344 +0800
++++ src_ohos/build/config/sysroot.gni	2024-10-24 14:08:53.731491294 +0800
+@@ -33,6 +33,9 @@
  
      # Android uses unified headers, and thus a single compile time sysroot
      sysroot = "$android_toolchain_root/sysroot"
@@ -297,10 +296,10 @@ diff -uprN src/build/config/sysroot.gni src_ohos/build/config/sysroot.gni
    } else if ((is_linux || is_chromeos) && use_sysroot) {
      # By default build against a sysroot image downloaded from Cloud Storage
      # during gclient runhooks.
-diff -uprN src/build/toolchain/gcc_toolchain.gni src_ohos/build/toolchain/gcc_toolchain.gni
---- src/build/toolchain/gcc_toolchain.gni	2023-12-15 19:46:40.000000000 -0800
-+++ src_ohos/build/toolchain/gcc_toolchain.gni	2024-04-10 03:50:24.311726114 -0700
-@@ -126,6 +126,30 @@ template("single_gcc_toolchain") {
+diff -Naur src/build/toolchain/gcc_toolchain.gni src_ohos/build/toolchain/gcc_toolchain.gni
+--- src/build/toolchain/gcc_toolchain.gni	2024-10-24 09:22:02.451536297 +0800
++++ src_ohos/build/toolchain/gcc_toolchain.gni	2024-10-24 14:37:10.727901585 +0800
+@@ -122,6 +122,30 @@
        rebuild_string = ""
      }
  
@@ -331,47 +330,36 @@ diff -uprN src/build/toolchain/gcc_toolchain.gni src_ohos/build/toolchain/gcc_to
      # GN's syntax can't handle more than one scope dereference at once, like
      # "invoker.toolchain_args.foo", so make a temporary to hold the toolchain
      # args so we can do "invoker_toolchain_args.foo".
-@@ -502,6 +526,8 @@ template("single_gcc_toolchain") {
-         # --whole-archive, --no-whole-archive flags are not available on the aix
+@@ -487,7 +511,7 @@
          # ld.
-         rspfile_content = "{{inputs}} {{solibs}} {{libs}}"
-+      } else if(current_os == "ohos") {
-+        rspfile_content = "-Wl,--whole-archive {{inputs}} {{solibs}} -Wl,--no-whole-archive $solink_libs_section_prefix {{libs}} $solink_libs_section_postfix"
+         rspfile_content = "{{inputs}} {{solibs}} {{libs}} {{rlibs}}"
        } else {
-         rspfile_content = "-Wl,--whole-archive {{inputs}} {{solibs}} -Wl,--no-whole-archive {{libs}}"
+-        rspfile_content = "-Wl,--whole-archive {{inputs}} {{solibs}} -Wl,--no-whole-archive {{libs}} -Wl,--whole-archive {{rlibs}} -Wl,--no-whole-archive"
++        rspfile_content = "-Wl,--whole-archive {{inputs}} {{solibs}} -Wl,--no-whole-archive $solink_libs_section_prefix {{libs}} $solink_libs_section_postfix"
        }
-@@ -582,8 +608,11 @@ template("single_gcc_toolchain") {
+ 
+       description = "SOLINK $sofile"
+@@ -565,7 +589,7 @@
          strip_command = "${invoker.strip} -o \"$sofile\" \"$unstripped_sofile\""
          command += " && " + strip_command
        }
--      rspfile_content = "$whole_archive_flag {{inputs}} {{solibs}} $no_whole_archive_flag {{libs}} {{rlibs}}"
--
-+      if (current_os == "ohos") {
-+        rspfile_content = "-Wl,--whole-archive {{inputs}} {{solibs}} -Wl,--no-whole-archive $solink_libs_section_prefix {{libs}} $solink_libs_section_postfix"
-+      } else {
-+        rspfile_content = "$whole_archive_flag {{inputs}} {{solibs}} $no_whole_archive_flag {{libs}} {{rlibs}}"
-+      }
+-      rspfile_content = "$whole_archive_flag {{inputs}} {{solibs}} $no_whole_archive_flag {{libs}} $whole_archive_flag {{rlibs}} $no_whole_archive_flag"
++      rspfile_content = "-Wl,--whole-archive {{inputs}} {{solibs}} -Wl,--no-whole-archive $solink_libs_section_prefix {{libs}} $solink_libs_section_postfix"
+ 
        description = "SOLINK_MODULE $sofile"
  
-       # Use this for {{output_extension}} expansions unless a target manually
-@@ -636,8 +665,13 @@ template("single_gcc_toolchain") {
+@@ -618,7 +642,7 @@
          start_group_flag = "-Wl,--start-group"
          end_group_flag = "-Wl,--end-group "
        }
--      link_command = "$ld {{ldflags}}${extra_ldflags} -o \"$unstripped_outfile\" $start_group_flag @\"$rspfile\" {{solibs}} $end_group_flag {{libs}} {{rlibs}}"
+-      link_command = "$ld {{ldflags}}${extra_ldflags} -o \"$unstripped_outfile\" $start_group_flag @\"$rspfile\" {{solibs}} $end_group_flag {{libs}}"
++      link_command = "$ld {{ldflags}}${extra_ldflags} -o \"$unstripped_outfile\" $libs_section_prefix $start_group_flag @\"$rspfile\" {{solibs}} {{libs}} $end_group_flag  $libs_section_postfix"
  
-+      if (is_ohos) {
-+        link_command = "$ld {{ldflags}}${extra_ldflags} -o \"$unstripped_outfile\" $libs_section_prefix $start_group_flag @\"$rspfile\" {{solibs}} {{libs}} $end_group_flag  $libs_section_postfix"
-+      } else {
-+        link_command = "$ld {{ldflags}}${extra_ldflags} -o \"$unstripped_outfile\" $start_group_flag @\"$rspfile\" {{solibs}} $end_group_flag {{libs}} {{rlibs}}"
-+      }
-+      
        # Generate a map file to be used for binary size analysis.
        # Map file adds ~10% to the link time on a z620.
-       # With target_os="android", libchrome.so.map.gz is ~20MB.
-diff -uprN src/build/toolchain/ohos/BUILD.gn src_ohos/build/toolchain/ohos/BUILD.gn
---- src/build/toolchain/ohos/BUILD.gn	1969-12-31 16:00:00.000000000 -0800
-+++ src_ohos/build/toolchain/ohos/BUILD.gn	2024-04-10 03:53:03.585749521 -0700
+diff -Naur src/build/toolchain/ohos/BUILD.gn src_ohos/build/toolchain/ohos/BUILD.gn
+--- src/build/toolchain/ohos/BUILD.gn	1970-01-01 08:00:00.000000000 +0800
++++ src_ohos/build/toolchain/ohos/BUILD.gn	2024-10-24 14:39:02.042839878 +0800
 @@ -0,0 +1,103 @@
 +import("//build/config/sysroot.gni")
 +import("//build/toolchain/gcc_toolchain.gni")
@@ -476,26 +464,26 @@ diff -uprN src/build/toolchain/ohos/BUILD.gn src_ohos/build/toolchain/ohos/BUILD
 +    current_cpu = "x86_64"
 +  }
 +}
-diff -uprN src/build/toolchain/toolchain.gni src_ohos/build/toolchain/toolchain.gni
---- src/build/toolchain/toolchain.gni	2023-12-15 19:46:40.000000000 -0800
-+++ src_ohos/build/toolchain/toolchain.gni	2024-04-10 03:38:39.829810271 -0700
-@@ -47,7 +47,11 @@ declare_args() {
-   if (llvm_android_mainline) {  # https://crbug.com/1481060
-     clang_version = "17"
-   } else {
--    clang_version = "18"
-+    if (is_ohos) {
-+      clang_version = "15.0.4"
-+    } else {
-+      clang_version = "18"
-+    }
-   }
+diff -Naur src/build/toolchain/toolchain.gni src_ohos/build/toolchain/toolchain.gni
+--- src/build/toolchain/toolchain.gni	2024-10-24 09:22:02.457486573 +0800
++++ src_ohos/build/toolchain/toolchain.gni	2024-10-24 14:10:30.133633570 +0800
+@@ -33,7 +33,11 @@
  }
  
-diff -uprN src/BUILD.gn src_ohos/BUILD.gn
---- src/BUILD.gn	2024-04-10 03:25:35.424316928 -0700
-+++ src_ohos/BUILD.gn	2024-04-10 04:15:07.765255442 -0700
-@@ -214,6 +214,9 @@ config("common_inherited_config") {
+ declare_args() {
+-  clang_version = "16.0.0"
++  if (is_ohos) {
++    clang_version = "15.0.4"
++  } else {
++    clang_version = "16.0.0"
++  }
+ }
+ 
+ # Extension for shared library files (including leading dot).
+diff -Naur src/BUILD.gn src_ohos/BUILD.gn
+--- src/BUILD.gn	2024-10-24 10:06:44.716202585 +0800
++++ src_ohos/BUILD.gn	2024-10-24 15:14:40.329478789 +0800
+@@ -205,6 +205,9 @@
        "WEBRTC_IOS",
      ]
    }
@@ -505,22 +493,2550 @@ diff -uprN src/BUILD.gn src_ohos/BUILD.gn
    if (is_linux || is_chromeos) {
      defines += [ "WEBRTC_LINUX" ]
    }
-diff -uprN src/modules/video_capture/BUILD.gn src_ohos/modules/video_capture/BUILD.gn
---- src/modules/video_capture/BUILD.gn	2023-12-15 19:42:56.000000000 -0800
-+++ src_ohos/modules/video_capture/BUILD.gn	2024-04-10 04:09:52.641358725 -0700
-@@ -71,7 +71,7 @@ if (!build_with_chromium || is_linux ||
-       "video_capture_options.h",
+diff -Naur src/modules/audio_device/audio_device_impl.cc src_ohos/modules/audio_device/audio_device_impl.cc
+--- src/modules/audio_device/audio_device_impl.cc	2024-10-24 10:06:44.981096356 +0800
++++ src_ohos/modules/audio_device/audio_device_impl.cc	2024-10-24 18:46:32.897468949 +0800
+@@ -36,6 +36,10 @@
+ #include "modules/audio_device/android/audio_track_jni.h"
+ #include "modules/audio_device/android/opensles_player.h"
+ #include "modules/audio_device/android/opensles_recorder.h"
++#elif defined(WEBRTC_OHOS)
++#include "modules/audio_device/ohos/audio_device_template.h"
++#include "modules/audio_device/ohos/ohaudio_recorder.h"
++#include "modules/audio_device/ohos/ohaudio_player.h"
+ #elif defined(WEBRTC_LINUX)
+ #if defined(WEBRTC_ENABLE_LINUX_ALSA)
+ #include "modules/audio_device/linux/audio_device_alsa_linux.h"
+@@ -131,6 +135,9 @@
+ #elif defined(WEBRTC_ANDROID)
+   platform = kPlatformAndroid;
+   RTC_LOG(LS_INFO) << "current platform is Android";
++#elif defined(WEBRTC_OHOS)
++  platform = kPlatformOHOS;
++  RTC_LOG(LS_INFO) << "current platform is OHOS";
+ #elif defined(WEBRTC_LINUX)
+   platform = kPlatformLinux;
+   RTC_LOG(LS_INFO) << "current platform is Linux";
+@@ -238,6 +245,17 @@
+     audio_device_.reset(nullptr);
+   }
+ // END #if defined(WEBRTC_ANDROID)
++#elif defined(WEBRTC_OHOS)
++
++static const int default_sample_rates = 48000;
++    static const int default_frames_per_buff = 240;
++    static const int default_channels = 2;
++    if (audio_layer == kPlatformDefaultAudio) {
++        AudioParameters audio_parameters(default_sample_rates, default_channels, default_frames_per_buff);
++        audio_device_.reset(new AudioDeviceTemplate<OHAudioRecorder, OHAudioPlayer>(
++                            audio_layer, audio_parameters));
++        RTC_LOG(LS_INFO) << "OHOS Audio APIs will be utilized.";
++    }
+ 
+ // Linux ADM implementation.
+ // Note that, WEBRTC_ENABLE_LINUX_ALSA is always defined by default when
+diff -Naur src/modules/audio_device/audio_device_impl.h src_ohos/modules/audio_device/audio_device_impl.h
+--- src/modules/audio_device/audio_device_impl.h	2024-10-24 10:06:44.981096356 +0800
++++ src_ohos/modules/audio_device/audio_device_impl.h	2024-10-24 18:38:06.288655603 +0800
+@@ -35,7 +35,8 @@
+     kPlatformLinux = 3,
+     kPlatformMac = 4,
+     kPlatformAndroid = 5,
+-    kPlatformIOS = 6
++    kPlatformIOS = 6,
++    kPlatformOHOS=7
+   };
+ 
+   int32_t CheckPlatform();
+diff -Naur src/modules/audio_device/BUILD.gn src_ohos/modules/audio_device/BUILD.gn
+--- src/modules/audio_device/BUILD.gn	2024-10-24 10:06:44.971175241 +0800
++++ src_ohos/modules/audio_device/BUILD.gn	2024-10-24 18:37:20.750156884 +0800
+@@ -340,6 +340,28 @@
+           "../third_party/portaudio:mac_portaudio",
+         ]
+       }
++
++      if (is_ohos) {
++        sources += [
++          "ohos/audio_device_module.h",
++          "ohos/audio_device_template.h",
++          "ohos/ohaudio_player.cc",
++          "ohos/ohaudio_player.h",
++          "ohos/ohaudio_player_wrapper.cc",
++          "ohos/ohaudio_player_wrapper.h",
++          "ohos/ohaudio_recorder.cc",
++          "ohos/ohaudio_recorder.h",
++          "ohos/ohaudio_recorder_wrapper.cc",
++          "ohos/ohaudio_recorder_wrapper.h",
++        ]
++        include_dirs = [ 
++          "${sysroot}/usr/include",
++          "//modules/audio_device",
++          "//modules/audio_device/ohos",
++        ]
++        libs = [ "ohaudio" ]
++      }
++
+       if (is_win) {
+         sources += [
+           "win/audio_device_core_win.cc",
+diff -Naur src/modules/audio_device/ohos/audio_device_module.h src_ohos/modules/audio_device/ohos/audio_device_module.h
+--- src/modules/audio_device/ohos/audio_device_module.h	1970-01-01 08:00:00.000000000 +0800
++++ src_ohos/modules/audio_device/ohos/audio_device_module.h	2024-10-24 18:52:12.708371952 +0800
+@@ -0,0 +1,70 @@
++/*
++# Copyright (c) 2023 Huawei Device Co., Ltd.
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++#     http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++*/
++
++#ifndef OHOS_AUDIO_DEVICE_MODULE_H
++#define OHOS_AUDIO_DEVICE_MODULE_H
++
++#include <memory>
++
++#include "absl/types/optional.h"
++#include "modules/audio_device/include/audio_device.h"
++
++namespace webrtc {
++class AudioDeviceBuffer;
++class AudioInput {
++public:
++    virtual ~AudioInput() {}
++
++    virtual int32_t Init() = 0;
++    virtual int32_t Terminate() = 0;
++
++    virtual int32_t InitRecording() = 0;
++    virtual bool RecordingIsInitialized() const = 0;
++
++    virtual int32_t StartRecording() = 0;
++    virtual int32_t StopRecording() = 0;
++    virtual bool Recording() const = 0;
++
++    virtual void AttachAudioBuffer(AudioDeviceBuffer* audioBuffer) = 0;
++
++    virtual bool IsAcousticEchoCancelerSupported() const = 0;
++    virtual bool IsNoiseSuppressorSupported() const = 0;
++
++    virtual int32_t EnableBuiltInAEC(bool enable) = 0;
++    virtual int32_t EnableBuiltInNS(bool enable) = 0;
++};
++
++class AudioOutput {
++public:
++    virtual ~AudioOutput() {}
++
++    virtual int32_t Init() = 0;
++    virtual int32_t Terminate() = 0;
++    virtual int32_t InitPlayout() = 0;
++    virtual bool PlayoutIsInitialized() const = 0;
++    virtual int32_t StartPlayout() = 0;
++    virtual int32_t StopPlayout() = 0;
++    virtual bool Playing() const = 0;
++    virtual int32_t SpeakerVolumeIsAvailable(bool &available) = 0;
++    virtual int32_t SetSpeakerVolume(uint32_t volume) = 0;
++    virtual int32_t SpeakerVolume(uint32_t &volume) const = 0;
++    virtual int32_t MaxSpeakerVolume(uint32_t &maxVolume) const = 0;
++    virtual int32_t MinSpeakerVolume(uint32_t &minVolume) const = 0;
++    virtual void AttachAudioBuffer(AudioDeviceBuffer* audioBuffer) = 0;
++    virtual int GetPlayoutUnderrunCount() = 0;
++};
++}  // namespace webrtc
++
++#endif  // OHOS_AUDIO_DEVICE_MODULE_H
+diff -Naur src/modules/audio_device/ohos/audio_device_template.h src_ohos/modules/audio_device/ohos/audio_device_template.h
+--- src/modules/audio_device/ohos/audio_device_template.h	1970-01-01 08:00:00.000000000 +0800
++++ src_ohos/modules/audio_device/ohos/audio_device_template.h	2024-04-13 18:18:41.032683021 +0800
+@@ -0,0 +1,380 @@
++/*
++# Copyright (c) 2023 Huawei Device Co., Ltd.
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++#     http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++*/
++
++#ifndef AUDIO_DEVICE_TEMPLATE_H
++#define AUDIO_DEVICE_TEMPLATE_H
++
++#include "modules/audio_device/audio_device_generic.h"
++
++#include "rtc_base/checks.h"
++#include "rtc_base/logging.h"
++
++namespace webrtc {
++
++template <class InputType, class OutputType>
++class AudioDeviceTemplate : public AudioDeviceGeneric {
++public:
++    AudioDeviceTemplate(AudioDeviceModule::AudioLayer audio_layer, AudioParameters &audio_parameters)
++        : audio_layer_(audio_layer), output_(audio_parameters), input_(audio_parameters), initialized_(false)
++    {
++        RTC_LOG(LS_INFO) << __FUNCTION__;
++    }
++
++    virtual ~AudioDeviceTemplate() { RTC_LOG(LS_INFO) << __FUNCTION__; }
++
++    int32_t ActiveAudioLayer(AudioDeviceModule::AudioLayer& audioLayer) const override
++    {
++        RTC_LOG(LS_INFO) << __FUNCTION__;
++        audioLayer = audio_layer_;
++        return 0;
++    }
++
++    InitStatus Init() override
++    {
++        RTC_LOG(LS_INFO) << __FUNCTION__;
++        RTC_DCHECK(!initialized_);
++        if (output_.Init() != 0) {
++            return InitStatus::PLAYOUT_ERROR;
++        }
++        if (input_.Init() != 0) {
++            output_.Terminate();
++            return InitStatus::RECORDING_ERROR;
++        }
++        initialized_ = true;
++        return InitStatus::OK;
++    }
++
++    int32_t Terminate() override
++    {
++        RTC_LOG(LS_INFO) << __FUNCTION__;
++        int32_t err = input_.Terminate();
++        err |= output_.Terminate();
++        initialized_ = false;
++        RTC_DCHECK_EQ(err, 0);
++        return err;
++    }
++
++    bool Initialized() const override
++    {
++        RTC_LOG(LS_INFO) << __FUNCTION__;
++        return initialized_;
++    }
++
++    int16_t PlayoutDevices() override
++    {
++        RTC_LOG(LS_INFO) << __FUNCTION__;
++        return 1;
++    }
++
++    int16_t RecordingDevices() override
++    {
++        RTC_LOG(LS_INFO) << __FUNCTION__;
++        return 1;
++    }
++
++    int32_t PlayoutDeviceName(uint16_t index, char name[kAdmMaxDeviceNameSize],
++                              char guid[kAdmMaxGuidSize]) override
++    {
++        RTC_LOG(LS_INFO) << "should nerver be called";
++        return -1;
++    }
++
++    int32_t RecordingDeviceName(uint16_t index, char name[kAdmMaxDeviceNameSize],
++                                char guid[kAdmMaxGuidSize]) override
++    {
++        RTC_LOG(LS_INFO) << "should nerver be called";
++        return -1;
++    }
++
++    int32_t SetPlayoutDevice(uint16_t index) override
++    {
++        RTC_LOG(LS_INFO) << __FUNCTION__;
++        return 0;
++    }
++
++    int32_t SetPlayoutDevice(AudioDeviceModule::WindowsDeviceType device) override
++    {
++        RTC_LOG(LS_INFO) << "should nerver be called";
++        return -1;
++    }
++
++    int32_t SetRecordingDevice(uint16_t index) override
++    {
++        RTC_LOG(LS_INFO) << __FUNCTION__;
++        return 0;
++    }
++
++    int32_t SetRecordingDevice(AudioDeviceModule::WindowsDeviceType device) override
++    {
++        RTC_LOG(LS_INFO) << "should nerver be called";
++        return -1;
++    }
++
++    int32_t PlayoutIsAvailable(bool& available) override
++    {
++        RTC_LOG(LS_INFO) << __FUNCTION__;
++        available = true;
++        return 0;
++    }
++
++    int32_t InitPlayout() override
++    {
++        RTC_LOG(LS_INFO) << __FUNCTION__;
++        return output_.InitPlayout();
++    }
++
++    bool PlayoutIsInitialized() const override
++    {
++        RTC_LOG(LS_INFO) << __FUNCTION__;
++        return output_.PlayoutIsInitialized();
++    }
++
++    int32_t RecordingIsAvailable(bool& available) override
++    {
++        RTC_LOG(LS_INFO) << __FUNCTION__;
++        available = true;
++        return 0;
++    }
++
++    int32_t InitRecording() override
++    {
++        RTC_LOG(LS_INFO) << __FUNCTION__;
++        return input_.InitRecording();
++    }
++
++    bool RecordingIsInitialized() const override
++    {
++        RTC_LOG(LS_INFO) << __FUNCTION__;
++        return input_.RecordingIsInitialized();
++    }
++
++    int32_t StartPlayout() override
++    {
++        RTC_LOG(LS_INFO) << __FUNCTION__;
++        return output_.StartPlayout();
++    }
++
++    int32_t StopPlayout() override
++    {
++        if (!Playing()) {
++            return 0;
++        }
++        RTC_LOG(LS_INFO) << __FUNCTION__;
++        int32_t err = output_.StopPlayout();
++        return err;
++    }
++
++    bool Playing() const override
++    {
++        RTC_LOG(LS_INFO) << __FUNCTION__;
++        return output_.Playing();
++    }
++
++    int32_t StartRecording() override
++    {
++        RTC_LOG(LS_INFO) << __FUNCTION__;
++        return input_.StartRecording();
++    }
++
++    int32_t StopRecording() override
++    {
++        RTC_LOG(LS_INFO) << __FUNCTION__;
++        if (!Recording()) {
++            return 0;
++        }
++        int32_t err = input_.StopRecording();
++        return err;
++    }
++
++    bool Recording() const override { return input_.Recording(); }
++
++    int32_t InitSpeaker() override
++    {
++        RTC_LOG(LS_INFO) << __FUNCTION__;
++        return 0;
++    }
++
++    bool SpeakerIsInitialized() const override
++    {
++        RTC_LOG(LS_INFO) << __FUNCTION__;
++        return true;
++    }
++
++    int32_t InitMicrophone() override
++    {
++        RTC_LOG(LS_INFO) << __FUNCTION__;
++        return 0;
++    }
++
++    bool MicrophoneIsInitialized() const override
++    {
++        RTC_LOG(LS_INFO) << __FUNCTION__;
++        return true;
++    }
++
++    int32_t SpeakerVolumeIsAvailable(bool& available) override
++    {
++        RTC_LOG(LS_INFO) << __FUNCTION__;
++        return output_.SpeakerVolumeIsAvailable(available);
++    }
++
++    int32_t SetSpeakerVolume(uint32_t volume) override
++    {
++        RTC_LOG(LS_INFO) << __FUNCTION__;
++        return output_.SetSpeakerVolume(volume);
++    }
++
++    int32_t SpeakerVolume(uint32_t& volume) const override
++    {
++        RTC_LOG(LS_INFO) << __FUNCTION__;
++        return output_.SpeakerVolume(volume);
++    }
++
++    int32_t MaxSpeakerVolume(uint32_t& maxVolume) const override
++    {
++        RTC_LOG(LS_INFO) << __FUNCTION__;
++        return output_.MaxSpeakerVolume(maxVolume);
++    }
++
++    int32_t MinSpeakerVolume(uint32_t& minVolume) const override
++    {
++        RTC_LOG(LS_INFO) << __FUNCTION__;
++        return output_.MinSpeakerVolume(minVolume);
++    }
++
++    int32_t MicrophoneVolumeIsAvailable(bool& available) override
++    {
++        available = false;
++        return -1;
++    }
++
++    int32_t SetMicrophoneVolume(uint32_t volume) override
++    {
++        RTC_LOG(LS_INFO) << "should nerver be called";
++        return -1;
++    }
++
++    int32_t MicrophoneVolume(uint32_t& volume) const override
++    {
++        RTC_LOG(LS_INFO) << "should nerver be called";
++        return -1;
++    }
++
++    int32_t MaxMicrophoneVolume(uint32_t& maxVolume) const override
++    {
++        RTC_LOG(LS_INFO) << "should nerver be called";
++        return -1;
++    }
++
++    int32_t MinMicrophoneVolume(uint32_t& minVolume) const override
++    {
++        RTC_LOG(LS_INFO) << "should nerver be called";
++        return -1;
++    }
++
++    int32_t SpeakerMuteIsAvailable(bool& available) override
++    {
++        RTC_LOG(LS_INFO) << "should nerver be called";
++        return -1;
++    }
++
++    int32_t SetSpeakerMute(bool enable) override
++    {
++        RTC_LOG(LS_INFO) << "should nerver be called";
++        return -1;
++    }
++
++    int32_t SpeakerMute(bool& enabled) const override
++    {
++        RTC_LOG(LS_INFO) << "should nerver be called";
++        return -1;
++    }
++
++    int32_t MicrophoneMuteIsAvailable(bool& available) override
++    {
++        RTC_LOG(LS_INFO) << "not implemented";
++        return -1;
++    }
++
++    int32_t SetMicrophoneMute(bool enable) override
++    {
++        RTC_LOG(LS_INFO) << "not implemented";
++        return -1;
++    }
++
++    int32_t MicrophoneMute(bool& enabled) const override
++    {
++        RTC_LOG(LS_INFO) << "not implemented";
++        return -1;
++    }
++
++    int32_t StereoPlayoutIsAvailable(bool& available) override
++    {
++        RTC_LOG(LS_INFO) << __FUNCTION__;
++        return 0;
++    }
++
++    int32_t SetStereoPlayout(bool enable) override
++    {
++        RTC_LOG(LS_INFO) << __FUNCTION__;
++        bool available = true;
++        return (enable == available) ? 0 : -1;
++    }
++
++    int32_t StereoPlayout(bool& enabled) const override
++    {
++        return 0;
++    }
++
++    int32_t StereoRecordingIsAvailable(bool& available) override
++    {
++        RTC_LOG(LS_INFO) << __FUNCTION__;
++        return 0;
++    }
++
++    int32_t SetStereoRecording(bool enable) override
++    {
++        RTC_LOG(LS_INFO) << __FUNCTION__;
++        bool available = true;
++        return (enable == available) ? 0 : -1;
++    }
++
++    int32_t StereoRecording(bool& enabled) const override
++    {
++        RTC_LOG(LS_INFO) << __FUNCTION__;
++        return 0;
++    }
++
++    int32_t PlayoutDelay(uint16_t& delay_ms) const override
++    {
++        return 0;
++    }
++
++    void AttachAudioBuffer(AudioDeviceBuffer* audioBuffer) override
++    {
++        RTC_LOG(LS_INFO) << __FUNCTION__;
++        output_.AttachAudioBuffer(audioBuffer);
++        input_.AttachAudioBuffer(audioBuffer);
++    }
++
++private:
++    const AudioDeviceModule::AudioLayer audio_layer_;
++    OutputType output_;
++    InputType input_;
++    bool initialized_;
++};
++}  // namespace webrtc
++
++#endif  // AUDIO_DEVICE_TEMPLATE_H
+diff -Naur src/modules/audio_device/ohos/ohaudio_player.cc src_ohos/modules/audio_device/ohos/ohaudio_player.cc
+--- src/modules/audio_device/ohos/ohaudio_player.cc	1970-01-01 08:00:00.000000000 +0800
++++ src_ohos/modules/audio_device/ohos/ohaudio_player.cc	2024-04-20 15:52:17.785642564 +0800
+@@ -0,0 +1,185 @@
++/*
++# Copyright (c) 2023 Huawei Device Co., Ltd.
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++#     http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++*/
++
++#include "modules/audio_device/ohos/ohaudio_player.h"
++
++#include <memory>
++
++#include "api/array_view.h"
++#include "api/task_queue/task_queue_base.h"
++#include "modules/audio_device/fine_audio_buffer.h"
++#include "rtc_base/checks.h"
++#include "rtc_base/logging.h"
++
++namespace webrtc {
++
++OHAudioPlayer::OHAudioPlayer(const AudioParameters& audio_parameters)
++    : main_thread_(TaskQueueBase::Current()),
++    ohaudio_(audio_parameters, AUDIOSTREAM_TYPE_RENDERER, this)
++{
++    RTC_LOG(LS_INFO) << "ctor";
++    thread_checker_ohaudio_.Detach();
++}
++
++OHAudioPlayer::~OHAudioPlayer()
++{
++    RTC_LOG(LS_INFO) << "dtor";
++    RTC_DCHECK_RUN_ON(&main_thread_checker_);
++    Terminate();
++    RTC_LOG(LS_INFO) << "#detected underruns: " << underrun_count_;
++}
++
++int OHAudioPlayer::Init()
++{
++    RTC_LOG(LS_INFO) << "Init";
++    RTC_DCHECK_RUN_ON(&main_thread_checker_);
++    if (ohaudio_.audio_parameters().channels() == default_channels) {
++        RTC_DLOG(LS_WARNING) << "Stereo mode is enabled";
++    }
++    return 0;
++}
++
++int OHAudioPlayer::Terminate()
++{
++    RTC_LOG(LS_INFO) << "Terminate";
++    RTC_DCHECK_RUN_ON(&main_thread_checker_);
++    StopPlayout();
++    return 0;
++}
++
++int OHAudioPlayer::InitPlayout()
++{
++    RTC_LOG(LS_INFO) << "InitPlayout";
++    RTC_DCHECK_RUN_ON(&main_thread_checker_);
++    RTC_DCHECK(!initialized_);
++    RTC_DCHECK(!playing_);
++    if (!ohaudio_.Init()) {
++        return -1;
++    }
++    initialized_ = true;
++    return 0;
++}
++
++bool OHAudioPlayer::PlayoutIsInitialized() const
++{
++    RTC_DCHECK_RUN_ON(&main_thread_checker_);
++    return initialized_;
++}
++
++int OHAudioPlayer::StartPlayout()
++{
++    RTC_LOG(LS_INFO) << "StartPlayout";
++    RTC_DCHECK_RUN_ON(&main_thread_checker_);
++    RTC_DCHECK(!playing_);
++    if (!initialized_) {
++        RTC_DLOG(LS_WARNING)
++            << "Playout can not start since InitPlayout must succeed first";
++        return 0;
++    }
++    if (fine_audio_buffer_) {
++        fine_audio_buffer_->ResetPlayout();
++    }
++    if (!ohaudio_.Start()) {
++        return -1;
++    }
++    underrun_count_ = ohaudio_.xrun_count();
++    first_data_callback_ = true;
++    playing_ = true;
++    return 0;
++}
++
++int OHAudioPlayer::StopPlayout()
++{
++    RTC_LOG(LS_INFO) << "StopPlayout";
++    RTC_DCHECK_RUN_ON(&main_thread_checker_);
++    if (!initialized_ || !playing_) {
++        return 0;
++    }
++    if (!ohaudio_.Stop()) {
++        RTC_LOG(LS_ERROR) << "StopPlayout failed";
++        return -1;
++    }
++    thread_checker_ohaudio_.Detach();
++    initialized_ = false;
++    playing_ = false;
++    return 0;
++}
++
++bool OHAudioPlayer::Playing() const
++{
++    RTC_DCHECK_RUN_ON(&main_thread_checker_);
++    return playing_;
++}
++
++void OHAudioPlayer::AttachAudioBuffer(AudioDeviceBuffer* audioBuffer)
++{
++    RTC_DLOG(LS_INFO) << "AttachAudioBuffer";
++    RTC_DCHECK_RUN_ON(&main_thread_checker_);
++    audio_device_buffer_ = audioBuffer;
++    const AudioParameters audio_parameters = ohaudio_.audio_parameters();
++    audio_device_buffer_->SetPlayoutSampleRate(audio_parameters.sample_rate());
++    audio_device_buffer_->SetPlayoutChannels(audio_parameters.channels());
++    RTC_CHECK(audio_device_buffer_);
++    fine_audio_buffer_ = std::make_unique<FineAudioBuffer>(audio_device_buffer_);
++}
++
++int OHAudioPlayer::SpeakerVolumeIsAvailable(bool &available)
++{
++    available=false;
++    return 0;
++}
++
++int32_t OHAudioPlayer::OnErrorCallback(OH_AudioStream_Result error)
++{
++    return 0;
++}
++
++int32_t OHAudioPlayer::OnDataCallback(void* audio_data, int32_t num_frames)
++{
++    static const float half_sec = 0.5;
++    RTC_DCHECK_RUN_ON(&thread_checker_ohaudio_);
++    if (first_data_callback_) {
++        RTC_LOG(LS_INFO) << "--- First output data callback: device id="
++                         << ohaudio_.device_id();
++        first_data_callback_ = false;
++    }
++  //  RTC_LOG(LS_INFO) << "num_frames=" << num_frames;
++    const int32_t underrun_count = ohaudio_.xrun_count();
++    if (underrun_count > underrun_count_) {
++        RTC_LOG(LS_ERROR) << "Underrun detected: " << underrun_count;
++        underrun_count_ = underrun_count;
++        ohaudio_.IncreaseOutputBufferSize();
++    }
++    latency_millis_ = ohaudio_.EstimateLatencyMillis();
++    fine_audio_buffer_->GetPlayoutData(
++        rtc::MakeArrayView(static_cast<int16_t*>(audio_data),
++            num_frames / sizeof(int16_t)),
++            static_cast<int>(latency_millis_ + half_sec));
++
++    return 0;
++}
++
++void OHAudioPlayer::HandleStreamDisconnected()
++{
++    RTC_DCHECK_RUN_ON(&main_thread_checker_);
++    RTC_DLOG(LS_INFO) << "HandleStreamDisconnected";
++    if (!initialized_ || !playing_) {
++        return;
++    }
++    StopPlayout();
++    InitPlayout();
++    StartPlayout();
++}
++}  // namespace webrtc
+diff -Naur src/modules/audio_device/ohos/ohaudio_player.h src_ohos/modules/audio_device/ohos/ohaudio_player.h
+--- src/modules/audio_device/ohos/ohaudio_player.h	1970-01-01 08:00:00.000000000 +0800
++++ src_ohos/modules/audio_device/ohos/ohaudio_player.h	2024-04-13 18:18:41.032683021 +0800
+@@ -0,0 +1,85 @@
++/*
++# Copyright (c) 2023 Huawei Device Co., Ltd.
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++#     http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++*/
++
++#ifndef OHAUDIO_PLAYER_H
++#define OHAUDIO_PLAYER_H
++
++#include <ohaudio/native_audiorenderer.h>
++#include <ohaudio/native_audiostreambuilder.h>
++
++#include <memory>
++
++#include "absl/types/optional.h"
++#include "api/sequence_checker.h"
++#include "api/task_queue/task_queue_base.h"
++#include "modules/audio_device/audio_device_buffer.h"
++#include "modules/audio_device/include/audio_device_defines.h"
++#include "rtc_base/thread_annotations.h"
++#include "modules/audio_device/ohos/ohaudio_player_wrapper.h"
++#include "modules/audio_device/ohos/audio_device_module.h"
++
++namespace webrtc {
++
++class AudioDeviceBuffer;
++class FineAudioBuffer;
++
++class OHAudioPlayer final : public AudioOutput, public OHAudioPlayerObserverInterface {
++public:
++    explicit OHAudioPlayer(const AudioParameters& audio_parameters);
++    ~OHAudioPlayer() override;
++
++    int Init() override;
++    int Terminate() override;
++
++    int InitPlayout() override;
++    bool PlayoutIsInitialized() const override;
++
++    int StartPlayout() override;
++    int StopPlayout() override;
++    bool Playing() const override;
++
++    void AttachAudioBuffer(AudioDeviceBuffer* audioBuffer) override;
++
++    int SpeakerVolumeIsAvailable(bool &available) override;
++    int SetSpeakerVolume(uint32_t volume) override { return -1; }
++    int SpeakerVolume(uint32_t &volume) const override { return -1; }
++    int MaxSpeakerVolume(uint32_t &maxVolume) const override { return -1; }
++    int MinSpeakerVolume(uint32_t &minVolume) const override { return -1; }
++
++protected:
++    int32_t OnDataCallback(void* audio_data, int32_t num_frames) override;
++    int32_t OnErrorCallback(OH_AudioStream_Result error) override;
++
++private:
++    int GetPlayoutUnderrunCount() override { return 0; }
++    void HandleStreamDisconnected();
++    SequenceChecker main_thread_checker_;
++    SequenceChecker thread_checker_ohaudio_;
++    TaskQueueBase* main_thread_;
++    OHAudioPlayerWrapper ohaudio_;
++    std::unique_ptr<FineAudioBuffer> fine_audio_buffer_;
++    int32_t underrun_count_ = 0;
++    bool first_data_callback_ = true;
++    AudioDeviceBuffer* audio_device_buffer_ RTC_GUARDED_BY(main_thread_checker_) = nullptr;
++
++    bool initialized_ RTC_GUARDED_BY(main_thread_checker_) = false;
++    bool playing_ RTC_GUARDED_BY(main_thread_checker_) = false;
++
++    double latency_millis_ RTC_GUARDED_BY(thread_checker_ohaudio_) = 0;
++    static const int default_channels = 2;
++};
++}  // namespace webrtc
++
++#endif  // OHAUDIO_PLAYER_H
+diff -Naur src/modules/audio_device/ohos/ohaudio_player_wrapper.cc src_ohos/modules/audio_device/ohos/ohaudio_player_wrapper.cc
+--- src/modules/audio_device/ohos/ohaudio_player_wrapper.cc	1970-01-01 08:00:00.000000000 +0800
++++ src_ohos/modules/audio_device/ohos/ohaudio_player_wrapper.cc	2024-04-20 15:38:05.097992336 +0800
+@@ -0,0 +1,421 @@
++/*
++# Copyright (c) 2023 Huawei Device Co., Ltd.
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++#     http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++*/
++
++#include "modules/audio_device/ohos/ohaudio_player_wrapper.h"
++
++#include "rtc_base/logging.h"
++#include "rtc_base/strings/string_builder.h"
++#include "rtc_base/time_utils.h"
++
++#define LOG_ON_ERROR(op)                                                      \
++    do {                                                                        \
++        OH_AudioStream_Result result = (op);                                            \
++        if (result != AUDIOSTREAM_SUCCESS) {                                                \
++            RTC_LOG(LS_ERROR) << #op << ": " << "NOK"; \
++        }                                                                         \
++    } while (0)
++
++#define RETURN_ON_ERROR(op, ...)                                              \
++    do {                                                                        \
++        OH_AudioStream_Result result = (op);                                            \
++        if (result != AUDIOSTREAM_SUCCESS) {                                                \
++            RTC_LOG(LS_ERROR) << #op << ": " << "NOK"; \
++            return __VA_ARGS__;                                                     \
++        }                                                                         \
++    } while (0)
++
++namespace webrtc {
++namespace {
++
++const char* DirectionToString(OH_AudioStream_Type direction)
++{
++    switch (direction) {
++        case AUDIOSTREAM_TYPE_RENDERER:
++            return "OUTPUT";
++        case AUDIOSTREAM_TYPE_CAPTURER:
++            return "INPUT";
++        default:
++            return "UNKNOWN";
++    }
++}
++
++const char *StateToString(OH_AudioStream_State state)
++{
++    switch (state) {
++        case AUDIOSTREAM_STATE_INVALID:
++            return "INVALID";
++        case AUDIOSTREAM_STATE_PREPARED:
++            return "PREPARED";
++        case AUDIOSTREAM_STATE_RUNNING:
++            return "RUNNING";
++        case AUDIOSTREAM_STATE_STOPPED:
++            return "STOPPED";
++        case AUDIOSTREAM_STATE_RELEASED:
++            return "RELEASED";
++        case AUDIOSTREAM_STATE_PAUSED:
++            return "PAUSED";
++        default:
++            return "UNKNOWN";
++    }
++}
++
++const char* PerformanceModeToString(OH_AudioStream_LatencyMode mode)
++{
++    switch (mode) {
++        case AUDIOSTREAM_LATENCY_MODE_NORMAL:
++            return "NORMAL";
++        case AUDIOSTREAM_LATENCY_MODE_FAST:
++            return "LOW_LATENCY";
++        default:
++            return "UNKNOWN";
++    }
++}
++
++const char* FormatToString(OH_AudioStream_SampleFormat id)
++{
++    switch (id) {
++        case AUDIOSTREAM_SAMPLE_U8:
++            return "INVALu8ID";
++        case AUDIOSTREAM_SAMPLE_S16LE:
++            return "S16LE";
++        case AUDIOSTREAM_SAMPLE_S24LE:
++            return "S24LE";
++        case AUDIOSTREAM_SAMPLE_S32LE:
++            return "S32LE";
++        default:
++            return "UNKNOWN";
++    }
++}
++
++static int32_t ErrorCallback(OH_AudioRenderer *stream, void* user_data, OH_AudioStream_Result error)
++{
++    RTC_DCHECK(user_data);
++    OHAudioPlayerWrapper* ohaudio_wrapper = reinterpret_cast<OHAudioPlayerWrapper*>(user_data);
++    RTC_LOG(LS_WARNING) << "ErrorCallback: "
++                        << DirectionToString(ohaudio_wrapper->direction());
++    RTC_DCHECK(ohaudio_wrapper->observer());
++    return ohaudio_wrapper->observer()->OnErrorCallback(error);
++}
++
++static int32_t DataCallback(OH_AudioRenderer *stream, void* user_data, void* audio_data, int32_t bufferLen)
++{
++    RTC_DCHECK(user_data);
++    RTC_DCHECK(audio_data);
++    RTC_LOG(LS_INFO) << "bufferLen=" << bufferLen;
++    OHAudioPlayerWrapper* ohaudio_wrapper = reinterpret_cast<OHAudioPlayerWrapper*>(user_data);
++    RTC_DCHECK(ohaudio_wrapper->observer());
++    return ohaudio_wrapper->observer()->OnDataCallback(audio_data, bufferLen);
++}
++
++class ScopedStreamBuilder {
++public:
++    ScopedStreamBuilder(OH_AudioStream_Type streamType)
++    {
++        LOG_ON_ERROR(OH_AudioStreamBuilder_Create(&builder_, streamType));
++        RTC_DCHECK(builder_);
++    }
++    ~ScopedStreamBuilder()
++    {
++        if (builder_) {
++            LOG_ON_ERROR(OH_AudioStreamBuilder_Destroy(builder_));
++        }
++    }
++
++    OH_AudioStreamBuilder* get() const { return builder_; }
++
++private:
++    OH_AudioStreamBuilder* builder_ = nullptr;
++};
++}  // namespace
++
++OHAudioPlayerWrapper::OHAudioPlayerWrapper(const AudioParameters& audio_parameters,
++    OH_AudioStream_Type direction, OHAudioPlayerObserverInterface* observer)
++    : audio_parameters_(audio_parameters), direction_(direction), observer_(observer)
++{
++    RTC_LOG(LS_INFO) << "ctor";
++    RTC_DCHECK(observer_);
++    ohaudio_thread_checker_.Detach();
++    RTC_LOG(LS_INFO) << audio_parameters_.ToString();
++}
++
++OHAudioPlayerWrapper::~OHAudioPlayerWrapper()
++{
++    RTC_LOG(LS_INFO) << "dtor";
++    RTC_DCHECK(thread_checker_.IsCurrent());
++    RTC_DCHECK(!stream_);
++}
++
++bool OHAudioPlayerWrapper::Init()
++{
++    RTC_LOG(LS_INFO) << "Init";
++    RTC_DCHECK(thread_checker_.IsCurrent());
++    ScopedStreamBuilder builder(AUDIOSTREAM_TYPE_RENDERER);
++    SetStreamConfiguration(builder.get());
++    if (!OpenStream(builder.get())) {
++        return false;
++    }
++    if (!VerifyStreamConfiguration()) {
++        return false;
++    }
++    if (!OptimizeBuffers()) {
++        return false;
++    }
++    LogStreamState();
++    return true;
++}
++
++bool OHAudioPlayerWrapper::Start()
++{
++    RTC_LOG(LS_INFO) << "Start";
++    RTC_DCHECK(thread_checker_.IsCurrent());
++    OH_AudioStream_State current_state;
++    OH_AudioRenderer_GetCurrentState(stream_, &current_state);
++    if (current_state != AUDIOSTREAM_STATE_PREPARED) {
++        RTC_LOG(LS_ERROR) << "Invalid state: "
++                          << StateToString(current_state);
++        return false;
++    }
++    RETURN_ON_ERROR(OH_AudioRenderer_Start(stream_), false);
++    LogStreamState();
++    return true;
++}
++
++bool OHAudioPlayerWrapper::Stop()
++{
++    RTC_LOG(LS_INFO) << "Stop: " << DirectionToString(direction());
++    RTC_DCHECK(thread_checker_.IsCurrent());
++    RETURN_ON_ERROR(OH_AudioRenderer_Stop(stream_), false);
++    CloseStream();
++    ohaudio_thread_checker_.Detach();
++    return true;
++}
++
++double OHAudioPlayerWrapper::EstimateLatencyMillis() const
++{
++    RTC_DCHECK(stream_);
++    double latency_millis = 20.0;
++    static const int latency_time = 20;
++#if 0
++    if (direction() == AUDIOSTREAM_TYPE_CAPTURER) {
++        latency_millis = latency_time;
++    } else {
++        int64_t existing_frame_index;
++        int64_t existing_frame_presentation_time;
++        OH_AudioStream_Result result = OH_AudioRenderer_GetTimestamp(
++            stream_, CLOCK_MONOTONIC, &existing_frame_index,
++            &existing_frame_presentation_time);
++        if (result == AUDIOSTREAM_SUCCESS) {
++            int64_t next_frame_index = frames_written();
++            int64_t frame_index_delta = next_frame_index - existing_frame_index;
++            int64_t next_frame_write_time = rtc::TimeNanos();
++            int64_t frame_time_delta = (frame_index_delta * rtc::kNumNanosecsPerSec) / sample_rate();
++            int64_t next_frame_presentation_time = existing_frame_presentation_time + frame_time_delta;
++            latency_millis = static_cast<double>(next_frame_presentation_time -
++                                                 next_frame_write_time) /
++                                                 rtc::kNumNanosecsPerMillisec;
++        }
++    }
++#endif
++    return latency_millis;
++}
++
++bool OHAudioPlayerWrapper::IncreaseOutputBufferSize()
++{
++    RTC_LOG(LS_INFO) << "IncreaseBufferSize";
++    RTC_DCHECK(stream_);
++    RTC_DCHECK(ohaudio_thread_checker_.IsCurrent());
++    RTC_DCHECK_EQ(direction(), AUDIOSTREAM_TYPE_RENDERER);
++
++    return true;
++}
++
++void OHAudioPlayerWrapper::ClearInputStream(void* audio_data, int32_t num_frames)
++{
++    RTC_LOG(LS_INFO) << "ClearInputStream";
++    RTC_DCHECK(stream_);
++    RTC_DCHECK(ohaudio_thread_checker_.IsCurrent());
++    RTC_DCHECK_EQ(direction(), AUDIOSTREAM_TYPE_CAPTURER);
++}
++
++OHAudioPlayerObserverInterface* OHAudioPlayerWrapper::observer() const
++{
++    return observer_;
++}
++
++AudioParameters OHAudioPlayerWrapper::audio_parameters() const
++{
++    return audio_parameters_;
++}
++
++int32_t OHAudioPlayerWrapper::samples_per_frame() const
++{
++    RTC_DCHECK(stream_);
++    int32_t channel_count;
++    OH_AudioRenderer_GetChannelCount(stream_, &channel_count);
++    return channel_count;
++}
++
++int32_t OHAudioPlayerWrapper::device_id() const
++{
++    RTC_DCHECK(stream_);
++    return 0;
++}
++
++int32_t OHAudioPlayerWrapper::xrun_count() const
++{
++    RTC_DCHECK(stream_);
++    return 0;
++}
++
++OH_AudioStream_SampleFormat OHAudioPlayerWrapper::format() const
++{
++    RTC_DCHECK(stream_);
++    OH_AudioStream_SampleFormat sampleFormat;
++    OH_AudioRenderer_GetSampleFormat(stream_, &sampleFormat);
++    return sampleFormat;
++}
++
++int32_t OHAudioPlayerWrapper::sample_rate() const
++{
++    RTC_DCHECK(stream_);
++    int32_t rate;
++    OH_AudioRenderer_GetSamplingRate(stream_, &rate);
++    return rate;
++}
++
++int32_t OHAudioPlayerWrapper::channel_count() const
++{
++    RTC_DCHECK(stream_);
++    int32_t channelCount;
++    OH_AudioRenderer_GetChannelCount(stream_, &channelCount);
++    return channelCount;
++}
++
++OH_AudioStream_LatencyMode OHAudioPlayerWrapper::performance_mode() const
++{
++    RTC_DCHECK(stream_);
++    OH_AudioStream_LatencyMode latencyMode;
++    OH_AudioRenderer_GetLatencyMode(stream_, &latencyMode);
++    return latencyMode;
++}
++
++OH_AudioStream_State OHAudioPlayerWrapper::stream_state() const
++{
++    RTC_DCHECK(stream_);
++    OH_AudioStream_State current_state;
++    OH_AudioRenderer_GetCurrentState(stream_, &current_state);
++    return current_state;
++}
++
++int64_t OHAudioPlayerWrapper::frames_written() const
++{
++    RTC_DCHECK(stream_);
++    int64_t frames;
++    OH_AudioRenderer_GetFramesWritten(stream_, &frames);
++    return frames;
++}
++
++int64_t OHAudioPlayerWrapper::frames_read() const
++{
++    RTC_DCHECK(stream_);
++    return 0;
++}
++
++void OHAudioPlayerWrapper::SetStreamConfiguration(OH_AudioStreamBuilder* builder)
++{
++    RTC_LOG(LS_INFO) << "SetStreamConfiguration";
++    RTC_DCHECK(builder);
++    RTC_DCHECK(thread_checker_.IsCurrent());
++    OH_AudioStreamBuilder_SetSamplingRate(builder, audio_parameters().sample_rate());
++    OH_AudioStreamBuilder_SetChannelCount(builder, audio_parameters().channels());
++    OH_AudioStreamBuilder_SetSampleFormat(builder, AUDIOSTREAM_SAMPLE_S16LE);
++    OH_AudioStreamBuilder_SetLatencyMode(builder, (OH_AudioStream_LatencyMode)AUDIOSTREAM_LATENCY_MODE_NORMAL);
++    OH_AudioRenderer_Callbacks callbacks;
++    callbacks.OH_AudioRenderer_OnWriteData = DataCallback;
++    callbacks.OH_AudioRenderer_OnError = ErrorCallback;
++    OH_AudioStreamBuilder_SetRendererCallback(builder, callbacks, this);
++}
++
++bool OHAudioPlayerWrapper::OpenStream(OH_AudioStreamBuilder* builder)
++{
++    RTC_LOG(LS_INFO) << "OpenStream";
++    RTC_DCHECK(builder);
++    OH_AudioRenderer* stream = nullptr;
++    RETURN_ON_ERROR(OH_AudioStreamBuilder_GenerateRenderer(builder, &stream), false);
++    stream_ = stream;
++    LogStreamConfiguration();
++    return true;
++}
++
++void OHAudioPlayerWrapper::CloseStream()
++{
++    RTC_LOG(LS_INFO) << "CloseStream";
++    RTC_DCHECK(stream_);
++    LOG_ON_ERROR(OH_AudioRenderer_Release(stream_));
++    stream_ = nullptr;
++}
++
++void OHAudioPlayerWrapper::LogStreamConfiguration()
++{
++    RTC_DCHECK(stream_);
++    char ss_buf[1024];
++    rtc::SimpleStringBuilder ss(ss_buf);
++    ss << "Stream Configuration: ";
++    ss << "sample rate=" << sample_rate() << ", channels=" << channel_count();
++    ss << ", format=" << FormatToString(format());
++    ss << ", performance mode=" << PerformanceModeToString(performance_mode());
++    ss << ", direction=" << DirectionToString(direction());
++    RTC_LOG(LS_INFO) << ss.str();
++}
++
++void OHAudioPlayerWrapper::LogStreamState()
++{
++    RTC_LOG(LS_INFO) << "OHAudio stream state: "
++                     << StateToString(stream_state());
++}
++
++bool OHAudioPlayerWrapper::VerifyStreamConfiguration()
++{
++    RTC_LOG(LS_INFO) << "VerifyStreamConfiguration";
++    RTC_DCHECK(stream_);
++    int32_t rate;
++    OH_AudioRenderer_GetSamplingRate(stream_, &rate);
++    if (rate != audio_parameters().sample_rate()) {
++        RTC_LOG(LS_ERROR) << "Stream unable to use requested sample rate";
++        return false;
++    }
++    int32_t channelCount;
++    OH_AudioRenderer_GetChannelCount(stream_, &channelCount);
++    if (channelCount != static_cast<int32_t>(audio_parameters().channels())) {
++        RTC_LOG(LS_ERROR) << "Stream unable to use requested channel count";
++        return false;
++    }
++
++    OH_AudioStream_SampleFormat sampleFormat;
++    OH_AudioRenderer_GetSampleFormat(stream_, &sampleFormat);
++    if (sampleFormat != AUDIOSTREAM_SAMPLE_S16LE) {
++        RTC_LOG(LS_ERROR) << "Stream unable to use requested format";
++        return false;
++    }
++    return true;
++}
++
++bool OHAudioPlayerWrapper::OptimizeBuffers()
++{
++    RTC_LOG(LS_INFO) << "OptimizeBuffers";
++    RTC_DCHECK(stream_);
++    return true;
++}
++}  // namespace webrtc
+diff -Naur src/modules/audio_device/ohos/ohaudio_player_wrapper.h src_ohos/modules/audio_device/ohos/ohaudio_player_wrapper.h
+--- src/modules/audio_device/ohos/ohaudio_player_wrapper.h	1970-01-01 08:00:00.000000000 +0800
++++ src_ohos/modules/audio_device/ohos/ohaudio_player_wrapper.h	2024-04-13 18:18:41.032683021 +0800
+@@ -0,0 +1,85 @@
++/*
++# Copyright (c) 2023 Huawei Device Co., Ltd.
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++#     http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++*/
++
++#ifndef SDK_OHOS_SRC_AUDIO_DEVICE_OHAUDIO_PLAYER_WRAPPER_H
++#define SDK_OHOS_SRC_AUDIO_DEVICE_OHAUDIO_PLAYER_WRAPPER_H
++
++#include <ohaudio/native_audiorenderer.h>
++#include <ohaudio/native_audiostreambuilder.h>
++
++#include "api/sequence_checker.h"
++#include "modules/audio_device/include/audio_device_defines.h"
++
++namespace webrtc {
++class OHAudioPlayerObserverInterface {
++public:
++    virtual int32_t OnDataCallback(void* audio_data, int32_t num_frames) = 0;
++    virtual int32_t OnErrorCallback(OH_AudioStream_Result error) = 0;
++
++protected:
++    virtual ~OHAudioPlayerObserverInterface() {}
++};
++
++class OHAudioPlayerWrapper {
++public:
++    OHAudioPlayerWrapper(const AudioParameters& audio_parameters,
++                         OH_AudioStream_Type direction,
++                         OHAudioPlayerObserverInterface* observer);
++    ~OHAudioPlayerWrapper();
++
++    bool Init();
++    bool Start();
++    bool Stop();
++
++    double EstimateLatencyMillis() const;
++    bool IncreaseOutputBufferSize();
++    void ClearInputStream(void* audio_data, int32_t num_frames);
++
++    OHAudioPlayerObserverInterface* observer() const;
++    AudioParameters audio_parameters() const;
++    int32_t samples_per_frame() const;
++    int32_t device_id() const;
++    int32_t xrun_count() const;
++    OH_AudioStream_SampleFormat format() const;
++    int32_t sample_rate() const;
++    int32_t channel_count() const;
++    OH_AudioStream_LatencyMode performance_mode() const;
++    OH_AudioStream_State stream_state() const;
++    int64_t frames_written() const;
++    int64_t frames_read() const;
++    OH_AudioStream_Type direction() const { return direction_; }
++    OH_AudioRenderer* stream() const { return stream_; }
++    int32_t frames_per_burst() const { return frames_per_burst_; }
++
++private:
++    void SetStreamConfiguration(OH_AudioStreamBuilder* builder);
++    bool OpenStream(OH_AudioStreamBuilder* builder);
++    void CloseStream();
++    void LogStreamConfiguration();
++    void LogStreamState();
++    bool VerifyStreamConfiguration();
++    bool OptimizeBuffers();
++
++    SequenceChecker thread_checker_;
++    SequenceChecker ohaudio_thread_checker_;
++    const AudioParameters audio_parameters_;
++    const OH_AudioStream_Type direction_;
++    OHAudioPlayerObserverInterface* observer_ = nullptr;
++    OH_AudioRenderer* stream_ = nullptr;
++    int32_t frames_per_burst_ = 0;
++};
++}  // namespace webrtc
++
++#endif  // SDK_OHOS_SRC_AUDIO_DEVICE_OHAUDIO_PLAYER_WRAPPER_H
+diff -Naur src/modules/audio_device/ohos/ohaudio_recorder.cc src_ohos/modules/audio_device/ohos/ohaudio_recorder.cc
+--- src/modules/audio_device/ohos/ohaudio_recorder.cc	1970-01-01 08:00:00.000000000 +0800
++++ src_ohos/modules/audio_device/ohos/ohaudio_recorder.cc	2024-04-13 18:18:41.032683021 +0800
+@@ -0,0 +1,204 @@
++/*
++# Copyright (c) 2023 Huawei Device Co., Ltd.
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++#     http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++*/
++
++#include "modules/audio_device/ohos/ohaudio_recorder.h"
++
++#include <memory>
++#include <cerrno>
++#include "api/array_view.h"
++#include "modules/audio_device/fine_audio_buffer.h"
++#include "rtc_base/checks.h"
++#include "rtc_base/logging.h"
++#include "rtc_base/time_utils.h"
++
++namespace webrtc {
++
++OHAudioRecorder::OHAudioRecorder(const AudioParameters& audio_parameters)
++    : main_thread_(TaskQueueBase::Current()),
++      ohaudio_(audio_parameters, AUDIOSTREAM_TYPE_CAPTURER, this)
++{
++    RTC_LOG(LS_INFO) << "ctor";
++    thread_checker_ohaudio_.Detach();
++}
++
++OHAudioRecorder::~OHAudioRecorder()
++{
++    RTC_LOG(LS_INFO) << "dtor";
++    RTC_DCHECK(thread_checker_.IsCurrent());
++    Terminate();
++    RTC_LOG(LS_INFO) << "detected owerflows: " << overflow_count_;
++}
++
++int OHAudioRecorder::Init()
++{
++    RTC_LOG(LS_INFO) << "Init";
++    RTC_DCHECK(thread_checker_.IsCurrent());
++    if (ohaudio_.audio_parameters().channels() == default_channels) {
++        RTC_DLOG(LS_WARNING) << "Stereo mode is enabled";
++    }
++    return 0;
++}
++
++int OHAudioRecorder::Terminate()
++{
++    RTC_LOG(LS_INFO) << "Terminate";
++    RTC_DCHECK(thread_checker_.IsCurrent());
++    StopRecording();
++    return 0;
++}
++
++int OHAudioRecorder::InitRecording()
++{
++    RTC_LOG(LS_INFO) << "InitRecording";
++    RTC_DCHECK(thread_checker_.IsCurrent());
++    RTC_DCHECK(!initialized_);
++    RTC_DCHECK(!recording_);
++    if (!ohaudio_.Init()) {
++        RTC_LOG(LS_ERROR) << "OHAUDIO INIT FAILED! errcode = " << errno;
++        return -1;
++    }
++    initialized_ = true;
++    return 0;
++}
++
++bool OHAudioRecorder::RecordingIsInitialized() const
++{
++    RTC_LOG(LS_INFO) << "initialized_ = " << initialized_;
++    return initialized_;
++}
++
++int OHAudioRecorder::StartRecording()
++{
++    RTC_LOG(LS_INFO) << "StartRecording";
++    RTC_DCHECK(thread_checker_.IsCurrent());
++    RTC_DCHECK(initialized_);
++    RTC_DCHECK(!recording_);
++    if (fine_audio_buffer_) {
++        fine_audio_buffer_->ResetPlayout();
++    }
++    if (!ohaudio_.Start()) {
++        return -1;
++    }
++    overflow_count_ = ohaudio_.xrun_count();
++    first_data_callback_ = true;
++    recording_ = true;
++    return 0;
++}
++
++int OHAudioRecorder::StopRecording()
++{
++    RTC_LOG(LS_INFO) << "StopRecording";
++    RTC_DCHECK(thread_checker_.IsCurrent());
++    if (!initialized_ || !recording_) {
++        return 0;
++    }
++    if (!ohaudio_.Stop()) {
++        return -1;
++    }
++    thread_checker_ohaudio_.Detach();
++    initialized_ = false;
++    recording_ = false;
++    return 0;
++}
++
++bool OHAudioRecorder::Recording() const
++{
++    return recording_;
++}
++
++void OHAudioRecorder::AttachAudioBuffer(AudioDeviceBuffer* audioBuffer)
++{
++    RTC_LOG(LS_INFO) << "AttachAudioBuffer";
++    RTC_DCHECK(thread_checker_.IsCurrent());
++    audio_device_buffer_ = audioBuffer;
++    const AudioParameters audio_parameters = ohaudio_.audio_parameters();
++    audio_device_buffer_->SetRecordingSampleRate(audio_parameters.sample_rate());
++    audio_device_buffer_->SetRecordingChannels(audio_parameters.channels());
++    RTC_CHECK(audio_device_buffer_);
++    fine_audio_buffer_ = std::make_unique<FineAudioBuffer>(audio_device_buffer_);
++}
++
++bool OHAudioRecorder::IsAcousticEchoCancelerSupported() const
++{
++    return false;
++}
++
++bool OHAudioRecorder::IsNoiseSuppressorSupported() const
++{
++    return false;
++}
++
++int OHAudioRecorder::EnableBuiltInAEC(bool enable)
++{
++    RTC_LOG(LS_INFO) << "EnableBuiltInAEC: " << enable;
++    RTC_LOG(LS_ERROR) << "Not implemented";
++    return -1;
++}
++
++int OHAudioRecorder::EnableBuiltInNS(bool enable)
++{
++    RTC_LOG(LS_INFO) << "EnableBuiltInNS: " << enable;
++    RTC_LOG(LS_ERROR) << "Not implemented";
++    return -1;
++}
++
++int32_t OHAudioRecorder::OnErrorCallback(OH_AudioStream_Result error)
++{
++    return 0;
++}
++
++int32_t OHAudioRecorder::OnDataCallback(void* audio_data, int32_t num_frames)
++{
++    RTC_LOG(LS_INFO) << "num_frames=" <<num_frames;
++    static const int audio_data_1s = 1000;
++    static const float half_sec = 0.5;
++    if (first_data_callback_) {
++        RTC_LOG(LS_INFO) << "--- First input data callback: device id="
++                         << ohaudio_.device_id();
++        ohaudio_.ClearInputStream(audio_data, num_frames);
++        first_data_callback_ = false;
++    }
++
++    const int32_t overflow_count = ohaudio_.xrun_count();
++    if (overflow_count > overflow_count_) {
++        RTC_LOG(LS_ERROR) << "Overflow detected: " << overflow_count;
++        overflow_count_ = overflow_count;
++    }
++
++    latency_millis_ = ohaudio_.EstimateLatencyMillis();
++    if (ohaudio_.frames_read() % (audio_data_1s * ohaudio_.frames_per_burst()) == 0) {
++        RTC_DLOG(LS_INFO) << "input latency: " << latency_millis_
++                          << ", num_frames: " << num_frames;
++    }
++    fine_audio_buffer_->DeliverRecordedData(
++        rtc::MakeArrayView(static_cast<const int16_t*>(audio_data),
++                           num_frames / sizeof(int16_t)),
++        static_cast<int>(latency_millis_ + half_sec));
++
++    return 0;
++}
++
++void OHAudioRecorder::HandleStreamDisconnected()
++{
++    RTC_DCHECK_RUN_ON(&thread_checker_);
++    RTC_LOG(LS_INFO) << "HandleStreamDisconnected";
++    if (!initialized_ || !recording_) {
++        return;
++    }
++    StopRecording();
++    InitRecording();
++    StartRecording();
++}
++}  // namespace webrtc
+diff -Naur src/modules/audio_device/ohos/ohaudio_recorder.h src_ohos/modules/audio_device/ohos/ohaudio_recorder.h
+--- src/modules/audio_device/ohos/ohaudio_recorder.h	1970-01-01 08:00:00.000000000 +0800
++++ src_ohos/modules/audio_device/ohos/ohaudio_recorder.h	2024-04-13 18:18:41.032683021 +0800
+@@ -0,0 +1,81 @@
++/*
++# Copyright (c) 2023 Huawei Device Co., Ltd.
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++#     http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++*/
++
++#ifndef SDK_OHOS_SRC_AUDIO_DEVICE_OHAUDIO_RECORDER_H
++#define SDK_OHOS_SRC_AUDIO_DEVICE_OHAUDIO_RECORDER_H
++
++#include <ohaudio/native_audiocapturer.h>
++#include <ohaudio/native_audiostreambuilder.h>
++
++#include <memory>
++
++#include "api/sequence_checker.h"
++#include "api/task_queue/task_queue_base.h"
++#include "modules/audio_device/audio_device_buffer.h"
++#include "modules/audio_device/include/audio_device_defines.h"
++#include "modules/audio_device/ohos/ohaudio_recorder_wrapper.h"
++#include "modules/audio_device/ohos/audio_device_module.h"
++
++namespace webrtc {
++
++class FineAudioBuffer;
++class AudioDeviceBuffer;
++
++class OHAudioRecorder : public AudioInput, public OHAudioRecorderObserverInterface {
++public:
++    explicit OHAudioRecorder(const AudioParameters& audio_parameters);
++    ~OHAudioRecorder() override;
++
++    int Init() override;
++    int Terminate() override;
++
++    int InitRecording() override;
++    bool RecordingIsInitialized() const override;
++
++    int StartRecording() override;
++    int StopRecording() override;
++    bool Recording() const override;
++
++    void AttachAudioBuffer(AudioDeviceBuffer* audioBuffer) override;
++
++    bool IsAcousticEchoCancelerSupported() const override;
++    bool IsNoiseSuppressorSupported() const override;
++    int EnableBuiltInAEC(bool enable) override;
++    int EnableBuiltInNS(bool enable) override;
++
++protected:
++    int32_t OnDataCallback(void* audio_data, int32_t num_frames) override;
++    int32_t OnErrorCallback(OH_AudioStream_Result error) override;
++
++private:
++    void HandleStreamDisconnected();
++    SequenceChecker thread_checker_;
++    SequenceChecker thread_checker_ohaudio_;
++    TaskQueueBase* main_thread_;
++    OHAudioRecorderWrapper ohaudio_;
++    AudioDeviceBuffer* audio_device_buffer_ = nullptr;
++
++    bool initialized_ = false;
++    bool recording_ = false;
++    std::unique_ptr<FineAudioBuffer> fine_audio_buffer_;
++    int32_t overflow_count_ = 0;
++    double latency_millis_ = 0;
++    bool first_data_callback_ = true;
++
++    static const int default_channels = 2;
++};
++}  // namespace webrtc
++
++#endif  // SDK_OHOS_SRC_AUDIO_DEVICE_OHAUDIO_RECORDER_H
+diff -Naur src/modules/audio_device/ohos/ohaudio_recorder_wrapper.cc src_ohos/modules/audio_device/ohos/ohaudio_recorder_wrapper.cc
+--- src/modules/audio_device/ohos/ohaudio_recorder_wrapper.cc	1970-01-01 08:00:00.000000000 +0800
++++ src_ohos/modules/audio_device/ohos/ohaudio_recorder_wrapper.cc	2024-04-20 15:38:22.728995545 +0800
+@@ -0,0 +1,410 @@
++/*
++# Copyright (c) 2023 Huawei Device Co., Ltd.
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++#     http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++*/
++
++#include "modules/audio_device/ohos/ohaudio_recorder_wrapper.h"
++
++#include "rtc_base/logging.h"
++#include "rtc_base/strings/string_builder.h"
++#include "rtc_base/time_utils.h"
++
++#define LOG_ON_ERROR(op)                                                      \
++    do {                                                                        \
++        OH_AudioStream_Result result = (op);                                            \
++        if (result != AUDIOSTREAM_SUCCESS) {                                                \
++            RTC_LOG(LS_ERROR) << #op << ": " << "NOK"; \
++        }                                                                         \
++    } while (0)
++
++#define RETURN_ON_ERROR(op, ...)                                              \
++    do {                                                                        \
++        OH_AudioStream_Result result = (op);                                            \
++        if (result != AUDIOSTREAM_SUCCESS) {                                                \
++            RTC_LOG(LS_ERROR) << #op << ": " << "NOK"; \
++            return __VA_ARGS__;                                                     \
++        }                                                                         \
++    } while (0)
++
++namespace webrtc {
++
++namespace {
++
++const char* DirectionToString(OH_AudioStream_Type direction)
++{
++    switch (direction) {
++        case AUDIOSTREAM_TYPE_RENDERER:
++            return "OUTPUT";
++        case AUDIOSTREAM_TYPE_CAPTURER:
++            return "INPUT";
++        default:
++            return "UNKNOWN";
++    }
++}
++
++const char *StateToString(OH_AudioStream_State state)
++{
++    switch (state) {
++        case AUDIOSTREAM_STATE_INVALID:
++            return "INVALID";
++        case AUDIOSTREAM_STATE_PREPARED:
++            return "PREPARED";
++        case AUDIOSTREAM_STATE_RUNNING:
++            return "RUNNING";
++        case AUDIOSTREAM_STATE_STOPPED:
++            return "STOPPED";
++        case AUDIOSTREAM_STATE_RELEASED:
++            return "RELEASED";
++        case AUDIOSTREAM_STATE_PAUSED:
++            return "PAUSED";
++        default:
++            return "UNKNOWN";
++    }
++}
++
++const char* PerformanceModeToString(OH_AudioStream_LatencyMode mode)
++{
++    switch (mode) {
++        case AUDIOSTREAM_LATENCY_MODE_NORMAL:
++            return "NORMAL";
++        case AUDIOSTREAM_LATENCY_MODE_FAST:
++            return "LOW_LATENCY";
++        default:
++            return "UNKNOWN";
++    }
++}
++
++const char* FormatToString(OH_AudioStream_SampleFormat id)
++{
++    switch (id) {
++        case AUDIOSTREAM_SAMPLE_U8:
++            return "INVALu8ID";
++        case AUDIOSTREAM_SAMPLE_S16LE:
++            return "S16LE";
++        case AUDIOSTREAM_SAMPLE_S24LE:
++            return "S24LE";
++        case AUDIOSTREAM_SAMPLE_S32LE:
++            return "S32LE";
++        default:
++            return "UNKNOWN";
++    }
++}
++
++static int32_t ErrorCallback(OH_AudioCapturer* stream, void* user_data, OH_AudioStream_Result error)
++{
++    RTC_DCHECK(user_data);
++    OHAudioRecorderWrapper* ohaudio_wrapper = reinterpret_cast<OHAudioRecorderWrapper*>(user_data);
++    RTC_LOG(LS_WARNING) << "ErrorCallback: "
++                        << DirectionToString(ohaudio_wrapper->direction());
++    RTC_DCHECK(ohaudio_wrapper->observer());
++    return ohaudio_wrapper->observer()->OnErrorCallback(error);
++}
++
++static int32_t DataCallback(OH_AudioCapturer* stream, void* user_data, void* audio_data, int32_t bufferLen)
++{
++    RTC_DCHECK(user_data);
++    RTC_DCHECK(audio_data);
++    RTC_LOG(LS_INFO) << "bufferLen=" << bufferLen;
++    OHAudioRecorderWrapper* ohaudio_wrapper = reinterpret_cast<OHAudioRecorderWrapper*>(user_data);
++    RTC_DCHECK(ohaudio_wrapper->observer());
++    return ohaudio_wrapper->observer()->OnDataCallback(audio_data, bufferLen);
++}
++
++class ScopedStreamBuilder {
++public:
++    ScopedStreamBuilder(OH_AudioStream_Type streamType)
++    {
++        LOG_ON_ERROR(OH_AudioStreamBuilder_Create(&builder_, streamType));
++        RTC_DCHECK(builder_);
++    }
++    ~ScopedStreamBuilder()
++    {
++        if (builder_) {
++            LOG_ON_ERROR(OH_AudioStreamBuilder_Destroy(builder_));
++        }
++    }
++
++    OH_AudioStreamBuilder* get() const { return builder_; }
++
++private:
++    OH_AudioStreamBuilder* builder_ = nullptr;
++};
++}  // namespace
++
++OHAudioRecorderWrapper::OHAudioRecorderWrapper(const AudioParameters& audio_parameters,
++    OH_AudioStream_Type direction, OHAudioRecorderObserverInterface* observer)
++    : audio_parameters_(audio_parameters), direction_(direction), observer_(observer)
++{
++    RTC_LOG(LS_INFO) << "ctor";
++    RTC_DCHECK(observer_);
++    ohaudio_thread_checker_.Detach();
++    RTC_LOG(LS_INFO) << audio_parameters_.ToString();
++}
++
++OHAudioRecorderWrapper::~OHAudioRecorderWrapper()
++{
++    RTC_LOG(LS_INFO) << "dtor";
++    RTC_DCHECK(thread_checker_.IsCurrent());
++    RTC_DCHECK(!stream_);
++}
++
++bool OHAudioRecorderWrapper::Init()
++{
++    RTC_LOG(LS_INFO) << "Init";
++    RTC_DCHECK(thread_checker_.IsCurrent());
++    ScopedStreamBuilder builder(AUDIOSTREAM_TYPE_CAPTURER);
++    SetStreamConfiguration(builder.get());
++    if (!OpenStream(builder.get())) {
++        return false;
++    }
++    if (!VerifyStreamConfiguration()) {
++        return false;
++    }
++    if (!OptimizeBuffers()) {
++        return false;
++    }
++    LogStreamState();
++    return true;
++}
++
++bool OHAudioRecorderWrapper::Start()
++{
++    RTC_LOG(LS_INFO) << "Start";
++    RTC_DCHECK(thread_checker_.IsCurrent());
++    OH_AudioStream_State current_state;
++    OH_AudioCapturer_GetCurrentState(stream_, &current_state);
++    if (current_state != AUDIOSTREAM_STATE_PREPARED) {
++        RTC_LOG(LS_ERROR) << "Invalid state: "
++                          << StateToString(current_state);
++        return false;
++    }
++    RETURN_ON_ERROR(OH_AudioCapturer_Start(stream_), false);
++    LogStreamState();
++    return true;
++}
++
++bool OHAudioRecorderWrapper::Stop()
++{
++    RTC_LOG(LS_INFO) << "Stop: " << DirectionToString(direction());
++    RTC_DCHECK(thread_checker_.IsCurrent());
++    RETURN_ON_ERROR(OH_AudioCapturer_Stop(stream_), false);
++    CloseStream();
++    ohaudio_thread_checker_.Detach();
++    return true;
++}
++
++double OHAudioRecorderWrapper::EstimateLatencyMillis() const
++{
++    RTC_DCHECK(stream_);
++    double latency_millis = 0.0;
++    if (direction() == AUDIOSTREAM_TYPE_CAPTURER) {
++        latency_millis = static_cast<double>(frames_per_burst()) / sample_rate() *
++                         rtc::kNumMillisecsPerSec;
++    }
++    return latency_millis;
++}
++
++bool OHAudioRecorderWrapper::IncreaseOutputBufferSize()
++{
++    RTC_LOG(LS_INFO) << "IncreaseBufferSize";
++    RTC_DCHECK(stream_);
++    RTC_DCHECK(ohaudio_thread_checker_.IsCurrent());
++    RTC_DCHECK_EQ(direction(), AUDIOSTREAM_TYPE_RENDERER);
++
++    return true;
++}
++
++void OHAudioRecorderWrapper::ClearInputStream(void* audio_data, int32_t num_frames)
++{
++    RTC_LOG(LS_INFO) << "ClearInputStream";
++    RTC_DCHECK(stream_);
++    RTC_DCHECK(ohaudio_thread_checker_.IsCurrent());
++    RTC_DCHECK_EQ(direction(), AUDIOSTREAM_TYPE_CAPTURER);
++    OH_AudioCapturer_Flush(stream_);
++}
++
++OHAudioRecorderObserverInterface* OHAudioRecorderWrapper::observer() const
++{
++    return observer_;
++}
++
++AudioParameters OHAudioRecorderWrapper::audio_parameters() const
++{
++    return audio_parameters_;
++}
++
++int32_t OHAudioRecorderWrapper::samples_per_frame() const
++{
++    RTC_DCHECK(stream_);
++    int32_t channel_count;
++    OH_AudioCapturer_GetChannelCount(stream_, &channel_count);
++    return channel_count;
++}
++
++int32_t OHAudioRecorderWrapper::device_id() const
++{
++    RTC_DCHECK(stream_);
++    return 0;
++}
++
++int32_t OHAudioRecorderWrapper::xrun_count() const
++{
++    RTC_DCHECK(stream_);
++    return 0;
++}
++
++OH_AudioStream_SampleFormat OHAudioRecorderWrapper::format() const
++{
++    RTC_DCHECK(stream_);
++    OH_AudioStream_SampleFormat sampleFormat;
++    OH_AudioCapturer_GetSampleFormat(stream_, &sampleFormat);
++    return sampleFormat;
++}
++
++int32_t OHAudioRecorderWrapper::sample_rate() const
++{
++    RTC_DCHECK(stream_);
++    int32_t rate;
++    OH_AudioCapturer_GetSamplingRate(stream_, &rate);
++    return rate;
++}
++
++int32_t OHAudioRecorderWrapper::channel_count() const
++{
++    RTC_DCHECK(stream_);
++    int32_t channelCount;
++    OH_AudioCapturer_GetChannelCount(stream_, &channelCount);
++    return channelCount;
++}
++
++OH_AudioStream_LatencyMode OHAudioRecorderWrapper::performance_mode() const
++{
++    RTC_DCHECK(stream_);
++    OH_AudioStream_LatencyMode latencyMode;
++    OH_AudioCapturer_GetLatencyMode(stream_, &latencyMode);
++    return latencyMode;
++}
++
++OH_AudioStream_State OHAudioRecorderWrapper::stream_state() const
++{
++    RTC_DCHECK(stream_);
++    OH_AudioStream_State current_state;
++    OH_AudioCapturer_GetCurrentState(stream_, &current_state);
++    return current_state;
++}
++
++int64_t OHAudioRecorderWrapper::frames_written() const
++{
++    RTC_DCHECK(stream_);
++    return 0;
++}
++
++int64_t OHAudioRecorderWrapper::frames_read() const
++{
++    RTC_DCHECK(stream_);
++    int64_t frames;
++    OH_AudioCapturer_GetFramesRead(stream_, &frames);
++    return frames;
++}
++
++void OHAudioRecorderWrapper::SetStreamConfiguration(OH_AudioStreamBuilder* builder)
++{
++    RTC_LOG(LS_INFO) << "SetStreamConfiguration";
++    RTC_DCHECK(builder);
++    RTC_DCHECK(thread_checker_.IsCurrent());
++    OH_AudioStreamBuilder_SetSamplingRate(builder, audio_parameters().sample_rate());
++    OH_AudioStreamBuilder_SetChannelCount(builder, audio_parameters().channels());
++    OH_AudioStreamBuilder_SetSampleFormat(builder, AUDIOSTREAM_SAMPLE_S16LE);
++//    OH_AudioStreamBuilder_SetFrameSizeInCallback(builder, 960);
++    OH_AudioStreamBuilder_SetLatencyMode(builder, AUDIOSTREAM_LATENCY_MODE_FAST);
++
++    OH_AudioCapturer_Callbacks callbacks;
++    callbacks.OH_AudioCapturer_OnReadData = DataCallback;
++    callbacks.OH_AudioCapturer_OnError = ErrorCallback;
++    OH_AudioStreamBuilder_SetCapturerCallback(builder, callbacks, this);
++}
++
++bool OHAudioRecorderWrapper::OpenStream(OH_AudioStreamBuilder* builder)
++{
++    RTC_LOG(LS_INFO) << "OpenStream";
++    RTC_DCHECK(builder);
++    OH_AudioCapturer* stream = nullptr;
++    RETURN_ON_ERROR(OH_AudioStreamBuilder_GenerateCapturer(builder, &stream), false);
++    stream_ = stream;
++    LogStreamConfiguration();
++    return true;
++}
++
++void OHAudioRecorderWrapper::CloseStream()
++{
++    RTC_LOG(LS_INFO) << "CloseStream";
++    RTC_DCHECK(stream_);
++    LOG_ON_ERROR(OH_AudioCapturer_Release(stream_));
++    stream_ = nullptr;
++}
++
++void OHAudioRecorderWrapper::LogStreamConfiguration()
++{
++    RTC_DCHECK(stream_);
++    char ss_buf[1024];
++    rtc::SimpleStringBuilder ss(ss_buf);
++    ss << "Stream Configuration: ";
++    ss << "sample rate=" << sample_rate() << ", channels=" << channel_count();
++    ss << ", format=" << FormatToString(format());
++    ss << ", performance mode=" << PerformanceModeToString(performance_mode());
++    ss << ", direction=" << DirectionToString(direction());
++    RTC_LOG(LS_INFO) << ss.str();
++}
++
++void OHAudioRecorderWrapper::LogStreamState()
++{
++    RTC_LOG(LS_INFO) << "OHAudio stream state: "
++                     << StateToString(stream_state());
++}
++
++bool OHAudioRecorderWrapper::VerifyStreamConfiguration()
++{
++    RTC_LOG(LS_INFO) << "VerifyStreamConfiguration";
++    RTC_DCHECK(stream_);
++    int32_t rate;
++    OH_AudioCapturer_GetSamplingRate(stream_, &rate);
++    if (rate != audio_parameters().sample_rate()) {
++        RTC_LOG(LS_ERROR) << "Stream unable to use requested sample rate";
++        return false;
++    }
++
++    int32_t channelCount;
++    OH_AudioCapturer_GetChannelCount(stream_, &channelCount);
++    if (channelCount != static_cast<int32_t>(audio_parameters().channels())) {
++        RTC_LOG(LS_ERROR) << "Stream unable to use requested channel count";
++        return false;
++    }
++
++    OH_AudioStream_SampleFormat sampleFormat;
++    OH_AudioCapturer_GetSampleFormat(stream_, &sampleFormat);
++    if (sampleFormat != AUDIOSTREAM_SAMPLE_S16LE) {
++        RTC_LOG(LS_ERROR) << "Stream unable to use requested format";
++        return false;
++    }
++
++    return true;
++}
++
++bool OHAudioRecorderWrapper::OptimizeBuffers()
++{
++    RTC_LOG(LS_INFO) << "OptimizeBuffers";
++    RTC_DCHECK(stream_);
++
++    return true;
++}
++}  // namespace webrtc
+diff -Naur src/modules/audio_device/ohos/ohaudio_recorder_wrapper.h src_ohos/modules/audio_device/ohos/ohaudio_recorder_wrapper.h
+--- src/modules/audio_device/ohos/ohaudio_recorder_wrapper.h	1970-01-01 08:00:00.000000000 +0800
++++ src_ohos/modules/audio_device/ohos/ohaudio_recorder_wrapper.h	2024-04-13 18:18:41.032683021 +0800
+@@ -0,0 +1,86 @@
++/*
++# Copyright (c) 2023 Huawei Device Co., Ltd.
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++#     http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++*/
++
++#ifndef SDK_OHOS_SRC_AUDIO_DEVICE_OHAUDIO_RECORDER_WRAPPER_H
++#define SDK_OHOS_SRC_AUDIO_DEVICE_OHAUDIO_RECORDER_WRAPPER_H
++
++#include <ohaudio/native_audiocapturer.h>
++#include <ohaudio/native_audiostreambuilder.h>
++
++#include "api/sequence_checker.h"
++#include "modules/audio_device/include/audio_device_defines.h"
++
++namespace webrtc {
++
++class OHAudioRecorderObserverInterface {
++public:
++    virtual int32_t OnDataCallback(void* audio_data, int32_t num_frames) = 0;
++    virtual int32_t OnErrorCallback(OH_AudioStream_Result error) = 0;
++
++protected:
++    virtual ~OHAudioRecorderObserverInterface() {}
++};
++
++class OHAudioRecorderWrapper {
++public:
++    OHAudioRecorderWrapper(const AudioParameters& audio_parameters,
++                  OH_AudioStream_Type direction,
++                  OHAudioRecorderObserverInterface* observer);
++    ~OHAudioRecorderWrapper();
++
++    bool Init();
++    bool Start();
++    bool Stop();
++
++    double EstimateLatencyMillis() const;
++    bool IncreaseOutputBufferSize();
++    void ClearInputStream(void* audio_data, int32_t num_frames);
++
++    OHAudioRecorderObserverInterface* observer() const;
++    AudioParameters audio_parameters() const;
++    int32_t samples_per_frame() const;
++    int32_t device_id() const;
++    int32_t xrun_count() const;
++    OH_AudioStream_SampleFormat format() const;
++    int32_t sample_rate() const;
++    int32_t channel_count() const;
++    OH_AudioStream_LatencyMode performance_mode() const;
++    OH_AudioStream_State stream_state() const;
++    int64_t frames_written() const;
++    int64_t frames_read() const;
++    OH_AudioStream_Type direction() const { return direction_; }
++    OH_AudioCapturer* stream() const { return stream_; }
++    int32_t frames_per_burst() const { return frames_per_burst_; }
++
++private:
++    void SetStreamConfiguration(OH_AudioStreamBuilder* builder);
++    bool OpenStream(OH_AudioStreamBuilder* builder);
++    void CloseStream();
++    void LogStreamConfiguration();
++    void LogStreamState();
++    bool VerifyStreamConfiguration();
++    bool OptimizeBuffers();
++
++    SequenceChecker thread_checker_;
++    SequenceChecker ohaudio_thread_checker_;
++    const AudioParameters audio_parameters_;
++    const OH_AudioStream_Type direction_;
++    OHAudioRecorderObserverInterface* observer_ = nullptr;
++    OH_AudioCapturer* stream_ = nullptr;
++    int32_t frames_per_burst_ = 240;
++};
++}  // namespace webrtc
++
++#endif  // SDK_OHOS_SRC_AUDIO_DEVICE_OHAUDIO_RECORDER_WRAPPER_H
+diff -Naur src/modules/audio_device/ohos/ohaudio_test.cc src_ohos/modules/audio_device/ohos/ohaudio_test.cc
+--- src/modules/audio_device/ohos/ohaudio_test.cc	1970-01-01 08:00:00.000000000 +0800
++++ src_ohos/modules/audio_device/ohos/ohaudio_test.cc	2024-10-19 11:47:34.317001589 +0800
+@@ -0,0 +1,390 @@
++/*
++# Copyright (c) 2023 Huawei Device Co., Ltd.
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++#     http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++*/
++#include <algorithm>
++#include <array>
++#include <memory>
++#include <utility>
++#include <cstdio>
++#include <cerrno>
++
++#include "modules/audio_device/include/test_audio_device.h"
++#include "modules/audio_device/ohos/audio_device_module.h"
++#include "modules/audio_device/include/audio_device_defines.h"
++
++#include "absl/types/optional.h"
++#include "api/array_view.h"
++#include "api/task_queue/task_queue_factory.h"
++#include "api/units/time_delta.h"
++#include "api/units/timestamp.h"
++#include "common_audio/wav_file.h"
++#include "common_audio/wav_header.h"
++#include "modules/audio_device/include/audio_device_defines.h"
++#include "rtc_base/checks.h"
++#include "rtc_base/logging.h"
++#include "rtc_base/synchronization/mutex.h"
++#include "test/gmock.h"
++#include "test/gtest.h"
++#include "test/testsupport/file_utils.h"
++#include "test/time_controller/simulated_time_controller.h"
++#include "common_audio/resampler/include/resampler.h"
++
++using namespace webrtc;
++
++#define SAMPLE_RATE         48000
++#define USLEEP_1000MS       1000
++#define SAMPLES_PER_10MS    (SAMPLE_RATE / 100)
++
++#define TEST_PLAY           0
++#define TEST_RECORD         1
++#define TEST_PLAY_RECORD    2
++
++static int g_testMode = TEST_PLAY;
++static int g_playing = 0;
++
++namespace {
++
++class ChunkBuffer {
++private:
++    int chunkCount = 0;
++    int chunkSize = 0;
++    int used = 0;
++    int first = 0;
++    char *buf = nullptr;
++
++public:
++    ChunkBuffer(int chunkCount, int chunkSize)
++    {
++        this->chunkCount = chunkCount;
++        this->chunkSize = chunkSize;
++        used = 0;
++        first = 0;
++    }
++
++    ~ChunkBuffer()
++    {
++        if (buf != nullptr) {
++            free(buf);
++        }
++    }
++
++    int CreateBuff()
++    {
++        if (chunkCount <= 0 && chunkSize <= 0) {
++            return -1;
++        }
++        buf = reinterpret_cast<char *>(malloc(chunkCount * chunkSize));
++        return buf != nullptr ? 0 : -1;
++    }
++
++    void *Push()
++    {
++        if (used >= chunkCount) {
++            return nullptr;
++        }
++        int available = (first + used) % chunkCount;
++        used++;
++        return buf + available * chunkSize;
++    }
++
++    void *Pop()
++    {
++        if (used <= 0) {
++            return nullptr;
++        }
++        void *ret = buf + first * chunkSize;
++        used--;
++        first = (++first) % chunkCount;
++        return ret;
++    }
++};
++
++class OHOSTestAudioTransport : public AudioTransport {
++public:
++    enum class Mode {
++        kPlaying,
++        kRecording
++    };
++    explicit OHOSTestAudioTransport(FILE *recFile, FILE *plyFile) : recFile_(recFile), plyFile_(plyFile)
++    {
++        buffer = new ChunkBuffer(buffersize, SAMPLES_PER_10MS * sizeof(int16_t));
++        buffer->CreateBuff();
++    }
++
++    ~OHOSTestAudioTransport()
++    {
++        delete buffer;
++    }
++
++    int32_t RecordedDataIsAvailable(
++        const void* audioSamples,
++        size_t samplesPerChannel,
++        size_t bytesPerSample,
++        size_t numberOfChannels,
++        uint32_t samplesPerSecond,
++        uint32_t totalDelay,
++        int32_t clockDrift,
++        uint32_t currentMicLevel,
++        bool keyPressed,
++        uint32_t& newMicLevel,
++        absl::optional<int64_t> estimatedCaptureTime) override
++    {
++        newMicLevel = 1;
++        RTC_LOG(LS_INFO) << "" << __FUNCTION__;
++        MutexLock lock(&mutex_);
++        RTC_LOG(LS_INFO) << "samplesPerChannel=" << samplesPerChannel;
++        RTC_LOG(LS_INFO) << "numberOfChannels=" << numberOfChannels;
++        RTC_LOG(LS_INFO) << "bytesPerSample=" << bytesPerSample;
++        RTC_LOG(LS_INFO) << "samplesPerSecond=" << samplesPerSecond;
++        RTC_LOG(LS_INFO) << "totalDelay_=" << totalDelay;
++        RTC_LOG(LS_INFO) << "clockDrift_=" << clockDrift;
++
++        if (g_testMode == TEST_RECORD) {
++            FILE *file = const_cast<FILE *>(recFile_);
++            if (file == nullptr) {
++                RTC_LOG(LS_ERROR)  << "file handle is invalid!";
++                return -1;
++            }
++            fwrite(audioSamples, sizeof(int16_t), samplesPerChannel * numberOfChannels, file);
++        } else if (g_testMode == TEST_PLAY_RECORD) {
++            RTC_LOG(LS_INFO) << "" << __FUNCTION__;
++            void *samples = buffer->Push();
++            if (samples == nullptr) {
++                buffer->Pop();
++                samples = buffer->Push();
++                return 0;
++            }
++            memcpy(samples, audioSamples, samplesPerChannel * numberOfChannels * sizeof(int16_t));
++            RTC_LOG(LS_INFO) << "dsize=" << (int)(samplesPerChannel * numberOfChannels * sizeof(int16_t));
++            RTC_LOG(LS_INFO) << "" << __FUNCTION__;
++        }
++        return 0;
++    }
++
++    int32_t NeedMorePlayData(size_t samplesPerChannel,
++                           size_t bytesPerSample,
++                           size_t numberOfChannels,
++                           uint32_t samplesPerSecond,
++                           void* audioSamples,
++                           size_t& samplesOut,
++                           int64_t* elapsedTime,
++                           int64_t* ntpTime) override
++    {
++        const size_t numBytes = samplesPerChannel * numberOfChannels;
++        // std::memset(audioSamples, 1, numBytes);
++        MutexLock lock(&mutex_);
++        samplesOut = numBytes;
++        *elapsedTime = 0;
++        *ntpTime = 0;
++        RTC_LOG(LS_INFO) << "samplesPerChannel=" << samplesPerChannel;
++        RTC_LOG(LS_INFO) << "numberOfChannels=" << numberOfChannels;
++        RTC_LOG(LS_INFO) << "bytesPerSample=" << bytesPerSample;
++        RTC_LOG(LS_INFO) << "samplesPerSecond=" << samplesPerSecond;
++        RTC_LOG(LS_INFO) << "dsize=" << numBytes;
++
++        if (g_testMode == TEST_PLAY_RECORD) {
++            RTC_LOG(LS_INFO) << "" << __FUNCTION__;
++            void *samples = buffer->Pop();
++            if (samples == nullptr) {
++                RTC_LOG(LS_INFO) <<"no data for playout";
++                return 0;
++            }
++            memcpy(audioSamples, samples, numBytes * sizeof(int16_t));
++        } else if (g_testMode == TEST_PLAY) {
++            FILE *file = const_cast<FILE *>(plyFile_);
++            if (file == nullptr) {
++                RTC_LOG(LS_ERROR)  << "file handle is invalid!";
++                g_playing = 0;
++                return -1;
++            }
++            if (fread(audioSamples, sizeof(int16_t), samplesPerChannel * numberOfChannels, file) <= 0) {
++                g_playing = 0;
++                return -1;
++            }
++        }
++
++        RTC_LOG(LS_INFO) << "" << __FUNCTION__;
++        return 0;
++    }
++
++    int32_t RecordedDataIsAvailable(const void* audioSamples,
++                                  size_t samplesPerChannel,
++                                  size_t bytesPerSample,
++                                  size_t numberOfChannels,
++                                  uint32_t samplesPerSecond,
++                                  uint32_t totalDelay,
++                                  int32_t clockDrift,
++                                  uint32_t currentMicLevel,
++                                  bool keyPressed,
++                                  uint32_t& newMicLevel) override
++    {
++        RTC_CHECK(false) << "This methods should be never executed";
++    }
++
++    void PullRenderData(int bits_per_sample,
++                      int sample_rate,
++                      size_t numberOfChannels,
++                      size_t number_of_frames,
++                      void* audio_data,
++                      int64_t* elapsedTime,
++                      int64_t* ntpTime) override
++    {
++        RTC_CHECK(false) << "This methods should be never executed";
++    }
++
++private:
++    const FILE *recFile_ = nullptr;
++    const FILE *plyFile_ = nullptr;
++    mutable Mutex mutex_;
++    ChunkBuffer *buffer = nullptr;
++
++    static const int buffersize = 10000;
++};
++}
++
++int main(int argc, char **argv)
++{
++    static const int channles = 2;
++    static const int amplitudes = 1000;
++    static const int delayTims = 1000;
++    if (argc > 1) {
++        g_testMode = atoi(argv[1]);
++    }
++
++    RTC_LOG(LS_INFO) << "current test mode is " << g_testMode;
++
++    FILE *fileRead = nullptr;
++    FILE *fileWrite = nullptr;
++
++    std::unique_ptr<TestAudioDeviceModule::Renderer> renderer = nullptr;
++    std::unique_ptr<TestAudioDeviceModule::PulsedNoiseCapturer> capturer = nullptr;
++    GlobalSimulatedTimeController time_controller(Timestamp::Millis(delayTims));
++
++    if (g_testMode == TEST_RECORD) {
++        fileWrite = fopen("/data/recorder.raw", "w+");
++    } else if (g_testMode == TEST_PLAY) {
++        fileRead = fopen("/data/resources/near48_stereo.pcm", "rb");
++    }
++    OHOSTestAudioTransport audioTransport(fileWrite, fileRead);
++    
++    if (g_testMode != TEST_RECORD) {
++        renderer = TestAudioDeviceModule::CreateDiscardRenderer(SAMPLE_RATE, channles);
++    }
++    if (g_testMode != TEST_PLAY) {
++        capturer = TestAudioDeviceModule::CreatePulsedNoiseCapturer(amplitudes, SAMPLE_RATE, channles);
++    }
++    RTC_LOG(LS_INFO) << "CreatedADMCanRecord";
++
++    rtc::scoped_refptr<AudioDeviceModule> adm = TestAudioDeviceModule::Create(
++        time_controller.GetTaskQueueFactory(), std::move(capturer), std::move(renderer));
++
++    if (adm->RegisterAudioCallback(&audioTransport) != 0) {
++        RTC_LOG(LS_INFO) << "RegisterAudioCallback failed!";
++        return -1;
++    }
++    RTC_LOG(LS_INFO) << "Init";
++    if (adm->Init() != 0) {
++        RTC_LOG(LS_INFO) << "Init failed!";
++        return -1;
++    }
++
++    if (g_testMode != TEST_PLAY) {
++        RTC_LOG(LS_INFO) << "InitRecording";
++        if (adm->InitRecording() != 0) {
++            RTC_LOG(LS_INFO) << "InitRecording failed!";
++            return -1;
++        }
++        RTC_LOG(LS_INFO) << "RecordingIsInitialized";
++        if (!adm->RecordingIsInitialized()) {
++            RTC_LOG(LS_INFO) << "RecordingIsInitialized failed!";
++            return -1;
++        }
++        RTC_LOG(LS_INFO) << "StartRecording";
++        if (adm->StartRecording() != 0) {
++            RTC_LOG(LS_INFO) << "StartRecording failed!";
++            return -1;
++        }
++    }
++
++    if (g_testMode != TEST_RECORD) {
++        RTC_LOG(LS_INFO) << "InitPlayout";
++        if (adm->InitPlayout() != 0) {
++            RTC_LOG(LS_INFO) << "InitPlayout failed!";
++            return -1;
++        }
++        RTC_LOG(LS_INFO) << "PlayoutIsInitialized";
++        if (!adm->PlayoutIsInitialized()) {
++            RTC_LOG(LS_INFO) << "PlayoutIsInitialized failed!";
++            return -1;
++        }
++
++        RTC_LOG(LS_INFO) << "StartPlayout";
++        if (adm->StartPlayout() != 0) {
++            RTC_LOG(LS_INFO) << "StartPlayout failed!";
++            return -1;
++        }
++    }
++
++    int count = 20;
++    if (g_testMode == TEST_PLAY) {
++        g_playing = 1;
++        count = 1;
++    }
++    while (count > 0) {
++        time_controller.AdvanceTime(TimeDelta::Millis(delayTims));
++        if (!adm->Recording()) {
++            RTC_LOG(LS_INFO) << "not Recording!";
++        } else {
++            RTC_LOG(LS_INFO) << "is Recording!";
++        }
++        if (!adm->Playing()) {
++            RTC_LOG(LS_INFO) << "not Playing!";
++        } else {
++            RTC_LOG(LS_INFO) << "is Playing!";
++        }
++        sleep(1);
++        if (g_playing == 0) {
++            count--;
++        }
++    }
++    time_controller.AdvanceTime(TimeDelta::Millis(delayTims));
++
++    if (g_testMode != TEST_PLAY) {
++        RTC_LOG(LS_INFO) << "StopRecording";
++        if (adm->StopRecording() != 0) {
++            RTC_LOG(LS_INFO) << "StopRecording failed!";
++            return -1;
++        }
++    }
++
++    if (g_testMode != TEST_RECORD) {
++        RTC_LOG(LS_INFO) << "StopPlayout";
++        if (adm->StopPlayout() != 0) {
++            RTC_LOG(LS_INFO) << "StopPlayout failed!";
++            return -1;
++        }
++    }
++
++    RTC_LOG(LS_INFO) << "fclose";
++    if (fileRead != nullptr) {
++        fclose(fileRead);
++        fileRead = nullptr;
++    }
++    if (fileWrite != nullptr) {
++        fclose(fileWrite);
++        fileWrite = nullptr;
++    }
++
++    return 0;
++}
+diff -Naur src/modules/video_capture/BUILD.gn src_ohos/modules/video_capture/BUILD.gn
+--- src/modules/video_capture/BUILD.gn	2024-10-24 10:06:45.106063829 +0800
++++ src_ohos/modules/video_capture/BUILD.gn	2024-10-24 15:10:49.503095752 +0800
+@@ -62,7 +62,7 @@
+       "../../system_wrappers",
      ]
  
 -    if (is_linux || is_chromeos) {
 +    if (is_linux || is_chromeos || is_ohos) {
-       sources += [
+       sources = [
          "linux/device_info_linux.cc",
          "linux/device_info_v4l2.cc",
-diff -uprN src/rtc_base/platform_thread_types.cc src_ohos/rtc_base/platform_thread_types.cc
---- src/rtc_base/platform_thread_types.cc	2023-12-15 19:42:56.000000000 -0800
-+++ src_ohos/rtc_base/platform_thread_types.cc	2024-04-10 04:18:58.367788314 -0700
-@@ -40,7 +40,7 @@ PlatformThreadId CurrentThreadId() {
+diff -Naur src/rtc_base/platform_thread_types.cc src_ohos/rtc_base/platform_thread_types.cc
+--- src/rtc_base/platform_thread_types.cc	2024-10-24 10:06:45.294495865 +0800
++++ src_ohos/rtc_base/platform_thread_types.cc	2024-10-24 15:13:38.537161785 +0800
+@@ -33,7 +33,7 @@
  #elif defined(WEBRTC_POSIX)
  #if defined(WEBRTC_MAC) || defined(WEBRTC_IOS)
    return pthread_mach_thread_np(pthread_self());
@@ -529,25 +3045,37 @@ diff -uprN src/rtc_base/platform_thread_types.cc src_ohos/rtc_base/platform_thre
    return gettid();
  #elif defined(WEBRTC_FUCHSIA)
    return zx_thread_self();
-diff -uprN src/third_party/dav1d/BUILD.gn src_ohos/third_party/dav1d/BUILD.gn
---- src/third_party/dav1d/BUILD.gn	2023-12-15 21:08:22.000000000 -0800
-+++ src_ohos/third_party/dav1d/BUILD.gn	2024-04-10 04:21:49.237316992 -0700
-@@ -56,7 +56,7 @@ config("public_dav1d_config") {
-     defines = [ "CONFIG_LOG=1" ]
+diff -Naur src/third_party/dav1d/BUILD.gn src_ohos/third_party/dav1d/BUILD.gn
+--- src/third_party/dav1d/BUILD.gn	2024-10-24 09:22:24.939204757 +0800
++++ src_ohos/third_party/dav1d/BUILD.gn	2024-10-24 15:15:56.361908606 +0800
+@@ -81,7 +81,7 @@
+     defines += [ "STACK_ALIGNMENT=$stack_alignment" ]
    }
  
 -  if (!is_android && !is_win) {
 +  if (!is_android && !is_win && !is_ohos) {
-     defines += [
-       "HAVE_PTHREAD_GETAFFINITY_NP=1",
-       "HAVE_PTHREAD_SETAFFINITY_NP=1",
-diff -uprN src/third_party/libevent/BUILD.gn src_ohos/third_party/libevent/BUILD.gn
---- src/third_party/libevent/BUILD.gn	2023-12-15 21:08:23.000000000 -0800
-+++ src_ohos/third_party/libevent/BUILD.gn	2024-04-10 04:08:34.032866252 -0700
-@@ -37,13 +37,13 @@ static_library("libevent") {
+     defines += [ "HAVE_PTHREAD_GETAFFINITY_NP=1" ]
+   }
+ 
+diff -Naur src/third_party/ffmpeg/ffmpeg_generated.gni src_ohos/third_party/ffmpeg/ffmpeg_generated.gni
+--- src/third_party/ffmpeg/ffmpeg_generated.gni	2024-10-24 09:22:33.989516136 +0800
++++ src_ohos/third_party/ffmpeg/ffmpeg_generated.gni	2024-10-24 17:38:38.315050107 +0800
+@@ -12,7 +12,7 @@
+ ffmpeg_gas_sources = []
+ ffmpeg_asm_sources = []
+ 
+-use_linux_config = is_linux || is_chromeos || is_fuchsia
++use_linux_config = is_linux || is_chromeos || is_fuchsia || is_ohos
+ 
+ if ((is_android && current_cpu == "arm" && arm_use_neon) || (is_android && current_cpu == "arm64") || (is_android && current_cpu == "x64") || (is_android && current_cpu == "x86") || (is_mac) || (is_win) || (use_linux_config)) {
+   ffmpeg_c_sources += [
+diff -Naur src/third_party/libevent/BUILD.gn src_ohos/third_party/libevent/BUILD.gn
+--- src/third_party/libevent/BUILD.gn	2024-10-24 09:22:25.466802965 +0800
++++ src_ohos/third_party/libevent/BUILD.gn	2024-10-24 14:57:37.673306420 +0800
+@@ -43,13 +43,13 @@
        "mac/event-config.h",
      ]
-     include_dirs += [ "mac" ]
+     include_dirs = [ "mac" ]
 -  } else if (is_linux || is_chromeos) {
 +  } else if (is_linux || is_chromeos || is_ohos) {
      sources += [
@@ -555,20 +3083,20 @@ diff -uprN src/third_party/libevent/BUILD.gn src_ohos/third_party/libevent/BUILD
        "linux/config.h",
        "linux/event-config.h",
      ]
--    include_dirs += [ "linux" ]
-+    include_dirs += [ "linux", "compat" ]
+-    include_dirs = [ "linux" ]
++    include_dirs = [ "linux", "compat" ]
    } else if (is_android) {
      sources += [
        "android/config.h",
-diff -uprN src/third_party/zlib/BUILD.gn src_ohos/third_party/zlib/BUILD.gn
---- src/third_party/zlib/BUILD.gn	2023-12-15 21:08:26.000000000 -0800
-+++ src_ohos/third_party/zlib/BUILD.gn	2024-04-10 04:13:27.424322434 -0700
-@@ -127,7 +127,7 @@ if (use_arm_neon_optimizations) {
-     defines = [ "CRC32_ARMV8_CRC32" ]
-     if (is_android) {
-       defines += [ "ARMV8_OS_ANDROID" ]
--    } else if (is_linux || is_chromeos) {
-+    } else if (is_linux || is_chromeos || is_ohos) {
-       defines += [ "ARMV8_OS_LINUX" ]
-     } else if (is_mac) {
-       defines += [ "ARMV8_OS_MACOS" ]
+diff -Naur src/third_party/zlib/BUILD.gn src_ohos/third_party/zlib/BUILD.gn
+--- src/third_party/zlib/BUILD.gn	2024-10-24 09:22:32.935042341 +0800
++++ src_ohos/third_party/zlib/BUILD.gn	2024-10-24 15:12:16.479317436 +0800
+@@ -121,7 +121,7 @@
+       defines = [ "CRC32_ARMV8_CRC32" ]
+       if (is_android) {
+         defines += [ "ARMV8_OS_ANDROID" ]
+-      } else if (is_linux || is_chromeos) {
++      } else if (is_linux || is_chromeos || is_ohos) {
+         defines += [ "ARMV8_OS_LINUX" ]
+       } else if (is_mac) {
+         defines += [ "ARMV8_OS_MACOS" ]

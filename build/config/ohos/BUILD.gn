@@ -1,4 +1,3 @@
-
 import("//build/config/sysroot.gni")
 import("//build/config/clang/clang.gni")
 assert(is_ohos)
@@ -26,7 +25,6 @@ config("compiler") {
     "-ffunction-sections",
     "-fno-short-enums",
     "-fno-addrsig",
-    "-fno-rtti",
   ]
 
   cflags += [
@@ -65,8 +63,6 @@ config("compiler") {
     # assembly code with symbols that aren't hidden properly.
     # http://crbug.com/448386
     "-Wl,--exclude-libs=libvpx_assembly_arm.a",
-    "-s",
-    "-L$sysroot/usr/lib/${abi_target}",
   ]
 
   cflags += [ "--target=$abi_target" ]

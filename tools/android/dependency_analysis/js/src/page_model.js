@@ -18,8 +18,7 @@ class PageModel {
 
     /**
      * The data for the selected node details UI component.
-     *
-     * @typedef {object} SelectedNodeDetailsData
+     * @typedef {Object} SelectedNodeDetailsData
      * @property {?Node} selectedNode The selected node, if it exists.
      */
     /** @public {!SelectedNodeDetailsData} */
@@ -30,7 +29,6 @@ class PageModel {
 
   /**
    * Gets the ids of all the nodes in the graph.
-   *
    * @return {!Array<string>} An array with the all node ids.
    */
   getNodeIds() {

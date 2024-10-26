@@ -21,7 +21,6 @@
 #include "absl/algorithm/container.h"
 #include "absl/base/macros.h"
 #include "api/adaptation/resource.h"
-#include "api/field_trials_view.h"
 #include "api/sequence_checker.h"
 #include "api/task_queue/task_queue_base.h"
 #include "api/video/video_adaptation_reason.h"
@@ -117,10 +116,9 @@ absl::optional<DataRate> GetSingleActiveLayerMaxBitrate(
 class VideoStreamEncoderResourceManager::InitialFrameDropper {
  public:
   explicit InitialFrameDropper(
-      rtc::scoped_refptr<QualityScalerResource> quality_scaler_resource,
-      const FieldTrialsView& field_trials)
+      rtc::scoped_refptr<QualityScalerResource> quality_scaler_resource)
       : quality_scaler_resource_(quality_scaler_resource),
-        quality_scaler_settings_(field_trials),
+        quality_scaler_settings_(QualityScalerSettings::ParseFromFieldTrials()),
         has_seen_first_bwe_drop_(false),
         set_start_bitrate_(DataRate::Zero()),
         set_start_bitrate_time_ms_(0),
@@ -291,10 +289,8 @@ VideoStreamEncoderResourceManager::VideoStreamEncoderResourceManager(
       clock_(clock),
       experiment_cpu_load_estimator_(experiment_cpu_load_estimator),
       initial_frame_dropper_(
-          std::make_unique<InitialFrameDropper>(quality_scaler_resource_,
-                                                field_trials)),
-      quality_scaling_experiment_enabled_(
-          QualityScalingExperiment::Enabled(field_trials_)),
+          std::make_unique<InitialFrameDropper>(quality_scaler_resource_)),
+      quality_scaling_experiment_enabled_(QualityScalingExperiment::Enabled()),
       pixel_limit_resource_experiment_enabled_(
           field_trials.IsEnabled(kPixelLimitResourceFieldTrialName)),
       encoder_target_bitrate_bps_(absl::nullopt),
@@ -511,7 +507,7 @@ void VideoStreamEncoderResourceManager::OnEncodeCompleted(
     DataSize frame_size) {
   RTC_DCHECK_RUN_ON(encoder_queue_);
   // Inform `encode_usage_resource_` of the encode completed event.
-  uint32_t timestamp = encoded_image.RtpTimestamp();
+  uint32_t timestamp = encoded_image.Timestamp();
   int64_t capture_time_us =
       encoded_image.capture_time_ms_ * rtc::kNumMicrosecsPerMillisec;
   encode_usage_resource_->OnEncodeCompleted(
@@ -565,8 +561,7 @@ void VideoStreamEncoderResourceManager::UpdateQualityScalerSettings(
     if (quality_scaler_resource_->is_started()) {
       quality_scaler_resource_->SetQpThresholds(qp_thresholds.value());
     } else {
-      quality_scaler_resource_->StartCheckForOveruse(qp_thresholds.value(),
-                                                     field_trials_);
+      quality_scaler_resource_->StartCheckForOveruse(qp_thresholds.value());
       AddResource(quality_scaler_resource_, VideoAdaptationReason::kQuality);
     }
   } else if (quality_scaler_resource_->is_started()) {
@@ -620,7 +615,7 @@ void VideoStreamEncoderResourceManager::ConfigureQualityScaler(
       absl::optional<VideoEncoder::QpThresholds> experimental_thresholds;
       if (quality_scaling_experiment_enabled_) {
         experimental_thresholds = QualityScalingExperiment::GetQpThresholds(
-            GetVideoCodecTypeOrGeneric(encoder_settings_), field_trials_);
+            GetVideoCodecTypeOrGeneric(encoder_settings_));
       }
       UpdateQualityScalerSettings(experimental_thresholds.has_value()
                                       ? experimental_thresholds
@@ -677,7 +672,7 @@ CpuOveruseOptions VideoStreamEncoderResourceManager::GetCpuOveruseOptions()
   // This is already ensured by the only caller of this method:
   // StartResourceAdaptation().
   RTC_DCHECK(encoder_settings_.has_value());
-  CpuOveruseOptions options;
+  CpuOveruseOptions options(field_trials_);
   // Hardware accelerated encoders are assumed to be pipelined; give them
   // additional overuse time.
   if (encoder_settings_->encoder_info().is_hardware_accelerated) {
@@ -820,8 +815,7 @@ void VideoStreamEncoderResourceManager::OnQualityRampUp() {
 }
 
 bool VideoStreamEncoderResourceManager::IsSimulcastOrMultipleSpatialLayers(
-    const VideoEncoderConfig& encoder_config,
-    const VideoCodec& video_codec) {
+    const VideoEncoderConfig& encoder_config) {
   const std::vector<VideoStream>& simulcast_layers =
       encoder_config.simulcast_layers;
   if (simulcast_layers.empty()) {
@@ -830,7 +824,7 @@ bool VideoStreamEncoderResourceManager::IsSimulcastOrMultipleSpatialLayers(
 
   absl::optional<int> num_spatial_layers;
   if (simulcast_layers[0].scalability_mode.has_value() &&
-      video_codec.numberOfSimulcastStreams == 1) {
+      encoder_config.number_of_streams == 1) {
     num_spatial_layers = ScalabilityModeToNumSpatialLayers(
         *simulcast_layers[0].scalability_mode);
   }

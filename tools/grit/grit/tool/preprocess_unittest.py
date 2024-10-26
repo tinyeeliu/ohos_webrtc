@@ -8,6 +8,7 @@
    provide the actual rctext data.
 '''
 
+from __future__ import print_function
 
 import os
 import sys
@@ -24,14 +25,14 @@ class PreProcessingUnittest(unittest.TestCase):
 
   def testPreProcessing(self):
     tool = rc2grd.Rc2Grd()
-    class DummyOpts:
+    class DummyOpts(object):
       verbose = False
       extra_verbose = False
     tool.o = DummyOpts()
     tool.pre_process = 'grit.tool.preprocess_unittest.DummyPreProcessor'
     result = tool.Process('', '.\resource.rc')
 
-    self.assertTrue(
+    self.failUnless(
       result.children[2].children[2].children[0].attrs['name'] == 'DUMMY_STRING_1')
 
 class DummyPreProcessor(grit.tool.preprocess_interface.PreProcessor):

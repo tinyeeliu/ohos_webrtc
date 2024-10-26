@@ -188,8 +188,6 @@ TEST_F(IceServerParsingTest, ParseHostnameAndPort) {
   EXPECT_FALSE(ParseUrl("stun:/hostname"));  // / is not allowed
   EXPECT_FALSE(ParseUrl("stun:?hostname"));  // ? is not allowed
   EXPECT_FALSE(ParseUrl("stun:#hostname"));  // # is not allowed
-  // STUN explicitly forbids query parameters.
-  EXPECT_FALSE(ParseUrl("stun:hostname?transport=udp"));
 }
 
 // Test parsing the "?transport=xxx" part of the URL.

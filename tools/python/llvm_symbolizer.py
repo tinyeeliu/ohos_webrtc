@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import functools
 import logging
 import os
 import subprocess
@@ -17,7 +16,7 @@ _UNKNOWN = '<UNKNOWN>'
 
 _ELF_MAGIC_HEADER_BYTES = b'\x7f\x45\x4c\x46'
 
-@functools.lru_cache
+
 def IsValidLLVMSymbolizerTarget(file_path):
   """ Verify the passed file is a valid target for llvm-symbolization
 
@@ -128,7 +127,3 @@ class LLVMSymbolizer(object):
           result.append((line[:-1], line_numbers[:-1]))
         else:
           return result
-
-  @staticmethod
-  def IsValidTarget(path):
-    return IsValidLLVMSymbolizerTarget(path)

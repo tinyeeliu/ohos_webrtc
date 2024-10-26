@@ -25,14 +25,13 @@ namespace webrtc {
 // the start of media_channel by caching its request.
 class JitterBufferDelay {
  public:
-  JitterBufferDelay() = default;
+  JitterBufferDelay();
 
   void Set(absl::optional<double> delay_seconds);
   int GetMs() const;
 
  private:
-  RTC_NO_UNIQUE_ADDRESS SequenceChecker worker_thread_checker_{
-      SequenceChecker::kDetached};
+  RTC_NO_UNIQUE_ADDRESS SequenceChecker worker_thread_checker_;
   absl::optional<double> cached_delay_seconds_
       RTC_GUARDED_BY(&worker_thread_checker_);
 };

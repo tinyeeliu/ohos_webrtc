@@ -26,9 +26,9 @@ struct CallConfig;
 // is constructed with a CallFactoryInterface, which may or may not be null.
 class CallFactoryInterface {
  public:
-  virtual ~CallFactoryInterface() = default;
+  virtual ~CallFactoryInterface() {}
 
-  virtual std::unique_ptr<Call> CreateCall(const CallConfig& config) = 0;
+  virtual Call* CreateCall(const CallConfig& config) = 0;
 };
 
 RTC_EXPORT std::unique_ptr<CallFactoryInterface> CreateCallFactory();

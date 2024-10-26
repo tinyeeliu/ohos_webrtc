@@ -12,6 +12,7 @@
 
 #include <memory>
 
+#include "api/field_trials_view.h"
 #include "api/video/encoded_image.h"
 #include "api/video/i420_buffer.h"
 #include "api/video/video_adaptation_reason.h"
@@ -35,6 +36,7 @@ const int kHeight = 480;
 // Corresponds to load of 15%
 const int kFrameIntervalUs = 33 * rtc::kNumMicrosecsPerMillisec;
 const int kProcessTimeUs = 5 * rtc::kNumMicrosecsPerMillisec;
+const test::ScopedKeyValueConfig kFieldTrials;
 }  // namespace
 
 class MockCpuOveruseObserver : public OveruseFrameDetectorObserverInterface {
@@ -62,7 +64,7 @@ class OveruseFrameDetectorUnderTest : public OveruseFrameDetector {
  public:
   explicit OveruseFrameDetectorUnderTest(
       CpuOveruseMetricsObserver* metrics_observer)
-      : OveruseFrameDetector(metrics_observer) {}
+      : OveruseFrameDetector(metrics_observer, kFieldTrials) {}
   ~OveruseFrameDetectorUnderTest() {}
 
   using OveruseFrameDetector::CheckForOveruse;
@@ -72,6 +74,8 @@ class OveruseFrameDetectorUnderTest : public OveruseFrameDetector {
 class OveruseFrameDetectorTest : public ::testing::Test,
                                  public CpuOveruseMetricsObserver {
  protected:
+  OveruseFrameDetectorTest() : options_(kFieldTrials) {}
+
   void SetUp() override {
     observer_ = &mock_observer_;
     options_.min_process_count = 0;

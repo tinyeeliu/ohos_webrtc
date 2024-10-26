@@ -16,16 +16,14 @@
 #include <string>
 
 #include "modules/desktop_capture/desktop_capture_types.h"
+#include "modules/desktop_capture/linux/wayland/portal_request_response.h"
 #include "modules/desktop_capture/linux/wayland/screen_capture_portal_interface.h"
-#include "modules/portal/pipewire_utils.h"
-#include "modules/portal/portal_request_response.h"
-#include "modules/portal/xdg_desktop_portal_utils.h"
-#include "modules/portal/xdg_session_details.h"
+#include "modules/desktop_capture/linux/wayland/xdg_desktop_portal_utils.h"
+#include "modules/desktop_capture/linux/wayland/xdg_session_details.h"
 
 namespace webrtc {
 
-class RTC_EXPORT ScreenCastPortal
-    : public xdg_portal::ScreenCapturePortalInterface {
+class ScreenCastPortal : public xdg_portal::ScreenCapturePortalInterface {
  public:
   using ProxyRequestResponseHandler = void (*)(GObject* object,
                                                GAsyncResult* result,
@@ -42,7 +40,7 @@ class RTC_EXPORT ScreenCastPortal
 
   // Values are set based on cursor mode property in
   // xdg-desktop-portal/screencast
-  // https://github.com/flatpak/xdg-desktop-portal/blob/main/data/org.freedesktop.portal.ScreenCast.xml
+  // https://github.com/flatpak/xdg-desktop-portal/blob/master/data/org.freedesktop.portal.ScreenCast.xml
   enum class CursorMode : uint32_t {
     // Mouse cursor will not be included in any form
     kHidden = 0b01,
@@ -54,7 +52,7 @@ class RTC_EXPORT ScreenCastPortal
 
   // Values are set based on persist mode property in
   // xdg-desktop-portal/screencast
-  // https://github.com/flatpak/xdg-desktop-portal/blob/main/data/org.freedesktop.portal.ScreenCast.xml
+  // https://github.com/flatpak/xdg-desktop-portal/blob/master/data/org.freedesktop.portal.ScreenCast.xml
   enum class PersistMode : uint32_t {
     // Do not allow to restore stream
     kDoNotPersist = 0b00,
@@ -86,10 +84,7 @@ class RTC_EXPORT ScreenCastPortal
                    ProxyRequestResponseHandler proxy_request_response_handler,
                    SourcesRequestResponseSignalHandler
                        sources_request_response_signal_handler,
-                   gpointer user_data,
-                   // TODO(chromium:1291247): Remove the default option once
-                   // downstream has been adjusted.
-                   bool prefer_cursor_embedded = false);
+                   gpointer user_data);
 
   ~ScreenCastPortal();
 
@@ -125,7 +120,7 @@ class RTC_EXPORT ScreenCastPortal
  private:
   // Values are set based on source type property in
   // xdg-desktop-portal/screencast
-  // https://github.com/flatpak/xdg-desktop-portal/blob/main/data/org.freedesktop.portal.ScreenCast.xml
+  // https://github.com/flatpak/xdg-desktop-portal/blob/master/data/org.freedesktop.portal.ScreenCast.xml
   enum class CaptureSourceType : uint32_t {
     kScreen = 0b01,
     kWindow = 0b10,
@@ -138,14 +133,14 @@ class RTC_EXPORT ScreenCastPortal
   // A PipeWire stream ID of stream we will be connecting to
   uint32_t pw_stream_node_id_ = 0;
   // A file descriptor of PipeWire socket
-  int pw_fd_ = kInvalidPipeWireFd;
+  int pw_fd_ = -1;
   // Restore token that can be used to restore previous session
   std::string restore_token_;
 
   CaptureSourceType capture_source_type_ =
       ScreenCastPortal::CaptureSourceType::kScreen;
 
-  CursorMode cursor_mode_ = CursorMode::kMetadata;
+  CursorMode cursor_mode_ = ScreenCastPortal::CursorMode::kMetadata;
 
   PersistMode persist_mode_ = ScreenCastPortal::PersistMode::kDoNotPersist;
 

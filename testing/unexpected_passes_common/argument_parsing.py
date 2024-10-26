@@ -37,12 +37,11 @@ def AddCommonArguments(parser: argparse.ArgumentParser) -> None:
                       default=False,
                       help='Automatically remove any expectations that are '
                       'determined to be stale from the expectation file.')
-  parser.add_argument('--narrow-semi-stale-expectation-scope',
+  parser.add_argument('--modify-semi-stale-expectations',
                       action='store_true',
                       default=False,
-                      help='Automatically modify or split semi-stale '
-                      'expectations so they only apply to configurations that '
-                      'actually need them.')
+                      help='If any semi-stale expectations are found, prompt '
+                      'the user about the modification of each one.')
   parser.add_argument('-v',
                       '--verbose',
                       action='count',
@@ -83,14 +82,6 @@ def AddCommonArguments(parser: argparse.ArgumentParser) -> None:
                       type=int,
                       help=('How many parallel jobs to run. By default, runs '
                             'all work in parallel.'))
-  parser.add_argument('--disable-batching',
-                      dest='use_batching',
-                      action='store_false',
-                      default=True,
-                      help=('Disables the use of batching when running '
-                            'queries. Batching allows for more queries to be '
-                            'run in parallel, but increases query overhead by '
-                            'a variable amount.'))
   internal_group = parser.add_mutually_exclusive_group()
   internal_group.add_argument('--include-internal-builders',
                               action='store_true',

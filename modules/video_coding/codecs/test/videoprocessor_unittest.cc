@@ -38,6 +38,7 @@ namespace {
 
 const int kWidth = 352;
 const int kHeight = 288;
+const int kFrameSize = kWidth * kHeight * 3 / 2;  // I420.
 
 }  // namespace
 
@@ -51,11 +52,14 @@ class VideoProcessorTest : public ::testing::Test {
     decoders_.push_back(std::unique_ptr<VideoDecoder>(decoder_mock_));
 
     ExpectInit();
-    q_.SendTask([this] {
-      video_processor_ = std::make_unique<VideoProcessor>(
-          &encoder_mock_, &decoders_, &frame_reader_mock_, config_, &stats_,
-          &encoded_frame_writers_, /*decoded_frame_writers=*/nullptr);
-    });
+    EXPECT_CALL(frame_reader_mock_, FrameLength())
+        .WillRepeatedly(Return(kFrameSize));
+    q_.SendTask(
+        [this] {
+          video_processor_ = std::make_unique<VideoProcessor>(
+              &encoder_mock_, &decoders_, &frame_reader_mock_, config_, &stats_,
+              &encoded_frame_writers_, /*decoded_frame_writers=*/nullptr);
+        });
   }
 
   ~VideoProcessorTest() {
@@ -103,7 +107,7 @@ TEST_F(VideoProcessorTest, ProcessFrames_FixedFramerate) {
       .Times(1);
   q_.SendTask([=] { video_processor_->SetRates(kBitrateKbps, kFramerateFps); });
 
-  EXPECT_CALL(frame_reader_mock_, PullFrame(_, _, _))
+  EXPECT_CALL(frame_reader_mock_, ReadFrame())
       .WillRepeatedly(Return(I420Buffer::Create(kWidth, kHeight)));
   EXPECT_CALL(
       encoder_mock_,
@@ -132,7 +136,7 @@ TEST_F(VideoProcessorTest, ProcessFrames_VariableFramerate) {
   q_.SendTask(
       [=] { video_processor_->SetRates(kBitrateKbps, kStartFramerateFps); });
 
-  EXPECT_CALL(frame_reader_mock_, PullFrame(_, _, _))
+  EXPECT_CALL(frame_reader_mock_, ReadFrame())
       .WillRepeatedly(Return(I420Buffer::Create(kWidth, kHeight)));
   EXPECT_CALL(encoder_mock_,
               Encode(Property(&VideoFrame::timestamp, kStartTimestamp), _))

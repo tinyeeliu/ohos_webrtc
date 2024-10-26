@@ -13,13 +13,13 @@
 // behavior.
 TEST(JsonSchemaCompilerReturnsAsyncTest, ReturnsObjectResultCreate) {
   test::api::returns_async::SupportsPromises::Results::SomeObject some_object;
-  some_object.state = test::api::returns_async::Enumeration::kFoo;
+  some_object.state = test::api::returns_async::ENUMERATION_FOO;
   base::Value results(
       test::api::returns_async::SupportsPromises::Results::Create(some_object));
 
-  base::Value::Dict expected_dict;
-  expected_dict.Set("state", "foo");
-  base::Value::List expected;
+  base::Value expected_dict = base::Value(base::Value::Type::DICTIONARY);
+  expected_dict.SetKey("state", base::Value("foo"));
+  base::Value expected = base::Value(base::Value::Type::LIST);
   expected.Append(std::move(expected_dict));
   EXPECT_EQ(expected, results);
 }

@@ -5,7 +5,7 @@
 
 import unittest
 
-from make_gtest_filter import PascalCaseSplit, CompressWithWildcards, GetFiltersForTests
+from make_gtest_filter import PascalCaseSplit, CompressWithWildcards
 
 
 class Foo(unittest.TestCase):
@@ -41,17 +41,6 @@ class Foo(unittest.TestCase):
                      ['A.DoomBanana', 'A.DoomMelon*'])
     self.assertEqual(list(CompressWithWildcards(fruit, 2, 2)),
                      ['A.DoomBanana', 'A.DoomMelonFooBar', 'A.DoomMelonFooBaz'])
-
-  def testGetFiltersForTests(self):
-    tests = ['TestSuite.TestName']
-    self.assertEqual(list(GetFiltersForTests(tests, class_only=True)), [
-        'TestSuite.*', '*/TestSuite.*/*', '*/TestSuite/*.*', 'TestSuite.*/*',
-        'TestSuite/*.*'
-    ])
-    self.assertEqual(list(GetFiltersForTests(tests, class_only=False)), [
-        'TestSuite.TestName', '*/TestSuite.TestName/*', 'TestSuite.TestName/*',
-        'TestSuite/*.TestName'
-    ])
 
 
 if __name__ == '__main__':

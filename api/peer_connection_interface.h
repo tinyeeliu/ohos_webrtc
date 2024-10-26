@@ -94,7 +94,6 @@
 #include "api/field_trials_view.h"
 #include "api/ice_transport_interface.h"
 #include "api/jsep.h"
-#include "api/legacy_stats_types.h"
 #include "api/media_stream_interface.h"
 #include "api/media_types.h"
 #include "api/metronome/metronome.h"
@@ -113,6 +112,7 @@
 #include "api/set_local_description_observer_interface.h"
 #include "api/set_remote_description_observer_interface.h"
 #include "api/stats/rtc_stats_collector_callback.h"
+#include "api/stats_types.h"
 #include "api/task_queue/task_queue_factory.h"
 #include "api/transport/bitrate_settings.h"
 #include "api/transport/enums.h"
@@ -426,6 +426,13 @@ class RTC_EXPORT PeerConnectionInterface : public rtc::RefCountInterface {
     // default will be used.
     //////////////////////////////////////////////////////////////////////////
 
+    // If set to true, don't gather IPv6 ICE candidates.
+    // TODO(https://crbug.com/webrtc/14608): Delete this flag.
+    union {
+      bool DEPRECATED_disable_ipv6 = false;
+      bool ABSL_DEPRECATED("https://crbug.com/webrtc/14608") disable_ipv6;
+    };
+
     // If set to true, don't gather IPv6 ICE candidates on Wi-Fi.
     // Only intended to be used on specific devices. Certain phones disable IPv6
     // when the screen is turned off and it would be better to just disable the
@@ -447,6 +454,9 @@ class RTC_EXPORT PeerConnectionInterface : public rtc::RefCountInterface {
     // This means adding padding bits up to this bitrate, which can help
     // when switching from a static scene to one with motion.
     absl::optional<int> screencast_min_bitrate;
+
+    // Use new combined audio/video bandwidth estimation?
+    absl::optional<bool> combined_audio_video_bwe;
 
 #if defined(WEBRTC_FUCHSIA)
     // TODO(bugs.webrtc.org/11066): Remove entirely once Fuchsia does not use.
@@ -661,6 +671,9 @@ class RTC_EXPORT PeerConnectionInterface : public rtc::RefCountInterface {
     // Added to be able to control rollout of this feature.
     bool enable_implicit_rollback = false;
 
+    // Whether network condition based codec switching is allowed.
+    absl::optional<bool> allow_codec_switching;
+
     // The delay before doing a usage histogram report for long-lived
     // PeerConnections. Used for testing only.
     absl::optional<int> report_usage_pattern_delay_ms;
@@ -681,9 +694,6 @@ class RTC_EXPORT PeerConnectionInterface : public rtc::RefCountInterface {
     std::vector<rtc::NetworkMask> vpn_list;
 
     PortAllocatorConfig port_allocator_config;
-
-    // The burst interval of the pacer, see TaskQueuePacedSender constructor.
-    absl::optional<TimeDelta> pacer_burst_interval;
 
     //
     // Don't forget to update operator== if adding something.
@@ -1383,12 +1393,7 @@ struct RTC_EXPORT PeerConnectionDependencies final {
   std::unique_ptr<webrtc::AsyncDnsResolverFactoryInterface>
       async_dns_resolver_factory;
   // Deprecated - use async_dns_resolver_factory
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-  [[deprecated("Use async_dns_resolver_factory")]] std::unique_ptr<
-      webrtc::AsyncResolverFactory>
-      async_resolver_factory;
-#pragma clang diagnostic pop
+  std::unique_ptr<webrtc::AsyncResolverFactory> async_resolver_factory;
   std::unique_ptr<webrtc::IceTransportFactory> ice_transport_factory;
   std::unique_ptr<rtc::RTCCertificateGeneratorInterface> cert_generator;
   std::unique_ptr<rtc::SSLCertificateVerifier> tls_cert_verifier;
@@ -1492,7 +1497,7 @@ class RTC_EXPORT PeerConnectionFactoryInterface
     rtc::SSLProtocolVersion ssl_max_version = rtc::SSL_PROTOCOL_DTLS_12;
 
     // Sets crypto related options, e.g. enabled cipher suites.
-    CryptoOptions crypto_options = {};
+    CryptoOptions crypto_options = CryptoOptions::NoGcm();
   };
 
   // Set the options to be used for subsequently created PeerConnections.
@@ -1552,15 +1557,8 @@ class RTC_EXPORT PeerConnectionFactoryInterface
   // Creates a new local VideoTrack. The same `source` can be used in several
   // tracks.
   virtual rtc::scoped_refptr<VideoTrackInterface> CreateVideoTrack(
-      rtc::scoped_refptr<VideoTrackSourceInterface> source,
-      absl::string_view label) = 0;
-  ABSL_DEPRECATED("Use version with scoped_refptr")
-  virtual rtc::scoped_refptr<VideoTrackInterface> CreateVideoTrack(
       const std::string& label,
-      VideoTrackSourceInterface* source) {
-    return CreateVideoTrack(
-        rtc::scoped_refptr<VideoTrackSourceInterface>(source), label);
-  }
+      VideoTrackSourceInterface* source) = 0;
 
   // Creates an new AudioTrack. At the moment `source` can be null.
   virtual rtc::scoped_refptr<AudioTrackInterface> CreateAudioTrack(

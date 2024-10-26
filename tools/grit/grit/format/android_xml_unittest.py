@@ -5,6 +5,7 @@
 
 """Unittest for android_xml.py."""
 
+from __future__ import print_function
 
 import os
 import sys
@@ -13,7 +14,7 @@ import unittest
 if __name__ == '__main__':
   sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
 
-from io import StringIO
+from six import StringIO
 
 from grit import util
 from grit.format import android_xml
@@ -138,7 +139,7 @@ a sledge hammer."</string>
     self.assertTrue(android_xml.ShouldOutputNode(msg_world, tagged_only=False))
 
 
-class DummyOutput:
+class DummyOutput(object):
 
   def __init__(self, type, language):
     self.type = type

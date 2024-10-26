@@ -91,7 +91,7 @@ RtpSenderFrameEncryptionConfig CreateFrameEncryptionConfig(
 RtpSenderObservers CreateObservers(RtcpRttStats* call_stats,
                                    EncoderRtcpFeedback* encoder_feedback,
                                    SendStatisticsProxy* stats_proxy,
-                                   SendPacketObserver* send_packet_observer) {
+                                   SendDelayStats* send_delay_stats) {
   RtpSenderObservers observers;
   observers.rtcp_rtt_stats = call_stats;
   observers.intra_frame_callback = encoder_feedback;
@@ -101,7 +101,8 @@ RtpSenderObservers CreateObservers(RtcpRttStats* call_stats,
   observers.bitrate_observer = stats_proxy;
   observers.frame_count_observer = stats_proxy;
   observers.rtcp_type_observer = stats_proxy;
-  observers.send_packet_observer = send_packet_observer;
+  observers.send_delay_observer = stats_proxy;
+  observers.send_packet_observer = send_delay_stats;
   return observers;
 }
 
@@ -121,7 +122,7 @@ std::unique_ptr<VideoStreamEncoder> CreateVideoStreamEncoder(
   TaskQueueBase* encoder_queue_ptr = encoder_queue.get();
   return std::make_unique<VideoStreamEncoder>(
       clock, num_cpu_cores, stats_proxy, encoder_settings,
-      std::make_unique<OveruseFrameDetector>(stats_proxy),
+      std::make_unique<OveruseFrameDetector>(stats_proxy, field_trials),
       FrameCadenceAdapterInterface::Create(clock, encoder_queue_ptr,
                                            field_trials),
       std::move(encoder_queue), bitrate_allocation_callback_type, field_trials,
@@ -148,9 +149,9 @@ VideoSendStream::VideoSendStream(
     const std::map<uint32_t, RtpPayloadState>& suspended_payload_states,
     std::unique_ptr<FecController> fec_controller,
     const FieldTrialsView& field_trials)
-    : transport_(transport),
+    : rtp_transport_queue_(transport->GetWorkerQueue()),
+      transport_(transport),
       stats_proxy_(clock, config, encoder_config.content_type, field_trials),
-      send_packet_observer_(&stats_proxy_, send_delay_stats),
       config_(std::move(config)),
       content_type_(encoder_config.content_type),
       video_stream_encoder_(CreateVideoStreamEncoder(
@@ -169,20 +170,20 @@ VideoSendStream::VideoSendStream(
           [this](uint32_t ssrc, const std::vector<uint16_t>& seq_nums) {
             return rtp_video_sender_->GetSentRtpPacketInfos(ssrc, seq_nums);
           }),
-      rtp_video_sender_(transport->CreateRtpVideoSender(
-          suspended_ssrcs,
-          suspended_payload_states,
-          config_.rtp,
-          config_.rtcp_report_interval_ms,
-          config_.send_transport,
-          CreateObservers(call_stats,
-                          &encoder_feedback_,
-                          &stats_proxy_,
-                          &send_packet_observer_),
-          event_log,
-          std::move(fec_controller),
-          CreateFrameEncryptionConfig(&config_),
-          config_.frame_transformer)),
+      rtp_video_sender_(
+          transport->CreateRtpVideoSender(suspended_ssrcs,
+                                          suspended_payload_states,
+                                          config_.rtp,
+                                          config_.rtcp_report_interval_ms,
+                                          config_.send_transport,
+                                          CreateObservers(call_stats,
+                                                          &encoder_feedback_,
+                                                          &stats_proxy_,
+                                                          send_delay_stats),
+                                          event_log,
+                                          std::move(fec_controller),
+                                          CreateFrameEncryptionConfig(&config_),
+                                          config_.frame_transformer)),
       send_stream_(clock,
                    &stats_proxy_,
                    transport,
@@ -208,12 +209,8 @@ VideoSendStream::~VideoSendStream() {
   transport_->DestroyRtpVideoSender(rtp_video_sender_);
 }
 
-void VideoSendStream::Start() {
-  const std::vector<bool> active_layers(config_.rtp.ssrcs.size(), true);
-  StartPerRtpStream(active_layers);
-}
-
-void VideoSendStream::StartPerRtpStream(const std::vector<bool> active_layers) {
+void VideoSendStream::UpdateActiveSimulcastLayers(
+    const std::vector<bool> active_layers) {
   RTC_DCHECK_RUN_ON(&thread_checker_);
 
   // Keep our `running_` flag expected state in sync with active layers since
@@ -235,9 +232,33 @@ void VideoSendStream::StartPerRtpStream(const std::vector<bool> active_layers) {
     }
   }
   active_layers_string << "}";
-  RTC_LOG(LS_INFO) << "StartPerRtpStream: " << active_layers_string.str();
-  send_stream_.StartPerRtpStream(active_layers);
+  RTC_LOG(LS_INFO) << "UpdateActiveSimulcastLayers: "
+                   << active_layers_string.str();
+
+  rtp_transport_queue_->RunOrPost(
+      SafeTask(transport_queue_safety_, [this, active_layers] {
+        send_stream_.UpdateActiveSimulcastLayers(active_layers);
+      }));
+
   running_ = running;
+}
+
+void VideoSendStream::Start() {
+  RTC_DCHECK_RUN_ON(&thread_checker_);
+  RTC_DLOG(LS_INFO) << "VideoSendStream::Start";
+  if (running_)
+    return;
+
+  running_ = true;
+
+  // It is expected that after VideoSendStream::Start has been called, incoming
+  // frames are not dropped in VideoStreamEncoder. To ensure this, Start has to
+  // be synchronized.
+  // TODO(tommi): ^^^ Validate if this still holds.
+  rtp_transport_queue_->RunSynchronous([this] {
+    transport_queue_safety_->SetAlive();
+    send_stream_.Start();
+  });
 }
 
 void VideoSendStream::Stop() {
@@ -246,7 +267,13 @@ void VideoSendStream::Stop() {
     return;
   RTC_DLOG(LS_INFO) << "VideoSendStream::Stop";
   running_ = false;
-  send_stream_.Stop();
+  rtp_transport_queue_->RunOrPost(SafeTask(transport_queue_safety_, [this] {
+    // As the stream can get re-used and implicitly restarted via changing
+    // the state of the active layers, we do not mark the
+    // `transport_queue_safety_` flag with `SetNotAlive()` here. That's only
+    // done when we stop permanently via `StopPermanentlyAndGetRtpStates()`.
+    send_stream_.Stop();
+  }));
 }
 
 bool VideoSendStream::started() {
@@ -274,23 +301,17 @@ void VideoSendStream::SetSource(
 }
 
 void VideoSendStream::ReconfigureVideoEncoder(VideoEncoderConfig config) {
-  ReconfigureVideoEncoder(std::move(config), nullptr);
-}
-
-void VideoSendStream::ReconfigureVideoEncoder(VideoEncoderConfig config,
-                                              SetParametersCallback callback) {
   RTC_DCHECK_RUN_ON(&thread_checker_);
   RTC_DCHECK_EQ(content_type_, config.content_type);
-  RTC_LOG(LS_VERBOSE) << "Encoder config: " << config.ToString()
-                      << " VideoSendStream config: " << config_.ToString();
   video_stream_encoder_->ConfigureEncoder(
       std::move(config),
-      config_.rtp.max_packet_size - CalculateMaxHeaderSize(config_.rtp),
-      std::move(callback));
+      config_.rtp.max_packet_size - CalculateMaxHeaderSize(config_.rtp));
 }
 
 VideoSendStream::Stats VideoSendStream::GetStats() {
-  RTC_DCHECK_RUN_ON(&thread_checker_);
+  // TODO(perkj, solenberg): Some test cases in EndToEndTest call GetStats from
+  // a network thread. See comment in Call::GetStats().
+  // RTC_DCHECK_RUN_ON(&thread_checker_);
   return stats_proxy_.GetStats();
 }
 
@@ -308,9 +329,13 @@ void VideoSendStream::StopPermanentlyAndGetRtpStates(
   // Always run these cleanup steps regardless of whether running_ was set
   // or not. This will unregister callbacks before destruction.
   // See `VideoSendStreamImpl::StopVideoSendStream` for more.
-  send_stream_.Stop();
-  *rtp_state_map = send_stream_.GetRtpStates();
-  *payload_state_map = send_stream_.GetRtpPayloadStates();
+  rtp_transport_queue_->RunSynchronous(
+      [this, rtp_state_map, payload_state_map]() {
+        transport_queue_safety_->SetNotAlive();
+        send_stream_.Stop();
+        *rtp_state_map = send_stream_.GetRtpStates();
+        *payload_state_map = send_stream_.GetRtpPayloadStates();
+      });
 }
 
 void VideoSendStream::DeliverRtcp(const uint8_t* packet, size_t length) {
@@ -319,7 +344,6 @@ void VideoSendStream::DeliverRtcp(const uint8_t* packet, size_t length) {
 }
 
 void VideoSendStream::GenerateKeyFrame(const std::vector<std::string>& rids) {
-  RTC_DCHECK_RUN_ON(&thread_checker_);
   // Map rids to layers. If rids is empty, generate a keyframe for all layers.
   std::vector<VideoFrameType> next_frames(config_.rtp.ssrcs.size(),
                                           VideoFrameType::kVideoFrameKey);

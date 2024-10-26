@@ -5,6 +5,7 @@
 """Handling of the <include> element.
 """
 
+from __future__ import print_function
 
 import os
 
@@ -18,7 +19,7 @@ class IncludeNode(base.Node):
   """An <include> element."""
 
   def __init__(self):
-    super().__init__()
+    super(IncludeNode, self).__init__()
 
     # Cache flattened data so that we don't flatten the same file
     # multiple times.

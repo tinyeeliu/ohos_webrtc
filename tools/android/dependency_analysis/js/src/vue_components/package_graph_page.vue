@@ -4,14 +4,14 @@
 
 <template>
   <div id="page-container">
-    <v-dialog/>
+    <v-dialog />
     <div id="title-and-graph-container">
       <div
           id="title-and-metadata">
         <div
             id="title"
             class="md-headline">
-          <a href="/">Clank Dependency Viewer</a> - Package Graph
+          Clank Dependency Viewer - Package Graph
         </div>
         <div
             id="graph-metadata-info">
@@ -128,8 +128,7 @@ const PackageGraphPage = {
 
   /**
    * Various references to objects used across the entire package page.
-   *
-   * @typedef {object} PackagePageData
+   * @typedef {Object} PackagePageData
    * @property {!PageModel} pageModel The data store for the page.
    * @property {!PackageDisplaySettingsData} displaySettingsData Additional data
    *   store for the graph's display settings.
@@ -138,7 +137,7 @@ const PackageGraphPage = {
 
   /**
    * @return {PackagePageData} The objects used throughout the page.
-   */
+  */
   data: function() {
     const graphModel = parsePackageGraphModelFromJson(this.graphJson);
     const pageModel = new PageModel(graphModel);

@@ -64,10 +64,6 @@ public:
     virtual int32_t MinSpeakerVolume(uint32_t &minVolume) const = 0;
     virtual void AttachAudioBuffer(AudioDeviceBuffer* audioBuffer) = 0;
     virtual int GetPlayoutUnderrunCount() = 0;
-    virtual absl::optional<AudioDeviceModule::Stats> GetStats() const
-    {
-        return absl::nullopt;
-    }
 };
 }  // namespace webrtc
 

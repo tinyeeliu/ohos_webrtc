@@ -21,7 +21,9 @@ import org.chromium.net.HttpNegotiateConstants;
 
 import java.util.Arrays;
 
-/** AccountAuthenticator implementation */
+/**
+ * AccountAuthenticator implementation
+ */
 public class SpnegoAuthenticator extends AbstractAccountAuthenticator {
 
     private static final String TAG = Constants.TAG;
@@ -36,27 +38,21 @@ public class SpnegoAuthenticator extends AbstractAccountAuthenticator {
     }
 
     @Override
-    public Bundle addAccount(
-            AccountAuthenticatorResponse response,
-            String accountType,
-            String authTokenType,
-            String[] requiredFeatures,
-            Bundle options)
+    public Bundle addAccount(AccountAuthenticatorResponse response, String accountType,
+            String authTokenType, String[] requiredFeatures, Bundle options)
             throws NetworkErrorException {
         Log.d(TAG, "addAccount()");
 
         // Delegate to the activity to get the account information from the user.
         Bundle bundle = new Bundle();
-        bundle.putParcelable(
-                AccountManager.KEY_INTENT,
+        bundle.putParcelable(AccountManager.KEY_INTENT,
                 SpnegoAuthenticatorActivity.getAddAccountIntent(mContext, response));
         return bundle;
     }
 
     @Override
-    public Bundle confirmCredentials(
-            AccountAuthenticatorResponse response, Account account, Bundle options)
-            throws NetworkErrorException {
+    public Bundle confirmCredentials(AccountAuthenticatorResponse response, Account account,
+            Bundle options) throws NetworkErrorException {
         Log.d(TAG, "confirmCredentials(%s)", account.name);
         return unsupportedOperationBundle("confirmCredentials");
     }
@@ -68,12 +64,8 @@ public class SpnegoAuthenticator extends AbstractAccountAuthenticator {
     }
 
     @Override
-    public Bundle getAuthToken(
-            AccountAuthenticatorResponse response,
-            Account account,
-            String authTokenType,
-            Bundle options)
-            throws NetworkErrorException {
+    public Bundle getAuthToken(AccountAuthenticatorResponse response, Account account,
+            String authTokenType, Bundle options) throws NetworkErrorException {
         Log.d(TAG, "getAuthToken(%s)", account.name);
 
         Bundle result = new Bundle();
@@ -85,9 +77,8 @@ public class SpnegoAuthenticator extends AbstractAccountAuthenticator {
             result.putInt(HttpNegotiateConstants.KEY_SPNEGO_RESULT, 0);
         } else {
             Log.d(TAG, "getAuthToken(): Asking for credentials confirmation");
-            Intent intent =
-                    SpnegoAuthenticatorActivity.getConfirmCredentialsIntent(
-                            mContext, account.name, response);
+            Intent intent = SpnegoAuthenticatorActivity.getConfirmCredentialsIntent(
+                    mContext, account.name, response);
             result.putParcelable(AccountManager.KEY_INTENT, intent);
 
             // We need to show a notification in case the caller can't use the intent directly.
@@ -104,9 +95,8 @@ public class SpnegoAuthenticator extends AbstractAccountAuthenticator {
     }
 
     @Override
-    public Bundle hasFeatures(
-            AccountAuthenticatorResponse response, Account account, String[] features)
-            throws NetworkErrorException {
+    public Bundle hasFeatures(AccountAuthenticatorResponse response, Account account,
+            String[] features) throws NetworkErrorException {
         Log.d(TAG, "hasFeatures(%s)", Arrays.asList(features));
         Bundle result = new Bundle();
 
@@ -122,12 +112,8 @@ public class SpnegoAuthenticator extends AbstractAccountAuthenticator {
     }
 
     @Override
-    public Bundle updateCredentials(
-            AccountAuthenticatorResponse response,
-            Account account,
-            String authTokenType,
-            Bundle options)
-            throws NetworkErrorException {
+    public Bundle updateCredentials(AccountAuthenticatorResponse response, Account account,
+            String authTokenType, Bundle options) throws NetworkErrorException {
         Log.d(TAG, "updateCredentials(%s)", account.name);
         return unsupportedOperationBundle("updateCredentials");
     }
@@ -135,14 +121,12 @@ public class SpnegoAuthenticator extends AbstractAccountAuthenticator {
     private void showConfirmCredentialsNotification(Context context, Intent intent) {
         PendingIntent notificationAction =
                 PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
-        Notification notification =
-                new Notification.Builder(context)
-                        .setContentTitle("Authentication required")
-                        .setContentText("Credential confirmation required for the Spnego account")
-                        .setSmallIcon(android.R.drawable.stat_sys_warning)
-                        .setContentIntent(notificationAction)
-                        .setAutoCancel(true)
-                        .build();
+        Notification notification = new Notification.Builder(context)
+                .setContentTitle("Authentication required")
+                .setContentText("Credential confirmation required for the Spnego account")
+                .setSmallIcon(android.R.drawable.stat_sys_warning)
+                .setContentIntent(notificationAction)
+                .setAutoCancel(true).build();
 
         NotificationManager notificationManager =
                 (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);

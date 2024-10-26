@@ -138,6 +138,7 @@ TEST_F(PeerConnectionE2EQualityTestSmokeTest, MAYBE_Smoke) {
 
     AudioConfig audio;
     audio.stream_label = "alice-audio";
+    audio.mode = AudioConfig::Mode::kFile;
     audio.input_file_name =
         test::ResourcePath("pc_quality_smoke_test_alice_source", "wav");
     audio.sampling_frequency_in_hz = 48000;
@@ -159,6 +160,7 @@ TEST_F(PeerConnectionE2EQualityTestSmokeTest, MAYBE_Smoke) {
 
     AudioConfig audio;
     audio.stream_label = "charlie-audio";
+    audio.mode = AudioConfig::Mode::kFile;
     audio.input_file_name =
         test::ResourcePath("pc_quality_smoke_test_bob_source", "wav");
     charlie->SetAudioConfig(std::move(audio));
@@ -209,6 +211,7 @@ TEST_F(PeerConnectionE2EQualityTestSmokeTest,
 
     AudioConfig audio;
     audio.stream_label = "alice-audio";
+    audio.mode = AudioConfig::Mode::kFile;
     audio.input_file_name =
         test::ResourcePath("pc_quality_smoke_test_alice_source", "wav");
     audio.sampling_frequency_in_hz = 48000;
@@ -228,6 +231,7 @@ TEST_F(PeerConnectionE2EQualityTestSmokeTest,
 
     AudioConfig audio;
     audio.stream_label = "charlie-audio";
+    audio.mode = AudioConfig::Mode::kFile;
     audio.input_file_name =
         test::ResourcePath("pc_quality_smoke_test_bob_source", "wav");
     charlie->SetAudioConfig(std::move(audio));
@@ -258,6 +262,7 @@ TEST_F(PeerConnectionE2EQualityTestSmokeTest, SmokeH264) {
 
     AudioConfig audio;
     audio.stream_label = "alice-audio";
+    audio.mode = AudioConfig::Mode::kFile;
     audio.input_file_name =
         test::ResourcePath("pc_quality_smoke_test_alice_source", "wav");
     audio.sampling_frequency_in_hz = 48000;
@@ -276,6 +281,7 @@ TEST_F(PeerConnectionE2EQualityTestSmokeTest, SmokeH264) {
 
     AudioConfig audio;
     audio.stream_label = "charlie-audio";
+    audio.mode = AudioConfig::Mode::kFile;
     audio.input_file_name =
         test::ResourcePath("pc_quality_smoke_test_bob_source", "wav");
     charlie->SetAudioConfig(std::move(audio));
@@ -407,6 +413,7 @@ TEST_F(PeerConnectionE2EQualityTestSmokeTest, MAYBE_Echo) {
   AddPeer(network_links.first, [](PeerConfigurer* alice) {
     AudioConfig audio;
     audio.stream_label = "alice-audio";
+    audio.mode = AudioConfig::Mode::kFile;
     audio.input_file_name =
         test::ResourcePath("pc_quality_smoke_test_alice_source", "wav");
     audio.sampling_frequency_in_hz = 48000;
@@ -415,6 +422,7 @@ TEST_F(PeerConnectionE2EQualityTestSmokeTest, MAYBE_Echo) {
   AddPeer(network_links.second, [](PeerConfigurer* bob) {
     AudioConfig audio;
     audio.stream_label = "bob-audio";
+    audio.mode = AudioConfig::Mode::kFile;
     audio.input_file_name =
         test::ResourcePath("pc_quality_smoke_test_bob_source", "wav");
     bob->SetAudioConfig(std::move(audio));
@@ -442,6 +450,7 @@ TEST_F(PeerConnectionE2EQualityTestSmokeTest, MAYBE_Simulcast) {
 
     AudioConfig audio;
     audio.stream_label = "alice-audio";
+    audio.mode = AudioConfig::Mode::kFile;
     audio.input_file_name =
         test::ResourcePath("pc_quality_smoke_test_alice_source", "wav");
     alice->SetAudioConfig(std::move(audio));
@@ -469,6 +478,7 @@ TEST_F(PeerConnectionE2EQualityTestSmokeTest, MAYBE_Svc) {
     alice->AddVideoConfig(std::move(simulcast));
 
     AudioConfig audio("alice-audio");
+    audio.mode = AudioConfig::Mode::kFile;
     audio.input_file_name =
         test::ResourcePath("pc_quality_smoke_test_alice_source", "wav");
     alice->SetAudioConfig(std::move(audio));
@@ -505,6 +515,7 @@ TEST_F(PeerConnectionE2EQualityTestSmokeTest, MAYBE_HighBitrate) {
 
     AudioConfig audio;
     audio.stream_label = "alice-audio";
+    audio.mode = AudioConfig::Mode::kFile;
     audio.input_file_name =
         test::ResourcePath("pc_quality_smoke_test_alice_source", "wav");
     audio.sampling_frequency_in_hz = 48000;

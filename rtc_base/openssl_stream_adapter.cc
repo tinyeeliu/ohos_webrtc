@@ -294,10 +294,8 @@ bool ShouldAllowLegacyTLSProtocols() {
 }
 
 OpenSSLStreamAdapter::OpenSSLStreamAdapter(
-    std::unique_ptr<StreamInterface> stream,
-    absl::AnyInvocable<void(SSLHandshakeError)> handshake_error)
+    std::unique_ptr<StreamInterface> stream)
     : stream_(std::move(stream)),
-      handshake_error_(std::move(handshake_error)),
       owner_(rtc::Thread::Current()),
       state_(SSL_NONE),
       role_(SSL_CLIENT),
@@ -469,17 +467,6 @@ bool OpenSSLStreamAdapter::ExportKeyingMaterial(absl::string_view label,
   return true;
 }
 
-uint16_t OpenSSLStreamAdapter::GetPeerSignatureAlgorithm() const {
-  if (state_ != SSL_CONNECTED) {
-    return 0;
-  }
-#ifdef OPENSSL_IS_BORINGSSL
-  return SSL_get_peer_signature_algorithm(ssl_);
-#else
-  return kSslSignatureAlgorithmUnknown;
-#endif
-}
-
 bool OpenSSLStreamAdapter::SetDtlsSrtpCryptoSuites(
     const std::vector<int>& ciphers) {
   if (state_ != SSL_NONE) {
@@ -574,6 +561,21 @@ void OpenSSLStreamAdapter::SetInitialRetransmissionTimeout(int timeout_ms) {
 //
 // StreamInterface Implementation
 //
+// Backwards compatible Write() method using deprecated API.
+// Needed because deprecated API is still =0 in API definition.
+StreamResult OpenSSLStreamAdapter::Write(const void* data,
+                                         size_t data_len,
+                                         size_t* written,
+                                         int* error) {
+  // TODO(bugs.webrtc.org/14632): Consider doing
+  // RTC_CHECK_NOTREACHED(); when downstream usage is eliminated.
+  size_t dummy_written;
+  int dummy_error;
+  return Write(
+      rtc::MakeArrayView(reinterpret_cast<const uint8_t*>(data), data_len),
+      written ? *written : dummy_written, error ? *error : dummy_error);
+}
+
 StreamResult OpenSSLStreamAdapter::Write(rtc::ArrayView<const uint8_t> data,
                                          size_t& written,
                                          int& error) {
@@ -633,6 +635,19 @@ StreamResult OpenSSLStreamAdapter::Write(rtc::ArrayView<const uint8_t> data,
       return SR_ERROR;
   }
   // not reached
+}
+
+// Backwards compatible Read() method using deprecated API.
+StreamResult OpenSSLStreamAdapter::Read(void* data,
+                                        size_t data_len,
+                                        size_t* read,
+                                        int* error) {
+  // TODO(bugs.webrtc.org/14632): Consider doing
+  // RTC_CHECK_NOTREACHED() when downstream usage is thought to be eliminated.
+  size_t dummy_read;
+  int dummy_error;
+  return Read(rtc::MakeArrayView(reinterpret_cast<uint8_t*>(data), data_len),
+              read ? *read : dummy_read, error ? *error : dummy_error);
 }
 
 StreamResult OpenSSLStreamAdapter::Read(rtc::ArrayView<uint8_t> data,
@@ -951,9 +966,7 @@ int OpenSSLStreamAdapter::ContinueSSL() {
       }
       RTC_DLOG(LS_VERBOSE) << " -- error " << code << ", " << err_code << ", "
                            << ERR_GET_REASON(err_code);
-      if (handshake_error_) {
-        handshake_error_(ssl_handshake_err);
-      }
+      SignalSSLHandshakeError(ssl_handshake_err);
       return (ssl_error != 0) ? ssl_error : -1;
   }
 
@@ -1072,7 +1085,9 @@ SSL_CTX* OpenSSLStreamAdapter::SetupSSLContext() {
     return nullptr;
   }
 
+#if !defined(NDEBUG)
   SSL_CTX_set_info_callback(ctx, OpenSSLAdapter::SSLInfoCallback);
+#endif
 
   int mode = SSL_VERIFY_PEER;
   if (GetClientAuthEnabled()) {
@@ -1108,11 +1123,6 @@ SSL_CTX* OpenSSLStreamAdapter::SetupSSLContext() {
       return nullptr;
     }
   }
-
-#ifdef OPENSSL_IS_BORINGSSL
-  SSL_CTX_set_permute_extensions(
-      ctx, webrtc::field_trial::IsEnabled("WebRTC-PermuteTlsClientHello"));
-#endif
 
   return ctx;
 }

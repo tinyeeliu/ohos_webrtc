@@ -1,7 +1,6 @@
 {
   "android-arm32-pgo": {
     "gn_args": {
-      "android_override_version_code": "1234567980",
       "chrome_pgo_phase": 1,
       "clang_use_default_sample_profile": false,
       "debuggable_apks": false,
@@ -12,13 +11,11 @@
       "symbol_level": 1,
       "target_cpu": "arm",
       "target_os": "android",
-      "use_remoteexec": true,
-      "v8_is_on_release_branch": true
+      "use_goma": true
     }
   },
   "android-arm64-pgo": {
     "gn_args": {
-      "android_override_version_code": "1234567980",
       "chrome_pgo_phase": 1,
       "clang_use_default_sample_profile": false,
       "debuggable_apks": false,
@@ -29,56 +26,7 @@
       "symbol_level": 1,
       "target_cpu": "arm64",
       "target_os": "android",
-      "use_remoteexec": true,
-      "v8_is_on_release_branch": true
-    }
-  },
-  "lacros-amd64-generic-pgo": {
-    "args_file": "//build/args/chromeos/amd64-generic-crostoolchain.gni",
-    "gn_args": {
-      "chrome_pgo_phase": 1,
-      "chromeos_is_browser_only": true,
-      "dcheck_always_on": false,
-      "is_chrome_branded": true,
-      "is_chromeos_device": true,
-      "is_debug": false,
-      "is_official_build": true,
-      "symbol_level": 0,
-      "target_os": "chromeos",
-      "use_remoteexec": true,
-      "v8_is_on_release_branch": true
-    }
-  },
-  "lacros-arm-generic-pgo": {
-    "args_file": "//build/args/chromeos/arm-generic-crostoolchain.gni",
-    "gn_args": {
-      "chrome_pgo_phase": 1,
-      "chromeos_is_browser_only": true,
-      "dcheck_always_on": false,
-      "is_chrome_branded": true,
-      "is_chromeos_device": true,
-      "is_debug": false,
-      "is_official_build": true,
-      "symbol_level": 0,
-      "target_os": "chromeos",
-      "use_remoteexec": true,
-      "v8_is_on_release_branch": true
-    }
-  },
-  "lacros-arm64-generic-pgo": {
-    "args_file": "//build/args/chromeos/arm64-generic-crostoolchain.gni",
-    "gn_args": {
-      "chrome_pgo_phase": 1,
-      "chromeos_is_browser_only": true,
-      "dcheck_always_on": false,
-      "is_chrome_branded": true,
-      "is_chromeos_device": true,
-      "is_debug": false,
-      "is_official_build": true,
-      "symbol_level": 0,
-      "target_os": "chromeos",
-      "use_remoteexec": true,
-      "v8_is_on_release_branch": true
+      "use_goma": true
     }
   },
   "linux-pgo": {
@@ -89,8 +37,7 @@
       "is_debug": false,
       "is_official_build": true,
       "symbol_level": 0,
-      "use_remoteexec": true,
-      "v8_is_on_release_branch": true
+      "use_goma": true
     }
   },
   "mac-arm-pgo": {
@@ -104,8 +51,7 @@
       "is_official_build": true,
       "symbol_level": 0,
       "target_cpu": "arm64",
-      "use_remoteexec": true,
-      "v8_is_on_release_branch": true
+      "use_goma": true
     }
   },
   "mac-pgo": {
@@ -118,21 +64,7 @@
       "is_debug": false,
       "is_official_build": true,
       "symbol_level": 0,
-      "use_remoteexec": true,
-      "v8_is_on_release_branch": true
-    }
-  },
-  "win-arm64-pgo": {
-    "gn_args": {
-      "chrome_pgo_phase": 1,
-      "dcheck_always_on": false,
-      "is_chrome_branded": true,
-      "is_debug": false,
-      "is_official_build": true,
-      "symbol_level": 0,
-      "target_cpu": "arm64",
-      "use_remoteexec": true,
-      "v8_is_on_release_branch": true
+      "use_goma": true
     }
   },
   "win32-pgo": {
@@ -144,8 +76,7 @@
       "is_official_build": true,
       "symbol_level": 0,
       "target_cpu": "x86",
-      "use_remoteexec": true,
-      "v8_is_on_release_branch": true
+      "use_goma": true
     }
   },
   "win64-pgo": {
@@ -157,8 +88,7 @@
       "is_official_build": true,
       "symbol_level": 0,
       "target_cpu": "x64",
-      "use_remoteexec": true,
-      "v8_is_on_release_branch": true
+      "use_goma": true
     }
   }
 }

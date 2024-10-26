@@ -5,6 +5,7 @@
 '''Gatherer for <structure type="chrome_scaled_image">.
 '''
 
+from __future__ import print_function
 
 import os
 import struct

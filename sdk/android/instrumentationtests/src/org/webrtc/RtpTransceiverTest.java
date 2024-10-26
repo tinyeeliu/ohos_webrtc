@@ -13,7 +13,7 @@ package org.webrtc;
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.mock;
 
-import androidx.test.InstrumentationRegistry;
+import android.support.test.InstrumentationRegistry;
 import androidx.test.filters.SmallTest;
 import java.util.ArrayList;
 import java.util.Arrays;

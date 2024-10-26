@@ -41,9 +41,6 @@ class DurationMs : public webrtc::StrongAlias<class DurationMsTag, int32_t> {
   constexpr explicit DurationMs(const UnderlyingType& v)
       : webrtc::StrongAlias<class DurationMsTag, int32_t>(v) {}
 
-  static constexpr DurationMs InfiniteDuration() {
-    return DurationMs(std::numeric_limits<int32_t>::max());
-  }
   // Convenience methods for working with time.
   constexpr DurationMs& operator+=(DurationMs d) {
     value_ += d.value_;

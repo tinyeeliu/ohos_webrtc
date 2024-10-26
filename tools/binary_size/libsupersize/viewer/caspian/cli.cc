@@ -9,8 +9,6 @@
 #include <algorithm>
 #include <fstream>
 #include <iostream>
-#include <string>
-#include <vector>
 
 #include "tools/binary_size/libsupersize/viewer/caspian/diff.h"
 #include "tools/binary_size/libsupersize/viewer/caspian/file_format.h"
@@ -35,24 +33,9 @@ void ParseDiffSizeInfoFromFile(const char* filename,
     std::cerr << "Unable to open file: " << filename << std::endl;
     exit(1);
   }
-  std::vector<std::string> removed_sources;
-  std::vector<std::string> added_sources;
   std::string compressed((std::istreambuf_iterator<char>(ifs)),
                          std::istreambuf_iterator<char>());
-  caspian::ParseDiffSizeInfo(&compressed[0], compressed.size(), before, after,
-                             &removed_sources, &added_sources);
-  if (removed_sources.size()) {
-    std::cout << "Removed " << removed_sources.size() << " files:" << std::endl;
-    for (const std::string& s : removed_sources) {
-      std::cout << "  " << s << std::endl;
-    }
-  }
-  if (added_sources.size()) {
-    std::cout << "Added " << added_sources.size() << " files:" << std::endl;
-    for (const std::string& s : added_sources) {
-      std::cout << "  " << s << std::endl;
-    }
-  }
+  caspian::ParseDiffSizeInfo(&compressed[0], compressed.size(), before, after);
 }
 
 void Diff(const char* before_filename, const char* after_filename) {
@@ -62,7 +45,7 @@ void Diff(const char* before_filename, const char* after_filename) {
   caspian::SizeInfo after;
   ParseSizeInfoFromFile(after_filename, &after);
 
-  caspian::DeltaSizeInfo diff = Diff(&before, &after, nullptr, nullptr);
+  caspian::DeltaSizeInfo diff = Diff(&before, &after);
 
   float pss = 0.0f;
   float size = 0.0f;

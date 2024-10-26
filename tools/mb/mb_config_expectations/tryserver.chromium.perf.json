@@ -39,7 +39,7 @@
       "symbol_level": 1,
       "target_cpu": "arm64",
       "target_os": "android",
-      "use_remoteexec": true
+      "use_goma": true
     }
   },
   "Android arm64 Compile Perf PGO": {
@@ -47,38 +47,6 @@
       "debuggable_apks": false,
       "ffmpeg_branding": "Chrome",
       "is_chrome_branded": true,
-      "is_official_build": true,
-      "proprietary_codecs": true,
-      "symbol_level": 1,
-      "target_cpu": "arm64",
-      "target_os": "android",
-      "use_goma": true
-    }
-  },
-  "Android arm64 High End Compile Perf": {
-    "gn_args": {
-      "chrome_pgo_phase": 0,
-      "clang_use_default_sample_profile": false,
-      "debuggable_apks": false,
-      "ffmpeg_branding": "Chrome",
-      "is_chrome_branded": true,
-      "is_high_end_android": true,
-      "is_official_build": true,
-      "proprietary_codecs": true,
-      "strip_absolute_paths_from_debug_symbols": true,
-      "symbol_level": 1,
-      "target_cpu": "arm64",
-      "target_os": "android",
-      "use_goma": true
-    }
-  },
-  "Android arm64 High End Compile Perf PGO": {
-    "gn_args": {
-      "clang_use_default_sample_profile": false,
-      "debuggable_apks": false,
-      "ffmpeg_branding": "Chrome",
-      "is_chrome_branded": true,
-      "is_high_end_android": true,
       "is_official_build": true,
       "proprietary_codecs": true,
       "symbol_level": 1,
@@ -100,7 +68,6 @@
       "symbol_level": 1,
       "target_os": "chromeos",
       "use_goma": true,
-      "use_remoteexec": false,
       "use_thin_lto": true
     }
   },
@@ -110,8 +77,7 @@
       "ffmpeg_branding": "Chrome",
       "fuchsia_additional_boot_images": [
         "//third_party/fuchsia-sdk/images-internal/astro-release/",
-        "//third_party/fuchsia-sdk/images-internal/sherlock-release/",
-        "//third_party/fuchsia-sdk/images-internal/nelson-release/"
+        "//third_party/fuchsia-sdk/images-internal/sherlock-release/"
       ],
       "is_chrome_branded": true,
       "is_official_build": true,
@@ -120,13 +86,13 @@
       "target_cpu": "arm64",
       "target_os": "fuchsia",
       "test_isolate_uses_emulator": false,
+      "use_cfv2_script": true,
       "use_goma": true
     }
   },
   "Fuchsia Builder Perf x64": {
     "gn_args": {
       "ffmpeg_branding": "Chrome",
-      "fuchsia_browser_type": "chrome",
       "is_chrome_branded": true,
       "is_official_build": true,
       "proprietary_codecs": true,
@@ -134,6 +100,7 @@
       "target_cpu": "x64",
       "target_os": "fuchsia",
       "test_isolate_uses_emulator": false,
+      "use_cfv2_script": true,
       "use_goma": true
     }
   },
@@ -145,7 +112,7 @@
       "strip_absolute_paths_from_debug_symbols": true,
       "symbol_level": 1,
       "use_gnome_keyring": false,
-      "use_remoteexec": true
+      "use_goma": true
     }
   },
   "Linux Builder Perf PGO": {

@@ -43,10 +43,6 @@ class DrawFrame {
   static maxBufferNumFrames = 60*60;
   static frameBuffer = new CircularBuffer(DrawFrame.maxBufferNumFrames);
   static buffer_map = new Object();
-  static demo_thread = {
-    thread_name: "demo thread",
-    thread_id: -1,
-  };
   static count() { return DrawFrame.frameBuffer.instances.length; }
 
   static get(index) {
@@ -60,15 +56,12 @@ class DrawFrame {
       height: parseInt(json.windowy),
     };
     this.logs_ = json.logs;
+    this.drawTexts_ = json.text;
     this.drawCalls_ = json.drawcalls.map(c => new DrawCall(c));
     this.buffer_map = json.buff_map;
-    this.resetFilter();
 
     this.threadMapping_ = {}
 
-    if (!('threads' in json)) {
-      json.threads = [DrawFrame.demo_thread];
-    }
     json.threads.forEach(t => {
       // If new thread has not been registered yet, then register it.
       if (!(Thread.isThreadRegistered(t.thread_name))) {
@@ -83,20 +76,20 @@ class DrawFrame {
                                            threadAlpha: "10"};
     });
 
+    this.submissionFreezeIndex_ = -1;
     if (json.new_sources) {
       for (const s of json.new_sources) {
         new Source(s);
-        notifyUiOfNewSource(s);
       }
     }
 
     for (let buff in this.buffer_map) {
-      // |buffer_map| contains data URIs, which we |fetch| to get a |Blob| to
-      // create an |ImageBitmap| with.
-      fetch(this.buffer_map[buff])
-        .then((res) => res.blob())
-        .then((blob) => createImageBitmap(blob))
-        .then((res) => {
+      let image = new ImageData(Uint8ClampedArray
+                                  .from(this.buffer_map[buff]["buffer"]),
+                                this.buffer_map[buff]["width"],
+                                this.buffer_map[buff]["height"]);
+      createImageBitmap(image)
+        .then(res => {
           DrawFrame.buffer_map[buff] = res;
           return res;
         });
@@ -135,10 +128,15 @@ class DrawFrame {
   }
 
   submissionCount() {
-    return this.drawCalls_.length + this.logs_.length;
+    return this.drawCalls_.length + this.drawTexts_.length + this.logs_.length;
   }
 
-  updateCanvasSize(canvas, context, scale, orientationDeg) {
+  submissionFreezeIndex() {
+    return this.submissionFreezeIndex_ >= 0 ? (this.submissionFreezeIndex_) :
+      (this.submissionCount() - 1);
+  }
+
+  updateCanvasSize(canvas, scale, orientationDeg) {
     // Swap canvas width/height for 90 or 270 deg rotations
     if (orientationDeg === 90 || orientationDeg === 270) {
       canvas.width = this.size_.height * scale;
@@ -149,22 +147,6 @@ class DrawFrame {
       canvas.width = this.size_.width * scale;
       canvas.height = this.size_.height * scale;
     }
-    // Some text can be drawn past the canvas boundaries, so add some padding on
-    // each side.
-    const padding = 20;
-    canvas.width += padding * 2;
-    canvas.height += padding * 2;
-
-    // Fill the actual frame bounds to an opaque color.
-    context.save();
-    context.fillStyle = "white";
-    context.fillRect(
-      padding,
-      padding,
-      canvas.width - padding * 2,
-      canvas.height - padding * 2
-    );
-    context.restore();
   }
 
   getFilter(source_index) {
@@ -214,13 +196,7 @@ class DrawFrame {
     context.translate(-this.size_.width / 2, -this.size_.height / 2);
 
     for (const call of this.drawCalls_) {
-      // Assumed to be a positional text call.
-      if (call.text) {
-        continue;
-      }
-      if (!this.withinFilter(call.drawIndex_)) {
-        continue;
-      }
+      if (call.drawIndex_ > this.submissionFreezeIndex()) break;
 
       // If thread not enabled, then skip draw call from this thread.
       if (!this.threadMapping_[call.threadId_].threadEnabled) {
@@ -236,49 +212,44 @@ class DrawFrame {
     const transformMatrix = context.getTransform();
     context.resetTransform();
 
-    context.font = "16px 'Courier bold', monospace";
+    context.fillStyle = 'black';
+    context.font = "16px Courier bold";
 
-    // Draw the frame number
-    {
-      context.textBaseline = "bottom";
-      context.fillStyle = "black";
-      var newTextPos = transformMatrix.transformPoint(new DOMPoint(0, 0));
-      context.fillText(this.num_, newTextPos.x, newTextPos.y);
-    }
+    const frameNumberPosX = 3;
+    const frameNumberPosY = 15;
+    this.drawText(context,
+                  this.num_,
+                  frameNumberPosX,
+                  frameNumberPosY,
+                  transformMatrix);
 
-
-    for (const text of this.drawCalls_) {
-      // Not a positional text call.
-      if (!text.text) {
-        continue;
-      }
+    for (const text of this.drawTexts_) {
       // If thread not enabled, then skip text calls from this thread.
-      if (!this.threadMapping_[text.threadId_].threadEnabled) {
+      if (!this.threadMapping_[text.thread_id].threadEnabled) {
         continue;
       }
-      if (!this.withinFilter(text.drawIndex_)) {
-        continue;
-      }
+
+      if (text.drawindex > this.submissionFreezeIndex()) break;
 
       var color;
       // If thread is overriding, take thread color.
-      if (this.threadMapping_[text.threadId_].overrideFilters) {
-        color = this.threadMapping_[text.threadId_].threadColor;
+      if (this.threadMapping_[text.thread_id].overrideFilters) {
+        color = this.threadMapping_[text.thread_id].threadColor;
       }
       // Otherwise, take filter's color.
       else {
-        let filter = this.getFilter(text.sourceIndex_);
+        let filter = this.getFilter(text.source_index);
         if (!filter) continue;
 
         color = (filter && filter.drawColor) ?
-          filter.drawColor : text.color_;
+          filter.drawColor : text.option.color;
       }
       context.fillStyle = color;
       // TODO: This should also create some DrawText object or something.
       this.drawText(context,
                     text.text,
-                    text.pos_.x,
-                    text.pos_.y,
+                    text.pos[0],
+                    text.pos[1],
                     transformMatrix);
     }
   }
@@ -287,47 +258,13 @@ class DrawFrame {
   drawText(context, text, posX, posY, transformMatrix) {
     // TODO: Set the text alignment based on the transform.
     var newTextPos = transformMatrix.transformPoint(new DOMPoint(posX, posY));
-
-    // Make the origin of text the top-left, similar to rectangles.
-    context.textBaseline = "top";
-
-    // Fill a background rectangle behind the text with the current fill color.
-    const measure = context.measureText(text);
-    context.fillRect(
-      newTextPos.x,
-      newTextPos.y,
-      measure.width,
-      measure.actualBoundingBoxDescent - measure.actualBoundingBoxAscent
-    );
-
-    function perceptualBrightness(hexColor) {
-      const r = parseInt(hexColor.substr(1, 2), 16) / 255;
-      const g = parseInt(hexColor.substr(3, 2), 16) / 255;
-      const b = parseInt(hexColor.substr(5, 2), 16) / 255;
-      return Math.sqrt(
-        0.299 * Math.pow(r, 2) + 0.587 * Math.pow(g, 2) + 0.114 * Math.pow(b, 2)
-      );
-    }
-
-    // Attempt to make the text contrast better against the background.
-    if (perceptualBrightness(context.fillStyle) > 0.65) {
-      context.fillStyle = "black";
-    } else {
-      context.fillStyle = "white";
-    }
-
     context.fillText(text, newTextPos.x, newTextPos.y);
   }
 
   appendLogs(logContainer) {
     for (const log of this.logs_) {
-      if (!this.withinFilter(log.drawindex)) {
-        continue;
-      }
+      if (log.drawindex > this.submissionFreezeIndex()) break;
 
-      if (!('thread_id' in log)) {
-        log.thread_id = DrawFrame.demo_thread.thread_id;
-      }
       // If thread not enabled, then skip draw call from this thread.
       if (!this.threadMapping_[log.thread_id].threadEnabled) {
         continue;
@@ -357,26 +294,12 @@ class DrawFrame {
     }
   }
 
-  resetFilter() {
-    this.filter(-1, -1);
+  unfreeze() {
+    this.submissionFreezeIndex_ = -1;
   }
 
-  filter(minIndex, maxIndex) {
-    this.minIndex_ = minIndex === -1 ? 0 : minIndex;
-    this.maxIndex_ = maxIndex === -1 ? this.submissionCount() : maxIndex;
-  }
-
-  minIndex() {
-    return this.minIndex_;
-  }
-
-  maxIndex() {
-    return this.maxIndex_;
-  }
-
-  // True iff drawIndex is in [minIndex_, maxIndex).
-  withinFilter(drawIndex) {
-    return drawIndex >= this.minIndex_ && drawIndex < this.maxIndex_;
+  freeze(index) {
+    this.submissionFreezeIndex_ = index;
   }
 
   toJSON() {
@@ -417,7 +340,6 @@ class Viewer {
     }
   }
 
-
   drawPreviousFrame() {
     // When we switch to a different frame, we need to unfreeze the current
     // frame (to make sure the frame draws completely the next time it is drawn
@@ -432,10 +354,7 @@ class Viewer {
   redrawCurrentFrame_() {
     const frame = this.getCurrentFrame();
     if (!frame) return;
-    frame.updateCanvasSize(this.canvas_,
-                           this.drawContext_,
-                           this.viewScale,
-                           this.viewOrientation);
+    frame.updateCanvasSize(this.canvas_, this.viewScale, this.viewOrientation);
     frame.draw(this.canvas_,
                this.drawContext_,
                this.viewScale,
@@ -463,19 +382,17 @@ class Viewer {
     this.viewOrientation = orientationAsInt;
   }
 
-  freezeFrame(frameIndex, minIndex, maxIndex) {
+  freezeFrame(frameIndex, drawIndex) {
     if (DrawFrame.get(frameIndex)) {
       this.currentFrameIndex_ = frameIndex;
-      this.getCurrentFrame().filter(minIndex, maxIndex);
+      this.getCurrentFrame().freeze(drawIndex);
       this.updateCurrentFrame();
     }
   }
 
   unfreeze() {
     const frame = this.getCurrentFrame();
-    if (frame) {
-      frame.resetFilter();
-    }
+    if (frame) frame.unfreeze();
   }
 
   zoomToMouse(currentMouseX, currentMouseY, delta) {
@@ -503,7 +420,7 @@ class Player {
     this.viewer_ = viewer;
     this.paused_ = false;
     this.nextFrameScheduled_ = false;
-    this.live_ = true;
+
     this.drawCb_ = draw_cb;
 
     Player.instances[0] = this;
@@ -514,10 +431,6 @@ class Player {
     if (this.nextFrameScheduled_) return;
 
     const drawn = this.viewer_.drawNextFrame();
-    if(this.live_){
-      while(this.viewer_.drawNextFrame());
-    }
-
     this.didDrawNewFrame_();
     if (!drawn) return;
 
@@ -529,15 +442,8 @@ class Player {
     });
   }
 
-  live()
-  {
-    this.live_ = true;
-    this.play();
-  }
-
   pause() {
     this.paused_ = true;
-    this.live_ = false;
   }
 
   rewind() {
@@ -554,10 +460,10 @@ class Player {
 
   // Pauses after drawing at most |drawIndex| number of calls of the
   // |frameIndex|-th frame.
-  // Draws all calls if |minIndex| and |maxIndex| are not set.
-  freezeFrame(frameIndex, minIndex = -1, maxIndex = -1) {
+  // Draws all calls if |drawIndex| is not set.
+  freezeFrame(frameIndex, drawIndex = -1) {
     this.pause();
-    this.viewer_.freezeFrame(frameIndex, minIndex, maxIndex);
+    this.viewer_.freezeFrame(parseInt(frameIndex), parseInt(drawIndex));
     this.didDrawNewFrame_();
   }
 

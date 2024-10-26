@@ -108,11 +108,7 @@ def main():
   # As a heuristic, find all .sh files in the crashreports directory, then
   # zip each up along with all other files that have the same basename with
   # different extensions.
-  clang_reproducers = glob.glob(os.path.join(CRASHREPORTS_DIR, '*.sh'))
-  # lld reproducers just leave a .tar
-  lld_reproducers = glob.glob(
-      os.path.join(CRASHREPORTS_DIR, 'linker-crash*.tar'))
-  for reproducer in clang_reproducers + lld_reproducers:
+  for reproducer in glob.glob(os.path.join(CRASHREPORTS_DIR, '*.sh')):
     base = os.path.splitext(os.path.basename(reproducer))[0]
     ProcessCrashreport(base, args.source)
 

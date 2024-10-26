@@ -36,13 +36,14 @@ class NetworkStateEndToEndTest : public test::CallTest {
  protected:
   class UnusedTransport : public Transport {
    private:
-    bool SendRtp(rtc::ArrayView<const uint8_t> packet,
+    bool SendRtp(const uint8_t* packet,
+                 size_t length,
                  const PacketOptions& options) override {
       ADD_FAILURE() << "Unexpected RTP sent.";
       return false;
     }
 
-    bool SendRtcp(rtc::ArrayView<const uint8_t> packet) override {
+    bool SendRtcp(const uint8_t* packet, size_t length) override {
       ADD_FAILURE() << "Unexpected RTCP sent.";
       return false;
     }
@@ -61,14 +62,15 @@ class NetworkStateEndToEndTest : public test::CallTest {
     }
 
    private:
-    bool SendRtp(rtc::ArrayView<const uint8_t> packet,
+    bool SendRtp(const uint8_t* packet,
+                 size_t length,
                  const PacketOptions& options) override {
       MutexLock lock(&mutex_);
       need_rtp_ = false;
       return true;
     }
 
-    bool SendRtcp(rtc::ArrayView<const uint8_t> packet) override {
+    bool SendRtcp(const uint8_t* packet, size_t length) override {
       MutexLock lock(&mutex_);
       need_rtcp_ = false;
       return true;
@@ -92,20 +94,21 @@ void NetworkStateEndToEndTest::VerifyNewVideoSendStreamsRespectNetworkState(
     Transport* transport) {
   test::VideoEncoderProxyFactory encoder_factory(encoder);
 
-  SendTask(task_queue(), [this, network_to_bring_up, &encoder_factory,
-                          transport]() {
-    CreateSenderCall(CallConfig(send_event_log_.get()));
-    sender_call_->SignalChannelNetworkState(network_to_bring_up, kNetworkUp);
+  SendTask(task_queue(),
+           [this, network_to_bring_up, &encoder_factory, transport]() {
+             CreateSenderCall(Call::Config(send_event_log_.get()));
+             sender_call_->SignalChannelNetworkState(network_to_bring_up,
+                                                     kNetworkUp);
 
-    CreateSendConfig(1, 0, 0, transport);
-    GetVideoSendConfig()->encoder_settings.encoder_factory = &encoder_factory;
-    CreateVideoStreams();
-    CreateFrameGeneratorCapturer(test::VideoTestConstants::kDefaultFramerate,
-                                 test::VideoTestConstants::kDefaultWidth,
-                                 test::VideoTestConstants::kDefaultHeight);
+             CreateSendConfig(1, 0, 0, transport);
+             GetVideoSendConfig()->encoder_settings.encoder_factory =
+                 &encoder_factory;
+             CreateVideoStreams();
+             CreateFrameGeneratorCapturer(kDefaultFramerate, kDefaultWidth,
+                                          kDefaultHeight);
 
-    Start();
-  });
+             Start();
+           });
 
   SleepMs(kSilenceTimeoutMs);
 
@@ -119,26 +122,35 @@ void NetworkStateEndToEndTest::VerifyNewVideoSendStreamsRespectNetworkState(
 void NetworkStateEndToEndTest::VerifyNewVideoReceiveStreamsRespectNetworkState(
     MediaType network_to_bring_up,
     Transport* transport) {
-  SendTask(task_queue(), [this, network_to_bring_up, transport]() {
-    CreateCalls();
-    receiver_call_->SignalChannelNetworkState(network_to_bring_up, kNetworkUp);
-    CreateSendTransport(BuiltInNetworkBehaviorConfig(),
-                        /*observer=*/nullptr);
+  std::unique_ptr<test::DirectTransport> sender_transport;
 
-    CreateSendConfig(1, 0, 0);
-    CreateMatchingReceiveConfigs(transport);
-    CreateVideoStreams();
-    CreateFrameGeneratorCapturer(test::VideoTestConstants::kDefaultFramerate,
-                                 test::VideoTestConstants::kDefaultWidth,
-                                 test::VideoTestConstants::kDefaultHeight);
-    Start();
-  });
+  SendTask(
+      task_queue(),
+      [this, &sender_transport, network_to_bring_up, transport]() {
+        CreateCalls();
+        receiver_call_->SignalChannelNetworkState(network_to_bring_up,
+                                                  kNetworkUp);
+        sender_transport = std::make_unique<test::DirectTransport>(
+            task_queue(),
+            std::make_unique<FakeNetworkPipe>(
+                Clock::GetRealTimeClock(), std::make_unique<SimulatedNetwork>(
+                                               BuiltInNetworkBehaviorConfig())),
+            sender_call_.get(), payload_type_map_);
+        sender_transport->SetReceiver(receiver_call_->Receiver());
+        CreateSendConfig(1, 0, 0, sender_transport.get());
+        CreateMatchingReceiveConfigs(transport);
+        CreateVideoStreams();
+        CreateFrameGeneratorCapturer(kDefaultFramerate, kDefaultWidth,
+                                     kDefaultHeight);
+        Start();
+      });
 
   SleepMs(kSilenceTimeoutMs);
 
-  SendTask(task_queue(), [this]() {
+  SendTask(task_queue(), [this, &sender_transport]() {
     Stop();
     DestroyStreams();
+    sender_transport.reset();
     DestroyCalls();
   });
 }
@@ -156,7 +168,7 @@ TEST_F(NetworkStateEndToEndTest, RespectsNetworkState) {
   class NetworkStateTest : public test::EndToEndTest, public test::FakeEncoder {
    public:
     explicit NetworkStateTest(TaskQueueBase* task_queue)
-        : EndToEndTest(test::VideoTestConstants::kDefaultTimeout),
+        : EndToEndTest(kDefaultTimeout),
           FakeEncoder(Clock::GetRealTimeClock()),
           e2e_test_task_queue_(task_queue),
           task_queue_(CreateDefaultTaskQueueFactory()->CreateTaskQueue(
@@ -172,10 +184,10 @@ TEST_F(NetworkStateEndToEndTest, RespectsNetworkState) {
           receiver_rtcp_(0),
           down_frames_(0) {}
 
-    Action OnSendRtp(rtc::ArrayView<const uint8_t> packet) override {
+    Action OnSendRtp(const uint8_t* packet, size_t length) override {
       MutexLock lock(&test_mutex_);
       RtpPacket rtp_packet;
-      EXPECT_TRUE(rtp_packet.Parse(packet));
+      EXPECT_TRUE(rtp_packet.Parse(packet, length));
       if (rtp_packet.payload_size() == 0)
         ++sender_padding_;
       ++sender_rtp_;
@@ -183,19 +195,19 @@ TEST_F(NetworkStateEndToEndTest, RespectsNetworkState) {
       return SEND_PACKET;
     }
 
-    Action OnSendRtcp(rtc::ArrayView<const uint8_t> packet) override {
+    Action OnSendRtcp(const uint8_t* packet, size_t length) override {
       MutexLock lock(&test_mutex_);
       ++sender_rtcp_;
       packet_event_.Set();
       return SEND_PACKET;
     }
 
-    Action OnReceiveRtp(rtc::ArrayView<const uint8_t> packet) override {
+    Action OnReceiveRtp(const uint8_t* packet, size_t length) override {
       ADD_FAILURE() << "Unexpected receiver RTP, should not be sending.";
       return SEND_PACKET;
     }
 
-    Action OnReceiveRtcp(rtc::ArrayView<const uint8_t> packet) override {
+    Action OnReceiveRtcp(const uint8_t* packet, size_t length) override {
       MutexLock lock(&test_mutex_);
       ++receiver_rtcp_;
       packet_event_.Set();
@@ -223,8 +235,7 @@ TEST_F(NetworkStateEndToEndTest, RespectsNetworkState) {
     }
 
     void PerformTest() override {
-      EXPECT_TRUE(
-          encoded_frames_.Wait(test::VideoTestConstants::kDefaultTimeout))
+      EXPECT_TRUE(encoded_frames_.Wait(kDefaultTimeout))
           << "No frames received by the encoder.";
 
       SendTask(task_queue_.get(), [this]() {

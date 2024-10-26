@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import os
-import tempfile
 import unittest
 
 import mock
@@ -41,6 +40,7 @@ class _VersionTest(unittest.TestCase):
 
   _ANDROID_CHROME_VARS = [
       'chrome_version_code',
+      'chrome_modern_version_code',
       'monochrome_version_code',
       'trichrome_version_code',
       'webview_stable_version_code',
@@ -106,6 +106,7 @@ class _VersionTest(unittest.TestCase):
     contents = output['contents']
 
     self.assertRegex(contents, r'\bchrome_version_code = "\d+"\s')
+    self.assertRegex(contents, r'\bchrome_modern_version_code = "\d+"\s')
     self.assertRegex(contents, r'\bmonochrome_version_code = "\d+"\s')
     self.assertRegex(contents, r'\btrichrome_version_code = "\d+"\s')
     self.assertRegex(contents, r'\bwebview_stable_version_code = "\d+"\s')
@@ -159,23 +160,6 @@ class _VersionTest(unittest.TestCase):
       self._RunBuildOutput(get_new_args=lambda args: new_args)
 
     self.assertEqual(cm.exception.code, 2)
-
-  def testSetExecutable(self):
-    """Assert that -x sets executable on POSIX and is harmless on Windows."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-      in_file = os.path.join(tmpdir, "in")
-      out_file = os.path.join(tmpdir, "out")
-      with open(in_file, "w") as f:
-        f.write("")
-      self.assertEqual(version.main(['-i', in_file, '-o', out_file, '-x']), 0)
-
-      # Whether lstat(out_file).st_mode has the executable bits set is
-      # platform-specific. Therefore, test that out_file has the same
-      # permissions that in_file would have after chmod(in_file, 0o755).
-      # On Windows: both files will have 0o666.
-      # On POSIX: both files will have 0o755.
-      os.chmod(in_file, 0o755)  # On Windows, this sets in_file to 0o666.
-      self.assertEqual(os.lstat(in_file).st_mode, os.lstat(out_file).st_mode)
 
 
 if __name__ == '__main__':

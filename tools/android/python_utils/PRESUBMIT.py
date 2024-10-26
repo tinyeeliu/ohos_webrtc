@@ -8,6 +8,7 @@ See http://dev.chromium.org/developers/how-tos/depottools/presubmit-scripts
 for more details on the presubmit API built into depot_tools.
 """
 
+USE_PYTHON3 = True
 PRESUBMIT_VERSION = '2.0.0'
 
 
@@ -22,6 +23,8 @@ def CheckChange(input_api, output_api):
         output_api,
         input_api.PresubmitLocalPath(),
         files_to_check=[r'.+_unittest\.py$'],
-        files_to_skip=[])
+        files_to_skip=[],
+        run_on_python2=False,
+        run_on_python3=True)
 
     return input_api.RunTests(checks, False)

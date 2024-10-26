@@ -8,6 +8,8 @@
 #include <stdint.h>
 #include <type_traits>
 
+#include "third_party/rust/cxx/v1/crate/include/cxx.h"
+
 namespace testing {
 class Test;
 }
@@ -41,7 +43,6 @@ class RustTest : public Subclass {
   void TestBody() override { test_fn_(this); }
 
  private:
-  // Not a `raw_ref<T>` because this is a function reference.
   void (&test_fn_)(Subclass*);
 };
 
@@ -60,8 +61,7 @@ Subclass* rust_gtest_factory_for_subclass(void (*body)(Subclass*)) {
 
 // Returns a factory that will run the test function. Used for any Rust tests
 // that don't need a specific C++ testing::Test subclass.
-extern "C" testing::Test* rust_gtest_default_factory(
-    void (*body)(testing::Test*));
+testing::Test* rust_gtest_default_factory(void (*body)());
 
 // Register a test to be run via GTest. This must be called before main(), as
 // there's no calls from C++ into Rust to collect tests. Any function given to
@@ -80,12 +80,12 @@ extern "C" testing::Test* rust_gtest_default_factory(
 //
 // SAFETY: This function makes copies of the strings so the pointers do not need
 // to outlive the function call.
-extern "C" void rust_gtest_add_test(GtestFactoryFunction gtest_factory,
-                                    void (*test_function)(testing::Test*),
-                                    const char* test_suite_name,
-                                    const char* test_name,
-                                    const char* file,
-                                    int32_t line);
+void rust_gtest_add_test(GtestFactoryFunction gtest_factory,
+                         void (*test_function)(testing::Test*),
+                         const char* test_suite_name,
+                         const char* test_name,
+                         const char* file,
+                         int32_t line);
 
 // Report a test failure at a given file and line tuple, with a provided
 // message.
@@ -99,9 +99,9 @@ extern "C" void rust_gtest_add_test(GtestFactoryFunction gtest_factory,
 //
 // SAFETY: This function makes copies of the strings so the pointers do not need
 // to outlive the function call.
-extern "C" void rust_gtest_add_failure_at(const char* file,
-                                          int32_t line,
-                                          const char* message);
+void rust_gtest_add_failure_at(const unsigned char* file,
+                               int32_t line,
+                               rust::Str message);
 
 }  // namespace rust_gtest_interop
 
