@@ -30,9 +30,6 @@ using ::testing::AllOf;
 using ::testing::Each;
 using ::testing::ElementsAreArray;
 using ::testing::Eq;
-using ::testing::InSequence;
-using ::testing::MockFunction;
-using ::testing::Ne;
 using ::testing::Property;
 using ::testing::SizeIs;
 
@@ -60,11 +57,11 @@ MATCHER(IsValidFeedback, "") {
 
 TransportFeedback Parse(rtc::ArrayView<const uint8_t> buffer) {
   rtcp::CommonHeader header;
-  EXPECT_TRUE(header.Parse(buffer.data(), buffer.size()));
-  EXPECT_EQ(header.type(), TransportFeedback::kPacketType);
-  EXPECT_EQ(header.fmt(), TransportFeedback::kFeedbackMessageType);
+  RTC_DCHECK(header.Parse(buffer.data(), buffer.size()));
+  RTC_DCHECK_EQ(header.type(), TransportFeedback::kPacketType);
+  RTC_DCHECK_EQ(header.fmt(), TransportFeedback::kFeedbackMessageType);
   TransportFeedback feedback;
-  EXPECT_TRUE(feedback.Parse(header));
+  RTC_DCHECK(feedback.Parse(header));
   return feedback;
 }
 
@@ -89,7 +86,7 @@ class FeedbackTester {
       temp_timestamps = GenerateReceiveTimestamps(received_seq);
       received_ts = temp_timestamps;
     }
-    ASSERT_EQ(received_seq.size(), received_ts.size());
+    RTC_DCHECK_EQ(received_seq.size(), received_ts.size());
 
     expected_deltas_.clear();
     feedback_.emplace(include_timestamps_);
@@ -150,7 +147,7 @@ class FeedbackTester {
 
   std::vector<Timestamp> GenerateReceiveTimestamps(
       rtc::ArrayView<const uint16_t> seq_nums) {
-    RTC_CHECK(!seq_nums.empty());
+    RTC_DCHECK(!seq_nums.empty());
     uint16_t last_seq = seq_nums[0];
     Timestamp time = Timestamp::Zero();
     std::vector<Timestamp> result;
@@ -636,13 +633,13 @@ TEST(TransportFeedbackTest, ReportsMissingPackets) {
   feedback_builder.AddReceivedPacket(kBaseSeqNo + 3,
                                      kBaseTimestamp + TimeDelta::Millis(2));
 
-  MockFunction<void(uint16_t, TimeDelta)> handler;
-  InSequence s;
-  EXPECT_CALL(handler, Call(kBaseSeqNo + 0, Ne(TimeDelta::PlusInfinity())));
-  EXPECT_CALL(handler, Call(kBaseSeqNo + 1, TimeDelta::PlusInfinity()));
-  EXPECT_CALL(handler, Call(kBaseSeqNo + 2, TimeDelta::PlusInfinity()));
-  EXPECT_CALL(handler, Call(kBaseSeqNo + 3, Ne(TimeDelta::PlusInfinity())));
-  Parse(feedback_builder.Build()).ForAllPackets(handler.AsStdFunction());
+  EXPECT_THAT(
+      Parse(feedback_builder.Build()).GetAllPackets(),
+      ElementsAre(
+          Property(&TransportFeedback::ReceivedPacket::received, true),
+          Property(&TransportFeedback::ReceivedPacket::received, false),
+          Property(&TransportFeedback::ReceivedPacket::received, false),
+          Property(&TransportFeedback::ReceivedPacket::received, true)));
 }
 
 TEST(TransportFeedbackTest, ReportsMissingPacketsWithoutTimestamps) {
@@ -655,13 +652,13 @@ TEST(TransportFeedbackTest, ReportsMissingPacketsWithoutTimestamps) {
   // Packet losses indicated by jump in sequence number.
   feedback_builder.AddReceivedPacket(kBaseSeqNo + 3, Timestamp::Zero());
 
-  MockFunction<void(uint16_t, TimeDelta)> handler;
-  InSequence s;
-  EXPECT_CALL(handler, Call(kBaseSeqNo + 0, Ne(TimeDelta::PlusInfinity())));
-  EXPECT_CALL(handler, Call(kBaseSeqNo + 1, TimeDelta::PlusInfinity()));
-  EXPECT_CALL(handler, Call(kBaseSeqNo + 2, TimeDelta::PlusInfinity()));
-  EXPECT_CALL(handler, Call(kBaseSeqNo + 3, Ne(TimeDelta::PlusInfinity())));
-  Parse(feedback_builder.Build()).ForAllPackets(handler.AsStdFunction());
+  EXPECT_THAT(
+      Parse(feedback_builder.Build()).GetAllPackets(),
+      ElementsAre(
+          Property(&TransportFeedback::ReceivedPacket::received, true),
+          Property(&TransportFeedback::ReceivedPacket::received, false),
+          Property(&TransportFeedback::ReceivedPacket::received, false),
+          Property(&TransportFeedback::ReceivedPacket::received, true)));
 }
 }  // namespace
 }  // namespace webrtc

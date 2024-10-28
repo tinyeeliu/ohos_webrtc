@@ -19,7 +19,7 @@
 
 namespace webrtc {
 
-class MockPeerConnectionFactoryInterface
+class MockPeerConnectionFactoryInterface final
     : public rtc::RefCountedObject<webrtc::PeerConnectionFactoryInterface> {
  public:
   static rtc::scoped_refptr<MockPeerConnectionFactoryInterface> Create() {
@@ -64,11 +64,6 @@ class MockPeerConnectionFactoryInterface
   MOCK_METHOD(rtc::scoped_refptr<VideoTrackInterface>,
               CreateVideoTrack,
               (const std::string&, VideoTrackSourceInterface*),
-              (override));
-  MOCK_METHOD(rtc::scoped_refptr<VideoTrackInterface>,
-              CreateVideoTrack,
-              (rtc::scoped_refptr<VideoTrackSourceInterface>,
-               absl::string_view),
               (override));
   MOCK_METHOD(rtc::scoped_refptr<AudioTrackInterface>,
               CreateAudioTrack,

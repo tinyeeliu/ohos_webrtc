@@ -20,11 +20,11 @@ struct MyStruct {
   int (*func_ptr_field)();
   const char* const_char_ptr;
 
-  // Expected rewrite: const raw_ref<SomeClass> ref1_;
+  // Expected rewrite: raw_ref<SomeClass> ref1_;
   SomeClass& ref1_;
-  // Expected rewrite: const raw_ref<SomeClass> ref2_;
+  // Expected rewrite: raw_ref<SomeClass> ref2_;
   SomeClass& ref2_;
-  // Expected rewrite: const raw_ref<const SomeClass> const_ref_;
+  // Expected rewrite: raw_ref<const SomeClass> const_ref_;
   const SomeClass& const_ref_;
 };
 
@@ -270,8 +270,12 @@ void foo(int x) {
   MyStruct my_struct(s, s, s);
   std::string other_str = "other";
 
-  // No rewrite expected. (for now)
-  // TODO(crbug.com/1381955) |const char| pointer fields are not supported yet.
+  // To avoid the following error type:
+  //   error: invalid operands to binary expression ... basic_string ... and ...
+  //   raw_ptr ...
+  // we need to append |.get()| to |my_struct.const_char_ptr| below.
+  //
+  // Expected rewrite: ... my_struct.const_char_ptr.get() ...
   bool v1 = my_struct.const_char_ptr == other_str;
   bool v2 = other_str == my_struct.const_char_ptr;
   bool v3 = my_struct.const_char_ptr > other_str;
@@ -441,7 +445,7 @@ void foo() {
 
 namespace implicit_constructors {
 
-// Based on //base/strings/string_piece.h:
+// Based on //base/strings/string_piece_forward.h:
 template <typename CharT>
 class BasicStringPiece;
 typedef BasicStringPiece<char> StringPiece;
@@ -466,8 +470,11 @@ void foo() {
   SomeClass s;
   MyStruct my_struct(s, s, s);
 
-  // No rewrite expected. (for now)
-  // TODO(crbug.com/1381955) |const char| pointer fields are not supported yet.
+  // Expected rewrite - appending: .get().  This avoids the following error:
+  // error: no matching function for call to 'FunctionTakingBasicStringPiece'
+  // note: candidate function not viable: no known conversion from
+  // 'base::raw_ptr<const char>' to 'templated_functions::StringPiece' (aka
+  // 'BasicStringPiece<char>') for 1st argument
   FunctionTakingBasicStringPiece(my_struct.const_char_ptr);
   FunctionTakingBasicStringPieceRef(my_struct.const_char_ptr);
 
@@ -484,7 +491,7 @@ void foo() {
 
 namespace implicit_constructors_raw_ref_tests {
 
-// Based on //base/strings/string_piece.h:
+// Based on //base/strings/string_piece_forward.h:
 template <typename CharT>
 class BasicStringPiece;
 typedef BasicStringPiece<char> StringPiece;

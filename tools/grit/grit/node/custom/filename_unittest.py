@@ -5,6 +5,7 @@
 
 '''Unit tests for grit.node.custom.filename'''
 
+from __future__ import print_function
 
 import os
 import sys
@@ -26,7 +27,7 @@ class WindowsFilenameUnittest(unittest.TestCase):
     c.SetCustomType(filename.WindowsFilename())
     translation = tclib.Translation(id=msg.GetId(), text='Bilingo bolongo:')
     c.AddTranslation(translation, 'fr')
-    self.assertTrue(c.MessageForLanguage('fr').GetRealContent() == 'Bilingo bolongo ')
+    self.failUnless(c.MessageForLanguage('fr').GetRealContent() == 'Bilingo bolongo ')
 
 
 if __name__ == '__main__':

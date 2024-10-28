@@ -54,8 +54,7 @@ class RtpSenderInternal : public RtpSenderInterface {
   // A VoiceMediaChannel should be used for audio RtpSenders and
   // a VideoMediaChannel should be used for video RtpSenders.
   // Must call SetMediaChannel(nullptr) before the media channel is destroyed.
-  virtual void SetMediaChannel(
-      cricket::MediaSendChannelInterface* media_channel) = 0;
+  virtual void SetMediaChannel(cricket::MediaChannel* media_channel) = 0;
 
   // Used to set the SSRC of the sender, once a local description has been set.
   // If `ssrc` is 0, this indiates that the sender should disconnect from the
@@ -74,9 +73,7 @@ class RtpSenderInternal : public RtpSenderInterface {
   // `GetParameters` and `SetParameters` operate with a transactional model.
   // Allow access to get/set parameters without invalidating transaction id.
   virtual RtpParameters GetParametersInternal() const = 0;
-  virtual void SetParametersInternal(const RtpParameters& parameters,
-                                     SetParametersCallback,
-                                     bool blocking) = 0;
+  virtual RTCError SetParametersInternal(const RtpParameters& parameters) = 0;
 
   // GetParameters and SetParameters will remove deactivated simulcast layers
   // and restore them on SetParameters. This is probably a Bad Idea, but we
@@ -85,8 +82,8 @@ class RtpSenderInternal : public RtpSenderInterface {
   virtual RTCError SetParametersInternalWithAllLayers(
       const RtpParameters& parameters) = 0;
 
-  // Additional checks that are specific to the current codec settings
-  virtual RTCError CheckCodecParameters(const RtpParameters& parameters) {
+  // Additional checks that are specific to the Sender type
+  virtual RTCError CheckSVCParameters(const RtpParameters& parameters) {
     return webrtc::RTCError::OK();
   }
 
@@ -104,8 +101,8 @@ class RtpSenderInternal : public RtpSenderInterface {
 
   // Used by the owning transceiver to inform the sender on the currently
   // selected codecs.
-  virtual void SetCodecPreferences(
-      std::vector<cricket::Codec> codec_preferences) = 0;
+  virtual void SetVideoCodecPreferences(
+      std::vector<cricket::VideoCodec> codec_preferences) = 0;
 };
 
 // Shared implementation for RtpSenderInternal interface.
@@ -121,8 +118,7 @@ class RtpSenderBase : public RtpSenderInternal, public ObserverInterface {
   // A VoiceMediaChannel should be used for audio RtpSenders and
   // a VideoMediaChannel should be used for video RtpSenders.
   // Must call SetMediaChannel(nullptr) before the media channel is destroyed.
-  void SetMediaChannel(
-      cricket::MediaSendChannelInterface* media_channel) override;
+  void SetMediaChannel(cricket::MediaChannel* media_channel) override;
 
   bool SetTrack(MediaStreamTrackInterface* track) override;
   rtc::scoped_refptr<MediaStreamTrackInterface> track() const override {
@@ -134,17 +130,11 @@ class RtpSenderBase : public RtpSenderInternal, public ObserverInterface {
 
   RtpParameters GetParameters() const override;
   RTCError SetParameters(const RtpParameters& parameters) override;
-  void SetParametersAsync(const RtpParameters& parameters,
-                          SetParametersCallback callback) override;
 
   // `GetParameters` and `SetParameters` operate with a transactional model.
   // Allow access to get/set parameters without invalidating transaction id.
   RtpParameters GetParametersInternal() const override;
-  void SetParametersInternal(const RtpParameters& parameters,
-                             SetParametersCallback callback = nullptr,
-                             bool blocking = true) override;
-  RTCError CheckSetParameters(const RtpParameters& parameters);
-  RTCError CheckCodecParameters(const RtpParameters& parameters) override;
+  RTCError SetParametersInternal(const RtpParameters& parameters) override;
   RtpParameters GetParametersInternalWithAllLayers() const override;
   RTCError SetParametersInternalWithAllLayers(
       const RtpParameters& parameters) override;
@@ -165,9 +155,9 @@ class RtpSenderBase : public RtpSenderInternal, public ObserverInterface {
     RTC_DCHECK_RUN_ON(signaling_thread_);
     return stream_ids_;
   }
-
-  // Set stream ids, eliminating duplicates in the process.
-  void set_stream_ids(const std::vector<std::string>& stream_ids) override;
+  void set_stream_ids(const std::vector<std::string>& stream_ids) override {
+    stream_ids_ = stream_ids;
+  }
   void SetStreams(const std::vector<std::string>& stream_ids) override;
 
   std::string id() const override { return id_; }
@@ -223,9 +213,9 @@ class RtpSenderBase : public RtpSenderInternal, public ObserverInterface {
     is_transceiver_stopped_ = true;
   }
 
-  void SetCodecPreferences(
-      std::vector<cricket::Codec> codec_preferences) override {
-    codec_preferences_ = codec_preferences;
+  void SetVideoCodecPreferences(
+      std::vector<cricket::VideoCodec> codec_preferences) override {
+    video_codec_preferences_ = codec_preferences;
   }
 
  protected:
@@ -263,14 +253,14 @@ class RtpSenderBase : public RtpSenderInternal, public ObserverInterface {
 
   std::vector<std::string> stream_ids_;
   RtpParameters init_parameters_;
-  std::vector<cricket::Codec> codec_preferences_;
+  std::vector<cricket::VideoCodec> video_codec_preferences_;
 
   // TODO(tommi): `media_channel_` and several other member variables in this
   // class (ssrc_, stopped_, etc) are accessed from more than one thread without
   // a guard or lock. Internally there are also several Invoke()s that we could
   // remove since the upstream code may already be performing several operations
   // on the worker thread.
-  cricket::MediaSendChannelInterface* media_channel_ = nullptr;
+  cricket::MediaChannel* media_channel_ = nullptr;
   rtc::scoped_refptr<MediaStreamTrackInterface> track_;
 
   rtc::scoped_refptr<DtlsTransportInterface> dtls_transport_;
@@ -288,8 +278,6 @@ class RtpSenderBase : public RtpSenderInternal, public ObserverInterface {
   rtc::scoped_refptr<FrameTransformerInterface> frame_transformer_;
   std::unique_ptr<VideoEncoderFactory::EncoderSelectorInterface>
       encoder_selector_;
-
-  virtual RTCError GenerateKeyFrame(const std::vector<std::string>& rids) = 0;
 };
 
 // LocalAudioSinkAdapter receives data callback as a sink to the local
@@ -381,8 +369,8 @@ class AudioRtpSender : public DtmfProviderInterface, public RtpSenderBase {
   void RemoveTrackFromStats() override;
 
  private:
-  cricket::VoiceMediaSendChannelInterface* voice_media_channel() {
-    return media_channel_->AsVoiceSendChannel();
+  cricket::VoiceMediaChannel* voice_media_channel() {
+    return static_cast<cricket::VoiceMediaChannel*>(media_channel_);
   }
   rtc::scoped_refptr<AudioTrackInterface> audio_track() const {
     return rtc::scoped_refptr<AudioTrackInterface>(
@@ -425,6 +413,8 @@ class VideoRtpSender : public RtpSenderBase {
   rtc::scoped_refptr<DtmfSenderInterface> GetDtmfSender() const override;
   RTCError GenerateKeyFrame(const std::vector<std::string>& rids) override;
 
+  RTCError CheckSVCParameters(const RtpParameters& parameters) override;
+
  protected:
   VideoRtpSender(rtc::Thread* worker_thread,
                  const std::string& id,
@@ -437,8 +427,8 @@ class VideoRtpSender : public RtpSenderBase {
   void AttachTrack() override;
 
  private:
-  cricket::VideoMediaSendChannelInterface* video_media_channel() {
-    return media_channel_->AsVideoSendChannel();
+  cricket::VideoMediaChannel* video_media_channel() {
+    return static_cast<cricket::VideoMediaChannel*>(media_channel_);
   }
   rtc::scoped_refptr<VideoTrackInterface> video_track() const {
     return rtc::scoped_refptr<VideoTrackInterface>(

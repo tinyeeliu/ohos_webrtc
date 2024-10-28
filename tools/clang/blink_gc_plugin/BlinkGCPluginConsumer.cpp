@@ -11,7 +11,6 @@
 #include "CheckDispatchVisitor.h"
 #include "CheckFieldsVisitor.h"
 #include "CheckFinalizerVisitor.h"
-#include "CheckForbiddenFieldsVisitor.h"
 #include "CheckGCRootsVisitor.h"
 #include "CheckTraceVisitor.h"
 #include "CollectVisitor.h"
@@ -85,20 +84,18 @@ BlinkGCPluginConsumer::BlinkGCPluginConsumer(
       options_(options),
       cache_(instance),
       json_(0) {
-  // Only check structures in blink, cppgc and pdfium.
+  // Only check structures in the blink and WebKit namespaces.
   options_.checked_namespaces.insert("blink");
   options_.checked_namespaces.insert("cppgc");
 
-  // Add Pdfium subfolders containing GCed classes.
-  options_.checked_directories.push_back("fpdfsdk/");
-  options_.checked_directories.push_back("fxjs/");
-  options_.checked_directories.push_back("xfa/");
-
   // Ignore GC implementation files.
   options_.ignored_directories.push_back(
-      "third_party/blink/renderer/platform/heap/collection_support/");
+      "third_party/blink/renderer/platform/heap/");
   options_.ignored_directories.push_back("v8/src/heap/cppgc/");
   options_.ignored_directories.push_back("v8/src/heap/cppgc-js/");
+
+  options_.allowed_directories.push_back(
+      "third_party/blink/renderer/platform/heap/test/");
 }
 
 void BlinkGCPluginConsumer::HandleTranslationUnit(ASTContext& context) {
@@ -143,7 +140,7 @@ void BlinkGCPluginConsumer::HandleTranslationUnit(ASTContext& context) {
     json_ = 0;
   }
 
-  FindBadPatterns(context, reporter_, cache_, options_);
+  FindBadPatterns(context, reporter_, options_);
 }
 
 void BlinkGCPluginConsumer::ParseFunctionTemplates(TranslationUnitDecl* decl) {
@@ -269,12 +266,6 @@ void BlinkGCPluginConsumer::CheckClass(RecordInfo* info) {
       CheckGCRootsVisitor visitor(options_);
       if (visitor.ContainsGCRoots(info))
         reporter_.ClassContainsGCRoots(info, visitor.gc_roots());
-      reporter_.ClassContainsGCRootRefs(info, visitor.gc_root_refs());
-    }
-
-    CheckForbiddenFieldsVisitor visitor(options_);
-    if (visitor.ContainsForbiddenFields(info)) {
-      reporter_.ClassContainsForbiddenFields(info, visitor.forbidden_fields());
     }
 
     if (info->NeedsFinalization())
@@ -621,8 +612,10 @@ std::string BlinkGCPluginConsumer::GetLocString(SourceLocation loc) {
 }
 
 bool BlinkGCPluginConsumer::IsIgnored(RecordInfo* record) {
-  return (!record || !InCheckedNamespaceOrDirectory(record) ||
-          IsIgnoredClass(record) || InIgnoredDirectory(record));
+  return (!record ||
+          !InCheckedNamespace(record) ||
+          IsIgnoredClass(record) ||
+          InIgnoredDirectory(record));
 }
 
 bool BlinkGCPluginConsumer::IsIgnoredClass(RecordInfo* info) {
@@ -644,12 +637,16 @@ bool BlinkGCPluginConsumer::InIgnoredDirectory(RecordInfo* info) {
 #endif
   for (const auto& ignored_dir : options_.ignored_directories)
     if (filename.find(ignored_dir) != std::string::npos) {
+      for (const auto& allowed_dir : options_.allowed_directories) {
+        if (filename.find(allowed_dir) != std::string::npos)
+          return false;
+      }
       return true;
     }
   return false;
 }
 
-bool BlinkGCPluginConsumer::InCheckedNamespaceOrDirectory(RecordInfo* info) {
+bool BlinkGCPluginConsumer::InCheckedNamespace(RecordInfo* info) {
   if (!info)
     return false;
   for (DeclContext* context = info->record()->getDeclContext();
@@ -662,18 +659,6 @@ bool BlinkGCPluginConsumer::InCheckedNamespaceOrDirectory(RecordInfo* info) {
           options_.checked_namespaces.end()) {
         return true;
       }
-    }
-  }
-  std::string filename;
-  if (!GetFilename(info->record()->getBeginLoc(), &filename)) {
-    return false;
-  }
-#if defined(_WIN32)
-  std::replace(filename.begin(), filename.end(), '\\', '/');
-#endif
-  for (const auto& checked_dir : options_.checked_directories) {
-    if (filename.find(checked_dir) != std::string::npos) {
-      return true;
     }
   }
   return false;

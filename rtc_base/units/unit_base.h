@@ -18,7 +18,6 @@
 #include <type_traits>
 
 #include "rtc_base/checks.h"
-#include "rtc_base/numerics/divide_round.h"
 #include "rtc_base/numerics/safe_conversions.h"
 
 namespace webrtc {
@@ -141,9 +140,10 @@ class UnitBase {
   template <typename T>
   constexpr typename std::enable_if<std::is_floating_point<T>::value, T>::type
   ToValue() const {
-    return IsPlusInfinity()    ? std::numeric_limits<T>::infinity()
-           : IsMinusInfinity() ? -std::numeric_limits<T>::infinity()
-                               : value_;
+    return IsPlusInfinity()
+               ? std::numeric_limits<T>::infinity()
+               : IsMinusInfinity() ? -std::numeric_limits<T>::infinity()
+                                   : value_;
   }
   template <typename T>
   constexpr T ToValueOr(T fallback_value) const {
@@ -154,7 +154,12 @@ class UnitBase {
   constexpr typename std::enable_if<std::is_integral<T>::value, T>::type
   ToFraction() const {
     RTC_DCHECK(IsFinite());
-    return rtc::dchecked_cast<T>(DivideRoundToNearest(value_, Denominator));
+    if (Unit_T::one_sided) {
+      return rtc::dchecked_cast<T>(
+          DivRoundPositiveToNearest(value_, Denominator));
+    } else {
+      return rtc::dchecked_cast<T>(DivRoundToNearest(value_, Denominator));
+    }
   }
   template <int64_t Denominator, typename T>
   constexpr typename std::enable_if<std::is_floating_point<T>::value, T>::type
@@ -164,7 +169,9 @@ class UnitBase {
 
   template <int64_t Denominator>
   constexpr int64_t ToFractionOr(int64_t fallback_value) const {
-    return IsFinite() ? DivideRoundToNearest(value_, Denominator)
+    return IsFinite() ? Unit_T::one_sided
+                            ? DivRoundPositiveToNearest(value_, Denominator)
+                            : DivRoundToNearest(value_, Denominator)
                       : fallback_value;
   }
 
@@ -197,6 +204,14 @@ class UnitBase {
   constexpr Unit_T& AsSubClassRef() { return static_cast<Unit_T&>(*this); }
   constexpr const Unit_T& AsSubClassRef() const {
     return static_cast<const Unit_T&>(*this);
+  }
+  // Assumes that n >= 0 and d > 0.
+  static constexpr int64_t DivRoundPositiveToNearest(int64_t n, int64_t d) {
+    return (n + d / 2) / d;
+  }
+  // Assumes that d > 0.
+  static constexpr int64_t DivRoundToNearest(int64_t n, int64_t d) {
+    return (n + (n >= 0 ? d / 2 : -d / 2)) / d;
   }
 
   int64_t value_;

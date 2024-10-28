@@ -40,6 +40,7 @@ import com.android.tools.r8.ResourceShrinker.ReferenceChecker;
 import com.android.tools.r8.origin.PathOrigin;
 import com.android.utils.XmlUtils;
 import com.google.common.base.Charsets;
+import com.google.common.base.Joiner;
 import com.google.common.collect.Maps;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.Closeables;
@@ -250,10 +251,6 @@ public class UnusedResources {
         final String resourceString = ".R$";
         Map<String, String> nameMap = null;
         for (String line : Files.readLines(mapping, UTF_8)) {
-            // Ignore R8's mapping comments.
-            if (line.startsWith("#")) {
-                continue;
-            }
             if (line.startsWith(" ") || line.startsWith("\t")) {
                 if (nameMap != null) {
                     // We're processing the members of a resource class: record names into the map
@@ -380,10 +377,6 @@ public class UnusedResources {
         }
     }
 
-    private String stringifyResource(Resource resource) {
-        return String.format("%s:%s:0x%08x", resource.type, resource.name, resource.value);
-    }
-
     private void recordClassUsages(File file, String name, byte[] bytes) {
         assert name.endsWith(DOT_DEX);
         ReferenceChecker callback = new ReferenceChecker() {
@@ -411,7 +404,7 @@ public class UnusedResources {
                 if (resource != null) {
                     ResourceUsageModel.markReachable(resource);
                     if (mDebugPrinter != null) {
-                        mDebugPrinter.println("Marking " + stringifyResource(resource)
+                        mDebugPrinter.println("Marking " + resource
                                 + " reachable: referenced from dex"
                                 + " in " + file + ":" + name + " (static field access "
                                 + internalName + "." + fieldName + ")");
@@ -499,12 +492,6 @@ public class UnusedResources {
                         mModel.addResource(symbol.getResourceType(), symbol.getName(), null);
                     }
                 } else {
-                    if (mDebugPrinter != null) {
-                        mDebugPrinter.println("Extracted R.txt resource: "
-                                + symbol.getResourceType() + ":" + symbol.getName() + ":"
-                                + String.format(
-                                        "0x%08x", Integer.parseInt(symbolValue.substring(2), 16)));
-                    }
                     mModel.addResource(symbol.getResourceType(), symbol.getName(), symbolValue);
                 }
             }
@@ -520,9 +507,8 @@ public class UnusedResources {
     private void referencedInt(String context, int value, File file, String currentClass) {
         Resource resource = mModel.getResource(value);
         if (ResourceUsageModel.markReachable(resource) && mDebugPrinter != null) {
-            mDebugPrinter.println("Marking " + stringifyResource(resource)
-                    + " reachable: referenced from " + context + " in " + file + ":"
-                    + currentClass);
+            mDebugPrinter.println("Marking " + resource + " reachable: referenced from " + context
+                    + " in " + file + ":" + currentClass);
         }
     }
 
@@ -547,10 +533,8 @@ public class UnusedResources {
         @Override
         protected void onRootResourcesFound(List<Resource> roots) {
             if (mDebugPrinter != null) {
-                mDebugPrinter.println("\nThe root reachable resources are:");
-                for (Resource root : roots) {
-                    mDebugPrinter.println("   " + stringifyResource(root) + ",");
-                }
+                mDebugPrinter.println(
+                        "\nThe root reachable resources are:\n" + Joiner.on(",\n   ").join(roots));
             }
         }
 

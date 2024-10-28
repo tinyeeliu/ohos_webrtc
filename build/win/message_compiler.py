@@ -6,6 +6,7 @@
 #
 # Usage: message_compiler.py <environment_file> [<args to mc.exe>*]
 
+from __future__ import print_function
 
 import difflib
 import distutils.dir_util

@@ -5,6 +5,7 @@
 
 '''Unit tests for grit.tool.rc2grd'''
 
+from __future__ import print_function
 
 import os
 import sys
@@ -14,7 +15,7 @@ if __name__ == '__main__':
 import re
 import unittest
 
-from io import StringIO
+from six import StringIO
 
 from grit import grd_reader
 from grit import util
@@ -27,16 +28,16 @@ class Rc2GrdUnittest(unittest.TestCase):
     tool = rc2grd.Rc2Grd()
     original = "Hello %s, how are you? I'm $1 years old!"
     msg = tool.Placeholderize(original)
-    self.assertTrue(msg.GetPresentableContent() == "Hello TODO_0001, how are you? I'm TODO_0002 years old!")
-    self.assertTrue(msg.GetRealContent() == original)
+    self.failUnless(msg.GetPresentableContent() == "Hello TODO_0001, how are you? I'm TODO_0002 years old!")
+    self.failUnless(msg.GetRealContent() == original)
 
   def testHtmlPlaceholderize(self):
     tool = rc2grd.Rc2Grd()
     original = "Hello <b>[USERNAME]</b>, how are you? I'm [AGE] years old!"
     msg = tool.Placeholderize(original)
-    self.assertTrue(msg.GetPresentableContent() ==
+    self.failUnless(msg.GetPresentableContent() ==
                     "Hello BEGIN_BOLDX_USERNAME_XEND_BOLD, how are you? I'm X_AGE_X years old!")
-    self.assertTrue(msg.GetRealContent() == original)
+    self.failUnless(msg.GetRealContent() == original)
 
   def testMenuWithoutWhitespaceRegression(self):
     # There was a problem in the original regular expression for parsing out
@@ -61,7 +62,7 @@ BEGIN
 END
 
 '''
-    self.assertTrue(len(rc2grd._MENU.findall(two_menus)) == 2)
+    self.failUnless(len(rc2grd._MENU.findall(two_menus)) == 2)
 
   def testRegressionScriptWithTranslateable(self):
     tool = rc2grd.Rc2Grd()
@@ -77,11 +78,11 @@ END
 
     rc_text = '''STRINGTABLE\nBEGIN\nID_BINGO "<SPAN id=hp style='BEHAVIOR: url(#default#homepage)'></SPAN><script>if (!hp.isHomePage('[$~HOMEPAGE~$]')) {document.write(""<a href=\\""[$~SETHOMEPAGEURL~$]\\"" >Set As Homepage</a> - "");}</script>"\nEND\n'''
     tool.AddMessages(rc_text, tool.o)
-    self.assertTrue(tool.o.node.GetCdata().find('Set As Homepage') != -1)
+    self.failUnless(tool.o.node.GetCdata().find('Set As Homepage') != -1)
 
     # TODO(joi) Improve the HTML parser to support translateables inside
     # <script> blocks?
-    self.assertTrue(tool.o.node.attrs['translateable'] == 'false')
+    self.failUnless(tool.o.node.attrs['translateable'] == 'false')
 
   def testRoleModel(self):
     rc_text = ('STRINGTABLE\n'
@@ -115,30 +116,30 @@ The installation will not proceed if you choose to cancel.
       </grit>'''), dir='.')
 
     # test rig
-    class DummyOpts:
+    class DummyOpts(object):
       verbose = False
       extra_verbose = False
     tool.o = DummyOpts()
     result = tool.Process(rc_text, '.\resource.rc')
-    self.assertTrue(
+    self.failUnless(
       result.children[2].children[2].children[0].attrs['desc'] == '')
-    self.assertTrue(
+    self.failUnless(
       result.children[2].children[2].children[0].children[0].attrs['name'] == 'USERNAME')
-    self.assertTrue(
+    self.failUnless(
       result.children[2].children[2].children[1].attrs['desc'] == 'The other description')
-    self.assertTrue(
+    self.failUnless(
       result.children[2].children[2].children[1].attrs['meaning'] == '')
-    self.assertTrue(
+    self.failUnless(
       result.children[2].children[2].children[1].children[0].attrs['name'] == 'USERNAME')
-    self.assertTrue(
+    self.failUnless(
       result.children[2].children[2].children[1].children[1].attrs['name'] == 'ADMINNAME')
-    self.assertTrue(
+    self.failUnless(
       result.children[2].children[2].children[2].children[0].attrs['name'] == 'LIST_OF_PROGRAMS')
 
   def testRunOutput(self):
     """Verify basic correct Run behavior."""
     tool = rc2grd.Rc2Grd()
-    class DummyOpts:
+    class DummyOpts(object):
       verbose = False
       extra_verbose = False
     with util.TempDir({}) as output_dir:
@@ -150,7 +151,7 @@ The installation will not proceed if you choose to cancel.
   def testMissingOutput(self):
     """Verify failure with no args."""
     tool = rc2grd.Rc2Grd()
-    class DummyOpts:
+    class DummyOpts(object):
       verbose = False
       extra_verbose = False
     ret = tool.Run(DummyOpts(), [])

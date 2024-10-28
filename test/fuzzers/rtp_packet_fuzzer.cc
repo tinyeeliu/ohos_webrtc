@@ -135,7 +135,7 @@ void FuzzOneInput(const uint8_t* data, size_t size) {
         packet.GetExtension<RtpMid>(&mid);
         break;
       }
-      case kRtpExtensionGenericFrameDescriptor: {
+      case kRtpExtensionGenericFrameDescriptor00: {
         RtpGenericFrameDescriptor descriptor;
         packet.GetExtension<RtpGenericFrameDescriptorExtension00>(&descriptor);
         break;
@@ -160,7 +160,7 @@ void FuzzOneInput(const uint8_t* data, size_t size) {
         packet.GetExtension<VideoFrameTrackingIdExtension>(&tracking_id);
         break;
       }
-      case kRtpExtensionDependencyDescriptor:
+      case kRtpExtensionGenericFrameDescriptor02:
         // This extension requires state to read and so complicated that
         // deserves own fuzzer.
         break;

@@ -172,10 +172,9 @@ def _BuildBrowserArgs(user_data_dir, extra_browser_args, variations_args):
   """
   # Make sure each run is fresh, but avoid first run setup steps.
   browser_args = [
-      '--no-first-run',
-      '--no-default-browser-check',
-      '--user-data-dir=%s' % user_data_dir,
-      '--disable-field-trial-config',
+    '--no-first-run',
+    '--no-default-browser-check',
+    '--user-data-dir=%s' % user_data_dir,
   ]
   browser_args.extend(extra_browser_args)
   browser_args.extend(variations_args)

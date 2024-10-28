@@ -9,7 +9,6 @@
  */
 
 #include "modules/audio_device/win/core_audio_utility_win.h"
-
 #include "rtc_base/arraysize.h"
 #include "rtc_base/logging.h"
 #include "rtc_base/win/scoped_com_initializer.h"

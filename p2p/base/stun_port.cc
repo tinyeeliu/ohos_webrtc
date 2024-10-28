@@ -29,6 +29,26 @@
 
 namespace cricket {
 
+namespace {
+
+bool ResolveStunHostnameForFamily(const webrtc::FieldTrialsView& field_trials) {
+  // Bug fix for STUN hostname resolution on IPv6.
+  // Field trial key reserved in bugs.webrtc.org/14334
+  static constexpr char field_trial_name[] =
+      "WebRTC-IPv6NetworkResolutionFixes";
+  if (!field_trials.IsEnabled(field_trial_name)) {
+    return false;
+  }
+
+  webrtc::FieldTrialParameter<bool> resolve_stun_hostname_for_family(
+      "ResolveStunHostnameForFamily", /*default_value=*/false);
+  webrtc::ParseFieldTrial({&resolve_stun_hostname_for_family},
+                          field_trials.Lookup(field_trial_name));
+  return resolve_stun_hostname_for_family;
+}
+
+}  // namespace
+
 // TODO(?): Move these to a common place (used in relayport too)
 const int RETRY_TIMEOUT = 50 * 1000;  // 50 seconds
 
@@ -143,7 +163,11 @@ void UDPPort::AddressResolver::Resolve(
       done_(it->first, it->second->result().GetError());
     }
   };
-  resolver_ptr->Start(address, family, std::move(callback));
+  if (ResolveStunHostnameForFamily(field_trials)) {
+    resolver_ptr->Start(address, family, std::move(callback));
+  } else {
+    resolver_ptr->Start(address, std::move(callback));
+  }
 }
 
 bool UDPPort::AddressResolver::GetResolvedAddress(
@@ -158,7 +182,6 @@ bool UDPPort::AddressResolver::GetResolvedAddress(
 }
 
 UDPPort::UDPPort(rtc::Thread* thread,
-                 absl::string_view type,
                  rtc::PacketSocketFactory* factory,
                  const rtc::Network* network,
                  rtc::AsyncPacketSocket* socket,
@@ -166,7 +189,13 @@ UDPPort::UDPPort(rtc::Thread* thread,
                  absl::string_view password,
                  bool emit_local_for_anyaddress,
                  const webrtc::FieldTrialsView* field_trials)
-    : Port(thread, type, factory, network, username, password, field_trials),
+    : Port(thread,
+           LOCAL_PORT_TYPE,
+           factory,
+           network,
+           username,
+           password,
+           field_trials),
       request_manager_(
           thread,
           [this](const void* data, size_t size, StunRequest* request) {
@@ -180,7 +209,6 @@ UDPPort::UDPPort(rtc::Thread* thread,
       emit_local_for_anyaddress_(emit_local_for_anyaddress) {}
 
 UDPPort::UDPPort(rtc::Thread* thread,
-                 absl::string_view type,
                  rtc::PacketSocketFactory* factory,
                  const rtc::Network* network,
                  uint16_t min_port,
@@ -190,7 +218,7 @@ UDPPort::UDPPort(rtc::Thread* thread,
                  bool emit_local_for_anyaddress,
                  const webrtc::FieldTrialsView* field_trials)
     : Port(thread,
-           type,
+           LOCAL_PORT_TYPE,
            factory,
            network,
            min_port,
@@ -304,9 +332,9 @@ int UDPPort::SendTo(const void* data,
     if (send_error_count_ < kSendErrorLogLimit) {
       ++send_error_count_;
       RTC_LOG(LS_ERROR) << ToString() << ": UDP send of " << size
-                        << " bytes to host "
-                        << addr.ToSensitiveNameAndAddressString()
-                        << " failed with error " << error_;
+                        << " bytes to host " << addr.ToSensitiveString() << " ("
+                        << addr.ToResolvedSensitiveString()
+                        << ") failed with error " << error_;
     }
   } else {
     send_error_count_ = 0;
@@ -522,12 +550,11 @@ void UDPPort::OnStunBindingRequestSucceeded(
   }
   bind_request_succeeded_servers_.insert(stun_server_addr);
   // If socket is shared and `stun_reflected_addr` is equal to local socket
-  // address and mDNS obfuscation is not enabled, or if the same address has
-  // been added by another STUN server, then discarding the stun address.
+  // address, or if the same address has been added by another STUN server,
+  // then discarding the stun address.
   // For STUN, related address is the local socket address.
-  if ((!SharedSocket() || stun_reflected_addr != socket_->GetLocalAddress() ||
-       Network()->GetMdnsResponder() != nullptr) &&
-      !HasStunCandidateWithAddress(stun_reflected_addr)) {
+  if ((!SharedSocket() || stun_reflected_addr != socket_->GetLocalAddress()) &&
+      !HasCandidateWithAddress(stun_reflected_addr)) {
     rtc::SocketAddress related_address = socket_->GetLocalAddress();
     // If we can't stamp the related address correctly, empty it to avoid leak.
     if (!MaybeSetDefaultLocalAddress(&related_address)) {
@@ -603,18 +630,18 @@ void UDPPort::OnSendPacket(const void* data, size_t size, StunRequest* req) {
   if (socket_->SendTo(data, size, sreq->server_addr(), options) < 0) {
     RTC_LOG_ERR_EX(LS_ERROR, socket_->GetError())
         << "UDP send of " << size << " bytes to host "
-        << sreq->server_addr().ToSensitiveNameAndAddressString()
-        << " failed with error " << error_;
+        << sreq->server_addr().ToSensitiveString() << " ("
+        << sreq->server_addr().ToResolvedSensitiveString()
+        << ") failed with error " << error_;
   }
   stats_.stun_binding_requests_sent++;
 }
 
-bool UDPPort::HasStunCandidateWithAddress(
-    const rtc::SocketAddress& addr) const {
+bool UDPPort::HasCandidateWithAddress(const rtc::SocketAddress& addr) const {
   const std::vector<Candidate>& existing_candidates = Candidates();
   std::vector<Candidate>::const_iterator it = existing_candidates.begin();
   for (; it != existing_candidates.end(); ++it) {
-    if (it->type() == STUN_PORT_TYPE && it->address() == addr)
+    if (it->address() == addr)
       return true;
   }
   return false;
@@ -652,7 +679,6 @@ StunPort::StunPort(rtc::Thread* thread,
                    const ServerAddresses& servers,
                    const webrtc::FieldTrialsView* field_trials)
     : UDPPort(thread,
-              STUN_PORT_TYPE,
               factory,
               network,
               min_port,
@@ -661,6 +687,8 @@ StunPort::StunPort(rtc::Thread* thread,
               password,
               false,
               field_trials) {
+  // UDPPort will set these to local udp, updating these to STUN.
+  set_type(STUN_PORT_TYPE);
   set_server_addresses(servers);
 }
 

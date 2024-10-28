@@ -82,8 +82,9 @@ typedef NS_ENUM(NSInteger, RTCStatsOutputLevel) {
   RTCStatsOutputLevelDebug,
 };
 
-typedef void (^RTCCreateSessionDescriptionCompletionHandler)(
-    RTC_OBJC_TYPE(RTCSessionDescription) *_Nullable sdp, NSError *_Nullable error);
+typedef void (^RTCCreateSessionDescriptionCompletionHandler)(RTC_OBJC_TYPE(RTCSessionDescription) *
+                                                                 _Nullable sdp,
+                                                             NSError *_Nullable error);
 
 typedef void (^RTCSetSessionDescriptionCompletionHandler)(NSError *_Nullable error);
 

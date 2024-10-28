@@ -12,6 +12,7 @@ import collections
 import tempfile
 import unittest
 
+from six.moves import range  # pylint: disable=redefined-builtin
 from pylib.base import base_test_result
 from pylib.instrumentation import instrumentation_test_instance
 

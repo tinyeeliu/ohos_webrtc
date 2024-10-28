@@ -35,6 +35,7 @@ group("grit_python_unittests") {
     "//tools/grit/",
     "//third_party/catapult/third_party/typ/",
     "//third_party/node/",
+    "//third_party/six/src/six.py",
   ]
 }
 

@@ -8,7 +8,6 @@ import re
 import sys
 
 from functools import reduce
-from itertools import chain
 from google.protobuf import text_format
 from google.protobuf.descriptor import FieldDescriptor
 from google.protobuf.message import Message
@@ -240,7 +239,6 @@ def write_annotations_tsv_file(file_path: Path, annotations: List["Annotation"],
         Destination.WEBSITE: "Website",
         Destination.GOOGLE_OWNED_SERVICE: "Google",
         Destination.LOCAL: "Local",
-        Destination.PROXIED_GOOGLE_OWNED_SERVICE: "Proxied to Google",
         Destination.OTHER: "Other",
     }
     if (semantics.destination == Destination.OTHER
@@ -249,9 +247,7 @@ def write_annotations_tsv_file(file_path: Path, annotations: List["Annotation"],
     elif semantics.destination in destination_names:
       line += "\t{}".format(destination_names[semantics.destination])
     else:
-      raise ValueError(
-          "Invalid value for the semantics.destination field: {}".format(
-              semantics.destination))
+      raise ValueError("Invalid value for the semantics.destination field")
 
     # Policy.
     policy = annotation.proto.policy
@@ -264,9 +260,8 @@ def write_annotations_tsv_file(file_path: Path, annotations: List["Annotation"],
     line += "\t{}".format(escape_for_tsv(policy.setting))
 
     # Chrome policies.
-    if annotation.has_policy():
-      policies_text = policy_to_text(
-          chain(policy.chrome_policy, policy.chrome_device_policy))
+    if policy.chrome_policy:
+      policies_text = policy_to_text(policy.chrome_policy)
     else:
       policies_text = policy.policy_exception_justification
     line += "\t{}".format(escape_for_tsv(policies_text))

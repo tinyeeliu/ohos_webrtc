@@ -23,14 +23,15 @@ namespace dcsctp {
 
 struct DataGeneratorOptions {
   StreamID stream_id = StreamID(1);
-  absl::optional<MID> mid = absl::nullopt;
+  absl::optional<MID> message_id = absl::nullopt;
   PPID ppid = PPID(53);
 };
 
 // Generates Data with correct sequence numbers, and used only in unit tests.
 class DataGenerator {
  public:
-  explicit DataGenerator(MID start_mid = MID(0)) : mid_(start_mid) {}
+  explicit DataGenerator(MID start_message_id = MID(0))
+      : message_id_(start_message_id) {}
 
   // Generates ordered "data" with the provided `payload` and flags, which can
   // contain "B" for setting the "is_beginning" flag, and/or "E" for setting the
@@ -47,10 +48,10 @@ class DataGenerator {
                  DataGeneratorOptions opts = {});
 
   // Resets the Message ID identifier - simulating a "stream reset".
-  void ResetStream() { mid_ = MID(0); }
+  void ResetStream() { message_id_ = MID(0); }
 
  private:
-  MID mid_;
+  MID message_id_;
   FSN fsn_ = FSN(0);
 };
 }  // namespace dcsctp

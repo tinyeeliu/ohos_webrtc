@@ -16,8 +16,7 @@
 #include <memory>
 
 #include "api/sequence_checker.h"
-#include "api/units/timestamp.h"
-#include "modules/rtp_rtcp/include/recovered_packet_receiver.h"
+#include "modules/rtp_rtcp/include/rtp_rtcp_defines.h"
 #include "modules/rtp_rtcp/source/forward_error_correction.h"
 #include "modules/rtp_rtcp/source/rtp_packet_received.h"
 #include "modules/rtp_rtcp/source/ulpfec_receiver.h"
@@ -68,8 +67,7 @@ class FlexfecReceiver {
 
   // Logging and stats.
   Clock* const clock_;
-  Timestamp last_recovered_packet_ RTC_GUARDED_BY(sequence_checker_) =
-      Timestamp::MinusInfinity();
+  int64_t last_recovered_packet_ms_ RTC_GUARDED_BY(sequence_checker_);
   FecPacketCounter packet_counter_ RTC_GUARDED_BY(sequence_checker_);
 
   RTC_NO_UNIQUE_ADDRESS SequenceChecker sequence_checker_;

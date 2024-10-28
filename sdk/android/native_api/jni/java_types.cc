@@ -178,35 +178,19 @@ std::map<std::string, std::string> JavaToNativeStringMap(
 }
 
 ScopedJavaLocalRef<jobject> NativeToJavaBoolean(JNIEnv* env, bool b) {
-#ifdef RTC_JNI_GENERATOR_LEGACY_SYMBOLS
   return JNI_Boolean::Java_Boolean_ConstructorJLB_Z(env, b);
-#else
-  return JNI_Boolean::Java_Boolean_Constructor__boolean(env, b);
-#endif
 }
 
 ScopedJavaLocalRef<jobject> NativeToJavaDouble(JNIEnv* env, double d) {
-#ifdef RTC_JNI_GENERATOR_LEGACY_SYMBOLS
   return JNI_Double::Java_Double_ConstructorJLD_D(env, d);
-#else
-  return JNI_Double::Java_Double_Constructor__double(env, d);
-#endif
 }
 
 ScopedJavaLocalRef<jobject> NativeToJavaInteger(JNIEnv* jni, int32_t i) {
-#ifdef RTC_JNI_GENERATOR_LEGACY_SYMBOLS
   return JNI_Integer::Java_Integer_ConstructorJLI_I(jni, i);
-#else
-  return JNI_Integer::Java_Integer_Constructor__int(jni, i);
-#endif
 }
 
 ScopedJavaLocalRef<jobject> NativeToJavaLong(JNIEnv* env, int64_t u) {
-#ifdef RTC_JNI_GENERATOR_LEGACY_SYMBOLS
   return JNI_Long::Java_Long_ConstructorJLLO_J(env, u);
-#else
-  return JNI_Long::Java_Long_Constructor__long(env, u);
-#endif
 }
 
 ScopedJavaLocalRef<jstring> NativeToJavaString(JNIEnv* env, const char* str) {
@@ -281,21 +265,6 @@ std::vector<int32_t> JavaToNativeIntArray(JNIEnv* env,
   return container;
 }
 
-std::vector<float> JavaToNativeFloatArray(JNIEnv* env,
-                                          const JavaRef<jfloatArray>& jarray) {
-  // jfloat is a "machine-dependent native type" which represents a 32-bit
-  // float. C++ makes no guarantees about the size of floating point types, and
-  // some exotic architectures don't even have 32-bit floats (or even binary
-  // floats), but on all architectures we care about this is a float.
-  static_assert(std::is_same<float, jfloat>::value, "jfloat must be float");
-  float* array_ptr =
-      env->GetFloatArrayElements(jarray.obj(), /*isCopy=*/nullptr);
-  size_t array_length = env->GetArrayLength(jarray.obj());
-  std::vector<float> container(array_ptr, array_ptr + array_length);
-  env->ReleaseFloatArrayElements(jarray.obj(), array_ptr, /*mode=*/JNI_ABORT);
-  return container;
-}
-
 ScopedJavaLocalRef<jobjectArray> NativeToJavaBooleanArray(
     JNIEnv* env,
     const std::vector<bool>& container) {
@@ -340,33 +309,17 @@ ScopedJavaLocalRef<jobjectArray> NativeToJavaStringArray(
 }
 
 JavaListBuilder::JavaListBuilder(JNIEnv* env)
-#ifdef RTC_JNI_GENERATOR_LEGACY_SYMBOLS
-    : env_(env),
-      j_list_(JNI_ArrayList::Java_ArrayList_ConstructorJUALI(env)) {}
-#else
-    : env_(env), j_list_(JNI_ArrayList::Java_ArrayList_Constructor(env)) {
-}
-#endif
+    : env_(env), j_list_(JNI_ArrayList::Java_ArrayList_ConstructorJUALI(env)) {}
 
-      JavaListBuilder::~JavaListBuilder() = default;
+JavaListBuilder::~JavaListBuilder() = default;
 
 void JavaListBuilder::add(const JavaRef<jobject>& element) {
-#ifdef RTC_JNI_GENERATOR_LEGACY_SYMBOLS
   JNI_ArrayList::Java_ArrayList_addZ_JUE(env_, j_list_, element);
-#else
-  JNI_ArrayList::Java_ArrayList_add(env_, j_list_, element);
-#endif
 }
 
 JavaMapBuilder::JavaMapBuilder(JNIEnv* env)
     : env_(env),
-#ifdef RTC_JNI_GENERATOR_LEGACY_SYMBOLS
-      j_map_(JNI_LinkedHashMap::Java_LinkedHashMap_ConstructorJULIHM(env)) {
-}
-#else
-      j_map_(JNI_LinkedHashMap::Java_LinkedHashMap_Constructor(env)) {
-}
-#endif
+      j_map_(JNI_LinkedHashMap::Java_LinkedHashMap_ConstructorJULIHM(env)) {}
 
 JavaMapBuilder::~JavaMapBuilder() = default;
 
@@ -375,7 +328,7 @@ void JavaMapBuilder::put(const JavaRef<jobject>& key,
   JNI_Map::Java_Map_put(env_, j_map_, key, value);
 }
 
-jlong NativeToJavaPointer(const void* ptr) {
+jlong NativeToJavaPointer(void* ptr) {
   static_assert(sizeof(intptr_t) <= sizeof(jlong),
                 "Time to rethink the use of jlongs");
   // Going through intptr_t to be obvious about the definedness of the

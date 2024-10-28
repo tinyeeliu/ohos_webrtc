@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import code_util
+import code
 import cpp_util
 from model import Platforms
 from schema_util import CapitalizeFirstLetter
@@ -33,7 +33,10 @@ def _RemoveUnneededFields(schema):
   # Return a copy so that we don't pollute the global api object, which may be
   # used elsewhere.
   ret = copy.deepcopy(schema)
-  _RemoveKey(ret, 'description', str)
+  if sys.version_info.major == 2:
+    _RemoveKey(ret, 'description', basestring)
+  else:
+    _RemoveKey(ret, 'description', str)
   _RemoveKey(ret, 'compiler_options', dict)
   _RemoveKey(ret, 'nodoc', bool)
   _RemoveKey(ret, 'nocompile', bool)
@@ -55,7 +58,8 @@ def _PrefixSchemaWithNamespace(schema):
       assert not mandatory, (
              'Required key "%s" is not present in object.' % key)
       return
-    assert type(obj[key]) is str
+    assert type(obj[key]) is str or (sys.version_info.major == 2 and
+                                     isinstance(obj[key], basestring))
     if obj[key].find('.') == -1:
       obj[key] = '%s.%s' % (namespace, obj[key])
 
@@ -110,12 +114,12 @@ class CppBundleGenerator(object):
     self.schemas_h_generator = _SchemasHGenerator(self)
 
   def _GenerateHeader(self, file_base, body_code):
-    """Generates a code_util.Code object for a header file
+    """Generates a code.Code object for a header file
 
     Parameters:
     - |file_base| - the base of the filename, e.g. 'foo' (for 'foo.h')
     - |body_code| - the code to put in between the multiple inclusion guards"""
-    c = code_util.Code()
+    c = code.Code()
     c.Append(cpp_util.CHROMIUM_LICENSE)
     c.Append()
     c.Append(cpp_util.GENERATED_BUNDLE_FILE_MESSAGE %
@@ -159,7 +163,7 @@ class CppBundleGenerator(object):
     return ' || '.join(ifdefs)
 
   def _GenerateRegistrationEntry(self, namespace_name, function):
-    c = code_util.Code()
+    c = code.Code()
     function_ifdefs = self._GetPlatformIfdefs(function)
     if function_ifdefs is not None:
       c.Append("#if %s" % function_ifdefs, indent_level=0)
@@ -177,7 +181,7 @@ class CppBundleGenerator(object):
     return c
 
   def _GenerateFunctionRegistryRegisterAll(self):
-    c = code_util.Code()
+    c = code.Code()
     c.Append('// static')
     c.Sblock('void %s::RegisterAll(ExtensionFunctionRegistry* registry) {' %
              self._GenerateBundleClass('GeneratedFunctionRegistry'))
@@ -223,7 +227,7 @@ class _APIHGenerator(object):
     self._bundle = cpp_bundle
 
   def Generate(self, _):  # namespace not relevant, this is a bundle
-    c = code_util.Code()
+    c = code.Code()
 
     c.Append('#include <string>')
     c.Append()
@@ -243,13 +247,13 @@ class _APIHGenerator(object):
 
 
 class _APICCGenerator(object):
-  """Generates a code_util.Code object for the generated API .cc file"""
+  """Generates a code.Code object for the generated API .cc file"""
 
   def __init__(self, cpp_bundle):
     self._bundle = cpp_bundle
 
   def Generate(self, _):  # namespace not relevant, this is a bundle
-    c = code_util.Code()
+    c = code.Code()
     c.Append(cpp_util.CHROMIUM_LICENSE)
     c.Append()
     c.Append('#include "%s"' % (
@@ -296,12 +300,12 @@ class _APICCGenerator(object):
 
 
 class _SchemasHGenerator(object):
-  """Generates a code_util.Code object for the generated schemas .h file"""
+  """Generates a code.Code object for the generated schemas .h file"""
   def __init__(self, cpp_bundle):
     self._bundle = cpp_bundle
 
   def Generate(self, _):  # namespace not relevant, this is a bundle
-    c = code_util.Code()
+    c = code.Code()
     c.Append('#include "base/strings/string_piece.h"')
     c.Append()
     c.Concat(cpp_util.OpenNamespace(self._bundle._cpp_namespace))
@@ -329,13 +333,13 @@ def _FormatNameAsConstant(name):
 
 
 class _SchemasCCGenerator(object):
-  """Generates a code_util.Code object for the generated schemas .cc file"""
+  """Generates a code.Code object for the generated schemas .cc file"""
 
   def __init__(self, cpp_bundle):
     self._bundle = cpp_bundle
 
   def Generate(self, _):  # namespace not relevant, this is a bundle
-    c = code_util.Code()
+    c = code.Code()
     c.Append(cpp_util.CHROMIUM_LICENSE)
     c.Append()
     c.Append('#include "%s"' % (

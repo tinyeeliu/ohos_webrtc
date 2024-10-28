@@ -38,7 +38,9 @@ static jlong JNI_Histogram_CreateEnumeration(
   return jlongFromPointer(metrics::HistogramFactoryGetEnumeration(name, max));
 }
 
-static void JNI_Histogram_AddSample(JNIEnv* jni, jlong histogram, jint sample) {
+static void JNI_Histogram_AddSample(JNIEnv* jni,
+                                    jlong histogram,
+                                    jint sample) {
   if (histogram) {
     HistogramAdd(reinterpret_cast<metrics::Histogram*>(histogram), sample);
   }

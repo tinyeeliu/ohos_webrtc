@@ -13,7 +13,6 @@
 #include <math.h>
 
 #include <algorithm>
-#include <cstdint>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -22,9 +21,6 @@
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
-#include "api/array_view.h"
-#include "api/units/timestamp.h"
 #include "p2p/base/port_allocator.h"
 #include "rtc_base/checks.h"
 #include "rtc_base/crc32.h"
@@ -250,7 +246,6 @@ Connection::Connection(rtc::WeakPtr<Port> port,
 Connection::~Connection() {
   RTC_DCHECK_RUN_ON(network_thread_);
   RTC_DCHECK(!port_);
-  RTC_DCHECK(!received_packet_callback_);
 }
 
 webrtc::TaskQueueBase* Connection::network_thread() const {
@@ -267,17 +262,14 @@ const Candidate& Connection::remote_candidate() const {
 }
 
 const rtc::Network* Connection::network() const {
-  RTC_DCHECK(port_) << ToDebugId() << ": port_ null in network()";
   return port()->Network();
 }
 
 int Connection::generation() const {
-  RTC_DCHECK(port_) << ToDebugId() << ": port_ null in generation()";
   return port()->generation();
 }
 
 uint64_t Connection::priority() const {
-  RTC_DCHECK(port_) << ToDebugId() << ": port_ null in priority()";
   if (!port_)
     return 0;
 
@@ -450,19 +442,6 @@ void Connection::OnSendStunPacket(const void* data,
   }
 }
 
-void Connection::RegisterReceivedPacketCallback(
-    absl::AnyInvocable<void(Connection*, const rtc::ReceivedPacket&)>
-        received_packet_callback) {
-  RTC_DCHECK_RUN_ON(network_thread_);
-  RTC_CHECK(!received_packet_callback_);
-  received_packet_callback_ = std::move(received_packet_callback);
-}
-
-void Connection::DeregisterReceivedPacketCallback() {
-  RTC_DCHECK_RUN_ON(network_thread_);
-  received_packet_callback_ = nullptr;
-}
-
 void Connection::OnReadPacket(const char* data,
                               size_t size,
                               int64_t packet_time_us) {
@@ -477,22 +456,8 @@ void Connection::OnReadPacket(const char* data,
     UpdateReceiving(last_data_received_);
     recv_rate_tracker_.AddSamples(size);
     stats_.packets_received++;
-    if (received_packet_callback_) {
-      RTC_DCHECK(packet_time_us == -1 || packet_time_us >= 0);
-      RTC_DCHECK(SignalReadPacket.is_empty());
-      received_packet_callback_(
-          this, rtc::ReceivedPacket(
-                    rtc::reinterpret_array_view<const uint8_t>(
-                        rtc::MakeArrayView(data, size)),
-                    (packet_time_us >= 0)
-                        ? absl::optional<webrtc::Timestamp>(
-                              webrtc::Timestamp::Micros(packet_time_us))
-                        : absl::nullopt));
-    } else {
-      // TODO(webrtc:11943): Remove SignalReadPacket once upstream projects have
-      // switched to use RegisterReceivedPacket.
-      SignalReadPacket(this, data, size, packet_time_us);
-    }
+    SignalReadPacket(this, data, size, packet_time_us);
+
     // If timed out sending writability checks, start up again
     if (!pruned_ && (write_state_ == STATE_WRITE_TIMEOUT)) {
       RTC_LOG(LS_WARNING)
@@ -500,95 +465,85 @@ void Connection::OnReadPacket(const char* data,
              "Resetting state to STATE_WRITE_INIT.";
       set_write_state(STATE_WRITE_INIT);
     }
-    return;
   } else if (!msg) {
     // The packet was STUN, but failed a check and was handled internally.
-    return;
-  }
-
-  // The packet is STUN and passed the Port checks.
-  // Perform our own checks to ensure this packet is valid.
-  // If this is a STUN request, then update the receiving bit and respond.
-  // If this is a STUN response, then update the writable bit.
-  // Log at LS_INFO if we receive a ping on an unwritable connection.
-
-  // REQUESTs   have msg->integrity() already checked in Port
-  // RESPONSEs  have msg->integrity() checked below.
-  // INDICATION does not have any integrity.
-  if (IsStunRequestType(msg->type())) {
-    if (msg->integrity() != StunMessage::IntegrityStatus::kIntegrityOk) {
-      // "silently" discard the request.
-      RTC_LOG(LS_VERBOSE) << ToString() << ": Discarding "
-                          << StunMethodToString(msg->type())
-                          << ", id=" << rtc::hex_encode(msg->transaction_id())
-                          << " with invalid message integrity: "
-                          << static_cast<int>(msg->integrity());
-      return;
-    }
-    // fall-through
-  } else if (IsStunSuccessResponseType(msg->type()) ||
-             IsStunErrorResponseType(msg->type())) {
-    RTC_DCHECK(msg->integrity() == StunMessage::IntegrityStatus::kNotSet);
-    if (msg->ValidateMessageIntegrity(remote_candidate().password()) !=
-        StunMessage::IntegrityStatus::kIntegrityOk) {
-      // "silently" discard the response.
-      RTC_LOG(LS_VERBOSE) << ToString() << ": Discarding "
-                          << StunMethodToString(msg->type())
-                          << ", id=" << rtc::hex_encode(msg->transaction_id())
-                          << " with invalid message integrity: "
-                          << static_cast<int>(msg->integrity());
-      return;
-    }
   } else {
-    RTC_DCHECK(IsStunIndicationType(msg->type()));
-    // No message integrity.
-  }
-
-  rtc::LoggingSeverity sev = (!writable() ? rtc::LS_INFO : rtc::LS_VERBOSE);
-  switch (msg->type()) {
-    case STUN_BINDING_REQUEST:
-      RTC_LOG_V(sev) << ToString() << ": Received "
-                     << StunMethodToString(msg->type())
-                     << ", id=" << rtc::hex_encode(msg->transaction_id());
-      if (remote_ufrag == remote_candidate_.username()) {
-        HandleStunBindingOrGoogPingRequest(msg.get());
-      } else {
-        // The packet had the right local username, but the remote username
-        // was not the right one for the remote address.
-        RTC_LOG(LS_ERROR) << ToString()
-                          << ": Received STUN request with bad remote username "
-                          << remote_ufrag;
-        port_->SendBindingErrorResponse(msg.get(), addr,
-                                        STUN_ERROR_UNAUTHORIZED,
-                                        STUN_ERROR_REASON_UNAUTHORIZED);
-      }
-      break;
+    // The packet is STUN and passed the Port checks.
+    // Perform our own checks to ensure this packet is valid.
+    // If this is a STUN request, then update the receiving bit and respond.
+    // If this is a STUN response, then update the writable bit.
+    // Log at LS_INFO if we receive a ping on an unwritable connection.
+    rtc::LoggingSeverity sev = (!writable() ? rtc::LS_INFO : rtc::LS_VERBOSE);
+    switch (msg->integrity()) {
+      case StunMessage::IntegrityStatus::kNotSet:
+        // This packet did not come through Port processing?
+        // TODO(bugs.webrtc.org/14578): Clean up this situation.
+        msg->ValidateMessageIntegrity(remote_candidate().password());
+        break;
+      case StunMessage::IntegrityStatus::kIntegrityOk:
+        if (remote_candidate().password() != msg->password()) {
+          // TODO(bugs.webrtc.org/14578): Do a better thing
+          RTC_LOG(LS_INFO) << "STUN code error - Different passwords, old = "
+                           << absl::CHexEscape(msg->password()) << ", new "
+                           << absl::CHexEscape(remote_candidate().password());
+        }
+        break;
+      default:
+        // kIntegrityBad and kNoIntegrity.
+        // This shouldn't happen.
+        RTC_DCHECK_NOTREACHED();
+        break;
+    }
+    switch (msg->type()) {
+      case STUN_BINDING_REQUEST:
+        RTC_LOG_V(sev) << ToString() << ": Received "
+                       << StunMethodToString(msg->type())
+                       << ", id=" << rtc::hex_encode(msg->transaction_id());
+        if (remote_ufrag == remote_candidate_.username()) {
+          HandleStunBindingOrGoogPingRequest(msg.get());
+        } else {
+          // The packet had the right local username, but the remote username
+          // was not the right one for the remote address.
+          RTC_LOG(LS_ERROR)
+              << ToString()
+              << ": Received STUN request with bad remote username "
+              << remote_ufrag;
+          port_->SendBindingErrorResponse(msg.get(), addr,
+                                          STUN_ERROR_UNAUTHORIZED,
+                                          STUN_ERROR_REASON_UNAUTHORIZED);
+        }
+        break;
 
       // Response from remote peer. Does it match request sent?
       // This doesn't just check, it makes callbacks if transaction
       // id's match.
-    case STUN_BINDING_RESPONSE:
-    case STUN_BINDING_ERROR_RESPONSE:
-      requests_.CheckResponse(msg.get());
-      break;
+      case STUN_BINDING_RESPONSE:
+      case STUN_BINDING_ERROR_RESPONSE:
+        if (msg->IntegrityOk()) {
+          requests_.CheckResponse(msg.get());
+        }
+        // Otherwise silently discard the response.
+        break;
 
       // Remote end point sent an STUN indication instead of regular binding
       // request. In this case `last_ping_received_` will be updated but no
       // response will be sent.
-    case STUN_BINDING_INDICATION:
-      ReceivedPing(msg->transaction_id());
-      break;
-    case GOOG_PING_REQUEST:
-      // Checked in Port::GetStunMessage.
-      HandleStunBindingOrGoogPingRequest(msg.get());
-      break;
-    case GOOG_PING_RESPONSE:
-    case GOOG_PING_ERROR_RESPONSE:
-      requests_.CheckResponse(msg.get());
-      break;
-    default:
-      RTC_DCHECK_NOTREACHED();
-      break;
+      case STUN_BINDING_INDICATION:
+        ReceivedPing(msg->transaction_id());
+        break;
+      case GOOG_PING_REQUEST:
+        HandleStunBindingOrGoogPingRequest(msg.get());
+        break;
+      case GOOG_PING_RESPONSE:
+      case GOOG_PING_ERROR_RESPONSE:
+        if (msg->IntegrityOk()) {
+          requests_.CheckResponse(msg.get());
+        }
+        break;
+      default:
+        RTC_DCHECK_NOTREACHED();
+        break;
+    }
   }
 }
 
@@ -739,28 +694,6 @@ void Connection::SendStunBindingResponse(const StunMessage* message) {
     }
   }
 
-  const StunByteStringAttribute* delta =
-      message->GetByteString(STUN_ATTR_GOOG_DELTA);
-  if (delta) {
-    if (field_trials_->answer_goog_delta && goog_delta_consumer_) {
-      auto ack = (*goog_delta_consumer_)(delta);
-      if (ack) {
-        RTC_LOG(LS_INFO) << "Sending GOOG_DELTA_ACK"
-                         << " delta len: " << delta->length();
-        response.AddAttribute(std::move(ack));
-      } else {
-        RTC_LOG(LS_ERROR) << "GOOG_DELTA consumer did not return ack!";
-      }
-    } else {
-      RTC_LOG(LS_WARNING) << "Ignore GOOG_DELTA"
-                          << " len: " << delta->length()
-                          << " answer_goog_delta = "
-                          << field_trials_->answer_goog_delta
-                          << " goog_delta_consumer_ = "
-                          << goog_delta_consumer_.has_value();
-    }
-  }
-
   response.AddMessageIntegrity(local_candidate().password());
   response.AddFingerprint();
 
@@ -841,14 +774,13 @@ void Connection::Prune() {
 
 void Connection::Destroy() {
   RTC_DCHECK_RUN_ON(network_thread_);
-  RTC_DCHECK(port_) << ToDebugId() << ": port_ null in Destroy()";
+  RTC_DCHECK(port_) << "Calling Destroy() twice?";
   if (port_)
     port_->DestroyConnection(this);
 }
 
 bool Connection::Shutdown() {
   RTC_DCHECK_RUN_ON(network_thread_);
-  RTC_DCHECK(port_) << ToDebugId() << ": Calling Shutdown() twice?";
   if (!port_)
     return false;  // already shut down.
 
@@ -868,9 +800,6 @@ bool Connection::Shutdown() {
   // information required for logging needs access to `port_`.
   port_.reset();
 
-  // Clear any pending requests (or responses).
-  requests_.Clear();
-
   return true;
 }
 
@@ -885,7 +814,6 @@ void Connection::FailAndPrune() {
   // will be nulled.
   // In such a case, there's a chance that the Port object gets
   // deleted before the Connection object ends up being deleted.
-  RTC_DCHECK(port_) << ToDebugId() << ": port_ null in FailAndPrune()";
   if (!port_)
     return;
 
@@ -922,7 +850,6 @@ void Connection::set_selected(bool selected) {
 
 void Connection::UpdateState(int64_t now) {
   RTC_DCHECK_RUN_ON(network_thread_);
-  RTC_DCHECK(port_) << ToDebugId() << ": port_ null in UpdateState()";
   if (!port_)
     return;
 
@@ -996,10 +923,8 @@ int64_t Connection::last_ping_sent() const {
   return last_ping_sent_;
 }
 
-void Connection::Ping(int64_t now,
-                      std::unique_ptr<StunByteStringAttribute> delta) {
+void Connection::Ping(int64_t now) {
   RTC_DCHECK_RUN_ON(network_thread_);
-  RTC_DCHECK(port_) << ToDebugId() << ": port_ null in Ping()";
   if (!port_)
     return;
 
@@ -1013,11 +938,10 @@ void Connection::Ping(int64_t now,
     nomination = nomination_;
   }
 
-  bool has_delta = delta != nullptr;
-  auto req = std::make_unique<ConnectionRequest>(
-      requests_, this, BuildPingRequest(std::move(delta)));
+  auto req =
+      std::make_unique<ConnectionRequest>(requests_, this, BuildPingRequest());
 
-  if (!has_delta && ShouldSendGoogPing(req->msg())) {
+  if (ShouldSendGoogPing(req->msg())) {
     auto message = std::make_unique<IceMessage>(GOOG_PING_REQUEST, req->id());
     message->AddMessageIntegrity32(remote_candidate_.password());
     req.reset(new ConnectionRequest(requests_, this, std::move(message)));
@@ -1032,8 +956,7 @@ void Connection::Ping(int64_t now,
   num_pings_sent_++;
 }
 
-std::unique_ptr<IceMessage> Connection::BuildPingRequest(
-    std::unique_ptr<StunByteStringAttribute> delta) {
+std::unique_ptr<IceMessage> Connection::BuildPingRequest() {
   auto message = std::make_unique<IceMessage>(STUN_BINDING_REQUEST);
   // Note that the order of attributes does not impact the parsing on the
   // receiver side. The attribute is retrieved then by iterating and matching
@@ -1089,13 +1012,6 @@ std::unique_ptr<IceMessage> Connection::BuildPingRequest(
     list->AddTypeAtIndex(kSupportGoogPingVersionRequestIndex, kGoogPingVersion);
     message->AddAttribute(std::move(list));
   }
-
-  if (delta) {
-    RTC_DCHECK(delta->type() == STUN_ATTR_GOOG_DELTA);
-    RTC_LOG(LS_INFO) << "Sending GOOG_DELTA: len: " << delta->length();
-    message->AddAttribute(std::move(delta));
-  }
-
   message->AddMessageIntegrity(remote_candidate_.password());
   message->AddFingerprint();
 
@@ -1293,13 +1209,11 @@ std::string Connection::ToDebugId() const {
 
 uint32_t Connection::ComputeNetworkCost() const {
   // TODO(honghaiz): Will add rtt as part of the network cost.
-  RTC_DCHECK(port_) << ToDebugId() << ": port_ null in ComputeNetworkCost()";
   return port()->network_cost() + remote_candidate_.network_cost();
 }
 
 std::string Connection::ToString() const {
   RTC_DCHECK_RUN_ON(network_thread_);
-  RTC_DCHECK(port_) << ToDebugId() << ": port_ null in ToString()";
   constexpr absl::string_view CONNECT_STATE_ABBREV[2] = {
       "-",  // not connected (false)
       "C",  // connected (true)
@@ -1469,40 +1383,10 @@ void Connection::OnConnectionRequestResponse(StunRequest* request,
       cached_stun_binding_ = request->msg()->Clone();
     }
   }
-
-  // Did we send a delta ?
-  const bool sent_goog_delta =
-      request->msg()->GetByteString(STUN_ATTR_GOOG_DELTA) != nullptr;
-  // Did we get a GOOG_DELTA_ACK ?
-  const StunUInt64Attribute* delta_ack =
-      response->GetUInt64(STUN_ATTR_GOOG_DELTA_ACK);
-
-  if (goog_delta_ack_consumer_) {
-    if (sent_goog_delta && delta_ack) {
-      RTC_LOG(LS_VERBOSE) << "Got GOOG_DELTA_ACK len: " << delta_ack->length();
-      (*goog_delta_ack_consumer_)(delta_ack);
-    } else if (sent_goog_delta) {
-      // We sent DELTA but did not get a DELTA_ACK.
-      // This means that remote does not support GOOG_DELTA
-      RTC_LOG(LS_INFO) << "NO DELTA ACK => disable GOOG_DELTA";
-      (*goog_delta_ack_consumer_)(
-          webrtc::RTCError(webrtc::RTCErrorType::UNSUPPORTED_OPERATION));
-    } else if (delta_ack) {
-      // We did NOT send DELTA but got a DELTA_ACK.
-      // That is internal error.
-      RTC_LOG(LS_ERROR) << "DELTA ACK w/o DELTA => disable GOOG_DELTA";
-      (*goog_delta_ack_consumer_)(
-          webrtc::RTCError(webrtc::RTCErrorType::INTERNAL_ERROR));
-    }
-  } else if (delta_ack) {
-    RTC_LOG(LS_ERROR) << "Discard GOOG_DELTA_ACK, no consumer";
-  }
 }
 
 void Connection::OnConnectionRequestErrorResponse(ConnectionRequest* request,
                                                   StunMessage* response) {
-  RTC_DCHECK(port_) << ToDebugId()
-                    << ": port_ null in OnConnectionRequestErrorResponse";
   if (!port_)
     return;
 
@@ -1656,8 +1540,6 @@ ConnectionInfo Connection::stats() {
 
 void Connection::MaybeUpdateLocalCandidate(StunRequest* request,
                                            StunMessage* response) {
-  RTC_DCHECK(port_) << ToDebugId()
-                    << ": port_ null in MaybeUpdateLocalCandidate";
   if (!port_)
     return;
 
@@ -1802,7 +1684,6 @@ ProxyConnection::ProxyConnection(rtc::WeakPtr<Port> port,
 int ProxyConnection::Send(const void* data,
                           size_t size,
                           const rtc::PacketOptions& options) {
-  RTC_DCHECK(port_) << ToDebugId() << ": port_ null in Send()";
   if (!port_)
     return SOCKET_ERROR;
 

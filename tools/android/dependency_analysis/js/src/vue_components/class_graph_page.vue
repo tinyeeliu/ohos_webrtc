@@ -4,14 +4,14 @@
 
 <template>
   <div id="page-container">
-    <v-dialog/>
+    <v-dialog />
     <div id="title-and-graph-container">
       <div
           id="title-and-metadata">
         <div
             id="title"
             class="md-headline">
-          <a href="/">Clank Dependency Viewer</a>  - Class Graph
+          Clank Dependency Viewer - Class Graph
         </div>
         <div
             id="graph-metadata-info">
@@ -156,8 +156,7 @@ const ClassGraphPage = {
 
   /**
    * Various references to objects used across the entire class page.
-   *
-   * @typedef {object} ClassPageData
+   * @typedef {Object} ClassPageData
    * @property {PageModel} pageModel The data store for the page.
    * @property {!ClassDisplaySettingsData} displaySettingsData Additional data
    *   store for the graph's display settings.

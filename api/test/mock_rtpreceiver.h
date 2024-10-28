@@ -14,7 +14,6 @@
 #include <string>
 #include <vector>
 
-#include "api/crypto/frame_decryptor_interface.h"
 #include "api/rtp_receiver_interface.h"
 #include "test/gmock.h"
 
@@ -33,24 +32,12 @@ class MockRtpReceiver : public rtc::RefCountedObject<RtpReceiverInterface> {
   MOCK_METHOD(cricket::MediaType, media_type, (), (const, override));
   MOCK_METHOD(std::string, id, (), (const, override));
   MOCK_METHOD(RtpParameters, GetParameters, (), (const, override));
-  MOCK_METHOD(bool,
-              SetParameters,
-              (const webrtc::RtpParameters& parameters),
-              (override));
   MOCK_METHOD(void, SetObserver, (RtpReceiverObserverInterface*), (override));
   MOCK_METHOD(void,
               SetJitterBufferMinimumDelay,
               (absl::optional<double>),
               (override));
   MOCK_METHOD(std::vector<RtpSource>, GetSources, (), (const, override));
-  MOCK_METHOD(void,
-              SetFrameDecryptor,
-              (rtc::scoped_refptr<webrtc::FrameDecryptorInterface>),
-              (override));
-  MOCK_METHOD(rtc::scoped_refptr<webrtc::FrameDecryptorInterface>,
-              GetFrameDecryptor,
-              (),
-              (const, override));
 };
 
 }  // namespace webrtc

@@ -10,7 +10,7 @@
 
 package org.webrtc;
 
-import androidx.test.InstrumentationRegistry;
+import android.support.test.InstrumentationRegistry;
 import androidx.test.filters.SmallTest;
 import org.junit.Test;
 import org.webrtc.PeerConnectionFactory;

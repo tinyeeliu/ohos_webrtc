@@ -17,7 +17,6 @@
 #include <string>
 #include <vector>
 
-#include "modules/audio_device/include/audio_device.h"
 #include "pc/peer_connection_internal.h"
 #include "test/gmock.h"
 
@@ -231,7 +230,7 @@ class MockPeerConnectionInternal : public PeerConnectionInternal {
   MOCK_METHOD(cricket::PortAllocator*, port_allocator, (), (override));
   MOCK_METHOD(LegacyStatsCollector*, legacy_stats, (), (override));
   MOCK_METHOD(PeerConnectionObserver*, Observer, (), (const, override));
-  MOCK_METHOD(absl::optional<rtc::SSLRole>, GetSctpSslRole_n, (), (override));
+  MOCK_METHOD(bool, GetSctpSslRole, (rtc::SSLRole*), (override));
   MOCK_METHOD(PeerConnectionInterface::IceConnectionState,
               ice_connection_state_internal,
               (),
@@ -248,6 +247,7 @@ class MockPeerConnectionInternal : public PeerConnectionInternal {
               (const cricket::SessionDescription*,
                (const std::map<std::string, const cricket::ContentGroup*>&)),
               (override));
+  MOCK_METHOD(absl::optional<std::string>, GetDataMid, (), (const, override));
   MOCK_METHOD(RTCErrorOr<rtc::scoped_refptr<RtpTransceiverInterface>>,
               AddTransceiver,
               (cricket::MediaType,
@@ -263,10 +263,12 @@ class MockPeerConnectionInternal : public PeerConnectionInternal {
   MOCK_METHOD(Call*, call_ptr, (), (override));
   MOCK_METHOD(bool, SrtpRequired, (), (const, override));
   MOCK_METHOD(bool,
-              CreateDataChannelTransport,
-              (absl::string_view),
+              SetupDataChannelTransport_n,
+              (const std::string&),
               (override));
-  MOCK_METHOD(void, DestroyDataChannelTransport, (RTCError error), (override));
+  MOCK_METHOD(void, TeardownDataChannelTransport_n, (), (override));
+  MOCK_METHOD(void, SetSctpDataMid, (const std::string&), (override));
+  MOCK_METHOD(void, ResetSctpDataMid, (), (override));
   MOCK_METHOD(const FieldTrialsView&, trials, (), (const, override));
 
   // PeerConnectionInternal
@@ -279,6 +281,10 @@ class MockPeerConnectionInternal : public PeerConnectionInternal {
       GetTransceiversInternal,
       (),
       (const, override));
+  MOCK_METHOD(sigslot::signal1<SctpDataChannel*>&,
+              SignalSctpDataChannelCreated,
+              (),
+              (override));
   MOCK_METHOD(std::vector<DataChannelStats>,
               GetDataChannelStats,
               (),
@@ -296,10 +302,6 @@ class MockPeerConnectionInternal : public PeerConnectionInternal {
               (const std::set<std::string>&),
               (override));
   MOCK_METHOD(Call::Stats, GetCallStats, (), (override));
-  MOCK_METHOD(absl::optional<AudioDeviceModule::Stats>,
-              GetAudioDeviceStats,
-              (),
-              (override));
   MOCK_METHOD(bool,
               GetLocalCertificate,
               (const std::string&, rtc::scoped_refptr<rtc::RTCCertificate>*),
@@ -315,8 +317,8 @@ class MockPeerConnectionInternal : public PeerConnectionInternal {
               (override));
   MOCK_METHOD(void, NoteDataAddedEvent, (), (override));
   MOCK_METHOD(void,
-              OnSctpDataChannelStateChanged,
-              (int channel_id, DataChannelInterface::DataState),
+              OnSctpDataChannelClosed,
+              (DataChannelInterface*),
               (override));
 };
 

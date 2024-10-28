@@ -91,11 +91,10 @@ class FakeMBW(mb.WebRTCMetaBuildWrapper):
     abpath = self._AbsPath(path)
     self.files[abpath] = contents
 
-  def Call(self, cmd, env=None, capture_output=True, input=None):
-    # pylint: disable=redefined-builtin
+  def Call(self, cmd, env=None, capture_output=True, stdin=None):
     del env
     del capture_output
-    del input
+    del stdin
     self.calls.append(cmd)
     if self.cmds:
       return self.cmds.pop(0)
@@ -325,15 +324,12 @@ class UnitTest(unittest.TestCase):
         files,
         ['../../.vpython3', '../../testing/test_env.py', 'foo_unittests'])
     self.assertEqual(command, [
-        'luci-auth',
-        'context',
-        '--',
         'vpython3',
         '../../build/android/test_wrapper/logdog_wrapper.py',
         '--target',
         'foo_unittests',
         '--logdog-bin-cmd',
-        '../../.task_template_packages/logdog_butler',
+        '../../bin/logdog_butler',
         '--logcat-output-file',
         '${ISOLATED_OUTDIR}/logcats',
         '--store-tombstones',
@@ -367,18 +363,64 @@ class UnitTest(unittest.TestCase):
         files,
         ['../../.vpython3', '../../testing/test_env.py', 'foo_unittests'])
     self.assertEqual(command, [
-        'luci-auth',
-        'context',
-        '--',
         'vpython3',
         '../../build/android/test_wrapper/logdog_wrapper.py',
         '--target',
         'foo_unittests',
         '--logdog-bin-cmd',
-        '../../.task_template_packages/logdog_butler',
+        '../../bin/logdog_butler',
         '--logcat-output-file',
         '${ISOLATED_OUTDIR}/logcats',
         '--store-tombstones',
+    ])
+
+  def test_gen_timeout(self):
+    test_files = {
+        '/tmp/swarming_targets':
+        'foo_unittests\n',
+        '/fake_src/testing/buildbot/gn_isolate_map.pyl':
+        ("{'foo_unittests': {"
+         "  'label': '//foo:foo_unittests',"
+         "  'type': 'non_parallel_console_test_launcher',"
+         "  'timeout': 500,"
+         "}}\n"),
+        '/fake_src/out/Default/foo_unittests.runtime_deps': ("foo_unittests\n"),
+    }
+    mbw = self.check([
+        'gen', '-c', 'debug_goma', '//out/Default', '--swarming-targets-file',
+        '/tmp/swarming_targets', '--isolate-map-file',
+        '/fake_src/testing/buildbot/gn_isolate_map.pyl'
+    ],
+                     files=test_files,
+                     ret=0)
+
+    isolate_file = mbw.files['/fake_src/out/Default/foo_unittests.isolate']
+    isolate_file_contents = ast.literal_eval(isolate_file)
+    files = isolate_file_contents['variables']['files']
+    command = isolate_file_contents['variables']['command']
+
+    self.assertEqual(files, [
+        '../../.vpython3',
+        '../../testing/test_env.py',
+        '../../third_party/gtest-parallel/gtest-parallel',
+        '../../third_party/gtest-parallel/gtest_parallel.py',
+        '../../tools_webrtc/gtest-parallel-wrapper.py',
+        'foo_unittests',
+    ])
+    self.assertEqual(command, [
+        'vpython3',
+        '../../testing/test_env.py',
+        '../../tools_webrtc/gtest-parallel-wrapper.py',
+        '--output_dir=${ISOLATED_OUTDIR}/test_logs',
+        '--gtest_color=no',
+        '--timeout=500',
+        '--workers=1',
+        '--retry_failed=3',
+        './foo_unittests',
+        '--asan=0',
+        '--lsan=0',
+        '--msan=0',
+        '--tsan=0',
     ])
 
   def test_gen_script(self):
@@ -447,9 +489,14 @@ class UnitTest(unittest.TestCase):
     self.assertEqual(files, [
         '../../.vpython3',
         '../../testing/test_env.py',
+        '../../tools_webrtc/flags_compatibility.py',
         'foo_unittests',
     ])
-    self.assertEqual(command, ['bin/run_foo_unittests'])
+    self.assertEqual(command, [
+        'vpython3',
+        '../../tools_webrtc/flags_compatibility.py',
+        './foo_unittests',
+    ])
 
   def test_gen_non_parallel_console_test_launcher(self):
     test_files = {
@@ -489,6 +536,7 @@ class UnitTest(unittest.TestCase):
         '../../tools_webrtc/gtest-parallel-wrapper.py',
         '--output_dir=${ISOLATED_OUTDIR}/test_logs',
         '--gtest_color=no',
+        '--timeout=900',
         '--workers=1',
         '--retry_failed=3',
         './foo_unittests',
@@ -540,6 +588,7 @@ class UnitTest(unittest.TestCase):
         '../../tools_webrtc/gtest-parallel-wrapper.py',
         '--output_dir=${ISOLATED_OUTDIR}/test_logs',
         '--gtest_color=no',
+        '--timeout=900',
         '--retry_failed=3',
         './foo_unittests',
         '--asan=0',
@@ -591,6 +640,7 @@ class UnitTest(unittest.TestCase):
         '../../tools_webrtc/gtest-parallel-wrapper.py',
         '--output_dir=${ISOLATED_OUTDIR}/test_logs',
         '--gtest_color=no',
+        '--timeout=900',
         '--retry_failed=3',
         r'.\unittests.exe',
         '--asan=0',
@@ -637,6 +687,7 @@ class UnitTest(unittest.TestCase):
         '../../tools_webrtc/gtest-parallel-wrapper.py',
         '--output_dir=${ISOLATED_OUTDIR}/test_logs',
         '--gtest_color=no',
+        '--timeout=900',
         '--retry_failed=3',
         './foo_unittests',
         '--asan=0',
@@ -690,6 +741,7 @@ class UnitTest(unittest.TestCase):
         '../../tools_webrtc/gtest-parallel-wrapper.py',
         '--output_dir=${ISOLATED_OUTDIR}/test_logs',
         '--gtest_color=no',
+        '--timeout=900',
         '--retry_failed=3',
         './foo_unittests',
         '--asan=0',

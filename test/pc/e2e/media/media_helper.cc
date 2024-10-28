@@ -36,7 +36,7 @@ void MediaHelper::MaybeAddAudio(TestPeer* peer) {
                                            source.get());
   std::string sync_group = audio_config.sync_group
                                ? audio_config.sync_group.value()
-                               : audio_config.stream_label.value() + "-sync";
+                               : audio_config.stream_label.value();
   peer->AddTrack(track, {sync_group, *audio_config.stream_label});
 }
 
@@ -59,19 +59,19 @@ MediaHelper::MaybeAddVideo(TestPeer* peer) {
             VideoTrackInterface::ContentHint::kDetailed;
     rtc::scoped_refptr<TestVideoCapturerVideoTrackSource> source =
         rtc::make_ref_counted<TestVideoCapturerVideoTrackSource>(
-            std::move(capturer), is_screencast, video_config.stream_label);
+            std::move(capturer), is_screencast);
     out.push_back(source);
     RTC_LOG(LS_INFO) << "Adding video with video_config.stream_label="
                      << video_config.stream_label.value();
     rtc::scoped_refptr<VideoTrackInterface> track =
-        peer->pc_factory()->CreateVideoTrack(source,
-                                             video_config.stream_label.value());
+        peer->pc_factory()->CreateVideoTrack(video_config.stream_label.value(),
+                                             source.get());
     if (video_config.content_hint.has_value()) {
       track->set_content_hint(video_config.content_hint.value());
     }
     std::string sync_group = video_config.sync_group
                                  ? video_config.sync_group.value()
-                                 : video_config.stream_label.value() + "-sync";
+                                 : video_config.stream_label.value();
     RTCErrorOr<rtc::scoped_refptr<RtpSenderInterface>> sender =
         peer->AddTrack(track, {sync_group, *video_config.stream_label});
     RTC_CHECK(sender.ok());

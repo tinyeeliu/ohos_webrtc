@@ -12,7 +12,6 @@
 #define PC_TEST_MOCK_DATA_CHANNEL_H_
 
 #include <string>
-#include <utility>
 
 #include "pc/sctp_data_channel.h"
 #include "test/gmock.h"
@@ -21,21 +20,16 @@ namespace webrtc {
 
 class MockSctpDataChannel : public SctpDataChannel {
  public:
-  MockSctpDataChannel(
-      rtc::WeakPtr<SctpDataChannelControllerInterface> controller,
-      int id,
-      DataState state)
-      : MockSctpDataChannel(std::move(controller),
-                            id,
+  MockSctpDataChannel(int id, DataState state)
+      : MockSctpDataChannel(id,
                             "MockSctpDataChannel",
                             state,
-                            "someProtocol",
+                            "udp",
                             0,
                             0,
                             0,
                             0) {}
   MockSctpDataChannel(
-      rtc::WeakPtr<SctpDataChannelControllerInterface> controller,
       int id,
       const std::string& label,
       DataState state,
@@ -48,9 +42,8 @@ class MockSctpDataChannel : public SctpDataChannel {
       rtc::Thread* signaling_thread = rtc::Thread::Current(),
       rtc::Thread* network_thread = rtc::Thread::Current())
       : SctpDataChannel(config,
-                        std::move(controller),
+                        nullptr,
                         label,
-                        false,
                         signaling_thread,
                         network_thread) {
     EXPECT_CALL(*this, id()).WillRepeatedly(::testing::Return(id));

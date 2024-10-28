@@ -1,6 +1,5 @@
 syntax = "proto3";
 // Contains enums used as part of chart.proto
-option optimize_for = LITE_RUNTIME;
 package webrtc.analytics;
 
 message ChartStyle {

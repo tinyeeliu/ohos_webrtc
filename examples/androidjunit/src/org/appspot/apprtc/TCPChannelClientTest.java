@@ -15,6 +15,7 @@ import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
+import org.chromium.testing.local.LocalRobolectricTestRunner;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -23,13 +24,12 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.robolectric.annotation.Config;
 import org.robolectric.shadows.ShadowLog;
-import org.robolectric.RobolectricTestRunner;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-@RunWith(RobolectricTestRunner.class)
+@RunWith(LocalRobolectricTestRunner.class)
 @Config(manifest = Config.NONE)
 public class TCPChannelClientTest {
   private static final int PORT = 8888;

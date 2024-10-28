@@ -10,7 +10,6 @@
 #include <tuple>
 
 #include "base/compiler_specific.h"
-#include "base/memory/raw_ptr.h"
 #include "v8/include/libplatform/libplatform.h"
 #include "v8/include/v8.h"
 
@@ -113,7 +112,7 @@ struct Environment {
   std::unique_ptr<MockArrayBufferAllocator> mock_arraybuffer_allocator;
   mutex mtx;
   std::thread terminator_thread;
-  raw_ptr<v8::Isolate> isolate;
+  v8::Isolate* isolate;
   std::unique_ptr<v8::Platform> platform_;
   time_point<steady_clock> start_time;
   bool is_running = true;

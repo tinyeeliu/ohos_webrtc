@@ -4,14 +4,11 @@
 
 /**
  * The different possible absolute pathnames for the visualization page.
- *
- * @readonly
- * @enum {string}
+ * @readonly @enum {string}
  */
 const PagePathName = {
-  CLASS: '/class_view.html',
   PACKAGE: '/package_view.html',
-  TARGET: '/target_view.html',
+  CLASS: '/class_view.html',
 };
 
 // Keys for identifying URL params.
@@ -37,7 +34,8 @@ class UrlProcessor {
   }
 
   /**
-   * @return {!UrlProcessor} a new UrlProcessor with no existing search params.
+   * Creates a new UrlProcessor with no existing search params.
+   * @return {!UrlProcessor}
    */
   static createForOutput() {
     return new UrlProcessor(new URLSearchParams());
@@ -45,7 +43,6 @@ class UrlProcessor {
 
   /**
    * Creates a URL using the current search params.
-   *
    * @param {string} originUrl The URL to use as the origin for the generated
    *   URL.
    * @param {PagePathName} pathName The pathname for the generated URL.

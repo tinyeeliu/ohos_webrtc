@@ -28,9 +28,7 @@ class MyClass {
 
 union MyUnion1 {
   SomeClass* some_class_ptr;
-  char* char_ptr;
-  // TODO(crbug.com/1381955) |const char| pointer fields are not supported yet.
-  const char* const_char_ptr;
+  const char* char_ptr;
 };
 
 union MyUnion2 {

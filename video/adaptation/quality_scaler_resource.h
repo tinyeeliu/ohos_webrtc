@@ -16,7 +16,6 @@
 #include <string>
 
 #include "absl/types/optional.h"
-#include "api/field_trials_view.h"
 #include "api/scoped_refptr.h"
 #include "api/video/video_adaptation_reason.h"
 #include "api/video_codecs/video_encoder.h"
@@ -38,8 +37,7 @@ class QualityScalerResource : public VideoStreamEncoderResource,
 
   bool is_started() const;
 
-  void StartCheckForOveruse(VideoEncoder::QpThresholds qp_thresholds,
-                            const FieldTrialsView& field_trials);
+  void StartCheckForOveruse(VideoEncoder::QpThresholds qp_thresholds);
   void StopCheckForOveruse();
   void SetQpThresholds(VideoEncoder::QpThresholds qp_thresholds);
   bool QpFastFilterLow();

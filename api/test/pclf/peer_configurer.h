@@ -10,35 +10,30 @@
 #ifndef API_TEST_PCLF_PEER_CONFIGURER_H_
 #define API_TEST_PCLF_PEER_CONFIGURER_H_
 
-#include <cstdint>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "absl/strings/string_view.h"
-#include "absl/types/variant.h"
-#include "api/async_dns_resolver.h"
+#include "api/async_resolver_factory.h"
 #include "api/audio/audio_mixer.h"
-#include "api/audio_codecs/audio_decoder_factory.h"
-#include "api/audio_codecs/audio_encoder_factory.h"
+#include "api/call/call_factory_interface.h"
 #include "api/fec_controller.h"
-#include "api/field_trials_view.h"
-#include "api/ice_transport_interface.h"
-#include "api/neteq/neteq_factory.h"
-#include "api/peer_connection_interface.h"
 #include "api/rtc_event_log/rtc_event_log_factory_interface.h"
-#include "api/scoped_refptr.h"
-#include "api/test/frame_generator_interface.h"
+#include "api/task_queue/task_queue_factory.h"
+#include "api/test/create_peer_connection_quality_test_frame_generator.h"
 #include "api/test/pclf/media_configuration.h"
 #include "api/test/pclf/media_quality_test_params.h"
 #include "api/test/peer_network_dependencies.h"
-#include "api/transport/bitrate_settings.h"
 #include "api/transport/network_control.h"
 #include "api/video_codecs/video_decoder_factory.h"
 #include "api/video_codecs/video_encoder_factory.h"
 #include "modules/audio_processing/include/audio_processing.h"
+#include "rtc_base/network.h"
 #include "rtc_base/rtc_certificate_generator.h"
 #include "rtc_base/ssl_certificate.h"
+#include "rtc_base/thread.h"
 
 namespace webrtc {
 namespace webrtc_pc_e2e {
@@ -52,14 +47,28 @@ class PeerConfigurer {
 
   explicit PeerConfigurer(const PeerNetworkDependencies& network_dependencies);
 
+  PeerConfigurer(rtc::Thread* network_thread,
+                 rtc::NetworkManager* network_manager,
+                 rtc::PacketSocketFactory* packet_socket_factory)
+      : components_(
+            std::make_unique<InjectableComponents>(network_thread,
+                                                   network_manager,
+                                                   packet_socket_factory)),
+        params_(std::make_unique<Params>()),
+        configurable_params_(std::make_unique<ConfigurableParams>()) {}
+
   // Sets peer name that will be used to report metrics related to this peer.
   // If not set, some default name will be assigned. All names have to be
   // unique.
   PeerConfigurer* SetName(absl::string_view name);
 
-  // The parameters of the following 7 methods will be passed to the
+  // The parameters of the following 9 methods will be passed to the
   // PeerConnectionFactoryInterface implementation that will be created for
   // this peer.
+  PeerConfigurer* SetTaskQueueFactory(
+      std::unique_ptr<TaskQueueFactory> task_queue_factory);
+  PeerConfigurer* SetCallFactory(
+      std::unique_ptr<CallFactoryInterface> call_factory);
   PeerConfigurer* SetEventLogFactory(
       std::unique_ptr<RtcEventLogFactoryInterface> event_log_factory);
   PeerConfigurer* SetFecControllerFactory(
@@ -71,10 +80,6 @@ class PeerConfigurer {
       std::unique_ptr<VideoEncoderFactory> video_encoder_factory);
   PeerConfigurer* SetVideoDecoderFactory(
       std::unique_ptr<VideoDecoderFactory> video_decoder_factory);
-  PeerConfigurer* SetAudioEncoderFactory(
-      rtc::scoped_refptr<webrtc::AudioEncoderFactory> audio_encoder_factory);
-  PeerConfigurer* SetAudioDecoderFactory(
-      rtc::scoped_refptr<webrtc::AudioDecoderFactory> audio_decoder_factory);
   // Set a custom NetEqFactory to be used in the call.
   PeerConfigurer* SetNetEqFactory(std::unique_ptr<NetEqFactory> neteq_factory);
   PeerConfigurer* SetAudioProcessing(
@@ -89,9 +94,8 @@ class PeerConfigurer {
   // The parameters of the following 4 methods will be passed to the
   // PeerConnectionInterface implementation that will be created for this
   // peer.
-  PeerConfigurer* SetAsyncDnsResolverFactory(
-      std::unique_ptr<webrtc::AsyncDnsResolverFactoryInterface>
-          async_dns_resolver_factory);
+  PeerConfigurer* SetAsyncResolverFactory(
+      std::unique_ptr<webrtc::AsyncResolverFactory> async_resolver_factory);
   PeerConfigurer* SetRTCCertificateGenerator(
       std::unique_ptr<rtc::RTCCertificateGeneratorInterface> cert_generator);
   PeerConfigurer* SetSSLCertificateVerifier(
@@ -119,24 +123,16 @@ class PeerConfigurer {
   // include all streams with `VideoSubscription::kSameAsSendStream`
   // resolution. To this behavior use this method.
   PeerConfigurer* SetVideoSubscription(VideoSubscription subscription);
-  // Sets the list of video codecs used by the peer during the test. These
+  // Set the list of video codecs used by the peer during the test. These
   // codecs will be negotiated in SDP during offer/answer exchange. The order
   // of these codecs during negotiation will be the same as in `video_codecs`.
   // Codecs have to be available in codecs list provided by peer connection to
   // be negotiated. If some of specified codecs won't be found, the test will
   // crash.
   PeerConfigurer* SetVideoCodecs(std::vector<VideoCodecConfig> video_codecs);
-  // Sets a list of RTP header extensions which will be enforced on all video
-  // streams added to this peer.
-  PeerConfigurer* SetExtraVideoRtpHeaderExtensions(
-      std::vector<std::string> extensions);
-  // Sets the audio stream for the call from this peer. If this method won't
+  // Set the audio stream for the call from this peer. If this method won't
   // be invoked, this peer will send no audio.
   PeerConfigurer* SetAudioConfig(AudioConfig config);
-  // Sets a list of RTP header extensions which will be enforced on all audio
-  // streams added to this peer.
-  PeerConfigurer* SetExtraAudioRtpHeaderExtensions(
-      std::vector<std::string> extensions);
 
   // Set if ULP FEC should be used or not. False by default.
   PeerConfigurer* SetUseUlpFEC(bool value);
@@ -154,10 +150,10 @@ class PeerConfigurer {
 
   // If is set, an RTCEventLog will be saved in that location and it will be
   // available for further analysis.
-  PeerConfigurer* SetRtcEventLogPath(absl::string_view path);
+  PeerConfigurer* SetRtcEventLogPath(std::string path);
   // If is set, an AEC dump will be saved in that location and it will be
   // available for further analysis.
-  PeerConfigurer* SetAecDumpPath(absl::string_view path);
+  PeerConfigurer* SetAecDumpPath(std::string path);
   PeerConfigurer* SetRTCConfiguration(
       PeerConnectionInterface::RTCConfiguration configuration);
   PeerConfigurer* SetRTCOfferAnswerOptions(
@@ -165,8 +161,6 @@ class PeerConfigurer {
   // Set bitrate parameters on PeerConnection. This constraints will be
   // applied to all summed RTP streams for this peer.
   PeerConfigurer* SetBitrateSettings(BitrateSettings bitrate_settings);
-  // Set field trials used for this PeerConnection.
-  PeerConfigurer* SetFieldTrials(std::unique_ptr<FieldTrialsView> field_trials);
 
   // Returns InjectableComponents and transfer ownership to the caller.
   // Can be called once.

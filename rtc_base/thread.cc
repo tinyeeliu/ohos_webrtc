@@ -11,7 +11,6 @@
 #include "rtc_base/thread.h"
 
 #include "absl/strings/string_view.h"
-#include "api/task_queue/task_queue_base.h"
 #include "api/units/time_delta.h"
 #include "rtc_base/socket_server.h"
 
@@ -37,6 +36,7 @@
 #include "absl/cleanup/cleanup.h"
 #include "api/sequence_checker.h"
 #include "rtc_base/checks.h"
+#include "rtc_base/deprecated/recursive_critical_section.h"
 #include "rtc_base/event.h"
 #include "rtc_base/internal/default_socket_server.h"
 #include "rtc_base/logging.h"
@@ -73,9 +73,34 @@ class ScopedAutoReleasePool {
 #endif
 
 namespace rtc {
+namespace {
 
 using ::webrtc::MutexLock;
 using ::webrtc::TimeDelta;
+
+class RTC_SCOPED_LOCKABLE MarkProcessingCritScope {
+ public:
+  MarkProcessingCritScope(const RecursiveCriticalSection* cs,
+                          size_t* processing) RTC_EXCLUSIVE_LOCK_FUNCTION(cs)
+      : cs_(cs), processing_(processing) {
+    cs_->Enter();
+    *processing_ += 1;
+  }
+
+  ~MarkProcessingCritScope() RTC_UNLOCK_FUNCTION() {
+    *processing_ -= 1;
+    cs_->Leave();
+  }
+
+  MarkProcessingCritScope(const MarkProcessingCritScope&) = delete;
+  MarkProcessingCritScope& operator=(const MarkProcessingCritScope&) = delete;
+
+ private:
+  const RecursiveCriticalSection* const cs_;
+  size_t* processing_;
+};
+
+}  // namespace
 
 ThreadManager* ThreadManager::Instance() {
   static ThreadManager* const thread_manager = new ThreadManager();
@@ -92,7 +117,9 @@ void ThreadManager::Add(Thread* message_queue) {
   return Instance()->AddInternal(message_queue);
 }
 void ThreadManager::AddInternal(Thread* message_queue) {
-  MutexLock cs(&crit_);
+  CritScope cs(&crit_);
+  // Prevent changes while the list of message queues is processed.
+  RTC_DCHECK_EQ(processing_, 0);
   message_queues_.push_back(message_queue);
 }
 
@@ -102,7 +129,9 @@ void ThreadManager::Remove(Thread* message_queue) {
 }
 void ThreadManager::RemoveInternal(Thread* message_queue) {
   {
-    MutexLock cs(&crit_);
+    CritScope cs(&crit_);
+    // Prevent changes while the list of message queues is processed.
+    RTC_DCHECK_EQ(processing_, 0);
     std::vector<Thread*>::iterator iter;
     iter = absl::c_find(message_queues_, message_queue);
     if (iter != message_queues_.end()) {
@@ -131,7 +160,7 @@ void ThreadManager::RegisterSendAndCheckForCycles(Thread* source,
   RTC_DCHECK(source);
   RTC_DCHECK(target);
 
-  MutexLock cs(&crit_);
+  CritScope cs(&crit_);
   std::deque<Thread*> all_targets({target});
   // We check the pre-existing who-sends-to-who graph for any path from target
   // to source. This loop is guaranteed to terminate because per the send graph
@@ -161,7 +190,7 @@ void ThreadManager::ProcessAllMessageQueuesInternal() {
   std::atomic<int> queues_not_done(0);
 
   {
-    MutexLock cs(&crit_);
+    MarkProcessingCritScope cs(&crit_, &processing_);
     for (Thread* queue : message_queues_) {
       if (!queue->IsProcessingMessagesForTesting()) {
         // If the queue is not processing messages, it can
@@ -362,7 +391,6 @@ void Thread::DoDestroy() {
   }
   ThreadManager::Remove(this);
   // Clear.
-  CurrentTaskQueueSetter set_current(this);
   messages_ = {};
   delayed_messages_ = {};
 }
@@ -455,9 +483,7 @@ absl::AnyInvocable<void() &&> Thread::Get(int cmsWait) {
   return nullptr;
 }
 
-void Thread::PostTaskImpl(absl::AnyInvocable<void() &&> task,
-                          const PostTaskTraits& traits,
-                          const webrtc::Location& location) {
+void Thread::PostTask(absl::AnyInvocable<void() &&> task) {
   if (IsQuitting()) {
     return;
   }
@@ -473,10 +499,8 @@ void Thread::PostTaskImpl(absl::AnyInvocable<void() &&> task,
   WakeUpSocketServer();
 }
 
-void Thread::PostDelayedTaskImpl(absl::AnyInvocable<void() &&> task,
-                                 webrtc::TimeDelta delay,
-                                 const PostDelayedTaskTraits& traits,
-                                 const webrtc::Location& location) {
+void Thread::PostDelayedHighPrecisionTask(absl::AnyInvocable<void() &&> task,
+                                          webrtc::TimeDelta delay) {
   if (IsQuitting()) {
     return;
   }
@@ -723,8 +747,7 @@ void Thread::Stop() {
   Join();
 }
 
-void Thread::BlockingCallImpl(rtc::FunctionView<void()> functor,
-                              const webrtc::Location& location) {
+void Thread::BlockingCall(rtc::FunctionView<void()> functor) {
   TRACE_EVENT0("webrtc", "Thread::BlockingCall");
 
   RTC_DCHECK(!IsQuitting());
@@ -741,10 +764,13 @@ void Thread::BlockingCallImpl(rtc::FunctionView<void()> functor,
     return;
   }
 
+  AssertBlockingIsAllowedOnCurrentThread();
+
+  Thread* current_thread = Thread::Current();
+
 #if RTC_DCHECK_IS_ON
-  if (Thread* current_thread = Thread::Current()) {
+  if (current_thread) {
     RTC_DCHECK_RUN_ON(current_thread);
-    RTC_DCHECK(current_thread->blocking_calls_allowed_);
     current_thread->blocking_call_count_++;
     RTC_DCHECK(current_thread->IsInvokeToThreadAllowed(this));
     ThreadManager::Instance()->RegisterSendAndCheckForCycles(current_thread,
@@ -752,10 +778,54 @@ void Thread::BlockingCallImpl(rtc::FunctionView<void()> functor,
   }
 #endif
 
-  Event done;
-  absl::Cleanup cleanup = [&done] { done.Set(); };
+  // Perhaps down the line we can get rid of this workaround and always require
+  // current_thread to be valid when BlockingCall() is called.
+  std::unique_ptr<rtc::Event> done_event;
+  if (!current_thread)
+    done_event.reset(new rtc::Event());
+
+  bool ready = false;
+  absl::Cleanup cleanup = [this, &ready, current_thread,
+                           done = done_event.get()] {
+    if (current_thread) {
+      {
+        MutexLock lock(&mutex_);
+        ready = true;
+      }
+      current_thread->socketserver()->WakeUp();
+    } else {
+      done->Set();
+    }
+  };
   PostTask([functor, cleanup = std::move(cleanup)] { functor(); });
-  done.Wait(Event::kForever);
+  if (current_thread) {
+    bool waited = false;
+    mutex_.Lock();
+    while (!ready) {
+      mutex_.Unlock();
+      current_thread->socketserver()->Wait(SocketServer::kForever, false);
+      waited = true;
+      mutex_.Lock();
+    }
+    mutex_.Unlock();
+
+    // Our Wait loop above may have consumed some WakeUp events for this
+    // Thread, that weren't relevant to this Send.  Losing these WakeUps can
+    // cause problems for some SocketServers.
+    //
+    // Concrete example:
+    // Win32SocketServer on thread A calls Send on thread B.  While processing
+    // the message, thread B Posts a message to A.  We consume the wakeup for
+    // that Post while waiting for the Send to complete, which means that when
+    // we exit this loop, we need to issue another WakeUp, or else the Posted
+    // message won't be processed in a timely manner.
+
+    if (waited) {
+      current_thread->socketserver()->WakeUp();
+    }
+  } else {
+    done_event->Wait(rtc::Event::kForever);
+  }
 }
 
 // Called by the ThreadManager when being set as the current thread.
@@ -826,6 +896,12 @@ bool Thread::IsInvokeToThreadAllowed(rtc::Thread* target) {
 void Thread::Delete() {
   Stop();
   delete this;
+}
+
+void Thread::PostDelayedTask(absl::AnyInvocable<void() &&> task,
+                             webrtc::TimeDelta delay) {
+  // This implementation does not support low precision yet.
+  PostDelayedHighPrecisionTask(std::move(task), delay);
 }
 
 bool Thread::IsProcessingMessagesForTesting() {

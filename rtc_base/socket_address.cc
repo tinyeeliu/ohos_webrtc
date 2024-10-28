@@ -179,21 +179,13 @@ std::string SocketAddress::ToSensitiveString() const {
   return sb.str();
 }
 
-std::string SocketAddress::ToSensitiveNameAndAddressString() const {
-  if (IsUnresolvedIP() || literal_ || hostname_.empty()) {
-    return ToSensitiveString();
+std::string SocketAddress::ToResolvedSensitiveString() const {
+  if (IsUnresolvedIP()) {
+    return "";
   }
   char buf[1024];
   rtc::SimpleStringBuilder sb(buf);
-  sb << HostAsSensitiveURIString() << ":" << port();
-  sb << " (";
-  if (ip_.family() == AF_INET6) {
-    sb << "[" << ipaddr().ToSensitiveString() << "]";
-  } else {
-    sb << ipaddr().ToSensitiveString();
-  }
-  sb << ":" << port() << ")";
-
+  sb << ipaddr().ToSensitiveString() << ":" << port();
   return sb.str();
 }
 

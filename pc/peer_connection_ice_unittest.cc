@@ -54,7 +54,6 @@
 #include "rtc_base/socket_address.h"
 #include "rtc_base/thread.h"
 #include "test/gtest.h"
-#include "test/scoped_key_value_config.h"
 #ifdef WEBRTC_ANDROID
 #include "pc/test/android_test_initializer.h"
 #endif
@@ -62,16 +61,8 @@
 #include "api/audio_codecs/builtin_audio_encoder_factory.h"
 #include "api/create_peerconnection_factory.h"
 #include "api/uma_metrics.h"
-#include "api/video_codecs/video_decoder_factory_template.h"
-#include "api/video_codecs/video_decoder_factory_template_dav1d_adapter.h"
-#include "api/video_codecs/video_decoder_factory_template_libvpx_vp8_adapter.h"
-#include "api/video_codecs/video_decoder_factory_template_libvpx_vp9_adapter.h"
-#include "api/video_codecs/video_decoder_factory_template_open_h264_adapter.h"
-#include "api/video_codecs/video_encoder_factory_template.h"
-#include "api/video_codecs/video_encoder_factory_template_libaom_av1_adapter.h"
-#include "api/video_codecs/video_encoder_factory_template_libvpx_vp8_adapter.h"
-#include "api/video_codecs/video_encoder_factory_template_libvpx_vp9_adapter.h"
-#include "api/video_codecs/video_encoder_factory_template_open_h264_adapter.h"
+#include "api/video_codecs/builtin_video_decoder_factory.h"
+#include "api/video_codecs/builtin_video_encoder_factory.h"
 #include "pc/peer_connection_proxy.h"
 #include "pc/test/fake_audio_capture_module.h"
 #include "pc/test/mock_peer_connection_observers.h"
@@ -149,7 +140,6 @@ class PeerConnectionIceBaseTest : public ::testing::Test {
 
   explicit PeerConnectionIceBaseTest(SdpSemantics sdp_semantics)
       : vss_(new rtc::VirtualSocketServer()),
-        socket_factory_(new rtc::BasicPacketSocketFactory(vss_.get())),
         main_(vss_.get()),
         sdp_semantics_(sdp_semantics) {
 #ifdef WEBRTC_ANDROID
@@ -159,12 +149,7 @@ class PeerConnectionIceBaseTest : public ::testing::Test {
         rtc::Thread::Current(), rtc::Thread::Current(), rtc::Thread::Current(),
         rtc::scoped_refptr<AudioDeviceModule>(FakeAudioCaptureModule::Create()),
         CreateBuiltinAudioEncoderFactory(), CreateBuiltinAudioDecoderFactory(),
-        std::make_unique<VideoEncoderFactoryTemplate<
-            LibvpxVp8EncoderTemplateAdapter, LibvpxVp9EncoderTemplateAdapter,
-            OpenH264EncoderTemplateAdapter, LibaomAv1EncoderTemplateAdapter>>(),
-        std::make_unique<VideoDecoderFactoryTemplate<
-            LibvpxVp8DecoderTemplateAdapter, LibvpxVp9DecoderTemplateAdapter,
-            OpenH264DecoderTemplateAdapter, Dav1dDecoderTemplateAdapter>>(),
+        CreateBuiltinVideoEncoderFactory(), CreateBuiltinVideoDecoderFactory(),
         nullptr /* audio_mixer */, nullptr /* audio_processing */);
   }
 
@@ -175,7 +160,8 @@ class PeerConnectionIceBaseTest : public ::testing::Test {
   WrapperPtr CreatePeerConnection(const RTCConfiguration& config) {
     auto* fake_network = NewFakeNetwork();
     auto port_allocator = std::make_unique<cricket::BasicPortAllocator>(
-        fake_network, socket_factory_.get());
+        fake_network,
+        std::make_unique<rtc::BasicPacketSocketFactory>(vss_.get()));
     port_allocator->set_flags(cricket::PORTALLOCATOR_DISABLE_TCP |
                               cricket::PORTALLOCATOR_DISABLE_RELAY);
     port_allocator->set_step_delay(cricket::kMinimumStepDelay);
@@ -330,7 +316,6 @@ class PeerConnectionIceBaseTest : public ::testing::Test {
   }
 
   std::unique_ptr<rtc::VirtualSocketServer> vss_;
-  std::unique_ptr<rtc::BasicPacketSocketFactory> socket_factory_;
   rtc::AutoSocketServerThread main_;
   rtc::scoped_refptr<PeerConnectionFactoryInterface> pc_factory_;
   std::vector<std::unique_ptr<rtc::FakeNetworkManager>> fake_networks_;
@@ -1431,22 +1416,16 @@ class PeerConnectionIceConfigTest : public ::testing::Test {
     pc_factory_ = CreatePeerConnectionFactory(
         rtc::Thread::Current(), rtc::Thread::Current(), rtc::Thread::Current(),
         FakeAudioCaptureModule::Create(), CreateBuiltinAudioEncoderFactory(),
-        CreateBuiltinAudioDecoderFactory(),
-        std::make_unique<VideoEncoderFactoryTemplate<
-            LibvpxVp8EncoderTemplateAdapter, LibvpxVp9EncoderTemplateAdapter,
-            OpenH264EncoderTemplateAdapter, LibaomAv1EncoderTemplateAdapter>>(),
-        std::make_unique<VideoDecoderFactoryTemplate<
-            LibvpxVp8DecoderTemplateAdapter, LibvpxVp9DecoderTemplateAdapter,
-            OpenH264DecoderTemplateAdapter, Dav1dDecoderTemplateAdapter>>(),
-        nullptr /* audio_mixer */, nullptr /* audio_processing */);
+        CreateBuiltinAudioDecoderFactory(), CreateBuiltinVideoEncoderFactory(),
+        CreateBuiltinVideoDecoderFactory(), nullptr /* audio_mixer */,
+        nullptr /* audio_processing */);
   }
   void CreatePeerConnection(const RTCConfiguration& config) {
     packet_socket_factory_.reset(
         new rtc::BasicPacketSocketFactory(socket_server_.get()));
     std::unique_ptr<cricket::FakePortAllocator> port_allocator(
         new cricket::FakePortAllocator(rtc::Thread::Current(),
-                                       packet_socket_factory_.get(),
-                                       &field_trials_));
+                                       packet_socket_factory_.get()));
     port_allocator_ = port_allocator.get();
     port_allocator_->SetIceTiebreaker(kTiebreakerDefault);
     PeerConnectionDependencies pc_dependencies(&observer_);
@@ -1457,7 +1436,6 @@ class PeerConnectionIceConfigTest : public ::testing::Test {
     pc_ = result.MoveValue();
   }
 
-  webrtc::test::ScopedKeyValueConfig field_trials_;
   std::unique_ptr<rtc::SocketServer> socket_server_;
   rtc::AutoSocketServerThread main_thread_;
   rtc::scoped_refptr<PeerConnectionFactoryInterface> pc_factory_ = nullptr;

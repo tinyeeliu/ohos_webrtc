@@ -9,7 +9,7 @@
       "symbol_level": 1,
       "target_cpu": "arm64",
       "target_os": "android",
-      "use_remoteexec": true
+      "use_goma": true
     }
   },
   "WebRTC Chromium Linux Builder": {
@@ -19,7 +19,7 @@
       "is_component_build": false,
       "is_debug": false,
       "proprietary_codecs": true,
-      "use_remoteexec": true
+      "use_goma": true
     }
   },
   "WebRTC Chromium Mac Builder": {
@@ -29,7 +29,7 @@
       "is_component_build": false,
       "is_debug": false,
       "proprietary_codecs": true,
-      "use_remoteexec": true
+      "use_goma": true
     }
   },
   "WebRTC Chromium Win Builder": {
@@ -41,7 +41,8 @@
       "is_debug": false,
       "proprietary_codecs": true,
       "symbol_level": 1,
-      "use_remoteexec": true
+      "target_cpu": "x86",
+      "use_goma": true
     }
   }
 }

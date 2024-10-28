@@ -44,19 +44,6 @@ NetworkQualityMetricsReporter::NetworkQualityMetricsReporter(
   RTC_CHECK(metrics_logger_);
 }
 
-NetworkQualityMetricsReporter::NetworkQualityMetricsReporter(
-    absl::string_view alice_network_label,
-    EmulatedNetworkManagerInterface* alice_network,
-    absl::string_view bob_network_label,
-    EmulatedNetworkManagerInterface* bob_network,
-    test::MetricsLogger* metrics_logger)
-    : NetworkQualityMetricsReporter(alice_network,
-                                    bob_network,
-                                    metrics_logger) {
-  alice_network_label_ = std::string(alice_network_label);
-  bob_network_label_ = std::string(bob_network_label);
-}
-
 void NetworkQualityMetricsReporter::Start(
     absl::string_view test_case_name,
     const TrackIdStreamInfoMap* /*reporter_helper*/) {
@@ -76,14 +63,14 @@ void NetworkQualityMetricsReporter::OnStatsReports(
   DataSize payload_received = DataSize::Zero();
   DataSize payload_sent = DataSize::Zero();
 
-  auto inbound_stats = report->GetStatsOfType<RTCInboundRtpStreamStats>();
+  auto inbound_stats = report->GetStatsOfType<RTCInboundRTPStreamStats>();
   for (const auto& stat : inbound_stats) {
     payload_received +=
         DataSize::Bytes(stat->bytes_received.ValueOrDefault(0ul) +
                         stat->header_bytes_received.ValueOrDefault(0ul));
   }
 
-  auto outbound_stats = report->GetStatsOfType<RTCOutboundRtpStreamStats>();
+  auto outbound_stats = report->GetStatsOfType<RTCOutboundRTPStreamStats>();
   for (const auto& stat : outbound_stats) {
     payload_sent +=
         DataSize::Bytes(stat->bytes_sent.ValueOrDefault(0ul) +
@@ -105,8 +92,8 @@ void NetworkQualityMetricsReporter::StopAndReportResults() {
   int64_t bob_packets_loss =
       bob_stats.overall_outgoing_stats.packets_sent -
       alice_stats.overall_incoming_stats.packets_received;
-  ReportStats(alice_network_label_, alice_stats, alice_packets_loss);
-  ReportStats(bob_network_label_, bob_stats, bob_packets_loss);
+  ReportStats("alice", alice_stats, alice_packets_loss);
+  ReportStats("bob", bob_stats, bob_packets_loss);
 
   if (!webrtc::field_trial::IsEnabled(kUseStandardBytesStats)) {
     RTC_LOG(LS_ERROR)
@@ -123,8 +110,8 @@ EmulatedNetworkStats NetworkQualityMetricsReporter::PopulateStats(
     EmulatedNetworkManagerInterface* network) {
   rtc::Event wait;
   EmulatedNetworkStats stats;
-  network->GetStats([&](EmulatedNetworkStats s) {
-    stats = std::move(s);
+  network->GetStats([&](std::unique_ptr<EmulatedNetworkStats> s) {
+    stats = *s;
     wait.Set();
   });
   bool stats_received = wait.Wait(kStatsWaitTimeout);

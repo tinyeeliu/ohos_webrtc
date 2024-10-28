@@ -5,6 +5,7 @@
 
 import logging
 
+from six.moves import range  # pylint: disable=redefined-builtin
 from devil.android import device_errors
 from devil.android.sdk import intent
 from pylib import constants
@@ -87,26 +88,11 @@ class LocalDeviceMonkeyTestRun(local_device_test_run.LocalDeviceTestRun):
     pass
 
   #override
-  def _CreateShardsForDevices(self, tests):
-    """Create shards of tests to run on devices.
-
-    Args:
-      tests: List containing tests or test batches.
-
-    Returns:
-      True if tests should be sharded across several devices,
-      False otherwise.
-    """
+  def _CreateShards(self, tests):
     return tests
 
   #override
-  def _ShouldShardTestsForDevices(self):
-    """Shard tests across several devices.
-
-    Returns:
-      True if tests should be sharded across several devices,
-      False otherwise.
-    """
+  def _ShouldShard(self):
     # TODO(mikecase): Run Monkey test concurrently on each attached device.
     return False
 

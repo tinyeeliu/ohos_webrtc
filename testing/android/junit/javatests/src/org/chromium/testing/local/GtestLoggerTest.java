@@ -18,7 +18,9 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.TreeSet;
 
-/** Unit tests for GtestLogger. */
+/**
+ *  Unit tests for GtestLogger.
+ */
 @RunWith(BlockJUnit4ClassRunner.class)
 public class GtestLoggerTest {
 
@@ -39,8 +41,7 @@ public class GtestLoggerTest {
         GtestLogger loggerUnderTest = new GtestLogger(new PrintStream(actual));
         loggerUnderTest.testFinished(
                 Description.createTestDescription(GtestLoggerTest.class, "testTestFinishedPassed"),
-                true,
-                123);
+                true, 123);
         Assert.assertEquals(
                 "[       OK ] org.chromium.testing.local.GtestLoggerTest.testTestFinishedPassed"
                         + " (123 ms)\n",
@@ -53,8 +54,7 @@ public class GtestLoggerTest {
         GtestLogger loggerUnderTest = new GtestLogger(new PrintStream(actual));
         loggerUnderTest.testFinished(
                 Description.createTestDescription(GtestLoggerTest.class, "testTestFinishedPassed"),
-                false,
-                123);
+                false, 123);
         Assert.assertEquals(
                 "[   FAILED ] org.chromium.testing.local.GtestLoggerTest.testTestFinishedPassed"
                         + " (123 ms)\n",
@@ -113,12 +113,10 @@ public class GtestLoggerTest {
         GtestLogger loggerUnderTest = new GtestLogger(new PrintStream(actual));
 
         Set<Description> failures = new TreeSet<Description>(new DescriptionComparator());
-        failures.add(
-                Description.createTestDescription(
-                        GtestLoggerTest.class, "testTestRunFinishedNoFailures"));
-        failures.add(
-                Description.createTestDescription(
-                        GtestLoggerTest.class, "testTestRunFinishedWithFailures"));
+        failures.add(Description.createTestDescription(
+                GtestLoggerTest.class, "testTestRunFinishedNoFailures"));
+        failures.add(Description.createTestDescription(
+                GtestLoggerTest.class, "testTestRunFinishedWithFailures"));
 
         loggerUnderTest.testRunFinished(1232, failures, 4312);
         Assert.assertEquals(
@@ -145,3 +143,4 @@ public class GtestLoggerTest {
         }
     }
 }
+

@@ -106,15 +106,15 @@ class TokenTaskQueue : public TaskQueueBase {
   using CurrentTaskQueueSetter = TaskQueueBase::CurrentTaskQueueSetter;
 
   void Delete() override { RTC_DCHECK_NOTREACHED(); }
-  void PostTaskImpl(absl::AnyInvocable<void() &&> task,
-                    const PostTaskTraits& traits,
-                    const Location& location) override {
+  void PostTask(absl::AnyInvocable<void() &&> /*task*/) override {
     RTC_DCHECK_NOTREACHED();
   }
-  void PostDelayedTaskImpl(absl::AnyInvocable<void() &&> task,
-                           TimeDelta delay,
-                           const PostDelayedTaskTraits& traits,
-                           const Location& location) override {
+  void PostDelayedTask(absl::AnyInvocable<void() &&> /*task*/,
+                       TimeDelta /*delay*/) override {
+    RTC_DCHECK_NOTREACHED();
+  }
+  void PostDelayedHighPrecisionTask(absl::AnyInvocable<void() &&> /*task*/,
+                                    TimeDelta /*delay*/) override {
     RTC_DCHECK_NOTREACHED();
   }
 };
@@ -137,11 +137,6 @@ class GlobalSimulatedTimeController : public TimeController {
   rtc::Thread* GetMainThread() override;
 
   void AdvanceTime(TimeDelta duration) override;
-
-  // Advances time by `duration`and do not run delayed tasks in the meantime.
-  // Runs any pending tasks at the end.
-  // Useful for simulating contention on destination queues.
-  void SkipForwardBy(TimeDelta duration);
 
   // Makes the simulated time controller aware of a custom
   // SimulatedSequenceRunner.

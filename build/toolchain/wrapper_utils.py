@@ -13,8 +13,6 @@ import shutil
 import sys
 import threading
 
-import whole_archive
-
 _BAT_PREFIX = 'cmd /c call '
 
 
@@ -71,10 +69,6 @@ def RunLinkWithOptionalMapFile(command, env=None, map_file=None):
     command.append('-Wl,-Map,' + tmp_map_path)
   elif map_file:
     command.append('-Wl,-Map,' + map_file)
-
-  # We want to link rlibs as --whole-archive if they are part of a unit test
-  # target. This is determined by switch `-LinkWrapper,add-whole-archive`.
-  command = whole_archive.wrap_with_whole_archive(command)
 
   result = subprocess.call(command, env=env)
 

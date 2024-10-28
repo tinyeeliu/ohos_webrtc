@@ -16,7 +16,9 @@
 
 #include "system_wrappers/include/field_trial.h"
 
-NSString *const kRTCFieldTrialAudioForceABWENoTWCCKey = @"WebRTC-Audio-ABWENoTWCC";
+NSString * const kRTCFieldTrialAudioForceNoTWCCKey = @"WebRTC-Audio-ForceNoTWCC";
+NSString * const kRTCFieldTrialAudioForceABWENoTWCCKey = @"WebRTC-Audio-ABWENoTWCC";
+NSString * const kRTCFieldTrialSendSideBweWithOverheadKey = @"WebRTC-SendSideBwe-WithOverhead";
 NSString * const kRTCFieldTrialFlexFec03AdvertisedKey = @"WebRTC-FlexFEC-03-Advertised";
 NSString * const kRTCFieldTrialFlexFec03Key = @"WebRTC-FlexFEC-03";
 NSString * const kRTCFieldTrialH264HighProfileKey = @"WebRTC-H264HighProfile";

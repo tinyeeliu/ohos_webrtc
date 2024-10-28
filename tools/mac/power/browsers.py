@@ -198,10 +198,7 @@ def MakeBrowserDriver(browser_name: str,
       ]
 
     if extra_command_line:
-      for command in extra_command_line:
-        # Quotes are needed to avoid to avoid cli replacement.
-        command = command.replace('"', '')
-        chrome_extra_arg += [command]
+      chrome_extra_arg += [extra_command_line]
 
     if browser_name == "chrome":
       return Chrome(variation, extra_args=chrome_extra_arg)

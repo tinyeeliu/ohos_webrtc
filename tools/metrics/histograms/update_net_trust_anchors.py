@@ -37,9 +37,8 @@ def main():
     spki_enum[int(spki_data['id'])] = spki
 
   update_histogram_enum.UpdateHistogramFromDict(
-      'tools/metrics/histograms/metadata/net/enums.xml', 'NetTrustAnchors',
-      spki_enum, NET_ROOT_CERTS_PATH, os.path.basename(__file__))
-
+    'NetTrustAnchors', spki_enum, NET_ROOT_CERTS_PATH,
+    os.path.basename(__file__))
 
 if __name__ == '__main__':
   main()

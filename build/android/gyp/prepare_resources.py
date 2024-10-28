@@ -18,8 +18,6 @@ from util import jar_info_utils
 from util import md5_check
 from util import resources_parser
 from util import resource_utils
-import action_helpers  # build_utils adds //build to sys.path.
-import zip_helpers
 
 
 def _ParseArgs(args):
@@ -29,7 +27,7 @@ def _ParseArgs(args):
     An options object as from argparse.ArgumentParser.parse_args()
   """
   parser = argparse.ArgumentParser(description=__doc__)
-  action_helpers.add_depfile_arg(parser)
+  build_utils.AddDepfileOption(parser)
 
   parser.add_argument('--res-sources-path',
                       required=True,
@@ -118,7 +116,7 @@ def _ZipResources(resource_dirs, zip_path, ignore_pattern):
     # the contents of possibly multiple res/ dirs each within an encapsulating
     # directory within the zip.
     z.comment = resource_utils.MULTIPLE_RES_MAGIC_STRING
-    zip_helpers.add_files_to_zip(files_to_zip, z)
+    build_utils.DoZip(files_to_zip, z)
 
 
 def _GenerateRTxt(options, r_txt_path):

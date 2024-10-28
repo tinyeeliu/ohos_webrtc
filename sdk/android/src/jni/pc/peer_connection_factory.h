@@ -12,7 +12,6 @@
 #define SDK_ANDROID_SRC_JNI_PC_PEER_CONNECTION_FACTORY_H_
 
 #include <jni.h>
-
 #include "api/peer_connection_interface.h"
 #include "rtc_base/thread.h"
 

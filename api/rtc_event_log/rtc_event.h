@@ -54,10 +54,8 @@ class RtcEvent {
     GenericPacketReceived,
     GenericAckReceived,
     FrameDecoded,
-    NetEqSetMinimumDelay,
     BeginV3Log = 0x2501580,
-    EndV3Log = 0x2501581,
-    FakeEvent,  // For unit testing.
+    EndV3Log = 0x2501581
   };
 
   RtcEvent();

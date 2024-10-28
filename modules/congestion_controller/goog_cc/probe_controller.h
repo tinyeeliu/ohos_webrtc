@@ -13,15 +13,16 @@
 
 #include <stdint.h>
 
+#include <initializer_list>
 #include <vector>
 
 #include "absl/base/attributes.h"
 #include "absl/types/optional.h"
 #include "api/field_trials_view.h"
 #include "api/rtc_event_log/rtc_event_log.h"
+#include "api/transport/network_control.h"
 #include "api/transport/network_types.h"
 #include "api/units/data_rate.h"
-#include "api/units/time_delta.h"
 #include "api/units/timestamp.h"
 #include "rtc_base/experiments/field_trial_parser.h"
 
@@ -71,21 +72,12 @@ struct ProbeControllerConfig {
   FieldTrialParameter<int> min_probe_packets_sent;
   // The minimum probing duration.
   FieldTrialParameter<TimeDelta> min_probe_duration;
-  FieldTrialParameter<double> loss_limited_probe_scale;
+  // Max limit the target rate of a probe to current estimate if BWE is loss
+  // limited.
+  FieldTrialParameter<bool> limit_probe_target_rate_to_loss_bwe;
   // Dont send a probe if min(estimate, network state estimate) is larger than
   // this fraction of the set max bitrate.
   FieldTrialParameter<double> skip_if_estimate_larger_than_fraction_of_max;
-};
-
-// Reason that bandwidth estimate is limited. Bandwidth estimate can be limited
-// by either delay based bwe, or loss based bwe when it increases/decreases the
-// estimate.
-enum class BandwidthLimitedCause {
-  kLossLimitedBweIncreasing = 0,
-  kLossLimitedBwe = 1,
-  kDelayBasedLimited = 2,
-  kDelayBasedLimitedDelayIncreased = 3,
-  kRttBasedBackOffHighRtt = 4
 };
 
 // This class controls initiation of probing to estimate initial channel
@@ -117,7 +109,7 @@ class ProbeController {
 
   ABSL_MUST_USE_RESULT std::vector<ProbeClusterConfig> SetEstimatedBitrate(
       DataRate bitrate,
-      BandwidthLimitedCause bandwidth_limited_cause,
+      bool bwe_limited_due_to_packet_loss,
       Timestamp at_time);
 
   void EnablePeriodicAlrProbing(bool enable);
@@ -131,8 +123,7 @@ class ProbeController {
   void SetNetworkStateEstimate(webrtc::NetworkStateEstimate estimate);
 
   // Resets the ProbeController to a state equivalent to as if it was just
-  // created EXCEPT for `enable_periodic_alr_probing_` and
-  // `network_available_`.
+  // created EXCEPT for `enable_periodic_alr_probing_`.
   void Reset(Timestamp at_time);
 
   ABSL_MUST_USE_RESULT std::vector<ProbeClusterConfig> Process(
@@ -158,8 +149,7 @@ class ProbeController {
   bool TimeForNetworkStateProbe(Timestamp at_time) const;
 
   bool network_available_;
-  BandwidthLimitedCause bandwidth_limited_cause_ =
-      BandwidthLimitedCause::kDelayBasedLimited;
+  bool bwe_limited_due_to_packet_loss_;
   State state_;
   DataRate min_bitrate_to_probe_further_ = DataRate::PlusInfinity();
   Timestamp time_last_probing_initiated_ = Timestamp::MinusInfinity();
@@ -176,6 +166,10 @@ class ProbeController {
   DataRate max_total_allocated_bitrate_ = DataRate::Zero();
 
   const bool in_rapid_recovery_experiment_;
+  // For WebRTC.BWE.MidCallProbing.* metric.
+  bool mid_call_probing_waiting_for_result_;
+  DataRate mid_call_probing_bitrate_ = DataRate::Zero();
+  DataRate mid_call_probing_succcess_threshold_ = DataRate::Zero();
   RtcEventLog* event_log_;
 
   int32_t next_probe_cluster_id_ = 1;

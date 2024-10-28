@@ -27,8 +27,6 @@
 using ::testing::_;
 using ::testing::Eq;
 using ::testing::Invoke;
-using ::testing::Mock;
-using ::testing::MockFunction;
 using ::testing::Return;
 
 namespace webrtc {
@@ -62,10 +60,10 @@ class DecodeSynchronizerTest : public ::testing::Test {
 };
 
 TEST_F(DecodeSynchronizerTest, AllFramesReadyBeforeNextTickDecoded) {
-  MockFunction<void(uint32_t, Timestamp)> mock_callback1;
+  ::testing::MockFunction<void(uint32_t, Timestamp)> mock_callback1;
   auto scheduler1 = decode_synchronizer_.CreateSynchronizedFrameScheduler();
 
-  MockFunction<void(unsigned int, Timestamp)> mock_callback2;
+  testing::MockFunction<void(unsigned int, Timestamp)> mock_callback2;
   auto scheduler2 = decode_synchronizer_.CreateSynchronizedFrameScheduler();
 
   {
@@ -99,7 +97,7 @@ TEST_F(DecodeSynchronizerTest, AllFramesReadyBeforeNextTickDecoded) {
 }
 
 TEST_F(DecodeSynchronizerTest, FramesNotDecodedIfDecodeTimeIsInNextInterval) {
-  MockFunction<void(unsigned int, Timestamp)> mock_callback;
+  ::testing::MockFunction<void(unsigned int, Timestamp)> mock_callback;
   auto scheduler = decode_synchronizer_.CreateSynchronizedFrameScheduler();
 
   uint32_t frame_rtp = 90000;
@@ -127,7 +125,7 @@ TEST_F(DecodeSynchronizerTest, FramesNotDecodedIfDecodeTimeIsInNextInterval) {
 }
 
 TEST_F(DecodeSynchronizerTest, FrameDecodedOnce) {
-  MockFunction<void(unsigned int, Timestamp)> mock_callback;
+  ::testing::MockFunction<void(unsigned int, Timestamp)> mock_callback;
   auto scheduler = decode_synchronizer_.CreateSynchronizedFrameScheduler();
 
   uint32_t frame_rtp = 90000;
@@ -151,7 +149,7 @@ TEST_F(DecodeSynchronizerTest, FrameDecodedOnce) {
 }
 
 TEST_F(DecodeSynchronizerTest, FrameWithDecodeTimeInPastDecodedImmediately) {
-  MockFunction<void(unsigned int, Timestamp)> mock_callback;
+  ::testing::MockFunction<void(unsigned int, Timestamp)> mock_callback;
   auto scheduler = decode_synchronizer_.CreateSynchronizedFrameScheduler();
 
   uint32_t frame_rtp = 90000;
@@ -173,7 +171,7 @@ TEST_F(DecodeSynchronizerTest, FrameWithDecodeTimeInPastDecodedImmediately) {
 
 TEST_F(DecodeSynchronizerTest,
        FrameWithDecodeTimeFarBeforeNextTickDecodedImmediately) {
-  MockFunction<void(unsigned int, Timestamp)> mock_callback;
+  ::testing::MockFunction<void(unsigned int, Timestamp)> mock_callback;
   auto scheduler = decode_synchronizer_.CreateSynchronizedFrameScheduler();
 
   // Frame which would be behind by more than kMaxAllowedFrameDelay after
@@ -212,7 +210,7 @@ TEST_F(DecodeSynchronizerTest,
 }
 
 TEST_F(DecodeSynchronizerTest, FramesNotReleasedAfterStop) {
-  MockFunction<void(unsigned int, Timestamp)> mock_callback;
+  ::testing::MockFunction<void(unsigned int, Timestamp)> mock_callback;
   auto scheduler = decode_synchronizer_.CreateSynchronizedFrameScheduler();
 
   uint32_t frame_rtp = 90000;
@@ -249,23 +247,6 @@ TEST(DecodeSynchronizerStandaloneTest,
   time_controller.AdvanceTime(TimeDelta::Seconds(1));
   ASSERT_TRUE(callback);
   (std::move)(callback)();
-}
-
-TEST(DecodeSynchronizerStandaloneTest,
-     RegistersCallbackOnceDuringRepeatedRegistrations) {
-  GlobalSimulatedTimeController time_controller(Timestamp::Millis(4711));
-  Clock* clock(time_controller.GetClock());
-  MockMetronome metronome;
-  ON_CALL(metronome, TickPeriod).WillByDefault(Return(TimeDelta::Seconds(1)));
-  DecodeSynchronizer decode_synchronizer_(clock, &metronome,
-                                          time_controller.GetMainThread());
-  // Expect at most 1 call to register a callback.
-  EXPECT_CALL(metronome, RequestCallOnNextTick);
-  auto scheduler1 = decode_synchronizer_.CreateSynchronizedFrameScheduler();
-  scheduler1->Stop();
-  auto scheduler2 = decode_synchronizer_.CreateSynchronizedFrameScheduler();
-  Mock::VerifyAndClearExpectations(&metronome);
-  scheduler2->Stop();
 }
 
 }  // namespace webrtc

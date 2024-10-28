@@ -105,14 +105,17 @@ class _CommonSystemHealthBenchmark(perf_benchmark.PerfBenchmark):
     return page_sets.SystemHealthStorySet(platform=self.PLATFORM)
 
 
-@benchmark.Info(emails=['kouhei@chromium.org'],
+@benchmark.Info(emails=['charliea@chromium.org', 'sullivan@chromium.org',
+                        'tdresser@chromium.org',
+                        'chrome-speed-metrics-dev@chromium.org'],
                 component='Speed>Metrics>SystemHealthRegressions',
                 documentation_url='https://bit.ly/system-health-benchmarks')
 class DesktopCommonSystemHealth(_CommonSystemHealthBenchmark):
   """Desktop Chrome Energy System Health Benchmark."""
   PLATFORM = 'desktop'
-  # TODO(johnchen): Remove either the SUPPORTED_PLATFORMS or
-  # SUPPORTED_PLATFORMS_TAGS lists. Only one is necessary.
+  # TODO(rmhasan): Remove the SUPPORTED_PLATFORMS lists.
+  # SUPPORTED_PLATFORMS is deprecated, please put system specifier tags
+  # from expectations.config in SUPPORTED_PLATFORM_TAGS.
   SUPPORTED_PLATFORM_TAGS = [platforms.DESKTOP]
   SUPPORTED_PLATFORMS = [story.expectations.ALL_DESKTOP]
 
@@ -127,14 +130,17 @@ class DesktopCommonSystemHealth(_CommonSystemHealthBenchmark):
     return options
 
 
-@benchmark.Info(emails=['kouhei@chromium.org'],
+@benchmark.Info(emails=['charliea@chromium.org', 'sullivan@chromium.org',
+                        'tdresser@chromium.org',
+                        'chrome-speed-metrics-dev@chromium.org'],
                 component='Speed>Metrics>SystemHealthRegressions',
                 documentation_url='https://bit.ly/system-health-benchmarks')
 class MobileCommonSystemHealth(_CommonSystemHealthBenchmark):
   """Mobile Chrome Energy System Health Benchmark."""
   PLATFORM = 'mobile'
-  # TODO(johnchen): Remove either the SUPPORTED_PLATFORMS or
-  # SUPPORTED_PLATFORMS_TAGS lists. Only one is necessary.
+  # TODO(rmhasan): Remove the SUPPORTED_PLATFORMS lists.
+  # SUPPORTED_PLATFORMS is deprecated, please put system specifier tags
+  # from expectations.config in SUPPORTED_PLATFORM_TAGS.
   SUPPORTED_PLATFORM_TAGS = [platforms.MOBILE]
   SUPPORTED_PLATFORMS = [story.expectations.ALL_MOBILE]
 
@@ -191,8 +197,9 @@ MEMORY_DEBUGGING_BLURB = "See https://bit.ly/2CpMhze for more information" \
 class DesktopMemorySystemHealth(_MemorySystemHealthBenchmark):
   """Desktop Chrome Memory System Health Benchmark."""
   PLATFORM = 'desktop'
-  # TODO(johnchen): Remove either the SUPPORTED_PLATFORMS or
-  # SUPPORTED_PLATFORMS_TAGS lists. Only one is necessary.
+  # TODO(rmhasan): Remove the SUPPORTED_PLATFORMS lists.
+  # SUPPORTED_PLATFORMS is deprecated, please put system specifier tags
+  # from expectations.config in SUPPORTED_PLATFORM_TAGS.
   SUPPORTED_PLATFORM_TAGS = [platforms.DESKTOP]
   SUPPORTED_PLATFORMS = [story.expectations.ALL_DESKTOP]
 
@@ -207,8 +214,9 @@ class DesktopMemorySystemHealth(_MemorySystemHealthBenchmark):
 class MobileMemorySystemHealth(_MemorySystemHealthBenchmark):
   """Mobile Chrome Memory System Health Benchmark."""
   PLATFORM = 'mobile'
-  # TODO(johnchen): Remove either the SUPPORTED_PLATFORMS or
-  # SUPPORTED_PLATFORMS_TAGS lists. Only one is necessary.
+  # TODO(rmhasan): Remove the SUPPORTED_PLATFORMS lists.
+  # SUPPORTED_PLATFORMS is deprecated, please put system specifier tags
+  # from expectations.config in SUPPORTED_PLATFORM_TAGS.
   SUPPORTED_PLATFORM_TAGS = [platforms.MOBILE]
   SUPPORTED_PLATFORMS = [story.expectations.ALL_MOBILE]
 
@@ -230,7 +238,8 @@ class MobileMemorySystemHealth(_MemorySystemHealthBenchmark):
     return 'system_health.memory_mobile'
 
 
-@benchmark.Info(emails=['oksamyt@chromium.org', 'torne@chromium.org'],
+@benchmark.Info(emails=['oksamyt@chromium.org', 'torne@chromium.org',
+                        'changwan@chromium.org'],
                 component='Mobile>WebView>Perf')
 class WebviewStartupSystemHealthBenchmark(perf_benchmark.PerfBenchmark):
   """Webview startup time benchmark
@@ -239,8 +248,9 @@ class WebviewStartupSystemHealthBenchmark(perf_benchmark.PerfBenchmark):
   and load a blank page.
   """
   options = {'pageset_repeat': 20}
-  # TODO(johnchen): Remove either the SUPPORTED_PLATFORMS or
-  # SUPPORTED_PLATFORMS_TAGS lists. Only one is necessary.
+  # TODO(rmhasan): Remove the SUPPORTED_PLATFORMS lists.
+  # SUPPORTED_PLATFORMS is deprecated, please put system specifier tags
+  # from expectations.config in SUPPORTED_PLATFORM_TAGS.
   SUPPORTED_PLATFORM_TAGS = [platforms.ANDROID_WEBVIEW]
   SUPPORTED_PLATFORMS = [story.expectations.ANDROID_WEBVIEW]
 
@@ -261,3 +271,29 @@ class WebviewStartupSystemHealthBenchmark(perf_benchmark.PerfBenchmark):
   @classmethod
   def Name(cls):
     return 'system_health.webview_startup'
+
+
+@benchmark.Info(emails=['tmrts@chromium.org', 'mlippautz@chromium.org'],
+                component='Blink',
+                documentation_url='https://bit.ly/36XBtpn')
+class PCScanSystemHealthBenchmark(perf_benchmark.PerfBenchmark):
+  """PCScan feature benchmark
+
+  Benchmark that enables PCScan feature.
+  """
+  options = {'pageset_repeat': 20}
+  SUPPORTED_PLATFORM_TAGS = [platforms.DESKTOP, platforms.MOBILE]
+  SUPPORTED_PLATFORMS = [
+      story.expectations.ALL_DESKTOP, story.expectations.ALL_MOBILE
+  ]
+
+  def CreateStorySet(self, options):
+    return page_sets.SystemHealthPCScanStorySet()
+
+  @classmethod
+  def Name(cls):
+    return 'system_health.pcscan'
+
+  def SetExtraBrowserOptions(self, options):
+    options.AppendExtraBrowserArgs(
+        '--enable-features=PartitionAllocPCScanBrowserOnly')

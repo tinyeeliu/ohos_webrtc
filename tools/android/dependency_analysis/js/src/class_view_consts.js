@@ -4,7 +4,6 @@
 
 /**
  * Different convex hull options.
- *
  * @enum {string}
  */
 const HullDisplay = {

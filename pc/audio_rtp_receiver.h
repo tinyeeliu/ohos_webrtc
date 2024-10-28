@@ -50,19 +50,18 @@ class AudioRtpReceiver : public ObserverInterface,
   // However, when using that, the assumption is that right after construction,
   // a call to either `SetupUnsignaledMediaChannel` or `SetupMediaChannel`
   // will be made, which will internally start the source on the worker thread.
-  AudioRtpReceiver(
-      rtc::Thread* worker_thread,
-      std::string receiver_id,
-      std::vector<std::string> stream_ids,
-      bool is_unified_plan,
-      cricket::VoiceMediaReceiveChannelInterface* voice_channel = nullptr);
+  AudioRtpReceiver(rtc::Thread* worker_thread,
+                   std::string receiver_id,
+                   std::vector<std::string> stream_ids,
+                   bool is_unified_plan,
+                   cricket::VoiceMediaChannel* voice_channel = nullptr);
   // TODO(https://crbug.com/webrtc/9480): Remove this when streams() is removed.
   AudioRtpReceiver(
       rtc::Thread* worker_thread,
       const std::string& receiver_id,
       const std::vector<rtc::scoped_refptr<MediaStreamInterface>>& streams,
       bool is_unified_plan,
-      cricket::VoiceMediaReceiveChannelInterface* media_channel = nullptr);
+      cricket::VoiceMediaChannel* media_channel = nullptr);
   virtual ~AudioRtpReceiver();
 
   // ObserverInterface implementation
@@ -100,7 +99,7 @@ class AudioRtpReceiver : public ObserverInterface,
   void Stop() override;
   void SetupMediaChannel(uint32_t ssrc) override;
   void SetupUnsignaledMediaChannel() override;
-  absl::optional<uint32_t> ssrc() const override;
+  uint32_t ssrc() const override;
   void NotifyFirstPacketReceived() override;
   void set_stream_ids(std::vector<std::string> stream_ids) override;
   void set_transport(
@@ -112,8 +111,7 @@ class AudioRtpReceiver : public ObserverInterface,
   void SetJitterBufferMinimumDelay(
       absl::optional<double> delay_seconds) override;
 
-  void SetMediaChannel(
-      cricket::MediaReceiveChannelInterface* media_channel) override;
+  void SetMediaChannel(cricket::MediaChannel* media_channel) override;
 
   std::vector<RtpSource> GetSources() const override;
   int AttachmentId() const override { return attachment_id_; }
@@ -136,9 +134,9 @@ class AudioRtpReceiver : public ObserverInterface,
   const std::string id_;
   const rtc::scoped_refptr<RemoteAudioSource> source_;
   const rtc::scoped_refptr<AudioTrackProxyWithInternal<AudioTrack>> track_;
-  cricket::VoiceMediaReceiveChannelInterface* media_channel_
-      RTC_GUARDED_BY(worker_thread_) = nullptr;
-  absl::optional<uint32_t> signaled_ssrc_ RTC_GUARDED_BY(worker_thread_);
+  cricket::VoiceMediaChannel* media_channel_ RTC_GUARDED_BY(worker_thread_) =
+      nullptr;
+  absl::optional<uint32_t> ssrc_ RTC_GUARDED_BY(worker_thread_);
   std::vector<rtc::scoped_refptr<MediaStreamInterface>> streams_
       RTC_GUARDED_BY(&signaling_thread_checker_);
   bool cached_track_enabled_ RTC_GUARDED_BY(&signaling_thread_checker_);
