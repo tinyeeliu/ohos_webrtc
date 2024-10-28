@@ -5,12 +5,15 @@
 """The 'grit xmb' tool.
 """
 
+from __future__ import print_function
 
 import getopt
 import os
 import sys
 
 from xml.sax import saxutils
+
+import six
 
 from grit import grd_reader
 from grit import lazy_re
@@ -26,8 +29,8 @@ _WHITESPACES_REGEX = lazy_re.compile(r'\s\s*')
 
 # See XmlEscape below.
 _XML_QUOTE_ESCAPES = {
-    "'":  '&apos;',
-    '"':  '&quot;',
+    u"'":  u'&apos;',
+    u'"':  u'&quot;',
 }
 
 def _XmlEscape(s):
@@ -35,7 +38,7 @@ def _XmlEscape(s):
   internal Translation Console tool.  May be used for attributes as
   well as for contents.
   """
-  return saxutils.escape(str(s), _XML_QUOTE_ESCAPES).encode('utf-8')
+  return saxutils.escape(six.text_type(s), _XML_QUOTE_ESCAPES).encode('utf-8')
 
 
 def _WriteAttribute(file, name, value):
@@ -53,11 +56,11 @@ def _WriteAttribute(file, name, value):
 
 def _WriteMessage(file, message):
   presentable_content = message.GetPresentableContent()
-  assert (isinstance(presentable_content, str) or
+  assert (isinstance(presentable_content, six.string_types) or
           (len(message.parts) == 1 and
            type(message.parts[0] == tclib.Placeholder)))
   preserve_space = presentable_content != _WHITESPACES_REGEX.sub(
-      ' ', presentable_content.strip())
+      u' ', presentable_content.strip())
 
   file.write(b'<msg')
   _WriteAttribute(file, 'desc', message.GetDescription())
@@ -157,7 +160,7 @@ Other options:
   FORMAT_IDS_ONLY = 1
 
   def __init__(self, defines=None):
-    super().__init__()
+    super(OutputXmb, self).__init__()
     self.format = self.FORMAT_XMB
     self.defines = defines or {}
 
@@ -175,7 +178,7 @@ Other options:
     own_opts, args = getopt.getopt(args, 'l:D:ih', ('help',))
     for key, val in own_opts:
       if key == '-l':
-        limit_file = open(val)
+        limit_file = open(val, 'r')
         limit_file_dir = util.dirname(val)
         if not len(limit_file_dir):
           limit_file_dir = '.'

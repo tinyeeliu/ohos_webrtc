@@ -16,7 +16,12 @@
 namespace rtc {
 namespace internal {
 
-WeakReference::Flag::Flag() : is_valid_(true) {}
+WeakReference::Flag::Flag() : is_valid_(true) {
+  // Flags only become bound when checked for validity, or invalidated,
+  // so that we can check that later validity/invalidation operations on
+  // the same Flag take place on the same sequence.
+  checker_.Detach();
+}
 
 void WeakReference::Flag::Invalidate() {
   RTC_DCHECK(checker_.IsCurrent())

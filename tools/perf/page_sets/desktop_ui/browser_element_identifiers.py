@@ -11,5 +11,5 @@
 
 kOmniboxElementId = 'kOmniboxElementId'
 kSideSearchButtonElementId = 'kSideSearchButtonElementId'
-kToolbarTabCounterButtonElementId = 'kToolbarTabCounterButtonElementId'
+kTabCounterButtonElementId = 'kTabCounterButtonElementId'
 kTabSearchButtonElementId = 'kTabSearchButtonElementId'

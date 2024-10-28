@@ -14,7 +14,6 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
-
 #include "absl/types/optional.h"
 
 namespace rtc {

@@ -37,11 +37,6 @@ absl::optional<int64_t> InitialPacketInserterNetEqInput::NextOutputEventTime()
   return source_->NextOutputEventTime();
 }
 
-absl::optional<NetEqInput::SetMinimumDelayInfo>
-InitialPacketInserterNetEqInput::NextSetMinimumDelayInfo() const {
-  return source_->NextSetMinimumDelayInfo();
-}
-
 std::unique_ptr<InitialPacketInserterNetEqInput::PacketData>
 InitialPacketInserterNetEqInput::PopPacket() {
   if (!first_packet_) {
@@ -66,10 +61,6 @@ InitialPacketInserterNetEqInput::PopPacket() {
     return dummy_packet;
   }
   return source_->PopPacket();
-}
-
-void InitialPacketInserterNetEqInput::AdvanceSetMinimumDelay() {
-  source_->AdvanceSetMinimumDelay();
 }
 
 void InitialPacketInserterNetEqInput::AdvanceOutputEvent() {

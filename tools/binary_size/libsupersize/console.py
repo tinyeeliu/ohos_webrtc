@@ -176,10 +176,11 @@ class _Session:
                      oneoffs_dir=oneoffs_dir,
                      visibility=visibility))
 
-  def _SaveSizeInfo(self, size_info=None, to_file=None):
-    """Writes a .size file.
+  def _SaveSizeInfo(self, filtered_symbols=None, size_info=None, to_file=None):
+    """Saves a .size file containing only filtered_symbols into to_file.
 
     Args:
+      filtered_symbols: Which symbols to include. Defaults to all.
       size_info: The size_info to filter. Defaults to size_infos[0].
       to_file: Defaults to default.size
     """
@@ -187,13 +188,17 @@ class _Session:
     to_file = to_file or 'default.size'
     assert to_file.endswith('.size'), 'to_file should end with .size'
 
-    file_format.SaveSizeInfo(size_info, to_file)
+    file_format.SaveSizeInfo(
+        size_info,
+        to_file,
+        include_padding=filtered_symbols is not None,
+        sparse_symbols=filtered_symbols)
 
     is_internal = len(size_info.symbols.WherePathMatches('^clank')) > 0
     self._PrintUploadCommand(to_file, is_internal)
 
   def _SaveDeltaSizeInfo(self, size_info, to_file=None):
-    """Writes a .sizediff file.
+    """Saves a .sizediff file containing only filtered_symbols into to_file.
 
     Args:
       delta_size_info: The delta_size_info to filter.
@@ -463,8 +468,7 @@ class _Session:
         '',
         '# Save a .size containing only the filtered symbols',
         'filtered_symbols = size_info.raw_symbols.Filter(lambda l: l.IsPak())',
-        'size_info.MakeSparse(filtered_symbols)',
-        'SaveSizeInfo(size_info, to_file="oneoff_paks.size")',
+        'SaveSizeInfo(filtered_symbols, size_info, to_file="oneoff_paks.size")',
         '',
         '# View per-component breakdowns, then drill into the last entry.',
         'c = canned_queries.CategorizeByChromeComponent()',
@@ -552,7 +556,6 @@ def Run(args, on_config_error):
 
   size_infos = []
   for path in args.inputs:
-    logging.warning('Loading %s', path)
     if path.endswith('.sizediff'):
       size_infos.extend(archive.LoadAndPostProcessDeltaSizeInfo(path))
     else:

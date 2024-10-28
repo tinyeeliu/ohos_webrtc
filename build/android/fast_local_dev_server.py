@@ -147,7 +147,6 @@ class Task:
     self.cmd = cmd
     self.stamp_file = stamp_file
     self._terminated = False
-    self._replaced = False
     self._lock = threading.Lock()
     self._proc: Optional[subprocess.Popen] = None
     self._thread: Optional[threading.Thread] = None
@@ -193,14 +192,13 @@ class Task:
       self._thread.start()
       return 1
 
-  def terminate(self, replaced=False):
+  def terminate(self):
     """Can be called multiple times to cancel and ignore the task's output."""
 
     with self._lock:
       if self._terminated:
         return
       self._terminated = True
-      self._replaced = replaced
     # It is safe to access _proc and _thread outside of _lock since they are
     # only changed by self.start holding _lock when self._terminate is false.
     # Since we have just set self._terminate to true inside of _lock, we know
@@ -232,17 +230,15 @@ class Task:
     that this method does not need locking."""
 
     TaskStats.complete_task()
-    delete_stamp = False
+    failed = False
     if self._terminated:
       log(f'TERMINATED {self.name}')
-      # When tasks are replaced, avoid deleting the stamp file, context:
-      # https://issuetracker.google.com/301961827.
-      if not self._replaced:
-        delete_stamp = True
+      # Ignore stdout as it is now outdated.
+      failed = True
     else:
       log(f'FINISHED {self.name}')
       if stdout or self._return_code != 0:
-        delete_stamp = True
+        failed = True
         # An extra new line is needed since we want to preserve the previous
         # _log line. Use a single print so that it is threadsafe.
         # TODO(wnwen): Improve stdout display by parsing over it and moving the
@@ -255,7 +251,7 @@ class Task:
             stdout,
         ]))
 
-    if delete_stamp:
+    if failed:
       # Force ninja to consider failed targets as dirty.
       try:
         os.unlink(os.path.join(self.cwd, self.stamp_file))
@@ -297,7 +293,7 @@ def _process_requests(sock: socket.socket):
                   stamp_file=data['stamp_file'])
       existing_task = tasks.get(task.key)
       if existing_task:
-        existing_task.terminate(replaced=True)
+        existing_task.terminate()
       tasks[task.key] = task
       task_manager.add_task(task)
   except KeyboardInterrupt:

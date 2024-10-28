@@ -2,9 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-  include: [
-    "//build/config/fuchsia/test/sysmem.shard.test-cml",
-  ],
   children: [
     {
       // Run an isolated instance of codec_factory so that tests can run on
@@ -27,11 +24,13 @@
         directory: "dev-mediacodec",
         from: "parent",
         to: "#isolated_codec_factory",
+        rights: [ "rw*" ],
     },
     {
         directory: "dev-gpu",
         from: "parent",
         to: "#isolated_codec_factory",
+        rights: [ "rw*" ],
     },
   ],
   use: [
@@ -40,9 +39,4 @@
       from: "#isolated_codec_factory",
     },
   ],
-  facets: {
-    "fuchsia.test": {
-        "deprecated-allowed-packages": [ "codec_factory" ],
-    },
-  },
 }

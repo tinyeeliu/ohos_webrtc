@@ -83,13 +83,6 @@ TEST(SequenceCheckerTest, DetachFromThreadAndUseOnTaskQueue) {
   queue.SendTask([&] { EXPECT_TRUE(sequence_checker.IsCurrent()); });
 }
 
-TEST(SequenceCheckerTest, InitializeForDifferentTaskQueue) {
-  TaskQueueForTest queue;
-  SequenceChecker sequence_checker(queue.Get());
-  EXPECT_EQ(sequence_checker.IsCurrent(), !RTC_DCHECK_IS_ON);
-  queue.SendTask([&] { EXPECT_TRUE(sequence_checker.IsCurrent()); });
-}
-
 TEST(SequenceCheckerTest, DetachFromTaskQueueAndUseOnThread) {
   TaskQueueForTest queue;
   queue.SendTask([] {
@@ -104,19 +97,6 @@ TEST(SequenceCheckerTest, MethodNotAllowedOnDifferentThreadInDebug) {
   RunOnDifferentThread(
       [&] { EXPECT_EQ(sequence_checker.IsCurrent(), !RTC_DCHECK_IS_ON); });
 }
-
-#if RTC_DCHECK_IS_ON
-TEST(SequenceCheckerTest, OnlyCurrentOnOneThread) {
-  SequenceChecker sequence_checker(SequenceChecker::kDetached);
-  RunOnDifferentThread([&] {
-    EXPECT_TRUE(sequence_checker.IsCurrent());
-    // Spawn a new thread from within the first one to guarantee that we have
-    // two concurrently active threads (and that there's no chance of the
-    // thread ref being reused).
-    RunOnDifferentThread([&] { EXPECT_FALSE(sequence_checker.IsCurrent()); });
-  });
-}
-#endif
 
 TEST(SequenceCheckerTest, MethodNotAllowedOnDifferentTaskQueueInDebug) {
   SequenceChecker sequence_checker;
@@ -142,7 +122,8 @@ TEST(SequenceCheckerTest, DetachFromTaskQueueInDebug) {
 TEST(SequenceCheckerTest, ExpectationToString) {
   TaskQueueForTest queue1;
 
-  SequenceChecker sequence_checker(SequenceChecker::kDetached);
+  SequenceChecker sequence_checker;
+  sequence_checker.Detach();
 
   rtc::Event blocker;
   queue1.PostTask([&blocker, &sequence_checker]() {
@@ -165,24 +146,6 @@ TEST(SequenceCheckerTest, ExpectationToString) {
 
 #else
   GTEST_ASSERT_EQ(ExpectationToString(&sequence_checker), "");
-#endif
-}
-
-TEST(SequenceCheckerTest, InitiallyDetached) {
-  TaskQueueForTest queue1;
-
-  SequenceChecker sequence_checker(SequenceChecker::kDetached);
-
-  rtc::Event blocker;
-  queue1.PostTask([&blocker, &sequence_checker]() {
-    EXPECT_TRUE(sequence_checker.IsCurrent());
-    blocker.Set();
-  });
-
-  blocker.Wait(rtc::Event::kForever);
-
-#if RTC_DCHECK_IS_ON
-  EXPECT_FALSE(sequence_checker.IsCurrent());
 #endif
 }
 

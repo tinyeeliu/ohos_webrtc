@@ -6,7 +6,7 @@
 
 #include <memory>
 
-#include "base/functional/bind.h"
+#include "base/bind.h"
 #include "base/logging.h"
 #include "base/process/launch.h"
 #include "base/strings/string_split.h"

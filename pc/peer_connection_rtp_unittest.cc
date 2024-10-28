@@ -34,16 +34,8 @@
 #include "api/scoped_refptr.h"
 #include "api/set_remote_description_observer_interface.h"
 #include "api/uma_metrics.h"
-#include "api/video_codecs/video_decoder_factory_template.h"
-#include "api/video_codecs/video_decoder_factory_template_dav1d_adapter.h"
-#include "api/video_codecs/video_decoder_factory_template_libvpx_vp8_adapter.h"
-#include "api/video_codecs/video_decoder_factory_template_libvpx_vp9_adapter.h"
-#include "api/video_codecs/video_decoder_factory_template_open_h264_adapter.h"
-#include "api/video_codecs/video_encoder_factory_template.h"
-#include "api/video_codecs/video_encoder_factory_template_libaom_av1_adapter.h"
-#include "api/video_codecs/video_encoder_factory_template_libvpx_vp8_adapter.h"
-#include "api/video_codecs/video_encoder_factory_template_libvpx_vp9_adapter.h"
-#include "api/video_codecs/video_encoder_factory_template_open_h264_adapter.h"
+#include "api/video_codecs/builtin_video_decoder_factory.h"
+#include "api/video_codecs/builtin_video_encoder_factory.h"
 #include "media/base/stream_params.h"
 #include "modules/audio_device/include/audio_device.h"
 #include "modules/audio_processing/include/audio_processing.h"
@@ -53,7 +45,6 @@
 #include "pc/sdp_utils.h"
 #include "pc/session_description.h"
 #include "pc/test/fake_audio_capture_module.h"
-#include "pc/test/integration_test_helpers.h"
 #include "pc/test/mock_peer_connection_observers.h"
 #include "rtc_base/checks.h"
 #include "rtc_base/gunit.h"
@@ -73,6 +64,8 @@ using ::testing::ElementsAre;
 using ::testing::Pair;
 using ::testing::UnorderedElementsAre;
 using ::testing::Values;
+
+const uint32_t kDefaultTimeout = 10000u;
 
 template <typename MethodFunctor>
 class OnSuccessObserver : public webrtc::SetRemoteDescriptionObserverInterface {
@@ -94,25 +87,17 @@ class PeerConnectionRtpBaseTest : public ::testing::Test {
  public:
   explicit PeerConnectionRtpBaseTest(SdpSemantics sdp_semantics)
       : sdp_semantics_(sdp_semantics),
-        pc_factory_(CreatePeerConnectionFactory(
-            rtc::Thread::Current(),
-            rtc::Thread::Current(),
-            rtc::Thread::Current(),
-            FakeAudioCaptureModule::Create(),
-            CreateBuiltinAudioEncoderFactory(),
-            CreateBuiltinAudioDecoderFactory(),
-            std::make_unique<
-                VideoEncoderFactoryTemplate<LibvpxVp8EncoderTemplateAdapter,
-                                            LibvpxVp9EncoderTemplateAdapter,
-                                            OpenH264EncoderTemplateAdapter,
-                                            LibaomAv1EncoderTemplateAdapter>>(),
-            std::make_unique<
-                VideoDecoderFactoryTemplate<LibvpxVp8DecoderTemplateAdapter,
-                                            LibvpxVp9DecoderTemplateAdapter,
-                                            OpenH264DecoderTemplateAdapter,
-                                            Dav1dDecoderTemplateAdapter>>(),
-            nullptr /* audio_mixer */,
-            nullptr /* audio_processing */)) {
+        pc_factory_(
+            CreatePeerConnectionFactory(rtc::Thread::Current(),
+                                        rtc::Thread::Current(),
+                                        rtc::Thread::Current(),
+                                        FakeAudioCaptureModule::Create(),
+                                        CreateBuiltinAudioEncoderFactory(),
+                                        CreateBuiltinAudioDecoderFactory(),
+                                        CreateBuiltinVideoEncoderFactory(),
+                                        CreateBuiltinVideoDecoderFactory(),
+                                        nullptr /* audio_mixer */,
+                                        nullptr /* audio_processing */)) {
     webrtc::metrics::Reset();
   }
 
@@ -825,8 +810,7 @@ TEST_F(PeerConnectionRtpTestUnifiedPlan, TracksDoNotEndWhenSsrcChanges) {
   for (size_t i = 0; i < contents.size(); ++i) {
     auto& mutable_streams = contents[i].media_description()->mutable_streams();
     ASSERT_EQ(mutable_streams.size(), 1u);
-    ReplaceFirstSsrc(mutable_streams[0],
-                     kFirstMungedSsrc + static_cast<uint32_t>(i));
+    mutable_streams[0].ssrcs = {kFirstMungedSsrc + static_cast<uint32_t>(i)};
   }
   ASSERT_TRUE(
       callee->SetLocalDescription(CloneSessionDescription(answer.get())));

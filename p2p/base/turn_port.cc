@@ -34,6 +34,26 @@
 
 namespace cricket {
 
+namespace {
+
+bool ResolveTurnHostnameForFamily(const webrtc::FieldTrialsView& field_trials) {
+  // Bug fix for TURN hostname resolution on IPv6.
+  // Field trial key reserved in bugs.webrtc.org/14334
+  static constexpr char field_trial_name[] =
+      "WebRTC-IPv6NetworkResolutionFixes";
+  if (!field_trials.IsEnabled(field_trial_name)) {
+    return false;
+  }
+
+  webrtc::FieldTrialParameter<bool> resolve_turn_hostname_for_family(
+      "ResolveTurnHostnameForFamily", /*default_value=*/false);
+  webrtc::ParseFieldTrial({&resolve_turn_hostname_for_family},
+                          field_trials.Lookup(field_trial_name));
+  return resolve_turn_hostname_for_family;
+}
+
+}  // namespace
+
 using ::webrtc::SafeTask;
 using ::webrtc::TaskQueueBase;
 using ::webrtc::TimeDelta;
@@ -299,7 +319,7 @@ TurnPort::~TurnPort() {
   entries_.clear();
 
   if (socket_)
-    socket_->UnsubscribeCloseEvent(this);
+    socket_->UnsubscribeClose(this);
 
   if (!SharedSocket()) {
     delete socket_;
@@ -373,10 +393,9 @@ void TurnPort::PrepareAddress() {
     // Insert the current address to prevent redirection pingpong.
     attempted_server_addresses_.insert(server_address_.address);
 
-    RTC_LOG(LS_INFO)
-        << ToString() << ": Trying to connect to TURN server via "
-        << ProtoToString(server_address_.proto) << " @ "
-        << server_address_.address.ToSensitiveNameAndAddressString();
+    RTC_LOG(LS_INFO) << ToString() << ": Trying to connect to TURN server via "
+                     << ProtoToString(server_address_.proto) << " @ "
+                     << server_address_.address.ToSensitiveString();
     if (!CreateTurnClientSocket()) {
       RTC_LOG(LS_ERROR) << "Failed to create TURN client socket";
       OnAllocateError(SERVER_NOT_REACHABLE_ERROR,
@@ -447,9 +466,9 @@ bool TurnPort::CreateTurnClientSocket() {
   if (server_address_.proto == PROTO_TCP ||
       server_address_.proto == PROTO_TLS) {
     socket_->SignalConnect.connect(this, &TurnPort::OnSocketConnect);
-    socket_->SubscribeCloseEvent(
-        this,
-        [this](rtc::AsyncPacketSocket* s, int err) { OnSocketClose(s, err); });
+    socket_->SubscribeClose(this, [this](rtc::AsyncPacketSocket* s, int err) {
+      OnSocketClose(s, err);
+    });
   } else {
     state_ = STATE_CONNECTED;
   }
@@ -483,21 +502,21 @@ void TurnPort::OnSocketConnect(rtc::AsyncPacketSocket* socket) {
                       })) {
     if (socket->GetLocalAddress().IsLoopbackIP()) {
       RTC_LOG(LS_WARNING) << "Socket is bound to the address:"
-                          << socket_address.ToSensitiveNameAndAddressString()
+                          << socket_address.ipaddr().ToSensitiveString()
                           << ", rather than an address associated with network:"
                           << Network()->ToString()
                           << ". Still allowing it since it's localhost.";
     } else if (IPIsAny(Network()->GetBestIP())) {
       RTC_LOG(LS_WARNING)
           << "Socket is bound to the address:"
-          << socket_address.ToSensitiveNameAndAddressString()
+          << socket_address.ipaddr().ToSensitiveString()
           << ", rather than an address associated with network:"
           << Network()->ToString()
           << ". Still allowing it since it's the 'any' address"
              ", possibly caused by multiple_routes being disabled.";
     } else {
       RTC_LOG(LS_WARNING) << "Socket is bound to the address:"
-                          << socket_address.ToSensitiveNameAndAddressString()
+                          << socket_address.ipaddr().ToSensitiveString()
                           << ", rather than an address associated with network:"
                           << Network()->ToString() << ". Discarding TURN port.";
       OnAllocateError(
@@ -541,7 +560,7 @@ void TurnPort::OnAllocateMismatch() {
                       "STUN_ERROR_ALLOCATION_MISMATCH, retry: "
                    << allocate_mismatch_retries_ + 1;
 
-  socket_->UnsubscribeCloseEvent(this);
+  socket_->UnsubscribeClose(this);
 
   if (SharedSocket()) {
     ResetSharedSocket();
@@ -693,10 +712,11 @@ bool TurnPort::HandleIncomingPacket(rtc::AsyncPacketSocket* socket,
   // alternative server redirection. TODO(guoweis): add a unit test for this
   // race condition.
   if (remote_addr != server_address_.address) {
-    RTC_LOG(LS_WARNING)
-        << ToString() << ": Discarding TURN message from unknown address: "
-        << remote_addr.ToSensitiveNameAndAddressString() << " server_address_: "
-        << server_address_.address.ToSensitiveNameAndAddressString();
+    RTC_LOG(LS_WARNING) << ToString()
+                        << ": Discarding TURN message from unknown address: "
+                        << remote_addr.ToSensitiveString()
+                        << " server_address_: "
+                        << server_address_.address.ToSensitiveString();
     return false;
   }
 
@@ -771,7 +791,7 @@ bool TurnPort::SetAlternateServer(const rtc::SocketAddress& address) {
   AttemptedServerSet::iterator iter = attempted_server_addresses_.find(address);
   if (iter != attempted_server_addresses_.end()) {
     RTC_LOG(LS_WARNING) << ToString() << ": Redirection to ["
-                        << address.ToSensitiveNameAndAddressString()
+                        << address.ToSensitiveString()
                         << "] ignored, allocation failed.";
     return false;
   }
@@ -792,9 +812,9 @@ bool TurnPort::SetAlternateServer(const rtc::SocketAddress& address) {
   }
 
   RTC_LOG(LS_INFO) << ToString() << ": Redirecting from TURN server ["
-                   << server_address_.address.ToSensitiveNameAndAddressString()
-                   << "] to TURN server ["
-                   << address.ToSensitiveNameAndAddressString() << "]";
+                   << server_address_.address.ToSensitiveString()
+                   << "] to TURN server [" << address.ToSensitiveString()
+                   << "]";
   server_address_ = ProtocolAddress(address, server_address_.proto);
 
   // Insert the current address to prevent redirection pingpong.
@@ -841,7 +861,12 @@ void TurnPort::ResolveTurnAddress(const rtc::SocketAddress& address) {
     server_address_.address = resolved_address;
     PrepareAddress();
   };
-  resolver_->Start(address, Network()->family(), std::move(callback));
+  // TODO(bugs.webrtc.org/14733): remove duplicate resolution with STUN port.
+  if (ResolveTurnHostnameForFamily(field_trials())) {
+    resolver_->Start(address, Network()->family(), std::move(callback));
+  } else {
+    resolver_->Start(address, std::move(callback));
+  }
 }
 
 void TurnPort::OnSendStunPacket(const void* data,
@@ -954,6 +979,11 @@ bool TurnPort::AllowedTurnPort(int port,
   // Port 53, 80 and 443 are used for existing deployments.
   // Ports above 1024 are assumed to be OK to use.
   if (port == 53 || port == 80 || port == 443 || port >= 1024) {
+    return true;
+  }
+  // Allow any port if relevant field trial is set. This allows disabling the
+  // check.
+  if (field_trials && field_trials->IsEnabled("WebRTC-Turn-AllowSystemPorts")) {
     return true;
   }
   return false;

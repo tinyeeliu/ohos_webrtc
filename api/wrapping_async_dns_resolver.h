@@ -33,10 +33,9 @@
 
 namespace webrtc {
 
-class [[deprecated("Use AsyncDnsResolver directly")]] WrappingAsyncDnsResolver;
+class WrappingAsyncDnsResolver;
 
-class [[deprecated(
-    "Use AsyncDnsResolver directly")]] RTC_EXPORT WrappingAsyncDnsResolverResult
+class RTC_EXPORT WrappingAsyncDnsResolverResult
     : public AsyncDnsResolverResult {
  public:
   explicit WrappingAsyncDnsResolverResult(WrappingAsyncDnsResolver* owner)
@@ -55,8 +54,6 @@ class [[deprecated(
 class RTC_EXPORT WrappingAsyncDnsResolver : public AsyncDnsResolverInterface,
                                             public sigslot::has_slots<> {
  public:
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   explicit WrappingAsyncDnsResolver(rtc::AsyncResolverInterface* wrapped)
       : wrapped_(absl::WrapUnique(wrapped)), result_(this) {}
 
@@ -70,7 +67,7 @@ class RTC_EXPORT WrappingAsyncDnsResolver : public AsyncDnsResolverInterface,
   }
 
   void Start(const rtc::SocketAddress& addr,
-             absl::AnyInvocable<void()> callback) override {
+             std::function<void()> callback) override {
     RTC_DCHECK_RUN_ON(&sequence_checker_);
     PrepareToResolve(std::move(callback));
     wrapped_->Start(addr);
@@ -78,7 +75,7 @@ class RTC_EXPORT WrappingAsyncDnsResolver : public AsyncDnsResolverInterface,
 
   void Start(const rtc::SocketAddress& addr,
              int family,
-             absl::AnyInvocable<void()> callback) override {
+             std::function<void()> callback) override {
     RTC_DCHECK_RUN_ON(&sequence_checker_);
     PrepareToResolve(std::move(callback));
     wrapped_->Start(addr, family);
@@ -100,7 +97,7 @@ class RTC_EXPORT WrappingAsyncDnsResolver : public AsyncDnsResolverInterface,
     return wrapped_.get();
   }
 
-  void PrepareToResolve(absl::AnyInvocable<void()> callback) {
+  void PrepareToResolve(std::function<void()> callback) {
     RTC_DCHECK_RUN_ON(&sequence_checker_);
     RTC_DCHECK_EQ(State::kNotStarted, state_);
     state_ = State::kStarted;
@@ -121,13 +118,12 @@ class RTC_EXPORT WrappingAsyncDnsResolver : public AsyncDnsResolverInterface,
 
   // The class variables need to be accessed on a single thread.
   SequenceChecker sequence_checker_;
-  absl::AnyInvocable<void()> callback_ RTC_GUARDED_BY(sequence_checker_);
+  std::function<void()> callback_ RTC_GUARDED_BY(sequence_checker_);
   std::unique_ptr<rtc::AsyncResolverInterface> wrapped_
       RTC_GUARDED_BY(sequence_checker_);
   State state_ RTC_GUARDED_BY(sequence_checker_) = State::kNotStarted;
   WrappingAsyncDnsResolverResult result_ RTC_GUARDED_BY(sequence_checker_);
   bool within_resolve_result_ RTC_GUARDED_BY(sequence_checker_) = false;
-#pragma clang diagnostic pop
 };
 
 }  // namespace webrtc

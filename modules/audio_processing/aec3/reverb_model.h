@@ -49,6 +49,7 @@ class ReverbModel {
                     float reverb_decay);
 
  private:
+
   std::array<float, kFftLengthBy2Plus1> reverb_;
 };
 

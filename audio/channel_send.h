@@ -48,7 +48,19 @@ struct CallSendStatistics {
   // ReportBlockData represents the latest Report Block that was received for
   // that pair.
   std::vector<ReportBlockData> report_block_datas;
-  uint32_t nacks_received;
+  uint32_t nacks_rcvd;
+};
+
+// See section 6.4.2 in http://www.ietf.org/rfc/rfc3550.txt for details.
+struct ReportBlock {
+  uint32_t sender_SSRC;  // SSRC of sender
+  uint32_t source_SSRC;
+  uint8_t fraction_lost;
+  int32_t cumulative_num_packets_lost;
+  uint32_t extended_highest_sequence_number;
+  uint32_t interarrival_jitter;
+  uint32_t last_SR_timestamp;
+  uint32_t delay_since_last_SR;
 };
 
 namespace voe {
@@ -71,9 +83,10 @@ class ChannelSendInterface {
   virtual void SetRTCP_CNAME(absl::string_view c_name) = 0;
   virtual void SetSendAudioLevelIndicationStatus(bool enable, int id) = 0;
   virtual void RegisterSenderCongestionControlObjects(
-      RtpTransportControllerSendInterface* transport) = 0;
+      RtpTransportControllerSendInterface* transport,
+      RtcpBandwidthObserver* bandwidth_observer) = 0;
   virtual void ResetSenderCongestionControlObjects() = 0;
-  virtual std::vector<ReportBlockData> GetRemoteRTCPReportBlocks() const = 0;
+  virtual std::vector<ReportBlock> GetRemoteRTCPReportBlocks() const = 0;
   virtual ANAStats GetANAStatistics() const = 0;
   virtual void RegisterCngPayloadType(int payload_type,
                                       int payload_frequency) = 0;
@@ -125,7 +138,7 @@ std::unique_ptr<ChannelSendInterface> CreateChannelSend(
     int rtcp_report_interval_ms,
     uint32_t ssrc,
     rtc::scoped_refptr<FrameTransformerInterface> frame_transformer,
-    RtpTransportControllerSendInterface* transport_controller,
+    TransportFeedbackObserver* feedback_observer,
     const FieldTrialsView& field_trials);
 
 }  // namespace voe

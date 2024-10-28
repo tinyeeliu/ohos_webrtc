@@ -4,6 +4,7 @@
 
 '''Count number of occurrences of a given message ID.'''
 
+from __future__ import print_function
 
 import getopt
 import sys

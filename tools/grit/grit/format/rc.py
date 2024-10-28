@@ -5,9 +5,13 @@
 '''Support for formatting an RC file for compilation.
 '''
 
+from __future__ import print_function
+
 import os
 import re
 from functools import partial
+
+import six
 
 from grit import util
 from grit.node import misc
@@ -318,7 +322,7 @@ def RcSubstitutions(substituter, lang):
 
 def _FormatHeader(root, lang, output_dir):
   '''Returns the required preamble for RC files.'''
-  assert isinstance(lang, str)
+  assert isinstance(lang, six.string_types)
   assert isinstance(root, misc.GritNode)
   # Find the location of the resource header file, so that we can include
   # it.
@@ -376,7 +380,7 @@ def FormatMessage(item, lang):
 
 def _FormatSection(item, lang, output_dir):
   '''Writes out an .rc file section.'''
-  assert isinstance(lang, str)
+  assert isinstance(lang, six.string_types)
   from grit.node import structure
   assert isinstance(item, structure.StructureNode)
 
@@ -405,7 +409,7 @@ def FormatInclude(item, lang, output_dir, type=None, process_html=False):
           StructureNode)
     process_html: False/True (ignored unless item is a StructureNode)
   '''
-  assert isinstance(lang, str)
+  assert isinstance(lang, six.string_types)
   from grit.node import structure
   from grit.node import include
   assert isinstance(item, (structure.StructureNode, include.IncludeNode))

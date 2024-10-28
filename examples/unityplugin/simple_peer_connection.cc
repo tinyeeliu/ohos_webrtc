@@ -460,15 +460,16 @@ void SimplePeerConnection::AddStreams(bool audio_only) {
     g_camera = (jobject)env->NewGlobalRef(camera_tmp);
 
     rtc::scoped_refptr<webrtc::VideoTrackInterface> video_track(
-        g_peer_connection_factory->CreateVideoTrack(source, kVideoLabel));
+        g_peer_connection_factory->CreateVideoTrack(kVideoLabel,
+                                                    source.release()));
     stream->AddTrack(video_track);
 #else
     rtc::scoped_refptr<CapturerTrackSource> video_device =
         CapturerTrackSource::Create();
     if (video_device) {
       rtc::scoped_refptr<webrtc::VideoTrackInterface> video_track(
-          g_peer_connection_factory->CreateVideoTrack(video_device,
-                                                      kVideoLabel));
+          g_peer_connection_factory->CreateVideoTrack(kVideoLabel,
+                                                      video_device.get()));
 
       stream->AddTrack(video_track);
     }

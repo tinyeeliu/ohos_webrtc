@@ -1,1 +1,2 @@
-file://base/allocator/partition_allocator/OWNERS
+lizeb@chromium.org
+bartekn@chromium.org

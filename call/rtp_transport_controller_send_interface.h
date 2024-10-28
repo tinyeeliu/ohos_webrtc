@@ -42,10 +42,12 @@ class TaskQueue;
 namespace webrtc {
 
 class FrameEncryptorInterface;
+class MaybeWorkerThread;
 class TargetTransferRateObserver;
 class Transport;
 class PacketRouter;
 class RtpVideoSenderInterface;
+class RtcpBandwidthObserver;
 class RtpPacketSender;
 
 struct RtpSenderObservers {
@@ -57,6 +59,7 @@ struct RtpSenderObservers {
   BitrateStatisticsObserver* bitrate_observer;
   FrameCountObserver* frame_count_observer;
   RtcpPacketTypeCounterObserver* rtcp_type_observer;
+  SendSideDelayObserver* send_delay_observer;
   SendPacketObserver* send_packet_observer;
 };
 
@@ -91,6 +94,9 @@ struct RtpSenderFrameEncryptionConfig {
 class RtpTransportControllerSendInterface {
  public:
   virtual ~RtpTransportControllerSendInterface() {}
+  // TODO(webrtc:14502): Remove MaybeWorkerThread when experiment has been
+  // evaluated.
+  virtual MaybeWorkerThread* GetWorkerQueue() = 0;
   virtual PacketRouter* packet_router() = 0;
 
   virtual RtpVideoSenderInterface* CreateRtpVideoSender(
@@ -128,7 +134,7 @@ class RtpTransportControllerSendInterface {
       absl::string_view transport_name,
       const rtc::NetworkRoute& network_route) = 0;
   virtual void OnNetworkAvailability(bool network_available) = 0;
-  virtual NetworkLinkRtcpObserver* GetRtcpObserver() = 0;
+  virtual RtcpBandwidthObserver* GetBandwidthObserver() = 0;
   virtual int64_t GetPacerQueuingDelayMs() const = 0;
   virtual absl::optional<Timestamp> GetFirstPacketTime() const = 0;
   virtual void EnablePeriodicAlrProbing(bool enable) = 0;

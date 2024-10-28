@@ -469,8 +469,8 @@ bool ScreenCapturerMac::RegisterRefreshAndMoveHandlers() {
 
     rtc::ScopedCFTypeRef<CFDictionaryRef> properties_dict(
         CFDictionaryCreate(kCFAllocatorDefault,
-                           (const void*[]){kCGDisplayStreamShowCursor},
-                           (const void*[]){kCFBooleanFalse},
+                           (const void* []){kCGDisplayStreamShowCursor},
+                           (const void* []){kCFBooleanFalse},
                            1,
                            &kCFTypeDictionaryKeyCallBacks,
                            &kCFTypeDictionaryValueCallBacks));

@@ -18,7 +18,8 @@
 
 namespace webrtc {
 
-class MockAudioSource : public rtc::RefCountedObject<AudioSourceInterface> {
+class MockAudioSource final
+    : public rtc::RefCountedObject<AudioSourceInterface> {
  public:
   static rtc::scoped_refptr<MockAudioSource> Create() {
     return rtc::scoped_refptr<MockAudioSource>(new MockAudioSource());
@@ -51,7 +52,7 @@ class MockAudioSource : public rtc::RefCountedObject<AudioSourceInterface> {
   MockAudioSource() = default;
 };
 
-class MockAudioTrack : public rtc::RefCountedObject<AudioTrackInterface> {
+class MockAudioTrack final : public rtc::RefCountedObject<AudioTrackInterface> {
  public:
   static rtc::scoped_refptr<MockAudioTrack> Create() {
     return rtc::scoped_refptr<MockAudioTrack>(new MockAudioTrack());

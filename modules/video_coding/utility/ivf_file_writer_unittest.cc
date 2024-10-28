@@ -54,7 +54,7 @@ class IvfFileWriterTest : public ::testing::Test {
       if (use_capture_tims_ms) {
         frame.capture_time_ms_ = i;
       } else {
-        frame.SetRtpTimestamp(i);
+        frame.SetTimestamp(i);
       }
       if (!file_writer_->WriteFrame(frame, codec_type))
         return false;

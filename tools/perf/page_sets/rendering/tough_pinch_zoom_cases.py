@@ -70,14 +70,10 @@ class GmailPinchZoom2018Page(ToughPinchZoomPage):
   BASE_NAME = 'gmail_pinch'
   YEAR = '2018'
   URL = 'https://mail.google.com/mail/'
-  EXTRA_BROWSER_ARGUMENTS = ['--allow-browser-signin=false']
 
   def RunNavigateSteps(self, action_runner):
     if self.wpr_mode != wpr_modes.WPR_REPLAY:
-      if self.wpr_mode in [wpr_modes.WPR_OFF, wpr_modes.WPR_RECORD]:
-        google_login.LoginWithLoginUrl(action_runner, self.URL)
-      else:
-        google_login.NewLoginGoogleAccount(action_runner, 'googletest')
+      google_login.NewLoginGoogleAccount(action_runner, 'googletest')
     super(GmailPinchZoom2018Page, self).RunNavigateSteps(action_runner)
     action_runner.WaitForJavaScriptCondition(
         'window.gmonkey !== undefined &&'
@@ -91,14 +87,10 @@ class GoogleCalendarPinchZoom2018Page(ToughPinchZoomPage):
   BASE_NAME = 'google_calendar_pinch'
   YEAR = '2018'
   URL = 'https://www.google.com/calendar/'
-  EXTRA_BROWSER_ARGUMENTS = ['--allow-browser-signin=false']
 
   def RunNavigateSteps(self, action_runner):
     if self.wpr_mode != wpr_modes.WPR_REPLAY:
-      if self.wpr_mode in [wpr_modes.WPR_OFF, wpr_modes.WPR_RECORD]:
-        google_login.LoginWithLoginUrl(action_runner, self.URL)
-      else:
-        google_login.NewLoginGoogleAccount(action_runner, 'googletest')
+      google_login.NewLoginGoogleAccount(action_runner, 'googletest')
     super(GoogleCalendarPinchZoom2018Page, self).RunNavigateSteps(
       action_runner)
     action_runner.WaitForElement('span[class~="sm8sCf"]')

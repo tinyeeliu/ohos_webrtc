@@ -56,7 +56,6 @@ class IDLLexer(object):
       'any': 'ANY',
       'async': 'ASYNC',
       'attribute': 'ATTRIBUTE',
-      'bigint': 'BIGINT',
       'boolean': 'BOOLEAN',
       'byte': 'BYTE',
       'ByteString': 'BYTESTRING',

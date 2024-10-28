@@ -12,121 +12,57 @@ import logging
 import os
 import sys
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),
-                                             'test')))
-
+from contextlib import ExitStack
 import common
-import update_sdk
-from compatible_utils import running_unattended
+import ffx_session
+import log_manager
 
-
-# TODO(crbug/1361089): Remove when the old scripts have been deprecated.
-_IMAGE_TO_PRODUCT_BUNDLE = {
-    'core.x64-dfv2-release':
+_PRODUCT_BUNDLES = [
     'core.x64-dfv2',
-    'qemu.arm64':
     'terminal.qemu-arm64',
-    'qemu.x64':
-    'terminal.x64',
+    'terminal.qemu-x64',
+    'workstation_eng.chromebook-x64',
+    'workstation_eng.chromebook-x64-dfv2',
+    'workstation_eng.qemu-x64',
+]
+
+_IMAGE_TO_PRODUCT_BUNDLE = {
+    'core.x64-dfv2-release': 'core.x64-dfv2',
+    'qemu.arm64': 'terminal.qemu-arm64',
+    'qemu.x64': 'terminal.qemu-x64',
     'workstation_eng.chromebook-x64-dfv2-release':
     'workstation_eng.chromebook-x64-dfv2',
-    'workstation_eng.chromebook-x64-release':
-    'workstation_eng.chromebook-x64',
-    'workstation_eng.qemu-x64-release':
-    'workstation_eng.qemu-x64',
-    'smart_display_eng_arrested.astro-release':
-    'smart_display_eng_arrested.astro',
-    'smart_display_max_eng_arrested.sherlock-release':
-    'smart_display_max_eng_arrested.sherlock',
-    'smart_display_m3_latest_eng_paused.nelson-release':
-    'smart_display_m3_latest_eng_paused.nelson',
+    'workstation_eng.chromebook-x64-release': 'workstation_eng.chromebook-x64',
+    'workstation_eng.qemu-x64-release': 'workstation_eng.qemu-x64',
 }
 
 
 # TODO(crbug/1361089): Remove when the old scripts have been deprecated.
-def convert_to_products(images_list):
+def convert_to_product_bundle(images_list):
   """Convert image names in the SDK to product bundle names."""
 
   product_bundle_list = []
   for image in images_list:
-    if image in _IMAGE_TO_PRODUCT_BUNDLE:
-      logging.warning(f'Image name {image} has been deprecated. Use '
-                      f'{_IMAGE_TO_PRODUCT_BUNDLE.get(image)} instead.')
     product_bundle_list.append(_IMAGE_TO_PRODUCT_BUNDLE.get(image, image))
   return product_bundle_list
 
 
-def remove_repositories(repo_names_to_remove):
-  """Removes given repos from repo list.
-  Repo MUST be present in list to succeed.
+def get_hash_from_sdk():
+  """Retrieve version info from the SDK."""
 
-  Args:
-    repo_names_to_remove: List of repo names (as strings) to remove.
-  """
-  for repo_name in repo_names_to_remove:
-    common.run_ffx_command(cmd=('repository', 'remove', repo_name), check=True)
-
-
-def get_repositories():
-  """Lists repositories that are available on disk.
-
-  Also prunes repositories that are listed, but do not have an actual packages
-  directory.
-
-  Returns:
-    List of dictionaries containing info about the repositories. They have the
-    following structure:
-    {
-      'name': <repo name>,
-      'spec': {
-        'type': <type, usually pm>,
-        'path': <path to packages directory>
-      },
-    }
-  """
-
-  repos = json.loads(
-      common.run_ffx_command(cmd=('--machine', 'json', 'repository', 'list'),
-                             check=True,
-                             capture_output=True).stdout.strip())
-  to_prune = set()
-  sdk_root_abspath = os.path.abspath(os.path.dirname(common.SDK_ROOT))
-  for repo in repos:
-    # Confirm the path actually exists. If not, prune list.
-    # Also assert the product-bundle repository is for the current repo
-    # (IE within the same directory).
-    if not os.path.exists(repo['spec']['path']):
-      to_prune.add(repo['name'])
-
-    if not repo['spec']['path'].startswith(sdk_root_abspath):
-      to_prune.add(repo['name'])
-
-  repos = [repo for repo in repos if repo['name'] not in to_prune]
-
-  remove_repositories(to_prune)
-  return repos
+  version_file = os.path.join(common.SDK_ROOT, 'meta', 'manifest.json')
+  if not os.path.exists(version_file):
+    raise RuntimeError('Could not detect version file. Make sure the SDK has '
+                       'been downloaded')
+  with open(version_file, 'r') as f:
+    return json.load(f)['id']
 
 
-def get_current_signature(image_dir):
-  """Determines the current version of the image, if it exists.
+def download_product_bundle(product_bundle, ffx_runner):
+  """Download product bundles using the SDK."""
 
-  Returns:
-    The current version, or None if the image is non-existent.
-  """
-
-  version_file = os.path.join(image_dir, 'product_bundle.json')
-  if os.path.exists(version_file):
-    with open(version_file) as f:
-      return json.load(f)['product_version']
-  return None
-
-
-# VisibleForTesting
-def internal_hash():
-  hash_filename = os.path.join(os.path.dirname(__file__),
-                               'linux_internal.sdk.sha1')
-  return (open(hash_filename, 'r').read().strip()
-          if os.path.exists(hash_filename) else '')
+  logging.info('Downloading Fuchsia product bundle %s', product_bundle)
+  ffx_runner.run_ffx(('product-bundle', 'get', product_bundle))
 
 
 def main():
@@ -136,75 +72,100 @@ def main():
                       action='store_true',
                       help='Enable debug-level logging.')
   parser.add_argument(
-      'products',
+      'product_bundles',
       type=str,
       help='List of product bundles to download, represented as a comma '
       'separated list.')
-  parser.add_argument(
-      '--internal',
-      action='store_true',
-      help='Whether the images are coming from internal, it impacts version '
-      'file, bucket and download location.')
   args = parser.parse_args()
 
   logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO)
 
   # Check whether there's Fuchsia support for this platform.
-  common.get_host_os()
+  common.GetHostOsFromPlatform()
 
-  new_products = convert_to_products(args.products.split(','))
-  logging.info('Searching for the following products: %s', str(new_products))
+  new_product_bundles = convert_to_product_bundle(
+      args.product_bundles.split(','))
+  for pb in new_product_bundles:
+    if pb not in _PRODUCT_BUNDLES:
+      raise ValueError(f'{pb} is not part of the Fuchsia product bundle.')
 
-  logging.debug('Getting new SDK hash')
-  if args.internal:
-    new_hash = internal_hash()
-  else:
-    new_hash = common.get_hash_from_sdk()
+  if '*' in args.product_bundles:
+    raise ValueError('Wildcards are no longer supported, all product bundles '
+                     'need to be explicitly listed. The full list can be '
+                     'found in the DEPS file.')
 
-  auth_args = [
-      '--auth',
-      os.path.join(os.path.dirname(__file__), 'get_auth_token.py')
-  ] if args.internal and running_unattended() else []
-  if args.internal and not running_unattended():
-    print('*** product bundle v2 requires authentication with your account and '
-          'it should already open a browser window to do it if you have not '
-          'granted the permission yet.')
-  for product in new_products:
-    prod, board = product.split('.', 1)
-    if prod.startswith('smart_display'):
-      # This is a hacky way of keeping the files into the folders matching
-      # the original image name, since the definition is unfortunately in
-      # src-internal. Likely we can download two copies for a smooth
-      # transition, but it would be easier to keep it as-is during the ffx
-      # product v2 migration.
-      # TODO(crbug.com/1496426): Migrate the image download folder away from the
-      # following hack.
-      prod, board = board + '-release', prod
-    image_dir = os.path.join(
-        common.INTERNAL_IMAGES_ROOT if args.internal else common.IMAGES_ROOT,
-        prod, board)
-    curr_signature = get_current_signature(image_dir)
+  with ExitStack() as stack:
+    ffx_runner = ffx_session.FfxRunner(log_manager.LogManager(None))
+    stack.enter_context(
+        ffx_runner.scoped_config('pbms.storage.path', common.IMAGES_ROOT))
 
-    if curr_signature != new_hash:
-      common.make_clean_directory(image_dir)
-      logging.debug('Checking for override file')
-      override_file = os.path.join(os.path.dirname(__file__),
-                                   'sdk_override.txt')
-      if os.path.isfile(override_file):
-        base_url = update_sdk.GetSDKOverrideGCSPath().replace('/sdk', '')
-      else:
-        bucket = 'fuchsia-sdk' if args.internal else 'fuchsia'
-        base_url = f'gs://{bucket}/development/{new_hash}'
-      download_url = common.run_ffx_command(
-          cmd=['product', 'lookup', product, new_hash, '--base-url', base_url] +
-          auth_args,
-          check=True,
-          capture_output=True).stdout.strip()
-      logging.info(f'Downloading {product} from {base_url}.')
-      common.run_ffx_command(
-          cmd=['product', 'download', download_url, image_dir] + auth_args,
-          check=True)
+    # TODO(crbug/1380807): Remove when product bundles can be downloaded
+    # for custom SDKs without editing metadata
+    override_file = os.path.join(os.path.dirname(__file__), 'sdk_override.txt')
+    if os.path.isfile(override_file):
+      with open(override_file) as f:
+        pb_metadata = f.read().split('\n')
+        pb_metadata.append('{sdk.root}/*.json')
+      stack.enter_context(
+          ffx_runner.scoped_config('pbms.metadata', json.dumps((pb_metadata))))
 
+    signature_filename = common.PRODUCT_BUNDLE_SIGNATURE_FILE
+    curr_signature = {}
+    if os.path.exists(signature_filename):
+      with open(signature_filename, 'r') as f:
+        curr_signature = json.load(f)
+
+    new_sdk_hash = get_hash_from_sdk()
+    new_signature = {'sdk_hash': new_sdk_hash}
+
+    # If SDK versions match, remove the product bundles that are no longer
+    # needed and download missing ones.
+    if curr_signature.get('sdk_hash') == new_sdk_hash:
+      curr_signature.get('sdk_hash')
+      new_signature['path'] = curr_signature.get('path')
+      new_product_bundle_hash = []
+
+      for image in curr_signature.get('images', []):
+        if image in new_product_bundles:
+          new_product_bundle_hash.append(image)
+        else:
+          logging.info('Removing no longer needed Fuchsia image %s' % image)
+          ffx_runner.run_ffx(('product-bundle', 'remove', '-f', image))
+
+      bundles_to_download = set(new_product_bundles) - \
+                            set(curr_signature.get('images', []))
+      for bundle in bundles_to_download:
+        download_product_bundle(bundle, ffx_runner)
+      new_product_bundle_hash.extend(bundles_to_download)
+      new_signature['images'] = new_product_bundle_hash
+
+      with open(signature_filename, 'w') as f:
+        f.write(json.dumps(new_signature))
+      return 0
+
+    # If SDK versions do not match, remove all existing product bundles
+    # and download the ones required.
+    for pb in curr_signature.get('images', []):
+      ffx_runner.run_ffx(('product-bundle', 'remove', '-f', pb))
+
+    curr_subdir = []
+    if os.path.exists(common.IMAGES_ROOT):
+      curr_subdir = os.listdir(common.IMAGES_ROOT)
+    common.MakeCleanDirectory(common.IMAGES_ROOT)
+
+    for pb in new_product_bundles:
+      download_product_bundle(pb, ffx_runner)
+    new_signature['images'] = new_product_bundles
+
+    new_subdir = os.listdir(common.IMAGES_ROOT)
+    subdir_diff = set(new_subdir) - set(curr_subdir)
+    if len(subdir_diff) != 1:
+      raise RuntimeError(f'Expected one new created subdirectory but got '
+                         '{subdir_diff} instead.')
+    new_signature['path'] = list(subdir_diff)[0]
+
+    with open(signature_filename, 'w') as f:
+      f.write(json.dumps(new_signature))
   return 0
 
 

@@ -231,21 +231,9 @@ class RTC_EXPORT NetworkManagerBase : public NetworkManager {
   // refactoring of the interface GetNetworks method.
   const std::vector<Network*>& GetNetworksInternal() const { return networks_; }
 
-  std::unique_ptr<Network> CreateNetwork(absl::string_view name,
-                                         absl::string_view description,
-                                         const IPAddress& prefix,
-                                         int prefix_length,
-                                         AdapterType type) const;
-
-  const webrtc::FieldTrialsView* field_trials() const {
-    return field_trials_.get();
-  }
-
  private:
   friend class NetworkTest;
-  webrtc::AlwaysValidPointer<const webrtc::FieldTrialsView,
-                             webrtc::FieldTrialBasedConfig>
-      field_trials_;
+  const webrtc::FieldTrialsView* field_trials_ = nullptr;
   EnumerationPermission enumeration_permission_;
 
   std::vector<Network*> networks_;
@@ -360,7 +348,7 @@ class RTC_EXPORT BasicNetworkManager : public NetworkManagerBase,
   Thread* thread_ = nullptr;
   bool sent_first_update_ = true;
   int start_count_ = 0;
-
+  // Chromium create BasicNetworkManager() w/o field trials.
   webrtc::AlwaysValidPointer<const webrtc::FieldTrialsView,
                              webrtc::FieldTrialBasedConfig>
       field_trials_;
@@ -382,18 +370,21 @@ class RTC_EXPORT Network {
   Network(absl::string_view name,
           absl::string_view description,
           const IPAddress& prefix,
-          int prefix_length)
+          int prefix_length,
+          const webrtc::FieldTrialsView* field_trials = nullptr)
       : Network(name,
                 description,
                 prefix,
                 prefix_length,
-                rtc::ADAPTER_TYPE_UNKNOWN) {}
+                rtc::ADAPTER_TYPE_UNKNOWN,
+                field_trials) {}
 
   Network(absl::string_view name,
           absl::string_view description,
           const IPAddress& prefix,
           int prefix_length,
-          AdapterType type);
+          AdapterType type,
+          const webrtc::FieldTrialsView* field_trials = nullptr);
 
   Network(const Network&);
   ~Network();
@@ -442,7 +433,8 @@ class RTC_EXPORT Network {
   // Here is the rule on how we mark the IPv6 address as ignorable for WebRTC.
   // 1) return all global temporary dynamic and non-deprecated ones.
   // 2) if #1 not available, return global ones.
-  // 3) if #2 not available, return local link ones.
+  // 3) if #2 not available and WebRTC-IPv6NetworkResolutionFixes enabled,
+  // return local link ones.
   // 4) if #3 not available, use ULA ipv6 as last resort. (ULA stands for
   // unique local address, which is not route-able in open internet but might
   // be useful for a close WebRTC deployment.
@@ -576,6 +568,7 @@ class RTC_EXPORT Network {
   std::string ToString() const;
 
  private:
+  const webrtc::FieldTrialsView* field_trials_ = nullptr;
   const DefaultLocalAddressProvider* default_local_address_provider_ = nullptr;
   const MdnsResponderProvider* mdns_responder_provider_ = nullptr;
   std::string name_;

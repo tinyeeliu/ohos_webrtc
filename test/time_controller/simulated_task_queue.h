@@ -40,13 +40,11 @@ class SimulatedTaskQueue : public TaskQueueBase,
 
   // TaskQueueBase interface
   void Delete() override;
-  void PostTaskImpl(absl::AnyInvocable<void() &&> task,
-                    const PostTaskTraits& traits,
-                    const Location& location) override;
-  void PostDelayedTaskImpl(absl::AnyInvocable<void() &&> task,
-                           TimeDelta delay,
-                           const PostDelayedTaskTraits& traits,
-                           const Location& location) override;
+  void PostTask(absl::AnyInvocable<void() &&> task) override;
+  void PostDelayedTask(absl::AnyInvocable<void() &&> task,
+                       TimeDelta delay) override;
+  void PostDelayedHighPrecisionTask(absl::AnyInvocable<void() &&> task,
+                                    TimeDelta delay) override;
 
  private:
   sim_time_impl::SimulatedTimeControllerImpl* const handler_;

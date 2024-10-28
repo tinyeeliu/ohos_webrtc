@@ -111,6 +111,7 @@ template("intent_definition") {
     }
 
     sources = _generate_source_output
+    configs += [ "//build/config/compiler:enable_arc" ]
     deps += [
       ":$_compile_intent_bundle",
       ":$_generate_source_target",

@@ -15,6 +15,7 @@
 
 #include "absl/algorithm/container.h"
 #include "api/call/transport.h"
+#include "api/transport/field_trial_based_config.h"
 #include "call/rtp_stream_receiver_controller.h"
 #include "call/rtx_receive_stream.h"
 #include "modules/rtp_rtcp/include/receive_statistics.h"
@@ -24,7 +25,6 @@
 #include "modules/rtp_rtcp/source/rtp_sender_video.h"
 #include "rtc_base/rate_limiter.h"
 #include "rtc_base/thread.h"
-#include "test/explicit_key_value_config.h"
 #include "test/gtest.h"
 
 namespace webrtc {
@@ -76,11 +76,12 @@ class RtxLoopBackTransport : public webrtc::Transport {
     packet_loss_ = 0;
   }
 
-  bool SendRtp(rtc::ArrayView<const uint8_t> data,
+  bool SendRtp(const uint8_t* data,
+               size_t len,
                const PacketOptions& options) override {
     count_++;
     RtpPacketReceived packet;
-    if (!packet.Parse(data))
+    if (!packet.Parse(data, len))
       return false;
     if (packet.Ssrc() == rtx_ssrc_) {
       count_rtx_ssrc_++;
@@ -101,8 +102,8 @@ class RtxLoopBackTransport : public webrtc::Transport {
     return true;
   }
 
-  bool SendRtcp(rtc::ArrayView<const uint8_t> data) override {
-    module_->IncomingRtcpPacket(data);
+  bool SendRtcp(const uint8_t* data, size_t len) override {
+    module_->IncomingRtcpPacket((const uint8_t*)data, len);
     return true;
   }
   int count_;
@@ -137,7 +138,7 @@ class RtpRtcpRtxNackTest : public ::testing::Test {
     configuration.local_media_ssrc = kTestSsrc;
     configuration.rtx_send_ssrc = kTestRtxSsrc;
     rtp_rtcp_module_ = ModuleRtpRtcpImpl2::Create(configuration);
-    test::ExplicitKeyValueConfig field_trials("");
+    FieldTrialBasedConfig field_trials;
     RTPSenderVideo::Config video_config;
     video_config.clock = &fake_clock;
     video_config.rtp_sender = rtp_rtcp_module_->RtpSender();
@@ -209,8 +210,7 @@ class RtpRtcpRtxNackTest : public ::testing::Test {
       video_header.frame_type = VideoFrameType::kVideoFrameDelta;
       EXPECT_TRUE(rtp_sender_video_->SendVideo(
           kPayloadType, VideoCodecType::kVideoCodecGeneric, timestamp,
-          /*capture_time=*/Timestamp::Millis(timestamp / 90), payload_data,
-          sizeof(payload_data), video_header, TimeDelta::Zero(), {}));
+          timestamp / 90, payload_data, video_header, 0));
       // Min required delay until retransmit = 5 + RTT ms (RTT = 0).
       fake_clock.AdvanceTimeMilliseconds(5);
       int length = BuildNackList(nack_list);
@@ -260,8 +260,7 @@ TEST_F(RtpRtcpRtxNackTest, LongNackList) {
     video_header.frame_type = VideoFrameType::kVideoFrameDelta;
     EXPECT_TRUE(rtp_sender_video_->SendVideo(
         kPayloadType, VideoCodecType::kVideoCodecGeneric, timestamp,
-        Timestamp::Millis(timestamp / 90), payload_data, sizeof(payload_data),
-        video_header, TimeDelta::Zero(), {}));
+        timestamp / 90, payload_data, video_header, 0));
     // Prepare next frame.
     timestamp += 3000;
     fake_clock.AdvanceTimeMilliseconds(33);

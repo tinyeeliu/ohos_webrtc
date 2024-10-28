@@ -11,7 +11,7 @@
 #include <memory>
 
 #include "api/rtp_packet_infos.h"
-#include "modules/rtp_rtcp/source/frame_object.h"
+#include "modules/video_coding/frame_object.h"
 #include "modules/video_coding/rtp_frame_reference_finder.h"
 
 namespace webrtc {
@@ -119,9 +119,6 @@ void FuzzOneInput(const uint8_t* data, size_t size) {
       case kVideoCodecH264:
         reader.CopyTo(
             &video_header.video_type_header.emplace<RTPVideoHeaderH264>());
-        break;
-      case kVideoCodecH265:
-        // TODO(bugs.webrtc.org/13485)
         break;
       default:
         break;

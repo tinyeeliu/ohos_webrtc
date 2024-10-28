@@ -5,6 +5,7 @@
 
 '''Unit tests for ChromeScaledImage.'''
 
+from __future__ import print_function
 
 import os
 import sys
@@ -62,9 +63,9 @@ def _GetFilesInRc(rcname, tmp_dir, contents):
   '''Get a set of the files that were actually included in the .rc output.
   '''
   data = util.ReadFile(rcname, util.BINARY).decode('utf-16')
-  contents = {tmp_dir.GetPath(k): v for k, v in contents.items()}
-  return {contents[os.path.normpath(m.group(1))]
-             for m in re.finditer(r'(?m)^\w+\s+BINDATA\s+"([^"]+)"$', data)}
+  contents = dict((tmp_dir.GetPath(k), v) for k, v in contents.items())
+  return set(contents[os.path.normpath(m.group(1))]
+             for m in re.finditer(r'(?m)^\w+\s+BINDATA\s+"([^"]+)"$', data))
 
 
 def _MakeFallbackAttr(fallback):
@@ -110,7 +111,7 @@ def _RunBuildTest(self, structures, inputs, expected_outputs, skip_rc=False,
   for pngpath, pngdata in inputs.items():
     normpath = os.path.normpath('in/' + pngpath)
     infiles[normpath] = pngdata
-  class Options:
+  class Options(object):
     pass
 
   with util.TempDir(infiles, mode='wb') as tmp_dir:
@@ -121,10 +122,10 @@ def _RunBuildTest(self, structures, inputs, expected_outputs, skip_rc=False,
       options.extra_verbose = False
       build.RcBuilder().Run(options, [])
     for context, expected_data in expected_outputs.items():
-      self.assertEqual(expected_data,
+      self.assertEquals(expected_data,
                         _GetFilesInPak(tmp_dir.GetPath('out/%s.pak' % context)))
       if not skip_rc:
-        self.assertEqual(expected_data,
+        self.assertEquals(expected_data,
                           _GetFilesInRc(tmp_dir.GetPath('out/%s.rc' % context),
                                         tmp_dir, infiles))
 
@@ -143,8 +144,8 @@ class ChromeScaledImageUnittest(unittest.TestCase):
          'tactile_123_percent/a.png': t123a,
          'default_123_percent/b.png': d123b,
         },
-        {'default_123_percent': {d123a, d123b},
-         'tactile_123_percent': {t123a, d123b},
+        {'default_123_percent': set([d123a, d123b]),
+         'tactile_123_percent': set([t123a, d123b]),
         })
 
   def testNormalFallbackFailure(self):
@@ -169,7 +170,7 @@ class ChromeScaledImageUnittest(unittest.TestCase):
                 _Structure('IDR_A', 'a.png', inner),
             ),
             {'default_100_percent/a.png': png},
-            {'tactile_200_percent': {png_with_csCl}})
+            {'tactile_200_percent': set([png_with_csCl])})
         if inner or (inner is None and outer):
           # should fall back to 100%
           _RunBuildTest(*args, skip_rc=True)
@@ -199,8 +200,8 @@ class ChromeScaledImageUnittest(unittest.TestCase):
          'tactile_123_percent/a.png': t123a,
          'default_123_percent/b.png': d123b,
         },
-        {'default_123_percent': {d123a, d123b},
-         'tactile_123_percent': {t123a},
+        {'default_123_percent': set([d123a, d123b]),
+         'tactile_123_percent': set([t123a]),
         },
         layout_fallback=' fallback_to_default_layout="false"')
 

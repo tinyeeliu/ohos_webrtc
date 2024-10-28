@@ -7,6 +7,7 @@
 GRIT tools.
 """
 
+from __future__ import print_function
 
 import os
 import sys
@@ -195,7 +196,7 @@ Tools:
 """ % (tool_list))
 
 
-class Options:
+class Options(object):
   """Option storage and parsing."""
 
   def __init__(self):

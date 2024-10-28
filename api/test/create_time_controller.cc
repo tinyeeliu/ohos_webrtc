@@ -36,7 +36,7 @@ std::unique_ptr<CallFactoryInterface> CreateTimeControllerBasedCallFactory(
    public:
     explicit TimeControllerBasedCallFactory(TimeController* time_controller)
         : time_controller_(time_controller) {}
-    std::unique_ptr<Call> CreateCall(const CallConfig& config) override {
+    Call* CreateCall(const Call::Config& config) override {
       RtpTransportConfig transportConfig = config.ExtractTransportConfig();
 
       return Call::Create(config, time_controller_->GetClock(),

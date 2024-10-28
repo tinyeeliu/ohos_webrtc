@@ -8,18 +8,17 @@
  */
 
 // Google APIs definitions.
-declare namespace google {
-  declare namespace accounts {
-    declare namespace oauth2 {
-      function revoke(string, Func): void;
-      function initTokenClient({}): TokenClient;
-    }
-  }
-}
+declare namespace gapi {
+  function load(string, Func): any;
+  function client(): any;
 
-interface TokenClient {
-  requestAccessToken: Func;
-  callback: Func;
+  declare namespace auth2 {
+    function getAuthInstance(): any;
+  }
+
+  declare namespace client {
+    function init(Object): any;
+  }
 }
 
 // Emscripten definitions.

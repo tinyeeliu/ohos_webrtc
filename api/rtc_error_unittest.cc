@@ -14,10 +14,9 @@
 
 #include "test/gtest.h"
 
-namespace webrtc {
 namespace {
 
-constexpr int kDefaultMoveOnlyIntValue = 0xbadf00d;
+const int kDefaultMoveOnlyIntValue = 0xbadf00d;
 
 // Class that has no copy constructor, ensuring that RTCErrorOr can
 struct MoveOnlyInt {
@@ -56,47 +55,46 @@ struct MoveOnlyInt2 {
   int value = kDefaultMoveOnlyIntValue;
 };
 
+}  // namespace
+
+namespace webrtc {
+
 // Test that the default constructor creates a "no error" error.
 TEST(RTCErrorTest, DefaultConstructor) {
   RTCError e;
-  EXPECT_EQ(e.type(), RTCErrorType::NONE);
-  EXPECT_STREQ(e.message(), "");
+  EXPECT_EQ(RTCErrorType::NONE, e.type());
+  EXPECT_EQ(std::string(), e.message());
   EXPECT_TRUE(e.ok());
 }
 
 TEST(RTCErrorTest, NormalConstructors) {
   RTCError a(RTCErrorType::INVALID_PARAMETER);
-  EXPECT_EQ(a.type(), RTCErrorType::INVALID_PARAMETER);
-  EXPECT_STREQ(a.message(), "");
+  EXPECT_EQ(RTCErrorType::INVALID_PARAMETER, a.type());
+  EXPECT_EQ(std::string(), a.message());
 
   // Constructor that takes const char* message.
   RTCError b(RTCErrorType::UNSUPPORTED_PARAMETER, "foobar");
-  EXPECT_EQ(b.type(), RTCErrorType::UNSUPPORTED_PARAMETER);
-  EXPECT_STREQ(b.message(), "foobar");
-
-  // Constructor that takes absl::string_view message.
-  RTCError c(RTCErrorType::SYNTAX_ERROR, absl::string_view("baz"));
-  EXPECT_EQ(c.type(), RTCErrorType::SYNTAX_ERROR);
-  EXPECT_STREQ(c.message(), "baz");
+  EXPECT_EQ(RTCErrorType::UNSUPPORTED_PARAMETER, b.type());
+  EXPECT_EQ(std::string("foobar"), b.message());
 
   // Constructor that takes std::string message.
-  RTCError d(RTCErrorType::INVALID_RANGE, std::string("new"));
-  EXPECT_EQ(d.type(), RTCErrorType::INVALID_RANGE);
-  EXPECT_STREQ(d.message(), "new");
+  RTCError c(RTCErrorType::INVALID_RANGE, std::string("new"));
+  EXPECT_EQ(RTCErrorType::INVALID_RANGE, c.type());
+  EXPECT_EQ(std::string("new"), c.message());
 }
 
 TEST(RTCErrorTest, MoveConstructor) {
   // Static string.
   RTCError a(RTCErrorType::INVALID_PARAMETER, "foo");
   RTCError b(std::move(a));
-  EXPECT_EQ(b.type(), RTCErrorType::INVALID_PARAMETER);
-  EXPECT_STREQ(b.message(), "foo");
+  EXPECT_EQ(RTCErrorType::INVALID_PARAMETER, b.type());
+  EXPECT_EQ(std::string("foo"), b.message());
 
   // Non-static string.
   RTCError c(RTCErrorType::UNSUPPORTED_PARAMETER, std::string("bar"));
   RTCError d(std::move(c));
-  EXPECT_EQ(d.type(), RTCErrorType::UNSUPPORTED_PARAMETER);
-  EXPECT_STREQ(d.message(), "bar");
+  EXPECT_EQ(RTCErrorType::UNSUPPORTED_PARAMETER, d.type());
+  EXPECT_EQ(std::string("bar"), d.message());
 }
 
 TEST(RTCErrorTest, MoveAssignment) {
@@ -104,21 +102,24 @@ TEST(RTCErrorTest, MoveAssignment) {
   RTCError e(RTCErrorType::INVALID_PARAMETER, "foo");
 
   e = RTCError(RTCErrorType::UNSUPPORTED_PARAMETER, "bar");
-  EXPECT_EQ(e.type(), RTCErrorType::UNSUPPORTED_PARAMETER);
-  EXPECT_STREQ(e.message(), "bar");
+  EXPECT_EQ(RTCErrorType::UNSUPPORTED_PARAMETER, e.type());
+  EXPECT_EQ(std::string("bar"), e.message());
 
-  e = RTCError(RTCErrorType::SYNTAX_ERROR, absl::string_view("baz"));
-  EXPECT_STREQ(e.message(), "baz");
+  e = RTCError(RTCErrorType::SYNTAX_ERROR, std::string("baz"));
+  EXPECT_EQ(std::string("baz"), e.message());
 
   e = RTCError(RTCErrorType::SYNTAX_ERROR, std::string("another"));
-  EXPECT_STREQ(e.message(), "another");
+  EXPECT_EQ(std::string("another"), e.message());
+
+  e = RTCError(RTCErrorType::SYNTAX_ERROR, "last");
+  EXPECT_EQ(std::string("last"), e.message());
 }
 
 // Test that the error returned by RTCError::OK() is a "no error" error.
 TEST(RTCErrorTest, OKConstant) {
   RTCError ok = RTCError::OK();
-  EXPECT_EQ(ok.type(), RTCErrorType::NONE);
-  EXPECT_STREQ(ok.message(), "");
+  EXPECT_EQ(RTCErrorType::NONE, ok.type());
+  EXPECT_EQ(std::string(), ok.message());
   EXPECT_TRUE(ok.ok());
 }
 
@@ -134,26 +135,33 @@ TEST(RTCErrorTest, OkMethod) {
 // std::strings.
 TEST(RTCErrorTest, SetMessage) {
   RTCError e;
+  // Try all combinations of "is static string"/"is non-static string" calls.
   e.set_message("foo");
-  EXPECT_STREQ(e.message(), "foo");
+  EXPECT_EQ(std::string("foo"), e.message());
 
-  e.set_message(absl::string_view("bar"));
-  EXPECT_STREQ(e.message(), "bar");
+  e.set_message("bar");
+  EXPECT_EQ(std::string("bar"), e.message());
 
   e.set_message(std::string("string"));
-  EXPECT_STREQ(e.message(), "string");
+  EXPECT_EQ(std::string("string"), e.message());
+
+  e.set_message(std::string("more"));
+  EXPECT_EQ(std::string("more"), e.message());
+
+  e.set_message("love to test");
+  EXPECT_EQ(std::string("love to test"), e.message());
 }
 
 // Test that the default constructor creates an "INTERNAL_ERROR".
 TEST(RTCErrorOrTest, DefaultConstructor) {
   RTCErrorOr<MoveOnlyInt> e;
-  EXPECT_EQ(e.error().type(), RTCErrorType::INTERNAL_ERROR);
+  EXPECT_EQ(RTCErrorType::INTERNAL_ERROR, e.error().type());
 }
 
 // Test that an RTCErrorOr can be implicitly constructed from a value.
 TEST(RTCErrorOrTest, ImplicitValueConstructor) {
   RTCErrorOr<MoveOnlyInt> e = [] { return MoveOnlyInt(100); }();
-  EXPECT_EQ(e.value().value, 100);
+  EXPECT_EQ(100, e.value().value);
 }
 
 // Test that an RTCErrorOr can be implicitly constructed from an RTCError.
@@ -161,20 +169,20 @@ TEST(RTCErrorOrTest, ImplicitErrorConstructor) {
   RTCErrorOr<MoveOnlyInt> e = [] {
     return RTCError(RTCErrorType::SYNTAX_ERROR);
   }();
-  EXPECT_EQ(e.error().type(), RTCErrorType::SYNTAX_ERROR);
+  EXPECT_EQ(RTCErrorType::SYNTAX_ERROR, e.error().type());
 }
 
 TEST(RTCErrorOrTest, MoveConstructor) {
   RTCErrorOr<MoveOnlyInt> a(MoveOnlyInt(5));
   RTCErrorOr<MoveOnlyInt> b(std::move(a));
-  EXPECT_EQ(b.value().value, 5);
+  EXPECT_EQ(5, b.value().value);
 }
 
 TEST(RTCErrorOrTest, MoveAssignment) {
   RTCErrorOr<MoveOnlyInt> a(MoveOnlyInt(5));
   RTCErrorOr<MoveOnlyInt> b(MoveOnlyInt(10));
   a = std::move(b);
-  EXPECT_EQ(a.value().value, 10);
+  EXPECT_EQ(10, a.value().value);
 }
 
 TEST(RTCErrorOrTest, ConversionConstructor) {
@@ -186,7 +194,7 @@ TEST(RTCErrorOrTest, ConversionAssignment) {
   RTCErrorOr<MoveOnlyInt> a(MoveOnlyInt(5));
   RTCErrorOr<MoveOnlyInt2> b(MoveOnlyInt2(10));
   b = std::move(a);
-  EXPECT_EQ(b.value().value, 5);
+  EXPECT_EQ(5, b.value().value);
 }
 
 TEST(RTCErrorOrTest, OkMethod) {
@@ -199,14 +207,14 @@ TEST(RTCErrorOrTest, OkMethod) {
 TEST(RTCErrorOrTest, MoveError) {
   RTCErrorOr<int> e({RTCErrorType::SYNTAX_ERROR, "message"});
   RTCError err = e.MoveError();
-  EXPECT_EQ(err.type(), RTCErrorType::SYNTAX_ERROR);
-  EXPECT_STREQ(err.message(), "message");
+  EXPECT_EQ(RTCErrorType::SYNTAX_ERROR, err.type());
+  EXPECT_EQ(std::string("message"), err.message());
 }
 
 TEST(RTCErrorOrTest, MoveValue) {
   RTCErrorOr<MoveOnlyInt> e(MoveOnlyInt(88));
   MoveOnlyInt value = e.MoveValue();
-  EXPECT_EQ(value.value, 88);
+  EXPECT_EQ(88, value.value);
 }
 
 // Death tests.
@@ -231,5 +239,4 @@ TEST(RTCErrorOrDeathTest, MoveErrorValue) {
 
 #endif  // RTC_DCHECK_IS_ON && GTEST_HAS_DEATH_TEST && !defined(WEBRTC_ANDROID)
 
-}  // namespace
 }  // namespace webrtc

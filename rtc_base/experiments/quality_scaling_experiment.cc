@@ -13,10 +13,8 @@
 
 #include <string>
 
-#include "absl/strings/match.h"
-#include "api/field_trials_view.h"
-#include "api/transport/field_trial_based_config.h"
 #include "rtc_base/logging.h"
+#include "system_wrappers/include/field_trial.h"
 
 namespace webrtc {
 namespace {
@@ -44,17 +42,17 @@ absl::optional<VideoEncoder::QpThresholds> GetThresholds(int low,
 }
 }  // namespace
 
-bool QualityScalingExperiment::Enabled(const FieldTrialsView& field_trials) {
+bool QualityScalingExperiment::Enabled() {
 #if defined(WEBRTC_IOS)
-  return absl::StartsWith(field_trials.Lookup(kFieldTrial), "Enabled");
+  return webrtc::field_trial::IsEnabled(kFieldTrial);
 #else
-  return !absl::StartsWith(field_trials.Lookup(kFieldTrial), "Disabled");
+  return !webrtc::field_trial::IsDisabled(kFieldTrial);
 #endif
 }
 
 absl::optional<QualityScalingExperiment::Settings>
-QualityScalingExperiment::ParseSettings(const FieldTrialsView& field_trials) {
-  std::string group = field_trials.Lookup(kFieldTrial);
+QualityScalingExperiment::ParseSettings() {
+  std::string group = webrtc::field_trial::FindFullName(kFieldTrial);
   // TODO(http://crbug.com/webrtc/12401): Completely remove the experiment code
   // after few releases.
 #if !defined(WEBRTC_IOS)
@@ -73,9 +71,8 @@ QualityScalingExperiment::ParseSettings(const FieldTrialsView& field_trials) {
 }
 
 absl::optional<VideoEncoder::QpThresholds>
-QualityScalingExperiment::GetQpThresholds(VideoCodecType codec_type,
-                                          const FieldTrialsView& field_trials) {
-  const auto settings = ParseSettings(field_trials);
+QualityScalingExperiment::GetQpThresholds(VideoCodecType codec_type) {
+  const auto settings = ParseSettings();
   if (!settings)
     return absl::nullopt;
 
@@ -84,8 +81,6 @@ QualityScalingExperiment::GetQpThresholds(VideoCodecType codec_type,
       return GetThresholds(settings->vp8_low, settings->vp8_high, kMaxVp8Qp);
     case kVideoCodecVP9:
       return GetThresholds(settings->vp9_low, settings->vp9_high, kMaxVp9Qp);
-    case kVideoCodecH265:
-    //  TODO(bugs.webrtc.org/13485): Use H264 QP thresholds for now.
     case kVideoCodecH264:
       return GetThresholds(settings->h264_low, settings->h264_high, kMaxH264Qp);
     case kVideoCodecGeneric:
@@ -96,9 +91,8 @@ QualityScalingExperiment::GetQpThresholds(VideoCodecType codec_type,
   }
 }
 
-QualityScalingExperiment::Config QualityScalingExperiment::GetConfig(
-    const FieldTrialsView& field_trials) {
-  const auto settings = ParseSettings(field_trials);
+QualityScalingExperiment::Config QualityScalingExperiment::GetConfig() {
+  const auto settings = ParseSettings();
   if (!settings)
     return Config();
 

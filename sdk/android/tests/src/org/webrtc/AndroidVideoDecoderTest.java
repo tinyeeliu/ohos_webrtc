@@ -39,7 +39,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.mockito.Spy;
 import org.robolectric.annotation.Config;
 import org.webrtc.EncodedImage.FrameType;
 import org.webrtc.FakeMediaCodecWrapper.State;
@@ -194,7 +193,7 @@ public class AndroidVideoDecoderTest {
   @Mock private EglBase.Context mockEglBaseContext;
   @Mock private SurfaceTextureHelper mockSurfaceTextureHelper;
   @Mock private VideoDecoder.Callback mockDecoderCallback;
-  @Spy private FakeMediaCodecWrapper fakeMediaCodecWrapper;
+  private FakeMediaCodecWrapper fakeMediaCodecWrapper;
   private FakeDecoderCallback fakeDecoderCallback;
 
   @Before
@@ -202,6 +201,10 @@ public class AndroidVideoDecoderTest {
     MockitoAnnotations.initMocks(this);
     when(mockSurfaceTextureHelper.getSurfaceTexture())
         .thenReturn(new SurfaceTexture(/*texName=*/0));
+    MediaFormat inputFormat = new MediaFormat();
+    MediaFormat outputFormat = new MediaFormat();
+    // TODO(sakal): Add more details to output format as needed.
+    fakeMediaCodecWrapper = spy(new FakeMediaCodecWrapper(inputFormat, outputFormat));
     fakeDecoderCallback = new FakeDecoderCallback();
   }
 

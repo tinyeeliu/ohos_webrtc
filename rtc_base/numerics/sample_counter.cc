@@ -31,9 +31,6 @@ void SampleCounter::Add(int sample) {
   if (!max_ || sample > *max_) {
     max_ = sample;
   }
-  if (!min_ || sample < *min_) {
-    min_ = sample;
-  }
 }
 
 void SampleCounter::Add(const SampleCounter& other) {
@@ -48,8 +45,6 @@ void SampleCounter::Add(const SampleCounter& other) {
   num_samples_ += other.num_samples_;
   if (other.max_ && (!max_ || *max_ < *other.max_))
     max_ = other.max_;
-  if (other.min_ && (!min_ || *min_ > *other.min_))
-    min_ = other.min_;
 }
 
 absl::optional<int> SampleCounter::Avg(int64_t min_required_samples) const {
@@ -61,10 +56,6 @@ absl::optional<int> SampleCounter::Avg(int64_t min_required_samples) const {
 
 absl::optional<int> SampleCounter::Max() const {
   return max_;
-}
-
-absl::optional<int> SampleCounter::Min() const {
-  return min_;
 }
 
 absl::optional<int64_t> SampleCounter::Sum(int64_t min_required_samples) const {

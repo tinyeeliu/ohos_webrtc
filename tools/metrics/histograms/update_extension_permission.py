@@ -22,8 +22,7 @@ if __name__ == '__main__':
     sys.exit(1)
 
   source_file = 'extensions/common/mojom/api_permission_id.mojom'
-  UpdateHistogramEnum('tools/metrics/histograms/enums.xml',
-                      histogram_enum_name='ExtensionPermission3',
+  UpdateHistogramEnum(histogram_enum_name='ExtensionPermission3',
                       source_enum_path=source_file,
                       start_marker='^enum APIPermissionID {',
                       end_marker='^};',

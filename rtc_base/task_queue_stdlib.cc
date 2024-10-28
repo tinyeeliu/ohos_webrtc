@@ -52,15 +52,11 @@ class TaskQueueStdlib final : public TaskQueueBase {
   ~TaskQueueStdlib() override = default;
 
   void Delete() override;
-
- protected:
-  void PostTaskImpl(absl::AnyInvocable<void() &&> task,
-                    const PostTaskTraits& traits,
-                    const Location& location) override;
-  void PostDelayedTaskImpl(absl::AnyInvocable<void() &&> task,
-                           TimeDelta delay,
-                           const PostDelayedTaskTraits& traits,
-                           const Location& location) override;
+  void PostTask(absl::AnyInvocable<void() &&> task) override;
+  void PostDelayedTask(absl::AnyInvocable<void() &&> task,
+                       TimeDelta delay) override;
+  void PostDelayedHighPrecisionTask(absl::AnyInvocable<void() &&> task,
+                                    TimeDelta delay) override;
 
  private:
   using OrderId = uint64_t;
@@ -160,9 +156,7 @@ void TaskQueueStdlib::Delete() {
   delete this;
 }
 
-void TaskQueueStdlib::PostTaskImpl(absl::AnyInvocable<void() &&> task,
-                                   const PostTaskTraits& traits,
-                                   const Location& location) {
+void TaskQueueStdlib::PostTask(absl::AnyInvocable<void() &&> task) {
   {
     MutexLock lock(&pending_lock_);
     pending_queue_.push(
@@ -172,10 +166,8 @@ void TaskQueueStdlib::PostTaskImpl(absl::AnyInvocable<void() &&> task,
   NotifyWake();
 }
 
-void TaskQueueStdlib::PostDelayedTaskImpl(absl::AnyInvocable<void() &&> task,
-                                          TimeDelta delay,
-                                          const PostDelayedTaskTraits& traits,
-                                          const Location& location) {
+void TaskQueueStdlib::PostDelayedTask(absl::AnyInvocable<void() &&> task,
+                                      TimeDelta delay) {
   DelayedEntryTimeout delayed_entry;
   delayed_entry.next_fire_at_us = rtc::TimeMicros() + delay.us();
 
@@ -186,6 +178,12 @@ void TaskQueueStdlib::PostDelayedTaskImpl(absl::AnyInvocable<void() &&> task,
   }
 
   NotifyWake();
+}
+
+void TaskQueueStdlib::PostDelayedHighPrecisionTask(
+    absl::AnyInvocable<void() &&> task,
+    TimeDelta delay) {
+  PostDelayedTask(std::move(task), delay);
 }
 
 TaskQueueStdlib::NextTask TaskQueueStdlib::GetNextTask() {
@@ -251,19 +249,6 @@ void TaskQueueStdlib::ProcessTasks() {
 
     flag_notify_.Wait(task.sleep_time);
   }
-
-  // Ensure remaining deleted tasks are destroyed with Current() set up to this
-  // task queue.
-  std::queue<std::pair<OrderId, absl::AnyInvocable<void() &&>>> pending_queue;
-  {
-    MutexLock lock(&pending_lock_);
-    pending_queue_.swap(pending_queue);
-  }
-  pending_queue = {};
-#if RTC_DCHECK_IS_ON
-  MutexLock lock(&pending_lock_);
-  RTC_DCHECK(pending_queue_.empty());
-#endif
 }
 
 void TaskQueueStdlib::NotifyWake() {

@@ -5,20 +5,23 @@
 
 '''Unit tests for grit.py'''
 
-import io
+from __future__ import print_function
+
 import os
 import sys
-import unittest
-
 if __name__ == '__main__':
   sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
+import unittest
+
+from six import StringIO
 
 from grit import util
 import grit.grit_runner
 
 class OptionArgsUnittest(unittest.TestCase):
   def setUp(self):
-    self.buf = io.StringIO()
+    self.buf = StringIO()
     self.old_stdout = sys.stdout
     sys.stdout = self.buf
 
@@ -30,9 +33,9 @@ class OptionArgsUnittest(unittest.TestCase):
                            util.PathFromRoot('grit/testdata/simple-input.xml'),
                            'test', 'bla', 'voff', 'ga'])
     output = self.buf.getvalue()
-    self.assertTrue(output.count("'test'") == 0)  # tool name doesn't occur
-    self.assertTrue(output.count('bla'))
-    self.assertTrue(output.count('simple-input.xml'))
+    self.failUnless(output.count("'test'") == 0)  # tool name doesn't occur
+    self.failUnless(output.count('bla'))
+    self.failUnless(output.count('simple-input.xml'))
 
 
 if __name__ == '__main__':

@@ -5,11 +5,15 @@
 '''Support for "policy_templates.json" format used by the policy template
 generator as a source for generating ADM,ADMX,etc files.'''
 
+from __future__ import print_function
+
 import importlib.abc
 import importlib.util
 import json
 import os.path
 import sys
+
+import six
 
 from grit.gather import skeleton_gatherer
 from grit import util
@@ -95,8 +99,8 @@ class PolicyJson(skeleton_gatherer.SkeletonGatherer):
     try:
       node = minidom.parseString(xml).childNodes[0]
     except ExpatError:
-      raise Exception('''Input isn't valid XML (has < & > been escaped?): ''' +
-                      string)
+      reason = '''Input isn't valid XML (has < & > been escaped?): ''' + string
+      six.reraise(Exception, reason, sys.exc_info()[2])
 
     for child in node.childNodes:
       if child.nodeType == minidom.Node.TEXT_NODE:
@@ -301,7 +305,7 @@ class PolicyJson(skeleton_gatherer.SkeletonGatherer):
     self.have_parsed_ = True
 
     self.text_ = self._LoadInputFile()
-    if isinstance(self.rc_file, str):
+    if isinstance(self.rc_file, six.string_types):
       name = 'policy_templates'
       spec = importlib.util.spec_from_loader(
           name,
@@ -336,17 +340,17 @@ class PolicyJson(skeleton_gatherer.SkeletonGatherer):
 
     if '_chromium' in defines:
       self._config = {
-          'build': 'chromium',
-          'app_name': 'Chromium',
-          'frame_name': 'Chromium Frame',
-          'os_name': 'ChromiumOS',
+        'build': 'chromium',
+        'app_name': 'Chromium',
+        'frame_name': 'Chromium Frame',
+        'os_name': 'Chromium OS',
       }
     elif '_google_chrome' in defines:
       self._config = {
-          'build': 'chrome',
-          'app_name': 'Google Chrome',
-          'frame_name': 'Google Chrome Frame',
-          'os_name': 'Google ChromeOS',
+        'build': 'chrome',
+        'app_name': 'Google Chrome',
+        'frame_name': 'Google Chrome Frame',
+        'os_name': 'Google Chrome OS',
       }
     else:
       raise Exception('Unknown build')

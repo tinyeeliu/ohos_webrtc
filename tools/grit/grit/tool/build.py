@@ -5,6 +5,7 @@
 '''The 'grit build' tool.
 '''
 
+from __future__ import print_function
 
 import collections
 import codecs
@@ -14,6 +15,8 @@ import gzip
 import os
 import shutil
 import sys
+
+import six
 
 from grit import grd_reader
 from grit import shortcuts
@@ -337,7 +340,7 @@ are exported to translation interchange files (e.g. XMB files), etc.
     # inefficient to call write once per character/byte.  Handle all of this
     # ourselves by calling write directly on strings/bytes before falling back
     # to writelines.
-    if isinstance(formatted, ((str,), bytes)):
+    if isinstance(formatted, (six.string_types, six.binary_type)):
       outfile.write(formatted)
     else:
       outfile.writelines(formatted)

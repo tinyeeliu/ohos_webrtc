@@ -35,7 +35,8 @@ static jboolean JNI_RtpSender_SetTrack(JNIEnv* jni,
       ->SetTrack(reinterpret_cast<MediaStreamTrackInterface*>(j_track_pointer));
 }
 
-jlong JNI_RtpSender_GetTrack(JNIEnv* jni, jlong j_rtp_sender_pointer) {
+jlong JNI_RtpSender_GetTrack(JNIEnv* jni,
+                             jlong j_rtp_sender_pointer) {
   // MediaStreamTrack will have shared ownership by the MediaStreamTrack Java
   // object.
   return jlongFromPointer(
@@ -64,7 +65,8 @@ ScopedJavaLocalRef<jobject> JNI_RtpSender_GetStreams(
       convert_function);
 }
 
-jlong JNI_RtpSender_GetDtmfSender(JNIEnv* jni, jlong j_rtp_sender_pointer) {
+jlong JNI_RtpSender_GetDtmfSender(JNIEnv* jni,
+                                  jlong j_rtp_sender_pointer) {
   return jlongFromPointer(
       reinterpret_cast<RtpSenderInterface*>(j_rtp_sender_pointer)
           ->GetDtmfSender()
@@ -106,16 +108,6 @@ static void JNI_RtpSender_SetFrameEncryptor(JNIEnv* jni,
       ->SetFrameEncryptor(rtc::scoped_refptr<FrameEncryptorInterface>(
           reinterpret_cast<FrameEncryptorInterface*>(
               j_frame_encryptor_pointer)));
-}
-
-static ScopedJavaLocalRef<jstring> JNI_RtpSender_GetMediaType(
-    JNIEnv* jni,
-    jlong j_rtp_sender_pointer) {
-  cricket::MediaType media_type =
-      reinterpret_cast<RtpSenderInterface*>(j_rtp_sender_pointer)->media_type();
-  return media_type == cricket::MEDIA_TYPE_AUDIO
-             ? NativeToJavaString(jni, "audio")
-             : NativeToJavaString(jni, "video");
 }
 
 }  // namespace jni

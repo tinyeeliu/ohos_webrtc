@@ -12,7 +12,6 @@
 #define SDK_ANDROID_SRC_JNI_PC_SSL_CERTIFICATE_VERIFIER_WRAPPER_H_
 
 #include <jni.h>
-
 #include <vector>
 
 #include "rtc_base/ssl_certificate.h"

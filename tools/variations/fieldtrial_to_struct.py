@@ -66,11 +66,11 @@ def _Load(filename):
   return result
 
 
-def _LoadFieldTrialConfig(filename, platforms):
+def _LoadFieldTrialConfig(filename, platforms, invert):
   """Loads a field trial config JSON and converts it into a format that can be
   used by json_to_struct.
   """
-  return _FieldTrialConfigToDescription(_Load(filename), platforms)
+  return _FieldTrialConfigToDescription(_Load(filename), platforms, invert)
 
 
 def _ConvertOverrideUIStrings(override_ui_strings):
@@ -83,9 +83,11 @@ def _ConvertOverrideUIStrings(override_ui_strings):
     })
   return overrides
 
-
-def _CreateExperiment(experiment_data, platforms, form_factors,
-                      is_low_end_device):
+def _CreateExperiment(experiment_data,
+                      platforms,
+                      form_factors,
+                      is_low_end_device,
+                      invert=False):
   """Creates an experiment dictionary with all necessary information.
 
   Args:
@@ -96,6 +98,8 @@ def _CreateExperiment(experiment_data, platforms, form_factors,
       a subset of |_form_factors|.
     is_low_end_device: An optional parameter. This can either be True or
       False. None if not specified.
+    invert: An optional parameter. If set, inverts the enabled and disabled
+      set of experiments. Controlled by a GN flag.
 
   Returns:
     An experiment dict.
@@ -118,11 +122,13 @@ def _CreateExperiment(experiment_data, platforms, form_factors,
     experiment['params'] = [{'key': param, 'value': params_data[param]}
                           for param in sorted(params_data.keys())];
   enable_features_data = experiment_data.get('enable_features')
-  if enable_features_data:
-    experiment['enable_features'] = enable_features_data
   disable_features_data = experiment_data.get('disable_features')
-  if disable_features_data:
-    experiment['disable_features'] = disable_features_data
+  if enable_features_data or (invert and disable_features_data):
+    experiment['enable_features'] = (disable_features_data
+                                     if invert else enable_features_data)
+  if disable_features_data or (invert and enable_features_data):
+    experiment['disable_features'] = (enable_features_data
+                                      if invert else disable_features_data)
   override_ui_strings = experiment_data.get('override_ui_strings')
   if override_ui_strings:
     experiment['override_ui_string'] = _ConvertOverrideUIStrings(
@@ -130,7 +136,7 @@ def _CreateExperiment(experiment_data, platforms, form_factors,
   return experiment
 
 
-def _CreateTrial(study_name, experiment_configs, platforms):
+def _CreateTrial(study_name, experiment_configs, platforms, invert):
   """Returns the applicable experiments for |study_name| and |platforms|.
 
   This iterates through all of the experiment_configs for |study_name|
@@ -143,10 +149,11 @@ def _CreateTrial(study_name, experiment_configs, platforms):
 
     if platform_intersection:
       experiments += [
-          _CreateExperiment(e, platform_intersection,
+          _CreateExperiment(e,
+                            platform_intersection,
                             config.get('form_factors', []),
-                            config.get('is_low_end_device'))
-          for e in config['experiments']
+                            config.get('is_low_end_device'),
+                            invert=invert) for e in config['experiments']
       ]
   return {
     'name': study_name,
@@ -154,9 +161,9 @@ def _CreateTrial(study_name, experiment_configs, platforms):
   }
 
 
-def _GenerateTrials(config, platforms):
+def _GenerateTrials(config, platforms, invert):
   for study_name in sorted(config.keys()):
-    study = _CreateTrial(study_name, config[study_name], platforms)
+    study = _CreateTrial(study_name, config[study_name], platforms, invert)
     # To avoid converting studies with empty experiments (e.g. the study doesn't
     # apply to the target platforms), this generator only yields studies that
     # have non-empty experiments.
@@ -164,16 +171,16 @@ def _GenerateTrials(config, platforms):
       yield study
 
 
-def ConfigToStudies(config, platforms):
+def ConfigToStudies(config, platforms, invert):
   """Returns the applicable studies from config for the platforms."""
-  return [study for study in _GenerateTrials(config, platforms)]
+  return [study for study in _GenerateTrials(config, platforms, invert)]
 
 
-def _FieldTrialConfigToDescription(config, platforms):
+def _FieldTrialConfigToDescription(config, platforms, invert):
   return {
       'elements': {
           'kFieldTrialConfig': {
-              'studies': ConfigToStudies(config, platforms)
+              'studies': ConfigToStudies(config, platforms, invert)
           }
       }
   }
@@ -194,12 +201,14 @@ def main(arguments):
       'mandatory.')
   parser.add_option('-o', '--output', help='output filename, '
       'mandatory.')
-  parser.add_option('-j',
-                    '--java',
-                    action='store_true',
-                    help='specify this flag to generate a java class.')
   parser.add_option('-y', '--year',
       help='year to put in the copy-right.')
+  parser.add_option(
+      '--invert_fieldtrials',
+      action='store_true',
+      help=
+      "Inverts the enabled and disabled experiments for existing field trials.")
+
   (opts, args) = parser.parse_args(args=arguments)
 
   if not opts.schema:
@@ -221,19 +230,12 @@ def main(arguments):
     basepath = ''
 
   schema = _Load(opts.schema)
-  description = _LoadFieldTrialConfig(description_filename, opts.platform)
+  description = _LoadFieldTrialConfig(description_filename, opts.platform,
+                                      opts.invert_fieldtrials)
   json_to_struct.GenerateStruct(
       basepath, output_root, opts.namespace, schema, description,
       os.path.split(description_filename)[1], os.path.split(opts.schema)[1],
       opts.year)
-
-  # TODO(peilinwang) filter the schema by platform, form_factor, etc.
-  if opts.java:
-    json_to_struct.GenerateClass(basepath, output_root, opts.namespace, schema,
-                                 description,
-                                 os.path.split(description_filename)[1],
-                                 os.path.split(opts.schema)[1], opts.year)
-
 
 if __name__ == '__main__':
   main(sys.argv[1:])

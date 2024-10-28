@@ -16,6 +16,7 @@ resilient across phone disconnects and reconnects and start the logcat
 early enough to not miss anything.
 """
 
+from __future__ import print_function
 
 import logging
 import os

@@ -5,6 +5,7 @@
 '''The 'grit transl2tc' tool.
 '''
 
+from __future__ import print_function
 
 from grit import grd_reader
 from grit import util

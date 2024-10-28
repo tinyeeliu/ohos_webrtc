@@ -13,8 +13,9 @@
 
 #include <memory>
 
-#include "api/task_queue/task_queue_factory.h"
 #include "audio_device_ios.h"
+
+#include "api/task_queue/task_queue_factory.h"
 #include "modules/audio_device/audio_device_buffer.h"
 #include "modules/audio_device/include/audio_device.h"
 #include "rtc_base/checks.h"

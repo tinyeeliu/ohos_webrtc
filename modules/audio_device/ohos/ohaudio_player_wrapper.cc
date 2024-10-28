@@ -205,8 +205,9 @@ bool OHAudioPlayerWrapper::Stop()
 double OHAudioPlayerWrapper::EstimateLatencyMillis() const
 {
     RTC_DCHECK(stream_);
-    double latency_millis = 0.0;
+    double latency_millis = 20.0;
     static const int latency_time = 20;
+#if 0
     if (direction() == AUDIOSTREAM_TYPE_CAPTURER) {
         latency_millis = latency_time;
     } else {
@@ -226,6 +227,7 @@ double OHAudioPlayerWrapper::EstimateLatencyMillis() const
                                                  rtc::kNumNanosecsPerMillisec;
         }
     }
+#endif
     return latency_millis;
 }
 
@@ -339,7 +341,7 @@ void OHAudioPlayerWrapper::SetStreamConfiguration(OH_AudioStreamBuilder* builder
     OH_AudioStreamBuilder_SetSamplingRate(builder, audio_parameters().sample_rate());
     OH_AudioStreamBuilder_SetChannelCount(builder, audio_parameters().channels());
     OH_AudioStreamBuilder_SetSampleFormat(builder, AUDIOSTREAM_SAMPLE_S16LE);
-    OH_AudioStreamBuilder_SetLatencyMode(builder, (OH_AudioStream_LatencyMode)AUDIOSTREAM_LATENCY_MODE_FAST);
+    OH_AudioStreamBuilder_SetLatencyMode(builder, (OH_AudioStream_LatencyMode)AUDIOSTREAM_LATENCY_MODE_NORMAL);
     OH_AudioRenderer_Callbacks callbacks;
     callbacks.OH_AudioRenderer_OnWriteData = DataCallback;
     callbacks.OH_AudioRenderer_OnError = ErrorCallback;

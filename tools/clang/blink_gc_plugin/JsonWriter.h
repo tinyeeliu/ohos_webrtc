@@ -42,15 +42,15 @@ class JsonWriter {
   }
   void Write(const std::string& val) {
     Separator();
-    *os_ << "\"" << Escape(val) << "\"";
+    *os_ << "\"" << val << "\"";
   }
   void Write(const std::string& key, const size_t val) {
     Separator();
-    *os_ << "\"" << Escape(key) << "\":" << val;
+    *os_ << "\"" << key << "\":" << val;
   }
   void Write(const std::string& key, const std::string& val) {
     Separator();
-    *os_ << "\"" << Escape(key) << "\":\"" << Escape(val) << "\"";
+    *os_ << "\"" << key << "\":\"" << val << "\"";
   }
  private:
   JsonWriter(std::unique_ptr<llvm::raw_ostream> os) : os_(std::move(os)) {}
@@ -62,15 +62,6 @@ class JsonWriter {
       return;
     }
     state_.top() = true;
-  }
-  std::string Escape(const std::string& s) {
-    std::string copy = s;
-    size_t i = 0;
-    while ((i = copy.find('\\', i)) != std::string::npos) {
-      copy.replace(i, 1, "\\\\");
-      i += 2;
-    }
-    return copy;
   }
   std::unique_ptr<llvm::raw_ostream> os_;
   std::stack<bool> state_;

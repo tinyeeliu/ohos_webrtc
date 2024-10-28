@@ -17,21 +17,33 @@ import zipfile
 
 from util import build_utils
 from util import md5_check
-import action_helpers  # build_utils adds //build to sys.path.
-import zip_helpers
+from util import zipalign
 
 
 _DEX_XMX = '2G'  # Increase this when __final_dex OOMs.
 
-DEFAULT_IGNORE_WARNINGS = (
-    # Warning: Running R8 version main (build engineering), which cannot be
-    # represented as a semantic version. Using an artificial version newer than
-    # any known version for selecting Proguard configurations embedded under
-    # META-INF/. This means that all rules with a '-upto-' qualifier will be
-    # excluded and all rules with a -from- qualifier will be included.
-    r'Running R8 version main', )
-
-INTERFACE_DESUGARING_WARNINGS = (r'default or static interface methods', )
+_IGNORE_WARNINGS = (
+    # E.g. Triggers for weblayer_instrumentation_test_apk since both it and its
+    # apk_under_test have no shared_libraries.
+    # https://crbug.com/1364192 << To fix this in a better way.
+    r'Missing class org.chromium.build.NativeLibraries',
+    # Caused by internal protobuf package: https://crbug.com/1183971
+    r'referenced from: com.google.protobuf.GeneratedMessageLite$GeneratedExtension',  # pylint: disable=line-too-long
+    # Desugaring configs may occasionally not match types in our program. This
+    # may happen temporarily until we move over to the new desugared library
+    # json flags. See crbug.com/1302088 - this should be removed when this bug
+    # is fixed.
+    r'Warning: Specification conversion: The following',
+    # Caused by protobuf runtime using -identifiernamestring in a way that
+    # doesn't work with R8. Looks like:
+    # Rule matches the static final field `...`, which may have been inlined...
+    # com.google.protobuf.*GeneratedExtensionRegistryLite {
+    #   static java.lang.String CONTAINING_TYPE_*;
+    # }
+    r'GeneratedExtensionRegistryLite.CONTAINING_TYPE_',
+    # Relevant for R8 when optimizing an app that doesn't use protobuf.
+    r'Ignoring -shrinkunusedprotofields since the protobuf-lite runtime is',
+)
 
 _SKIPPED_CLASS_FILE_NAMES = (
     'module-info.class',  # Explicitly skipped by r8/utils/FileUtils#isClassFile
@@ -42,7 +54,7 @@ def _ParseArgs(args):
   args = build_utils.ExpandFileArgs(args)
   parser = argparse.ArgumentParser()
 
-  action_helpers.add_depfile_arg(parser)
+  build_utils.AddDepfileOption(parser)
   parser.add_argument('--output', required=True, help='Dex output path.')
   parser.add_argument(
       '--class-inputs',
@@ -61,6 +73,13 @@ def _ParseArgs(args):
   parser.add_argument(
       '--incremental-dir',
       help='Path of directory to put intermediate dex files.')
+  parser.add_argument('--main-dex-rules-path',
+                      action='append',
+                      help='Path to main dex rules for multidex.')
+  parser.add_argument(
+      '--multi-dex',
+      action='store_true',
+      help='Allow multiple dex files within output.')
   parser.add_argument('--library',
                       action='store_true',
                       help='Allow numerous dex files within output.')
@@ -80,6 +99,8 @@ def _ParseArgs(args):
       '--bootclasspath',
       action='append',
       help='GN-list of bootclasspath. Needed for --desugar')
+  parser.add_argument(
+      '--desugar-jdk-libs-json', help='Path to desugar_jdk_libs.json.')
   parser.add_argument('--show-desugar-default-interface-warnings',
                       action='store_true',
                       help='Enable desugaring warnings.')
@@ -87,9 +108,12 @@ def _ParseArgs(args):
       '--classpath',
       action='append',
       help='GN-list of full classpath. Needed for --desugar')
-  parser.add_argument('--release',
-                      action='store_true',
-                      help='Run D8 in release mode.')
+  parser.add_argument(
+      '--release',
+      action='store_true',
+      help='Run D8 in release mode. Release mode maximises main dex and '
+      'deletes non-essential line number information (vs debug which minimizes '
+      'main dex and keeps all line number information, and then some.')
   parser.add_argument(
       '--min-api', help='Minimum Android API level compatibility.')
   parser.add_argument('--force-enable-assertions',
@@ -106,39 +130,45 @@ def _ParseArgs(args):
                       ' Stores inputs to d8inputs.zip')
   options = parser.parse_args(args)
 
+  if options.main_dex_rules_path and not options.multi_dex:
+    parser.error('--main-dex-rules-path is unused if multidex is not enabled')
+
   if options.force_enable_assertions and options.assertion_handler:
     parser.error('Cannot use both --force-enable-assertions and '
                  '--assertion-handler')
 
-  options.class_inputs = action_helpers.parse_gn_list(options.class_inputs)
-  options.class_inputs_filearg = action_helpers.parse_gn_list(
+  options.class_inputs = build_utils.ParseGnList(options.class_inputs)
+  options.class_inputs_filearg = build_utils.ParseGnList(
       options.class_inputs_filearg)
-  options.bootclasspath = action_helpers.parse_gn_list(options.bootclasspath)
-  options.classpath = action_helpers.parse_gn_list(options.classpath)
-  options.dex_inputs = action_helpers.parse_gn_list(options.dex_inputs)
-  options.dex_inputs_filearg = action_helpers.parse_gn_list(
+  options.bootclasspath = build_utils.ParseGnList(options.bootclasspath)
+  options.classpath = build_utils.ParseGnList(options.classpath)
+  options.dex_inputs = build_utils.ParseGnList(options.dex_inputs)
+  options.dex_inputs_filearg = build_utils.ParseGnList(
       options.dex_inputs_filearg)
 
   return options
 
 
-def CreateStderrFilter(filters):
+def CreateStderrFilter(show_desugar_default_interface_warnings):
   def filter_stderr(output):
     # Set this when debugging R8 output.
     if os.environ.get('R8_SHOW_ALL_OUTPUT', '0') != '0':
       return output
 
-    # All missing definitions are logged as a single warning, but start on a
-    # new line like "Missing class ...".
-    warnings = re.split(r'^(?=Warning|Error|Missing (?:class|field|method))',
-                        output,
-                        flags=re.MULTILINE)
+    warnings = re.split(r'^(?=Warning)', output, flags=re.MULTILINE)
     preamble, *warnings = warnings
 
-    combined_pattern = '|'.join(filters)
+    patterns = list(_IGNORE_WARNINGS)
+
+    # Missing deps can happen for prebuilts that are missing transitive deps
+    # and have set enable_bytecode_checks=false.
+    if not show_desugar_default_interface_warnings:
+      patterns += ['default or static interface methods']
+
+    combined_pattern = '|'.join(re.escape(p) for p in patterns)
     preamble = build_utils.FilterLines(preamble, combined_pattern)
 
-    compiled_re = re.compile(combined_pattern, re.DOTALL)
+    compiled_re = re.compile(combined_pattern)
     warnings = [w for w in warnings if not compiled_re.search(w)]
 
     return preamble + ''.join(warnings)
@@ -150,13 +180,7 @@ def _RunD8(dex_cmd, input_paths, output_path, warnings_as_errors,
            show_desugar_default_interface_warnings):
   dex_cmd = dex_cmd + ['--output', output_path] + input_paths
 
-  # Missing deps can happen for prebuilts that are missing transitive deps
-  # and have set enable_bytecode_checks=false.
-  filters = list(DEFAULT_IGNORE_WARNINGS)
-  if not show_desugar_default_interface_warnings:
-    filters += INTERFACE_DESUGARING_WARNINGS
-
-  stderr_filter = CreateStderrFilter(filters)
+  stderr_filter = CreateStderrFilter(show_desugar_default_interface_warnings)
 
   is_debug = logging.getLogger().isEnabledFor(logging.DEBUG)
 
@@ -183,15 +207,7 @@ def _RunD8(dex_cmd, input_paths, output_path, warnings_as_errors,
       build_utils.CheckOutput(dex_cmd,
                               stderr_filter=stderr_filter,
                               fail_on_output=warnings_as_errors)
-    except Exception as e:
-      if isinstance(e, build_utils.CalledProcessError):
-        output = e.output  # pylint: disable=no-member
-        if "global synthetic for 'Record desugaring'" in output:
-          sys.stderr.write('Java records are not supported.\n')
-          sys.stderr.write(
-              'See https://chromium.googlesource.com/chromium/src/+/' +
-              'main/styleguide/java/java.md#Records\n')
-          sys.exit(1)
+    except Exception:
       if orig_dex_cmd is not dex_cmd:
         sys.stderr.write('Full command: ' + shlex.join(orig_dex_cmd) + '\n')
       raise
@@ -207,7 +223,7 @@ def _ZipAligned(dex_files, output_path):
   with zipfile.ZipFile(output_path, 'w') as z:
     for i, dex_file in enumerate(dex_files):
       name = 'classes{}.dex'.format(i + 1 if i > 0 else '')
-      zip_helpers.add_to_zip_hermetic(z, name, src_path=dex_file, alignment=4)
+      zipalign.AddToZipHermetic(z, name, src_path=dex_file, alignment=4)
 
 
 def _CreateFinalDex(d8_inputs, output, tmp_dir, dex_cmd, options=None):
@@ -215,6 +231,10 @@ def _CreateFinalDex(d8_inputs, output, tmp_dir, dex_cmd, options=None):
   needs_dexing = not all(f.endswith('.dex') for f in d8_inputs)
   needs_dexmerge = output.endswith('.dex') or not (options and options.library)
   if needs_dexing or needs_dexmerge:
+    if options and options.main_dex_rules_path:
+      for main_dex_rule in options.main_dex_rules_path:
+        dex_cmd = dex_cmd + ['--main-dex-rules', main_dex_rule]
+
     tmp_dex_dir = os.path.join(tmp_dir, 'tmp_dex_dir')
     os.mkdir(tmp_dex_dir)
 
@@ -273,7 +293,7 @@ def _ParseDesugarDeps(desugar_dependencies_file):
   org/chromium/base/task/TaskRunnerImpl.class
     <-  org/chromium/base/task/TaskRunner.class
   org/chromium/base/task/TaskRunnerImplJni$1.class
-    <-  obj/base/jni_java.turbine.jar:org/jni_zero/JniStaticTestMocker.class
+    <-  obj/base/jni_java.turbine.jar:org/chromium/base/JniStaticTestMocker.class
   org/chromium/base/task/TaskRunnerImplJni.class
     <-  org/chromium/base/task/TaskRunnerImpl$Natives.class
   """
@@ -398,7 +418,7 @@ def _OnStaleMd5(changes, options, final_dex_inputs, dex_cmd):
 
 def MergeDexForIncrementalInstall(r8_jar_path, src_paths, dest_dex_jar,
                                   min_api):
-  dex_cmd = build_utils.JavaCmd(xmx=_DEX_XMX) + [
+  dex_cmd = build_utils.JavaCmd(verify=False, xmx=_DEX_XMX) + [
       '-cp',
       r8_jar_path,
       'com.android.tools.r8.D8',
@@ -416,10 +436,11 @@ def main(args):
   options.class_inputs += options.class_inputs_filearg
   options.dex_inputs += options.dex_inputs_filearg
 
-  input_paths = ([
-      build_utils.JAVA_PATH_FOR_INPUTS, options.r8_jar_path,
-      options.custom_d8_jar_path
-  ] + options.class_inputs + options.dex_inputs)
+  input_paths = options.class_inputs + options.dex_inputs
+  input_paths.append(options.r8_jar_path)
+  input_paths.append(options.custom_d8_jar_path)
+  if options.main_dex_rules_path:
+    input_paths.extend(options.main_dex_rules_path)
 
   depfile_deps = options.class_inputs_filearg + options.dex_inputs_filearg
 
@@ -435,7 +456,7 @@ def main(args):
     final_dex_inputs = list(options.class_inputs)
   final_dex_inputs += options.dex_inputs
 
-  dex_cmd = build_utils.JavaCmd(xmx=_DEX_XMX)
+  dex_cmd = build_utils.JavaCmd(options.warnings_as_errors, xmx=_DEX_XMX)
 
   if options.dump_inputs:
     dex_cmd += ['-Dcom.android.tools.r8.dumpinputtofile=d8inputs.zip']
@@ -473,7 +494,8 @@ def main(args):
     for path in options.classpath:
       dex_cmd += ['--classpath', path]
 
-  if options.classpath:
+  if options.classpath or options.main_dex_rules_path:
+    # --main-dex-rules requires bootclasspath.
     dex_cmd += ['--lib', build_utils.JAVA_HOME]
     for path in options.bootclasspath:
       dex_cmd += ['--lib', path]
@@ -481,6 +503,9 @@ def main(args):
     input_paths += options.bootclasspath
 
 
+  if options.desugar_jdk_libs_json:
+    dex_cmd += ['--desugared-lib', options.desugar_jdk_libs_json]
+    input_paths += [options.desugar_jdk_libs_json]
   if options.assertion_handler:
     dex_cmd += ['--force-assertions-handler:' + options.assertion_handler]
   if options.force_enable_assertions:

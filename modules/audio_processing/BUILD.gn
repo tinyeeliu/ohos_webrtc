@@ -138,15 +138,11 @@ rtc_library("gain_controller2") {
     "../../rtc_base:logging",
     "../../rtc_base:stringutils",
     "../../system_wrappers:field_trial",
-    "agc2:adaptive_digital_gain_controller",
-    "agc2:common",
+    "agc2:adaptive_digital",
     "agc2:cpu_features",
     "agc2:fixed_digital",
     "agc2:gain_applier",
     "agc2:input_volume_controller",
-    "agc2:noise_level_estimator",
-    "agc2:saturation_protector",
-    "agc2:speech_level_estimator",
     "agc2:vad_wrapper",
   ]
 }
@@ -197,7 +193,6 @@ rtc_library("audio_processing") {
     "../../rtc_base:sanitizer",
     "../../rtc_base:swap_queue",
     "../../rtc_base:timeutils",
-    "../../rtc_base/experiments:field_trial_parser",
     "../../rtc_base/synchronization:mutex",
     "../../rtc_base/system:rtc_export",
     "../../system_wrappers",
@@ -371,12 +366,10 @@ if (rtc_include_tests) {
         "echo_control_mobile_unittest.cc",
         "gain_controller2_unittest.cc",
         "splitting_filter_unittest.cc",
-        "test/echo_canceller3_config_json_unittest.cc",
         "test/fake_recording_device_unittest.cc",
       ]
 
       deps = [
-        ":aec3_config_json",
         ":analog_mic_simulation",
         ":api",
         ":apm_logging",
@@ -395,6 +388,7 @@ if (rtc_include_tests) {
         "../../api/audio:echo_detector_creator",
         "../../common_audio",
         "../../common_audio:common_audio_c",
+        "../../rtc_base",
         "../../rtc_base:checks",
         "../../rtc_base:gtest_prod",
         "../../rtc_base:ignore_wundef",
@@ -422,14 +416,12 @@ if (rtc_include_tests) {
         "../audio_coding:neteq_input_audio_tools",
         "aec_dump:mock_aec_dump_unittests",
         "agc:agc_unittests",
-        "agc2:adaptive_digital_gain_controller_unittest",
+        "agc2:adaptive_digital_unittests",
         "agc2:biquad_filter_unittests",
         "agc2:fixed_digital_unittests",
-        "agc2:gain_applier_unittest",
         "agc2:input_volume_controller_unittests",
         "agc2:input_volume_stats_reporter_unittests",
         "agc2:noise_estimator_unittests",
-        "agc2:saturation_protector_unittest",
         "agc2:speech_level_estimator_unittest",
         "agc2:test_utils",
         "agc2:vad_wrapper_unittests",
@@ -560,7 +552,6 @@ if (rtc_include_tests) {
       ]
 
       deps = [
-        ":aec3_config_json",
         ":analog_mic_simulation",
         ":api",
         ":apm_logging",
@@ -569,6 +560,7 @@ if (rtc_include_tests) {
         ":audioproc_protobuf_utils",
         ":audioproc_test_utils",
         ":runtime_settings_protobuf_utils",
+        "../../api/audio:aec3_config_json",
         "../../api/audio:aec3_factory",
         "../../api/audio:echo_detector_creator",
         "../../common_audio",
@@ -676,22 +668,4 @@ rtc_library("audioproc_test_utils") {
     "//third_party/abseil-cpp/absl/strings",
     "//third_party/abseil-cpp/absl/types:optional",
   ]
-}
-
-rtc_library("aec3_config_json") {
-  visibility = [ "*" ]
-  testonly = true
-  sources = [
-    "test/echo_canceller3_config_json.cc",
-    "test/echo_canceller3_config_json.h",
-  ]
-  deps = [
-    "../../api/audio:aec3_config",
-    "../../rtc_base:checks",
-    "../../rtc_base:logging",
-    "../../rtc_base:rtc_json",
-    "../../rtc_base:stringutils",
-    "../../rtc_base/system:rtc_export",
-  ]
-  absl_deps = [ "//third_party/abseil-cpp/absl/strings" ]
 }
