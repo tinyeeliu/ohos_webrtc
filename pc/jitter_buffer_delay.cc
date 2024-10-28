@@ -22,6 +22,10 @@ constexpr int kMaximumDelayMs = 10000;
 
 namespace webrtc {
 
+JitterBufferDelay::JitterBufferDelay() {
+  worker_thread_checker_.Detach();
+}
+
 void JitterBufferDelay::Set(absl::optional<double> delay_seconds) {
   RTC_DCHECK_RUN_ON(&worker_thread_checker_);
   cached_delay_seconds_ = delay_seconds;

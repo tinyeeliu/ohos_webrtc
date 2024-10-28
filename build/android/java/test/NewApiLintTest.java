@@ -6,8 +6,10 @@ package test;
 
 import android.app.Application;
 
-/** Class which fails 'NewAPI' lint check. */
-public class NewApiLintTest extends Application {
+/**
+ * Class which fails 'NewAPI' lint check.
+ */
+public class NewApiTest extends Application {
     public String testTriggerNewApiCheck() {
         // This was added in API level 30.
         return getApplicationContext().getAttributionTag();

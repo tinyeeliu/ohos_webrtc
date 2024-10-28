@@ -29,7 +29,6 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property(nonatomic, readonly) rtc::Thread* signalingThread;
 @property(nonatomic, readonly) rtc::Thread* workerThread;
-@property(nonatomic, readonly) rtc::Thread* networkThread;
 
 @end
 

@@ -31,10 +31,10 @@
 #include "absl/base/attributes.h"
 #include "absl/functional/any_invocable.h"
 #include "api/function_view.h"
-#include "api/location.h"
 #include "api/task_queue/task_queue_base.h"
 #include "api/units/time_delta.h"
 #include "rtc_base/checks.h"
+#include "rtc_base/deprecated/recursive_critical_section.h"
 #include "rtc_base/platform_thread_types.h"
 #include "rtc_base/socket_server.h"
 #include "rtc_base/synchronization/mutex.h"
@@ -140,8 +140,11 @@ class RTC_EXPORT ThreadManager {
   // This list contains all live Threads.
   std::vector<Thread*> message_queues_ RTC_GUARDED_BY(crit_);
 
-  webrtc::Mutex crit_;
-
+  // Methods that don't modify the list of message queues may be called in a
+  // re-entrant fashion. "processing_" keeps track of the depth of re-entrant
+  // calls.
+  RecursiveCriticalSection crit_;
+  size_t processing_ RTC_GUARDED_BY(crit_) = 0;
 #if RTC_DCHECK_IS_ON
   // Represents all thread seand actions by storing all send targets per thread.
   // This is used by RegisterSendAndCheckForCycles. This graph has no cycles
@@ -309,20 +312,14 @@ class RTC_LOCKABLE RTC_EXPORT Thread : public webrtc::TaskQueueBase {
   // See ScopedDisallowBlockingCalls for details.
   // NOTE: Blocking calls are DISCOURAGED, consider if what you're doing can
   // be achieved with PostTask() and callbacks instead.
-  void BlockingCall(
-      FunctionView<void()> functor,
-      const webrtc::Location& location = webrtc::Location::Current()) {
-    BlockingCallImpl(std::move(functor), location);
-  }
+  virtual void BlockingCall(FunctionView<void()> functor);
 
   template <typename Functor,
             typename ReturnT = std::invoke_result_t<Functor>,
             typename = typename std::enable_if_t<!std::is_void_v<ReturnT>>>
-  ReturnT BlockingCall(
-      Functor&& functor,
-      const webrtc::Location& location = webrtc::Location::Current()) {
+  ReturnT BlockingCall(Functor&& functor) {
     ReturnT result;
-    BlockingCall([&] { result = std::forward<Functor>(functor)(); }, location);
+    BlockingCall([&] { result = std::forward<Functor>(functor)(); });
     return result;
   }
 
@@ -343,6 +340,11 @@ class RTC_LOCKABLE RTC_EXPORT Thread : public webrtc::TaskQueueBase {
 
   // From TaskQueueBase
   void Delete() override;
+  void PostTask(absl::AnyInvocable<void() &&> task) override;
+  void PostDelayedTask(absl::AnyInvocable<void() &&> task,
+                       webrtc::TimeDelta delay) override;
+  void PostDelayedHighPrecisionTask(absl::AnyInvocable<void() &&> task,
+                                    webrtc::TimeDelta delay) override;
 
   // ProcessMessages will process I/O and dispatch messages until:
   //  1) cms milliseconds have elapsed (returns true)
@@ -413,18 +415,6 @@ class RTC_LOCKABLE RTC_EXPORT Thread : public webrtc::TaskQueueBase {
     // priority queue. That is ok because `functor` doesn't affect operator<
     mutable absl::AnyInvocable<void() &&> functor;
   };
-
-  // TaskQueueBase implementation.
-  void PostTaskImpl(absl::AnyInvocable<void() &&> task,
-                    const PostTaskTraits& traits,
-                    const webrtc::Location& location) override;
-  void PostDelayedTaskImpl(absl::AnyInvocable<void() &&> task,
-                           webrtc::TimeDelta delay,
-                           const PostDelayedTaskTraits& traits,
-                           const webrtc::Location& location) override;
-
-  virtual void BlockingCallImpl(FunctionView<void()> functor,
-                                const webrtc::Location& location);
 
   // Perform initialization, subclasses must call this from their constructor
   // if false was passed as init_queue to the Thread constructor.

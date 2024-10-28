@@ -10,70 +10,76 @@ import subprocess
 import sys
 
 
-_CLOUD_PROJECT_ID = 'chrome-luci-data'
+_CLOUD_PROJECT_ID = 'test-results-hrd'
 QUERY_BY_BUILD_NUMBER = """
 SELECT
-  test_id AS name,
-  SUM(duration) AS duration
+  run.name AS name,
+  SUM(run.times) AS duration
 FROM
-  `%s.chrome.ci_test_results`
+  [%s:events.test_results]
 WHERE
-  DATE(partition_time) = "{}"
-  AND exported.id like "{}"
+  buildbot_info.builder_name IN ({})
+  AND buildbot_info.build_number = {}
 GROUP BY
-  test_id
+  name
 ORDER BY
-  test_id
-LIMIT
-  1000
+  name
 """ % _CLOUD_PROJECT_ID
 QUERY_STORY_AVG_RUNTIME = """
 SELECT
-  test_id AS name,
-  ROUND(AVG(duration)) AS duration
-FROM
-  `%s.chrome.ci_test_results`
-CROSS JOIN
-  UNNEST(variant) AS v
-WHERE
-  v.key = 'builder'
-  AND v.value IN ({configuration_names})
-  AND duration IS NOT NULL
-  AND duration != 0
-  AND expected
-  AND DATE(partition_time) > DATE_SUB(CURRENT_DATE(), INTERVAL {num_last_days} DAY)
-GROUP BY
-  test_id
-ORDER BY
-  test_id
-""" % _CLOUD_PROJECT_ID
-QUERY_STORY_TOTAL_RUNTIME = """
-SELECT
-  test_id AS name,
+  name,
   ROUND(AVG(time)) AS duration,
 FROM (
   SELECT
-    parent.id,
-    test_id,
-    SUM(duration) AS time
+    run.name AS name,
+    start_time,
+    AVG(run.times) AS time
   FROM
-    `%s.chrome.ci_test_results`
-  CROSS JOIN
-    UNNEST(variant) AS v
+    [%s:events.test_results]
   WHERE
-    v.key = 'builder'
-    AND v.value IN ({configuration_names})
-    AND duration IS NOT NULL
-    AND duration != 0
-    AND expected
-    AND DATE(partition_time) > DATE_SUB(CURRENT_DATE(), INTERVAL {num_last_days} DAY)
+    buildbot_info.builder_name IN ({configuration_names})
+    AND run.time IS NOT NULL
+    AND run.time != 0
+    AND run.is_unexpected IS FALSE
+    AND DATEDIFF(CURRENT_DATE(), DATE(start_time)) < {num_last_days}
+    AND _PARTITIONTIME > DATE_ADD(CURRENT_DATE(), -{num_last_days}, "DAY")
   GROUP BY
-    parent.id,
-    test_id)
+    name,
+    start_time
+  ORDER BY
+    start_time DESC)
 GROUP BY
-  test_id
+  name
 ORDER BY
-  test_id
+  name
+""" % _CLOUD_PROJECT_ID
+QUERY_STORY_TOTAL_RUNTIME = """
+SELECT
+  name,
+  ROUND(AVG(time)) AS duration,
+FROM (
+  SELECT
+    run.name AS name,
+    start_time,
+    SUM(run.times) AS time
+  FROM
+    [%s:events.test_results]
+  WHERE
+    buildbot_info.builder_name IN ({configuration_names})
+    AND run.time IS NOT NULL
+    AND run.time != 0
+    AND run.is_unexpected IS FALSE
+    AND DATEDIFF(CURRENT_DATE(), DATE(start_time)) < {num_last_days}
+    AND _PARTITIONTIME > DATE_ADD(CURRENT_DATE(), -{num_last_days}, "DAY")
+  GROUP BY
+    name,
+    start_time
+  ORDER BY
+    start_time DESC)
+GROUP BY
+  name
+ORDER BY
+  name
 """ % _CLOUD_PROJECT_ID
 
 
@@ -87,8 +93,8 @@ If this is the first time you run the script, do the following steps:
 1) Follow the steps at https://cloud.google.com/sdk/docs/ to download and
    unpack google-cloud-sdk in your home directory.
 2) Run `gcloud auth login`
-3) Run `gcloud config set project chrome-luci-data`
-   3a) If 'chrome-luci-data' does not show up, contact chops-data@
+3) Run `gcloud config set project test-results-hrd`
+   3a) If 'test-results-hrd' does not show up, contact chops-data@
        to be added as a user of the table
 4) Run this script!
 """
@@ -100,7 +106,7 @@ def _run_query(query):
   except subprocess.CalledProcessError:
     raise RuntimeError(_BQ_SETUP_INSTRUCTION)
   args = ["bq", "query", "--project_id="+_CLOUD_PROJECT_ID, "--format=json",
-          "--max_rows=100000", "--nouse_legacy_sql", query]
+          "--max_rows=100000", query]
 
   p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
   stdout, stderr = p.communicate()
@@ -111,8 +117,10 @@ def _run_query(query):
       (stdout, stderr))
 
 
-def FetchStoryTimingDataForSingleBuild(date, build_number):
-  return _run_query(QUERY_BY_BUILD_NUMBER.format(date, build_number))
+def FetchStoryTimingDataForSingleBuild(configurations, build_number):
+  configurations_str = ','.join(repr(c) for c in configurations)
+  return _run_query(QUERY_BY_BUILD_NUMBER.format(
+      configurations_str, build_number))
 
 
 def FetchAverageStoryTimingData(configurations, num_last_days):
@@ -122,9 +130,8 @@ def FetchAverageStoryTimingData(configurations, num_last_days):
 
 
 def FetchBenchmarkRuntime(configurations, num_last_days):
-  configurations_str = ','.join(repr(c) for c in configurations)
   test_total_runtime =  _run_query(QUERY_STORY_TOTAL_RUNTIME.format(
-      configuration_names=configurations_str, num_last_days=num_last_days))
+      configuration_names=configurations, num_last_days=num_last_days))
   benchmarks_data = collections.OrderedDict()
   total_runtime = 0
   total_num_stories = 0
@@ -164,9 +171,6 @@ def main(args):
       '--configurations', '-c', action='append', required=True,
       help='The configuration(s) of the builder to query results from.')
   parser.add_argument(
-      '--date', '-d',
-      help='The date to query results from.')
-  parser.add_argument(
       '--build-number', action='store',
       help='If specified, the build number to get timing data from.')
   opts = parser.parse_args(args)
@@ -176,7 +180,8 @@ def main(args):
     data = FetchBenchmarkRuntime(opts.configurations, num_last_days=5)
   else:
     if opts.build_number:
-      data = FetchStoryTimingDataForSingleBuild(opts.date, opts.build_number)
+      data = FetchStoryTimingDataForSingleBuild(opts.configurations,
+          opts.build_number)
     else:
       data = FetchAverageStoryTimingData(opts.configurations, num_last_days=5)
 

@@ -10,7 +10,7 @@
       "is_debug": true,
       "symbol_level": 1,
       "target_os": "android",
-      "use_remoteexec": true
+      "use_goma": true
     }
   },
   "gen-chromiumos-try": {
@@ -23,8 +23,7 @@
       "is_debug": true,
       "symbol_level": 1,
       "target_os": "chromeos",
-      "use_cups": true,
-      "use_remoteexec": true
+      "use_goma": true
     }
   },
   "gen-fuchsia-try": {
@@ -32,25 +31,11 @@
       "blink_enable_generated_code_formatting": true,
       "clang_use_chrome_plugins": false,
       "dcheck_always_on": false,
-      "enable_cast_receiver": true,
       "enable_kythe_annotations": true,
       "is_component_build": false,
       "is_debug": false,
       "target_os": "fuchsia",
-      "use_remoteexec": true
-    }
-  },
-  "gen-ios-try": {
-    "gn_args": {
-      "blink_enable_generated_code_formatting": true,
-      "clang_use_chrome_plugins": false,
-      "enable_kythe_annotations": true,
-      "ios_enable_code_signing": false,
-      "is_clang": true,
-      "is_debug": true,
-      "symbol_level": 1,
-      "target_os": "ios",
-      "use_remoteexec": true
+      "use_goma": true
     }
   },
   "gen-lacros-try": {
@@ -64,8 +49,7 @@
       "is_debug": true,
       "symbol_level": 1,
       "target_os": "chromeos",
-      "use_cups": true,
-      "use_remoteexec": true
+      "use_goma": true
     }
   },
   "gen-linux-try": {
@@ -77,7 +61,7 @@
       "is_component_build": true,
       "is_debug": true,
       "symbol_level": 1,
-      "use_remoteexec": true
+      "use_goma": true
     }
   },
   "gen-mac-try": {
@@ -90,7 +74,7 @@
       "is_debug": true,
       "symbol_level": 1,
       "target_os": "mac",
-      "use_remoteexec": true
+      "use_goma": true
     }
   },
   "gen-webview-try": {
@@ -104,7 +88,7 @@
       "is_debug": true,
       "symbol_level": 1,
       "target_os": "android",
-      "use_remoteexec": true
+      "use_goma": true
     }
   },
   "gen-win-try": {
@@ -116,7 +100,7 @@
       "is_component_build": true,
       "is_debug": true,
       "symbol_level": 1,
-      "use_remoteexec": true
+      "use_goma": true
     }
   }
 }

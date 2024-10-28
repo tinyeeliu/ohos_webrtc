@@ -13,6 +13,7 @@ package org.webrtc;
 import android.graphics.Canvas;
 import android.graphics.Rect;
 import android.graphics.SurfaceTexture;
+import android.opengl.EGL14;
 import android.opengl.GLException;
 import android.view.Surface;
 import android.view.SurfaceHolder;
@@ -32,10 +33,11 @@ class EglBase10Impl implements EglBase10 {
   // This constant is taken from EGL14.EGL_CONTEXT_CLIENT_VERSION.
   private static final int EGL_CONTEXT_CLIENT_VERSION = 0x3098;
 
-  private static final EglConnection EGL_NO_CONNECTION = new EglConnection();
-
+  private final EGL10 egl;
+  private EGLContext eglContext;
+  @Nullable private EGLConfig eglConfig;
+  private EGLDisplay eglDisplay;
   private EGLSurface eglSurface = EGL10.EGL_NO_SURFACE;
-  private EglConnection eglConnection;
 
   // EGL wrapper for an actual EGLContext.
   private static class Context implements EglBase10.Context {
@@ -88,107 +90,14 @@ class EglBase10Impl implements EglBase10 {
     }
   }
 
-  public static class EglConnection implements EglBase10.EglConnection {
-    private final EGL10 egl;
-    private final EGLContext eglContext;
-    private final EGLDisplay eglDisplay;
-    private final EGLConfig eglConfig;
-    private final RefCountDelegate refCountDelegate;
-    private EGLSurface currentSurface = EGL10.EGL_NO_SURFACE;
-
-    public EglConnection(EGLContext sharedContext, int[] configAttributes) {
-      egl = (EGL10) EGLContext.getEGL();
-      eglDisplay = getEglDisplay(egl);
-      eglConfig = getEglConfig(egl, eglDisplay, configAttributes);
-      final int openGlesVersion = EglBase.getOpenGlesVersionFromConfig(configAttributes);
-      Logging.d(TAG, "Using OpenGL ES version " + openGlesVersion);
-      eglContext = createEglContext(egl, sharedContext, eglDisplay, eglConfig, openGlesVersion);
-
-      // Ref count delegate with release callback.
-      refCountDelegate = new RefCountDelegate(() -> {
-        synchronized (EglBase.lock) {
-          egl.eglMakeCurrent(
-              eglDisplay, EGL10.EGL_NO_SURFACE, EGL10.EGL_NO_SURFACE, EGL10.EGL_NO_CONTEXT);
-        }
-        egl.eglDestroyContext(eglDisplay, eglContext);
-        egl.eglTerminate(eglDisplay);
-        currentSurface = EGL10.EGL_NO_SURFACE;
-      });
-    }
-
-    // Returns a "null" EglConnection. Useful to represent a released instance with default values.
-    private EglConnection() {
-      egl = (EGL10) EGLContext.getEGL();
-      eglContext = EGL10.EGL_NO_CONTEXT;
-      eglDisplay = EGL10.EGL_NO_DISPLAY;
-      eglConfig = null;
-      refCountDelegate = new RefCountDelegate(() -> {});
-    }
-
-    @Override
-    public void retain() {
-      refCountDelegate.retain();
-    }
-
-    @Override
-    public void release() {
-      refCountDelegate.release();
-    }
-
-    @Override
-    public EGL10 getEgl() {
-      return egl;
-    }
-
-    @Override
-    public EGLContext getContext() {
-      return eglContext;
-    }
-
-    @Override
-    public EGLDisplay getDisplay() {
-      return eglDisplay;
-    }
-
-    @Override
-    public EGLConfig getConfig() {
-      return eglConfig;
-    }
-
-    public void makeCurrent(EGLSurface eglSurface) {
-      if (egl.eglGetCurrentContext() == eglContext && currentSurface == eglSurface) {
-        return;
-      }
-
-      synchronized (EglBase.lock) {
-        if (!egl.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)) {
-          throw new GLException(egl.eglGetError(),
-              "eglMakeCurrent failed: 0x" + Integer.toHexString(egl.eglGetError()));
-        }
-      }
-      currentSurface = eglSurface;
-    }
-
-    public void detachCurrent() {
-      synchronized (EglBase.lock) {
-        if (!egl.eglMakeCurrent(
-                eglDisplay, EGL10.EGL_NO_SURFACE, EGL10.EGL_NO_SURFACE, EGL10.EGL_NO_CONTEXT)) {
-          throw new GLException(egl.eglGetError(),
-              "eglDetachCurrent failed: 0x" + Integer.toHexString(egl.eglGetError()));
-        }
-      }
-      currentSurface = EGL10.EGL_NO_SURFACE;
-    }
-  }
-
   // Create a new context with the specified config type, sharing data with sharedContext.
   public EglBase10Impl(EGLContext sharedContext, int[] configAttributes) {
-    this.eglConnection = new EglConnection(sharedContext, configAttributes);
-  }
-
-  public EglBase10Impl(EglConnection eglConnection) {
-    this.eglConnection = eglConnection;
-    this.eglConnection.retain();
+    this.egl = (EGL10) EGLContext.getEGL();
+    eglDisplay = getEglDisplay();
+    eglConfig = getEglConfig(egl, eglDisplay, configAttributes);
+    final int openGlesVersion = EglBase.getOpenGlesVersionFromConfig(configAttributes);
+    Logging.d(TAG, "Using OpenGL ES version " + openGlesVersion);
+    eglContext = createEglContext(sharedContext, eglDisplay, eglConfig, openGlesVersion);
   }
 
   @Override
@@ -277,11 +186,8 @@ class EglBase10Impl implements EglBase10 {
     if (eglSurface != EGL10.EGL_NO_SURFACE) {
       throw new RuntimeException("Already has an EGLSurface");
     }
-
-    EGL10 egl = eglConnection.getEgl();
     int[] surfaceAttribs = {EGL10.EGL_NONE};
-    eglSurface = egl.eglCreateWindowSurface(
-        eglConnection.getDisplay(), eglConnection.getConfig(), nativeWindow, surfaceAttribs);
+    eglSurface = egl.eglCreateWindowSurface(eglDisplay, eglConfig, nativeWindow, surfaceAttribs);
     if (eglSurface == EGL10.EGL_NO_SURFACE) {
       throw new GLException(egl.eglGetError(),
           "Failed to create window surface: 0x" + Integer.toHexString(egl.eglGetError()));
@@ -300,10 +206,8 @@ class EglBase10Impl implements EglBase10 {
     if (eglSurface != EGL10.EGL_NO_SURFACE) {
       throw new RuntimeException("Already has an EGLSurface");
     }
-    EGL10 egl = eglConnection.getEgl();
     int[] surfaceAttribs = {EGL10.EGL_WIDTH, width, EGL10.EGL_HEIGHT, height, EGL10.EGL_NONE};
-    eglSurface = egl.eglCreatePbufferSurface(
-        eglConnection.getDisplay(), eglConnection.getConfig(), surfaceAttribs);
+    eglSurface = egl.eglCreatePbufferSurface(eglDisplay, eglConfig, surfaceAttribs);
     if (eglSurface == EGL10.EGL_NO_SURFACE) {
       throw new GLException(egl.eglGetError(),
           "Failed to create pixel buffer surface with size " + width + "x" + height + ": 0x"
@@ -313,8 +217,7 @@ class EglBase10Impl implements EglBase10 {
 
   @Override
   public org.webrtc.EglBase.Context getEglBaseContext() {
-    return new Context(
-        eglConnection.getEgl(), eglConnection.getContext(), eglConnection.getConfig());
+    return new Context(egl, eglContext, eglConfig);
   }
 
   @Override
@@ -325,29 +228,28 @@ class EglBase10Impl implements EglBase10 {
   @Override
   public int surfaceWidth() {
     final int widthArray[] = new int[1];
-    eglConnection.getEgl().eglQuerySurface(
-        eglConnection.getDisplay(), eglSurface, EGL10.EGL_WIDTH, widthArray);
+    egl.eglQuerySurface(eglDisplay, eglSurface, EGL10.EGL_WIDTH, widthArray);
     return widthArray[0];
   }
 
   @Override
   public int surfaceHeight() {
     final int heightArray[] = new int[1];
-    eglConnection.getEgl().eglQuerySurface(
-        eglConnection.getDisplay(), eglSurface, EGL10.EGL_HEIGHT, heightArray);
+    egl.eglQuerySurface(eglDisplay, eglSurface, EGL10.EGL_HEIGHT, heightArray);
     return heightArray[0];
   }
 
   @Override
   public void releaseSurface() {
     if (eglSurface != EGL10.EGL_NO_SURFACE) {
-      eglConnection.getEgl().eglDestroySurface(eglConnection.getDisplay(), eglSurface);
+      egl.eglDestroySurface(eglDisplay, eglSurface);
       eglSurface = EGL10.EGL_NO_SURFACE;
     }
   }
 
   private void checkIsNotReleased() {
-    if (eglConnection == EGL_NO_CONNECTION) {
+    if (eglDisplay == EGL10.EGL_NO_DISPLAY || eglContext == EGL10.EGL_NO_CONTEXT
+        || eglConfig == null) {
       throw new RuntimeException("This object has been released");
     }
   }
@@ -356,8 +258,12 @@ class EglBase10Impl implements EglBase10 {
   public void release() {
     checkIsNotReleased();
     releaseSurface();
-    eglConnection.release();
-    eglConnection = EGL_NO_CONNECTION;
+    detachCurrent();
+    egl.eglDestroyContext(eglDisplay, eglContext);
+    egl.eglTerminate(eglDisplay);
+    eglContext = EGL10.EGL_NO_CONTEXT;
+    eglDisplay = EGL10.EGL_NO_DISPLAY;
+    eglConfig = null;
   }
 
   @Override
@@ -366,13 +272,24 @@ class EglBase10Impl implements EglBase10 {
     if (eglSurface == EGL10.EGL_NO_SURFACE) {
       throw new RuntimeException("No EGLSurface - can't make current");
     }
-    eglConnection.makeCurrent(eglSurface);
+    synchronized (EglBase.lock) {
+      if (!egl.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)) {
+        throw new GLException(egl.eglGetError(),
+            "eglMakeCurrent failed: 0x" + Integer.toHexString(egl.eglGetError()));
+      }
+    }
   }
 
   // Detach the current EGL context, so that it can be made current on another thread.
   @Override
   public void detachCurrent() {
-    eglConnection.detachCurrent();
+    synchronized (EglBase.lock) {
+      if (!egl.eglMakeCurrent(
+              eglDisplay, EGL10.EGL_NO_SURFACE, EGL10.EGL_NO_SURFACE, EGL10.EGL_NO_CONTEXT)) {
+        throw new GLException(egl.eglGetError(),
+            "eglDetachCurrent failed: 0x" + Integer.toHexString(egl.eglGetError()));
+      }
+    }
   }
 
   @Override
@@ -382,7 +299,7 @@ class EglBase10Impl implements EglBase10 {
       throw new RuntimeException("No EGLSurface - can't swap buffers");
     }
     synchronized (EglBase.lock) {
-      eglConnection.getEgl().eglSwapBuffers(eglConnection.getDisplay(), eglSurface);
+      egl.eglSwapBuffers(eglDisplay, eglSurface);
     }
   }
 
@@ -393,7 +310,7 @@ class EglBase10Impl implements EglBase10 {
   }
 
   // Return an EGLDisplay, or die trying.
-  private static EGLDisplay getEglDisplay(EGL10 egl) {
+  private EGLDisplay getEglDisplay() {
     EGLDisplay eglDisplay = egl.eglGetDisplay(EGL10.EGL_DEFAULT_DISPLAY);
     if (eglDisplay == EGL10.EGL_NO_DISPLAY) {
       throw new GLException(egl.eglGetError(),
@@ -426,8 +343,8 @@ class EglBase10Impl implements EglBase10 {
   }
 
   // Return an EGLConfig, or die trying.
-  private static EGLContext createEglContext(EGL10 egl, @Nullable EGLContext sharedContext,
-      EGLDisplay eglDisplay, EGLConfig eglConfig, int openGlesVersion) {
+  private EGLContext createEglContext(@Nullable EGLContext sharedContext, EGLDisplay eglDisplay,
+      EGLConfig eglConfig, int openGlesVersion) {
     if (sharedContext != null && sharedContext == EGL10.EGL_NO_CONTEXT) {
       throw new RuntimeException("Invalid sharedContext");
     }

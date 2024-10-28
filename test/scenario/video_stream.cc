@@ -27,7 +27,6 @@
 #include "test/fake_encoder.h"
 #include "test/scenario/hardware_codecs.h"
 #include "test/testsupport/file_utils.h"
-#include "test/video_test_constants.h"
 #include "video/config/encoder_stream_factory.h"
 
 namespace webrtc {
@@ -40,18 +39,17 @@ enum : int {  // The first valid value is 1.
   kVideoRotationRtpExtensionId,
 };
 
+constexpr int kDefaultMaxQp = cricket::WebRtcVideoChannel::kDefaultQpMax;
 uint8_t CodecTypeToPayloadType(VideoCodecType codec_type) {
   switch (codec_type) {
     case VideoCodecType::kVideoCodecGeneric:
-      return VideoTestConstants::kFakeVideoSendPayloadType;
+      return CallTest::kFakeVideoSendPayloadType;
     case VideoCodecType::kVideoCodecVP8:
-      return VideoTestConstants::kPayloadTypeVP8;
+      return CallTest::kPayloadTypeVP8;
     case VideoCodecType::kVideoCodecVP9:
-      return VideoTestConstants::kPayloadTypeVP9;
+      return CallTest::kPayloadTypeVP9;
     case VideoCodecType::kVideoCodecH264:
-      return VideoTestConstants::kPayloadTypeH264;
-    case VideoCodecType::kVideoCodecH265:
-      return VideoTestConstants::kPayloadTypeH265;
+      return CallTest::kPayloadTypeH264;
     default:
       RTC_DCHECK_NOTREACHED();
   }
@@ -67,8 +65,6 @@ std::string CodecTypeToCodecName(VideoCodecType codec_type) {
       return cricket::kVp9CodecName;
     case VideoCodecType::kVideoCodecH264:
       return cricket::kH264CodecName;
-    case VideoCodecType::kVideoCodecH265:
-      return cricket::kH265CodecName;
     default:
       RTC_DCHECK_NOTREACHED();
   }
@@ -82,6 +78,24 @@ VideoEncoderConfig::ContentType ConvertContentType(
     case VideoStreamConfig::Encoder::ContentType::kScreen:
       return VideoEncoderConfig::ContentType::kScreen;
   }
+}
+
+std::vector<RtpExtension> GetVideoRtpExtensions(
+    const VideoStreamConfig config) {
+  std::vector<RtpExtension> res = {
+      RtpExtension(RtpExtension::kVideoContentTypeUri,
+                   kVideoContentTypeExtensionId),
+      RtpExtension(RtpExtension::kVideoRotationUri,
+                   kVideoRotationRtpExtensionId)};
+  if (config.stream.packet_feedback) {
+    res.push_back(RtpExtension(RtpExtension::kTransportSequenceNumberUri,
+                               kTransportSequenceNumberExtensionId));
+  }
+  if (config.stream.abs_send_time) {
+    res.push_back(
+        RtpExtension(RtpExtension::kAbsSendTimeUri, kAbsSendTimeExtensionId));
+  }
+  return res;
 }
 
 std::string TransformFilePath(std::string path) {
@@ -112,22 +126,18 @@ VideoSendStream::Config CreateVideoSendStreamConfig(
   send_config.rtp.extensions = GetVideoRtpExtensions(config);
 
   if (config.stream.use_rtx) {
-    send_config.rtp.rtx.payload_type = VideoTestConstants::kSendRtxPayloadType;
+    send_config.rtp.rtx.payload_type = CallTest::kSendRtxPayloadType;
     send_config.rtp.rtx.ssrcs = rtx_ssrcs;
   }
   if (config.stream.use_flexfec) {
-    send_config.rtp.flexfec.payload_type =
-        VideoTestConstants::kFlexfecPayloadType;
-    send_config.rtp.flexfec.ssrc = VideoTestConstants::kFlexfecSendSsrc;
+    send_config.rtp.flexfec.payload_type = CallTest::kFlexfecPayloadType;
+    send_config.rtp.flexfec.ssrc = CallTest::kFlexfecSendSsrc;
     send_config.rtp.flexfec.protected_media_ssrcs = ssrcs;
   }
   if (config.stream.use_ulpfec) {
-    send_config.rtp.ulpfec.red_payload_type =
-        VideoTestConstants::kRedPayloadType;
-    send_config.rtp.ulpfec.ulpfec_payload_type =
-        VideoTestConstants::kUlpfecPayloadType;
-    send_config.rtp.ulpfec.red_rtx_payload_type =
-        VideoTestConstants::kRtxRedPayloadType;
+    send_config.rtp.ulpfec.red_payload_type = CallTest::kRedPayloadType;
+    send_config.rtp.ulpfec.ulpfec_payload_type = CallTest::kUlpfecPayloadType;
+    send_config.rtp.ulpfec.red_rtx_payload_type = CallTest::kRtxRedPayloadType;
   }
   return send_config;
 }
@@ -206,7 +216,6 @@ CreateEncoderSpecificSettings(VideoStreamConfig config) {
       return CreateVp9SpecificSettings(config);
     case Codec::kVideoCodecGeneric:
     case Codec::kVideoCodecAV1:
-    case Codec::kVideoCodecH265:
       return nullptr;
     case Codec::kVideoCodecMultiplex:
       RTC_DCHECK_NOTREACHED();
@@ -233,8 +242,8 @@ VideoEncoderConfig CreateVideoEncoderConfig(VideoStreamConfig config) {
                        VideoStreamConfig::Encoder::ContentType::kScreen;
     encoder_config.video_stream_factory =
         rtc::make_ref_counted<cricket::EncoderStreamFactory>(
-            cricket_codec, cricket::kDefaultVideoMaxQpVpx, screenshare,
-            screenshare, encoder_info);
+            cricket_codec, kDefaultMaxQp, screenshare, screenshare,
+            encoder_info);
   } else {
     encoder_config.video_stream_factory =
         rtc::make_ref_counted<DefaultVideoStreamFactory>();
@@ -320,7 +329,9 @@ VideoReceiveStreamInterface::Config CreateVideoReceiveStreamConfig(
     uint32_t ssrc,
     uint32_t rtx_ssrc) {
   VideoReceiveStreamInterface::Config recv(feedback_transport);
+  recv.rtp.transport_cc = config.stream.packet_feedback;
   recv.rtp.local_ssrc = local_ssrc;
+  recv.rtp.extensions = GetVideoRtpExtensions(config);
 
   RTC_DCHECK(!config.stream.use_rtx ||
              config.stream.nack_history_time > TimeDelta::Zero());
@@ -332,39 +343,19 @@ VideoReceiveStreamInterface::Config CreateVideoReceiveStreamConfig(
   recv.renderer = renderer;
   if (config.stream.use_rtx) {
     recv.rtp.rtx_ssrc = rtx_ssrc;
-    recv.rtp
-        .rtx_associated_payload_types[VideoTestConstants::kSendRtxPayloadType] =
+    recv.rtp.rtx_associated_payload_types[CallTest::kSendRtxPayloadType] =
         CodecTypeToPayloadType(config.encoder.codec);
   }
   if (config.stream.use_ulpfec) {
-    recv.rtp.red_payload_type = VideoTestConstants::kRedPayloadType;
-    recv.rtp.ulpfec_payload_type = VideoTestConstants::kUlpfecPayloadType;
-    recv.rtp
-        .rtx_associated_payload_types[VideoTestConstants::kRtxRedPayloadType] =
-        VideoTestConstants::kRedPayloadType;
+    recv.rtp.red_payload_type = CallTest::kRedPayloadType;
+    recv.rtp.ulpfec_payload_type = CallTest::kUlpfecPayloadType;
+    recv.rtp.rtx_associated_payload_types[CallTest::kRtxRedPayloadType] =
+        CallTest::kRedPayloadType;
   }
   recv.sync_group = config.render.sync_group;
   return recv;
 }
 }  // namespace
-
-std::vector<RtpExtension> GetVideoRtpExtensions(
-    const VideoStreamConfig config) {
-  std::vector<RtpExtension> res = {
-      RtpExtension(RtpExtension::kVideoContentTypeUri,
-                   kVideoContentTypeExtensionId),
-      RtpExtension(RtpExtension::kVideoRotationUri,
-                   kVideoRotationRtpExtensionId)};
-  if (config.stream.packet_feedback) {
-    res.push_back(RtpExtension(RtpExtension::kTransportSequenceNumberUri,
-                               kTransportSequenceNumberExtensionId));
-  }
-  if (config.stream.abs_send_time) {
-    res.push_back(
-        RtpExtension(RtpExtension::kAbsSendTimeUri, kAbsSendTimeExtensionId));
-  }
-  return res;
-}
 
 SendVideoStream::SendVideoStream(CallClient* sender,
                                  VideoStreamConfig config,
@@ -423,7 +414,6 @@ SendVideoStream::SendVideoStream(CallClient* sender,
   send_config.suspend_below_min_bitrate =
       config.encoder.suspend_below_min_bitrate;
 
-  video_capturer_->Start();
   sender_->SendTask([&] {
     if (config.stream.fec_controller_factory) {
       send_stream_ = sender_->call_->CreateVideoSendStream(
@@ -490,7 +480,7 @@ void SendVideoStream::UpdateActiveLayers(std::vector<bool> active_layers) {
     MutexLock lock(&mutex_);
     if (config_.encoder.codec ==
         VideoStreamConfig::Encoder::Codec::kVideoCodecVP8) {
-      send_stream_->StartPerRtpStream(active_layers);
+      send_stream_->UpdateActiveSimulcastLayers(active_layers);
     }
     VideoEncoderConfig encoder_config = CreateVideoEncoderConfig(config_);
     RTC_CHECK_EQ(encoder_config.simulcast_layers.size(), active_layers.size());
@@ -576,8 +566,8 @@ ReceiveVideoStream::ReceiveVideoStream(CallClient* receiver,
     if (config.stream.use_flexfec) {
       RTC_DCHECK(num_streams == 1);
       FlexfecReceiveStream::Config flexfec(feedback_transport);
-      flexfec.payload_type = VideoTestConstants::kFlexfecPayloadType;
-      flexfec.rtp.remote_ssrc = VideoTestConstants::kFlexfecSendSsrc;
+      flexfec.payload_type = CallTest::kFlexfecPayloadType;
+      flexfec.rtp.remote_ssrc = CallTest::kFlexfecSendSsrc;
       flexfec.protected_media_ssrcs = send_stream->rtx_ssrcs_;
       flexfec.rtp.local_ssrc = recv_config.rtp.local_ssrc;
       receiver_->ssrc_media_types_[flexfec.rtp.remote_ssrc] = MediaType::VIDEO;

@@ -2,12 +2,15 @@
 # Copyright 2019 The Chromium Authors
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+
 """Utilities for optimistically parsing dex files.
 
 This file is not meant to provide a generic tool for analyzing dex files.
 A DexFile class that exposes access to several memory items in the dex format
 is provided, but it does not include error handling or validation.
 """
+
+
 
 import argparse
 import collections
@@ -113,18 +116,21 @@ class _MemoryItemList:
 
 
 class _TypeIdItemList(_MemoryItemList):
+
   def __init__(self, reader, offset, size):
     factory = lambda x: _TypeIdItem(x.ReadUInt())
     super().__init__(reader, offset, size, factory)
 
 
 class _ProtoIdItemList(_MemoryItemList):
+
   def __init__(self, reader, offset, size):
     factory = lambda x: _ProtoIdItem(x.ReadUInt(), x.ReadUInt(), x.ReadUInt())
     super().__init__(reader, offset, size, factory)
 
 
 class _MethodIdItemList(_MemoryItemList):
+
   def __init__(self, reader, offset, size):
     factory = (
         lambda x: _MethodIdItem(x.ReadUShort(), x.ReadUShort(), x.ReadUInt()))
@@ -132,6 +138,7 @@ class _MethodIdItemList(_MemoryItemList):
 
 
 class _StringItemList(_MemoryItemList):
+
   def __init__(self, reader, offset, size):
     reader.Seek(offset)
     string_item_offsets = iter([reader.ReadUInt() for _ in range(size)])
@@ -145,6 +152,7 @@ class _StringItemList(_MemoryItemList):
 
 
 class _TypeListItem(_MemoryItemList):
+
   def __init__(self, reader):
     offset = reader.Tell()
     size = reader.ReadUInt()
@@ -161,11 +169,13 @@ class _TypeListItem(_MemoryItemList):
 
 
 class _TypeListItemList(_MemoryItemList):
+
   def __init__(self, reader, offset, size):
     super().__init__(reader, offset, size, _TypeListItem)
 
 
 class _ClassDefItemList(_MemoryItemList):
+
   def __init__(self, reader, offset, size):
     reader.Seek(offset)
 
@@ -177,6 +187,7 @@ class _ClassDefItemList(_MemoryItemList):
 
 
 class _DexMapItem:
+
   def __init__(self, reader):
     self.type = reader.ReadUShort()
     reader.ReadUShort()
@@ -212,6 +223,7 @@ class _DexMapList:
 
 
 class _DexReader:
+
   def __init__(self, data):
     self._data = data
     self._pos = 0
@@ -306,7 +318,11 @@ class _DexReader:
         code = ((a & 0x0f) << 12) | ((b & 0x3f) << 6) | (c & 0x3f)
       else:
         raise _MUTf8DecodeError('Bad byte', string_length, offset)
-      ret += chr(code)
+
+      try:
+        ret += unichr(code)
+      except NameError:
+        ret += chr(code)
 
     if self.ReadUByte() != 0x00:
       raise _MUTf8DecodeError('Expected string termination', string_length,
@@ -316,6 +332,7 @@ class _DexReader:
 
 
 class _MUTf8DecodeError(Exception):
+
   def __init__(self, message, length, offset):
     message += ' (decoded string length: {}, string data offset: {:#x})'.format(
         length, offset)
@@ -365,25 +382,20 @@ class DexFile:
     self.map_list = _DexMapList(self.reader, self.header.map_off)
     self.type_item_list = _TypeIdItemList(self.reader, self.header.type_ids_off,
                                           self.header.type_ids_size)
-    self.proto_item_list = _ProtoIdItemList(self.reader,
-                                            self.header.proto_ids_off,
-                                            self.header.proto_ids_size)
-    self.method_item_list = _MethodIdItemList(self.reader,
-                                              self.header.method_ids_off,
-                                              self.header.method_ids_size)
-    self.string_item_list = _StringItemList(self.reader,
-                                            self.header.string_ids_off,
-                                            self.header.string_ids_size)
-    self.class_def_item_list = _ClassDefItemList(self.reader,
-                                                 self.header.class_defs_off,
-                                                 self.header.class_defs_size)
+    self.proto_item_list = _ProtoIdItemList(
+        self.reader, self.header.proto_ids_off, self.header.proto_ids_size)
+    self.method_item_list = _MethodIdItemList(
+        self.reader, self.header.method_ids_off, self.header.method_ids_size)
+    self.string_item_list = _StringItemList(
+        self.reader, self.header.string_ids_off, self.header.string_ids_size)
+    self.class_def_item_list = _ClassDefItemList(
+        self.reader, self.header.class_defs_off, self.header.class_defs_size)
 
     type_list_key = _DexMapList.TYPE_TYPE_LIST
     if type_list_key in self.map_list:
       map_list_item = self.map_list[type_list_key]
-      self.type_list_item_list = _TypeListItemList(self.reader,
-                                                   map_list_item.offset,
-                                                   map_list_item.size)
+      self.type_list_item_list = _TypeListItemList(
+          self.reader, map_list_item.offset, map_list_item.size)
     else:
       self.type_list_item_list = _TypeListItemList(self.reader, 0, 0)
     self._type_lists_by_offset = {
@@ -443,6 +455,7 @@ class DexFile:
 
 
 class _DumpCommand:
+
   def __init__(self, dexfile):
     self._dexfile = dexfile
 
@@ -451,6 +464,7 @@ class _DumpCommand:
 
 
 class _DumpMethods(_DumpCommand):
+
   def Run(self):
     for parts in self._dexfile.IterMethodSignatureParts():
       class_type, return_type, method_name, parameter_types = parts
@@ -459,6 +473,7 @@ class _DumpMethods(_DumpCommand):
 
 
 class _DumpStrings(_DumpCommand):
+
   def Run(self):
     for string_item in self._dexfile.string_item_list:
       # Some strings are likely to be non-ascii (vs. methods/classes).
@@ -466,6 +481,7 @@ class _DumpStrings(_DumpCommand):
 
 
 class _DumpClasses(_DumpCommand):
+
   def Run(self):
     for class_item in self._dexfile.class_def_item_list:
       class_string = self._dexfile.GetTypeString(class_item.class_idx)
@@ -478,6 +494,7 @@ class _DumpClasses(_DumpCommand):
 
 
 class _DumpSummary(_DumpCommand):
+
   def Run(self):
     print(self._dexfile)
 
@@ -501,13 +518,14 @@ def _DumpDexItems(dexfile_data, name, item):
 
 def main():
   parser = argparse.ArgumentParser(description='Dump dex contents to stdout.')
-  parser.add_argument('input',
-                      help='Input (.dex, .jar, .zip, .aab, .apk) file path.')
-  parser.add_argument('item',
-                      choices=('methods', 'strings', 'classes', 'summary'),
-                      help='Item to dump',
-                      nargs='?',
-                      default='summary')
+  parser.add_argument(
+      'input', help='Input (.dex, .jar, .zip, .aab, .apk) file path.')
+  parser.add_argument(
+      'item',
+      choices=('methods', 'strings', 'classes', 'summary'),
+      help='Item to dump',
+      nargs='?',
+      default='summary')
   args = parser.parse_args()
 
   if os.path.splitext(args.input)[1] in ('.apk', '.jar', '.zip', '.aab'):
@@ -524,7 +542,7 @@ def main():
         _DumpDexItems(z.read(path), path, args.item)
 
   else:
-    with open(args.input, 'rb') as f:
+    with open(args.input) as f:
       _DumpDexItems(f.read(), args.input, args.item)
 
 

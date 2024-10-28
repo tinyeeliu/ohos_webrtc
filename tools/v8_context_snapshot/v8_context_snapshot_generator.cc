@@ -8,6 +8,7 @@
 #include "base/task/single_thread_task_executor.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/task/thread_pool/thread_pool_instance.h"
+#include "base/threading/thread_task_runner_handle.h"
 #include "gin/v8_initializer.h"
 #include "mojo/core/embedder/embedder.h"
 #include "mojo/public/cpp/bindings/binder_map.h"
@@ -34,9 +35,6 @@ class SnapshotPlatform final : public blink::Platform {
 // % v8_context_snapshot_generator --output_file=<filename>
 int main(int argc, char** argv) {
   base::AtExitManager at_exit;
-
-  const bool kRemoveRecognizedFlags = true;
-  v8::V8::SetFlagsFromCommandLine(&argc, argv, kRemoveRecognizedFlags);
   base::CommandLine::Init(argc, argv);
 #ifdef V8_USE_EXTERNAL_STARTUP_DATA
   gin::V8Initializer::LoadV8Snapshot();
@@ -54,19 +52,17 @@ int main(int argc, char** argv) {
   SnapshotPlatform platform;
   mojo::BinderMap binders;
   blink::CreateMainThreadAndInitialize(&platform, &binders);
-  auto* isolate = blink::CreateMainThreadIsolate();
-  v8::StartupData blob = blink::WebV8ContextSnapshot::TakeSnapshot(isolate);
+  v8::StartupData blob = blink::WebV8ContextSnapshot::TakeSnapshot();
 
   // Save the snapshot as a file. Filename is given in a command line option.
   base::FilePath file_path =
       base::CommandLine::ForCurrentProcess()->GetSwitchValuePath("output_file");
   CHECK(!file_path.empty());
+  int written = base::WriteFile(file_path, blob.data, blob.raw_size);
   int error_code = 0;
-  if (!base::WriteFile(file_path,
-                       base::as_bytes(base::make_span(
-                           blob.data, static_cast<size_t>(blob.raw_size))))) {
-    fprintf(stderr, "Error: WriteFile of %d snapshot has failed.\n",
-            blob.raw_size);
+  if (written != blob.raw_size) {
+    fprintf(stderr, "Error: WriteFile of %d snapshot bytes returned %d.\n",
+            blob.raw_size, written);
     error_code = 1;
   }
 

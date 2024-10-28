@@ -7,7 +7,6 @@ set(plugin_sources
   CheckDispatchVisitor.cpp
   CheckFieldsVisitor.cpp
   CheckFinalizerVisitor.cpp
-  CheckForbiddenFieldsVisitor.cpp
   CheckGCRootsVisitor.cpp
   CheckTraceVisitor.cpp
   CollectVisitor.cpp

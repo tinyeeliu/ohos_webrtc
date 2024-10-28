@@ -54,7 +54,6 @@ struct BitstreamThresholds {
 };
 
 // NOTE: This class is still under development and may change without notice.
-// TODO(webrtc:14852): Deprecated in favor VideoCodecTester.
 class VideoCodecTestFixture {
  public:
   class EncodedFrameChecker {

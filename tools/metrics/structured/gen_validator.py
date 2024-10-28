@@ -22,12 +22,12 @@ parser.add_argument('--output', help='Path to generated files.')
 
 def main():
   args = parser.parse_args()
-  structured = model.Model(open(args.input, encoding='utf-8').read())
+  data = model.Model(open(args.input).read())
 
   codegen.ValidatorHeaderTemplate(
-      args.output, 'structured_metrics_validator.h').write_file()
+      data, args.output, 'structured_metrics_validator.h').write_file()
 
-  codegen.ValidatorImplTemplate(structured, args.output,
+  codegen.ValidatorImplTemplate(data, args.output,
                                 'structured_metrics_validator.cc').write_file()
 
   return 0

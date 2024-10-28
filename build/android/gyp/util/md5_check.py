@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+from __future__ import print_function
 
 import difflib
 import hashlib
@@ -12,7 +13,8 @@ import sys
 import zipfile
 
 from util import build_utils
-import action_helpers  # build_utils adds //build to sys.path.
+
+sys.path.insert(1, os.path.join(build_utils.DIR_SOURCE_ROOT, 'build'))
 import print_python_deps
 
 # When set and a difference is detected, a diff of what changed is printed.
@@ -65,7 +67,7 @@ def CallAndWriteDepfileIfStale(on_stale_md5,
   # on bots that build with & without patch, and the patch changes the depfile
   # location.
   if hasattr(options, 'depfile') and options.depfile:
-    action_helpers.write_depfile(options.depfile, output_paths[0], depfile_deps)
+    build_utils.WriteDepfile(options.depfile, output_paths[0], depfile_deps)
 
 
 def CallAndRecordIfStale(function,

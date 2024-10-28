@@ -16,7 +16,6 @@
 
 #include "absl/memory/memory.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "api/function_view.h"
 #include "api/scoped_refptr.h"
 #include "api/sequence_checker.h"
@@ -110,10 +109,9 @@ class TestPeer final : public StatsProvider {
   }
 
   rtc::scoped_refptr<DataChannelInterface> CreateDataChannel(
-      const std::string& label,
-      const absl::optional<DataChannelInit>& config = absl::nullopt) {
+      const std::string& label) {
     RTC_CHECK(wrapper_) << "TestPeer is already closed";
-    return wrapper_->CreateDataChannel(label, config);
+    return wrapper_->CreateDataChannel(label);
   }
 
   PeerConnectionInterface::SignalingState signaling_state() {

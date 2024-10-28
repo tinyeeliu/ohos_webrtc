@@ -5,6 +5,7 @@
 
 '''Unit tests for grit.clique'''
 
+from __future__ import print_function
 
 import os
 import sys
@@ -14,7 +15,7 @@ if __name__ == '__main__':
 import re
 import unittest
 
-from io import StringIO
+from six import StringIO
 
 from grit import clique
 from grit import exception
@@ -31,8 +32,8 @@ class MessageCliqueUnittest(unittest.TestCase):
                           tclib.Placeholder('USERNAME', '%s', 'Joi')])
     c = factory.MakeClique(msg)
 
-    self.assertTrue(c.GetMessage() == msg)
-    self.assertTrue(c.GetId() == msg.GetId())
+    self.failUnless(c.GetMessage() == msg)
+    self.failUnless(c.GetId() == msg.GetId())
 
     msg_fr = tclib.Translation(text='Bonjour USERNAME, comment ca va?',
                                id=msg.GetId(), placeholders=[
@@ -46,9 +47,9 @@ class MessageCliqueUnittest(unittest.TestCase):
 
     # sort() sorts lists in-place and does not return them
     for lang in ('en', 'fr', 'de'):
-      self.assertTrue(lang in c.clique)
+      self.failUnless(lang in c.clique)
 
-    self.assertTrue(c.MessageForLanguage('fr').GetRealContent() ==
+    self.failUnless(c.MessageForLanguage('fr').GetRealContent() ==
                     msg_fr.GetRealContent())
 
     try:
@@ -57,11 +58,11 @@ class MessageCliqueUnittest(unittest.TestCase):
     except:
       pass
 
-    self.assertTrue(c.MessageForLanguage('zh-CN', True) != None)
+    self.failUnless(c.MessageForLanguage('zh-CN', True) != None)
 
     rex = re.compile('fr|de|bingo')
-    self.assertTrue(len(c.AllMessagesThatMatch(rex, False)) == 2)
-    self.assertTrue(
+    self.failUnless(len(c.AllMessagesThatMatch(rex, False)) == 2)
+    self.failUnless(
         c.AllMessagesThatMatch(rex, True)[pseudo.PSEUDO_LANG] is not None)
 
   def testBestClique(self):
@@ -83,16 +84,16 @@ class MessageCliqueUnittest(unittest.TestCase):
       text = msg.GetRealContent()
       description = msg.GetDescription()
       if text == 'Alfur':
-        self.assertTrue(description == 'alfaholl')
+        self.failUnless(description == 'alfaholl')
       elif text == 'Gryla':
-        self.assertTrue(description == 'vondakerling')
+        self.failUnless(description == 'vondakerling')
       elif text == 'Leppaludi':
-        self.assertTrue(description == 'ID: IDS_LL')
-    self.assertTrue(count_best_cliques == 5)
+        self.failUnless(description == 'ID: IDS_LL')
+    self.failUnless(count_best_cliques == 5)
 
   def testAllInUberClique(self):
     resources = grd_reader.Parse(
-        StringIO('''<?xml version="1.0" encoding="UTF-8"?>
+        StringIO(u'''<?xml version="1.0" encoding="UTF-8"?>
 <grit latest_public_release="2" source_lang_id="en-US" current_release="3" base_dir=".">
   <release seq="3">
     <messages>
@@ -112,14 +113,14 @@ class MessageCliqueUnittest(unittest.TestCase):
     for clique_list in resources.UberClique().cliques_.values():
       for clique in clique_list:
         content_list.append(clique.GetMessage().GetRealContent())
-    self.assertTrue('Hello %s, how are you doing today?' in content_list)
-    self.assertTrue('Jack "Black" Daniels' in content_list)
-    self.assertTrue('Hello!' in content_list)
+    self.failUnless('Hello %s, how are you doing today?' in content_list)
+    self.failUnless('Jack "Black" Daniels' in content_list)
+    self.failUnless('Hello!' in content_list)
 
   def testCorrectExceptionIfWrongEncodingOnResourceFile(self):
     '''This doesn't really belong in this unittest file, but what the heck.'''
     resources = grd_reader.Parse(
-        StringIO('''<?xml version="1.0" encoding="UTF-8"?>
+        StringIO(u'''<?xml version="1.0" encoding="UTF-8"?>
 <grit latest_public_release="2" source_lang_id="en-US" current_release="3" base_dir=".">
   <release seq="3">
     <structures>
@@ -136,7 +137,7 @@ class MessageCliqueUnittest(unittest.TestCase):
       tclib.Message(text='Hello USERNAME',
                     placeholders=[tclib.Placeholder('USERNAME', '%s', 'Joi')]),
     ]
-    self.assertTrue(messages[0].GetId() == messages[1].GetId())
+    self.failUnless(messages[0].GetId() == messages[1].GetId())
 
     # Both of the above would share a translation.
     translation = tclib.Translation(id=messages[0].GetId(),
@@ -150,9 +151,9 @@ class MessageCliqueUnittest(unittest.TestCase):
     for clq in cliques:
       clq.AddTranslation(translation, 'fr')
 
-    self.assertTrue(cliques[0].MessageForLanguage('fr').GetRealContent() ==
+    self.failUnless(cliques[0].MessageForLanguage('fr').GetRealContent() ==
                     'Bonjour $1')
-    self.assertTrue(cliques[1].MessageForLanguage('fr').GetRealContent() ==
+    self.failUnless(cliques[1].MessageForLanguage('fr').GetRealContent() ==
                     'Bonjour %s')
 
   def testMissingTranslations(self):
@@ -162,17 +163,17 @@ class MessageCliqueUnittest(unittest.TestCase):
 
     cliques[1].MessageForLanguage('fr', False, True)
 
-    self.assertTrue(not factory.HasMissingTranslations())
+    self.failUnless(not factory.HasMissingTranslations())
 
     cliques[0].MessageForLanguage('de', False, False)
 
-    self.assertTrue(factory.HasMissingTranslations())
+    self.failUnless(factory.HasMissingTranslations())
 
     report = factory.MissingTranslationsReport()
-    self.assertTrue(report.count('WARNING') == 1)
-    self.assertTrue(report.count('8053599568341804890 "Goodbye" fr') == 1)
-    self.assertTrue(report.count('ERROR') == 1)
-    self.assertTrue(report.count('800120468867715734 "Hello" de') == 1)
+    self.failUnless(report.count('WARNING') == 1)
+    self.failUnless(report.count('8053599568341804890 "Goodbye" fr') == 1)
+    self.failUnless(report.count('ERROR') == 1)
+    self.failUnless(report.count('800120468867715734 "Hello" de') == 1)
 
   def testCustomTypes(self):
     factory = clique.UberClique()
@@ -190,22 +191,22 @@ class MessageCliqueUnittest(unittest.TestCase):
       'grit.clique_unittest.DummyCustomType', clique.CustomType))
     translation = tclib.Translation(id=message.GetId(), text='Bilingo bolongo')
     c.AddTranslation(translation, 'fr')
-    self.assertTrue(c.MessageForLanguage('fr').GetRealContent().startswith('jjj'))
+    self.failUnless(c.MessageForLanguage('fr').GetRealContent().startswith('jjj'))
 
   def testWhitespaceMessagesAreNontranslateable(self):
     factory = clique.UberClique()
 
     message = tclib.Message(text=' \t')
     c = factory.MakeClique(message, translateable=True)
-    self.assertFalse(c.IsTranslateable())
+    self.failIf(c.IsTranslateable())
 
     message = tclib.Message(text='\n \n ')
     c = factory.MakeClique(message, translateable=True)
-    self.assertFalse(c.IsTranslateable())
+    self.failIf(c.IsTranslateable())
 
     message = tclib.Message(text='\n hello')
     c = factory.MakeClique(message, translateable=True)
-    self.assertTrue(c.IsTranslateable())
+    self.failUnless(c.IsTranslateable())
 
   def testEachCliqueKeptSorted(self):
     factory = clique.UberClique()
@@ -217,10 +218,10 @@ class MessageCliqueUnittest(unittest.TestCase):
     clique_a = factory.MakeClique(msg_a, translateable=True)
     clique_c = factory.MakeClique(msg_c, translateable=True)
     clique_list = factory.cliques_[clique_a.GetId()]
-    self.assertTrue(len(clique_list) == 3)
-    self.assertTrue(clique_list[0] == clique_a)
-    self.assertTrue(clique_list[1] == clique_b)
-    self.assertTrue(clique_list[2] == clique_c)
+    self.failUnless(len(clique_list) == 3)
+    self.failUnless(clique_list[0] == clique_a)
+    self.failUnless(clique_list[1] == clique_b)
+    self.failUnless(clique_list[2] == clique_c)
 
   def testBestCliqueSortIsStable(self):
     factory = clique.UberClique()
@@ -235,19 +236,19 @@ class MessageCliqueUnittest(unittest.TestCase):
     # Insert in an order that tests all outcomes.
     clique_no_description = factory.MakeClique(msg_no_description,
                                                translateable=True)
-    self.assertTrue(factory.BestClique(clique_id) == clique_no_description)
+    self.failUnless(factory.BestClique(clique_id) == clique_no_description)
     clique_id_description_b = factory.MakeClique(msg_id_description_b,
                                                  translateable=True)
-    self.assertTrue(factory.BestClique(clique_id) == clique_id_description_b)
+    self.failUnless(factory.BestClique(clique_id) == clique_id_description_b)
     clique_id_description_a = factory.MakeClique(msg_id_description_a,
                                                  translateable=True)
-    self.assertTrue(factory.BestClique(clique_id) == clique_id_description_a)
+    self.failUnless(factory.BestClique(clique_id) == clique_id_description_a)
     clique_description_y = factory.MakeClique(msg_description_y,
                                               translateable=True)
-    self.assertTrue(factory.BestClique(clique_id) == clique_description_y)
+    self.failUnless(factory.BestClique(clique_id) == clique_description_y)
     clique_description_x = factory.MakeClique(msg_description_x,
                                               translateable=True)
-    self.assertTrue(factory.BestClique(clique_id) == clique_description_x)
+    self.failUnless(factory.BestClique(clique_id) == clique_description_x)
 
 
 class DummyCustomType(clique.CustomType):

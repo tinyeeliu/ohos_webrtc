@@ -4,95 +4,80 @@
 
 'use strict';
 
-
-/** @type {(a: TokenClient) => void} Resolve function of g_authScriptPromise. */
-let g_onAuthScriptLoaded = null;
-/** @type {Promise<TokenClient>} Resolves when GIS is loaded. */
+/** @type {Promise} Resolves when gapi.js is loaded. */
 const g_authScriptPromise = new Promise((resolve, reject) => {
-  g_onAuthScriptLoaded = resolve;
+  window.onAuthScriptLoaded = resolve;
 });
 
-/** @type {(a: string) => void} Resolve function of g_authTokenPromise. */
-let g_onTokenReceived = null;
-/** @type {Promise<string>} Resolves when access token is received. */
-const g_authTokenPromise = new Promise((resolve, reject) => {
-  g_onTokenReceived = resolve;
-});
-
-/** @type {boolean} Used to ensure the auth pipeline is only setup once. */
-let g_authFetchCalled = false;
+/** @type {?Promise} Resolves when auth has completed. */
+let g_doAuthPromise = null;
 
 /** @return {Promise<*>} */
-async function initClient() {
-  let tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: AUTH_CLIENT_ID,
-    scope: AUTH_SCOPE,
-    callback: '',  // defined at request time in await/promise scope.
+async function initAuthApi() {
+  await g_authScriptPromise;
+  await new Promise((resolve, reject) => {
+    gapi.load('client:auth2', resolve);
   });
-  g_onAuthScriptLoaded(tokenClient);
+  await gapi.client.init({
+      'clientId': AUTH_CLIENT_ID,
+      'discoveryDocs': [AUTH_DISCOVERY_URL],
+      'scope': AUTH_SCOPE,
+  })
+  return gapi.auth2.getAuthInstance();
 }
 
-/** @return {Promise<void>} */
-async function getToken() {
-  let tokenClient = await g_authScriptPromise;
-  try {
-    tokenClient.callback = (resp) => {
-      if (resp.error === undefined) {
-        g_onTokenReceived(resp.access_token);
-      }
-    };
-    tokenClient.requestAccessToken();
-  } catch (err) {
-    console.error(err)
-  }
-}
-
-/** @return {Promise<void>} */
+/** @return {Promise<*>} */
 async function doAuthFetch() {
-  // TODO(mheikal): cache access token in localstorage and check if expired here
-  // and return cached token.
+  let googleAuth = await initAuthApi();
+
+  // See if already signed in.
+  if (googleAuth.isSignedIn.get()) {
+    return googleAuth.currentUser.get();
+  }
 
   // Show a "Please sign in" dialog.
   toggleSigninModal(true /*show*/);
-  const btnSignin = g_el.divSigninModal.querySelector('button.signin');
-  btnSignin.addEventListener('click', getToken);
 
-  // Only hide the dialog once we have the token.
-  await g_authTokenPromise;
+  // Loop in case the pop-up dialog is closed without signing in.
+  while (true) {
+    await new Promise((resolve, reject) => {
+      let signinButton = document.querySelector('#signin-modal button.signin');
+      signinButton.addEventListener('click', resolve, {once: true});
+    });
+
+    try {
+      await googleAuth.signIn();
+      break;
+    } catch {
+      // Allow them to click dialog button again.
+    }
+  }
   toggleSigninModal(false /*show*/);
+
+  return googleAuth.currentUser.get();
 }
 
 /** @return {Promise<?string>} */
 async function fetchAccessToken() {
-  if (!g_authFetchCalled) {
-    doAuthFetch();
-    g_authFetchCalled = true;
+  if (!g_doAuthPromise) {
+    g_doAuthPromise = doAuthFetch();
   }
-  return await g_authTokenPromise;
+  let user = await g_doAuthPromise;
+  return user.getAuthResponse().access_token;
 }
 
 /** @param {boolean} show */
 function toggleSigninModal(show) {
-  g_el.divSigninModal.style.display = show ? '' : 'none';
+  const modal = document.getElementById('signin-modal');
+  modal.style.display = show ? '': 'none';
 }
 
-/**
- * @param {!Array<!URL>} urlsToLoad
- * @return {boolean}
- */
-function requiresAuthentication(urlsToLoad) {
-  for (const url of urlsToLoad) {
-    // Files from ocalhost, public trybot, and one-offs don't need auth.
-    if (url.hostname === 'localhost')
-      continue;
-    if (url.pathname.startsWith(
-            '/chromium-binary-size-trybot-results/android-binary-size/')) {
-      continue;
-    }
-    if (url.pathname.indexOf('/oneoffs/') >= 0)
-      continue;
-    // Assume everything else requires auth.
-    return true;
-  }
-  return false;
+/** @return {boolean} */
+function requiresAuthentication() {
+  // Assume everything requires auth except public trybot and one-offs.
+  const queryString = decodeURIComponent(location.search);
+  const isPublicTrybot = queryString.indexOf(
+      'chromium-binary-size-trybot-results/android-binary-size') != -1;
+  const isOneOff = queryString.indexOf('/oneoffs/') != -1;
+  return !isPublicTrybot && !isOneOff;
 }

@@ -14,7 +14,6 @@
 #include <set>
 #include <utility>
 
-#include "absl/flags/flag.h"
 #include "absl/strings/string_view.h"
 #include "api/jsep.h"
 #include "api/media_stream_interface.h"
@@ -45,7 +44,6 @@
 #include "test/pc/e2e/peer_params_preprocessor.h"
 #include "test/pc/e2e/stats_poller.h"
 #include "test/pc/e2e/test_peer_factory.h"
-#include "test/test_flags.h"
 #include "test/testsupport/file_utils.h"
 
 namespace webrtc {
@@ -195,6 +193,16 @@ void PeerConnectionE2EQualityTest::ExecuteEvery(
 void PeerConnectionE2EQualityTest::AddQualityMetricsReporter(
     std::unique_ptr<QualityMetricsReporter> quality_metrics_reporter) {
   quality_metrics_reporters_.push_back(std::move(quality_metrics_reporter));
+}
+
+PeerConnectionE2EQualityTest::PeerHandle* PeerConnectionE2EQualityTest::AddPeer(
+    const PeerNetworkDependencies& network_dependencies,
+    rtc::FunctionView<void(PeerConfigurer*)> configurer) {
+  peer_configurations_.push_back(
+      std::make_unique<PeerConfigurer>(network_dependencies));
+  configurer(peer_configurations_.back().get());
+  peer_handles_.push_back(PeerHandleImpl());
+  return &peer_handles_.back();
 }
 
 PeerConnectionE2EQualityTest::PeerHandle* PeerConnectionE2EQualityTest::AddPeer(
@@ -386,7 +394,7 @@ void PeerConnectionE2EQualityTest::Run(RunParams run_params) {
   executor_->Start(task_queue_.get());
   Timestamp start_time = Now();
 
-  bool is_quick_test_enabled = absl::GetFlag(FLAGS_webrtc_quick_perf_test);
+  bool is_quick_test_enabled = field_trial::IsEnabled("WebRTC-QuickPerfTest");
   if (is_quick_test_enabled) {
     time_controller_.AdvanceTime(kQuickTestModeRunDuration);
   } else {
@@ -743,18 +751,14 @@ void PeerConnectionE2EQualityTest::TearDownCall() {
 }
 
 void PeerConnectionE2EQualityTest::ReportGeneralTestResults() {
-  // TODO(bugs.webrtc.org/14757): Remove kExperimentalTestNameMetadataKey.
   metrics_logger_->LogSingleValueMetric(
       *alice_->params().name + "_connected", test_case_name_, alice_connected_,
       Unit::kUnitless, ImprovementDirection::kBiggerIsBetter,
-      {{MetricMetadataKey::kPeerMetadataKey, *alice_->params().name},
-       {MetricMetadataKey::kExperimentalTestNameMetadataKey, test_case_name_}});
-  // TODO(bugs.webrtc.org/14757): Remove kExperimentalTestNameMetadataKey.
+      {{MetricMetadataKey::kPeerMetadataKey, *alice_->params().name}});
   metrics_logger_->LogSingleValueMetric(
       *bob_->params().name + "_connected", test_case_name_, bob_connected_,
       Unit::kUnitless, ImprovementDirection::kBiggerIsBetter,
-      {{MetricMetadataKey::kPeerMetadataKey, *bob_->params().name},
-       {MetricMetadataKey::kExperimentalTestNameMetadataKey, test_case_name_}});
+      {{MetricMetadataKey::kPeerMetadataKey, *bob_->params().name}});
 }
 
 Timestamp PeerConnectionE2EQualityTest::Now() const {

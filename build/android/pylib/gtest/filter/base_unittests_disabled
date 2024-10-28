@@ -20,3 +20,6 @@ ScopedJavaRefTest.RefCounts
 FileTest.MemoryCorruption
 MessagePumpLibeventTest.QuitOutsideOfRun
 ScopedFD.ScopedFDCrashesOnCloseFailure
+
+# http://crbug.com/245043
+StackContainer.BufferAlignment

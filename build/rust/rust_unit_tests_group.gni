@@ -20,12 +20,11 @@
 #
 # Example usage:
 #
-#   # This will generate a script at out/Default/bin/run_foo_tests (or
-#   # run_foo_tests.bat on Windows) that wraps the executables containing
-#   # native Rust unit tests:
-#   # * out/Default/foo_crate1_unittests
-#   # * out/Default/foo_mixed_source_set2_rs_unittests
-#   # * out/Default/foo_mixed_source_set3_rs_unittests
+#   # This will generate a script at out/Default/bin/run_foo_tests that wraps
+#   # out/Default/foo_crate1_unittests,
+#   # out/Default/foo_mixed_source_set2_rs_unittests,
+#   # and out/Default/foo_mixed_source_set3_rs_unittests executables containing
+#   # native Rust unit tests.
 #   rust_unit_tests_group("foo_tests") {
 #     deps = [
 #       "foo_crate1",
@@ -33,6 +32,7 @@
 #       "foo_mixed_source_set3",
 #     ]
 #   }
+#   # TODO(https://crbug.com/1271215): Mention .bat generation once implemented.
 
 template("rust_unit_tests_group") {
   assert(defined(invoker.deps), "deps must be listed")
@@ -40,11 +40,7 @@ template("rust_unit_tests_group") {
   # As noted in the top-level comment of //testing/buildbot/gn_isolate_map.pyl
   # the script *must* be in output_dir/bin/run_$target (or
   # output_dir\bin\run_$target.bat on Windows).
-  bat = ""
-  if (is_win) {
-    bat = ".bat"
-  }
-  _script_filepath = "$root_out_dir/bin/run_${target_name}${bat}"
+  _script_filepath = "$root_out_dir/bin/run_${target_name}"
 
   # Gathering metadata provided by the rust_unit_test gni template from all of
   # our dependencies.
@@ -60,11 +56,15 @@ template("rust_unit_tests_group") {
 
   # Generating a script that can run all of the wrapped Rust unit test
   # executables.
+  #
+  # TODO(https://crbug.com/1271215): Also generate: bin/run_${target_name}.bat
+  # when *targeting* Windows: if (is_win) { ... }.  (The "targeting" part means
+  # that we can't just detect whether the build is *hosted* on Windows.)
   action(target_name) {
     forward_variables_from(invoker, "*", [])
 
     testonly = true
-    script = "//testing/scripts/rust/generate_script.py"
+    script = "//testing/scripts/rust/generate_bash_script.py"
     inputs = [ _metadata_filepath ]
     outputs = [ _script_filepath ]
 
@@ -86,8 +86,5 @@ template("rust_unit_tests_group") {
       "--script-path",
       rebase_path(_script_filepath, root_build_dir),
     ]
-    if (is_win) {
-      args += [ "--make-bat" ]
-    }
   }
 }

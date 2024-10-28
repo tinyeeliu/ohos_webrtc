@@ -13,7 +13,6 @@
 
 #include <memory>
 #include <string>
-#include <utility>
 #include <vector>
 
 #include "absl/strings/string_view.h"
@@ -28,10 +27,8 @@
 #include "p2p/base/transport_description.h"
 #include "rtc_base/async_packet_socket.h"
 #include "rtc_base/network.h"
-#include "rtc_base/network/received_packet.h"
 #include "rtc_base/numerics/event_based_exponential_moving_average.h"
 #include "rtc_base/rate_tracker.h"
-#include "rtc_base/system/rtc_export.h"
 #include "rtc_base/weak_ptr.h"
 
 namespace cricket {
@@ -59,7 +56,7 @@ struct CandidatePair final : public CandidatePairInterface {
 
 // Represents a communication link between a port on the local client and a
 // port on the remote client.
-class RTC_EXPORT Connection : public CandidatePairInterface {
+class Connection : public CandidatePairInterface {
  public:
   struct SentPing {
     SentPing(absl::string_view id, int64_t sent_time, uint32_t nomination)
@@ -112,7 +109,6 @@ class RTC_EXPORT Connection : public CandidatePairInterface {
   bool connected() const;
   bool weak() const;
   bool active() const;
-  bool pending_delete() const { return !port_; }
 
   // A connection is dead if it can be safely deleted.
   bool dead(int64_t now) const;
@@ -147,15 +143,7 @@ class RTC_EXPORT Connection : public CandidatePairInterface {
   // Error if Send() returns < 0
   virtual int GetError() = 0;
 
-  // TODO(webrtc:11943): Remove SignalReadPacket once upstream projects have
-  // switched to use RegisterReceivedPacket.
   sigslot::signal4<Connection*, const char*, size_t, int64_t> SignalReadPacket;
-
-  // Register as a recipient of received packets. There can only be one.
-  void RegisterReceivedPacketCallback(
-      absl::AnyInvocable<void(Connection*, const rtc::ReceivedPacket&)>
-          received_packet_callback);
-  void DeregisterReceivedPacketCallback();
 
   sigslot::signal1<Connection*> SignalReadyToSend;
 
@@ -216,15 +204,12 @@ class RTC_EXPORT Connection : public CandidatePairInterface {
 
   // Called when this connection should try checking writability again.
   int64_t last_ping_sent() const;
-  void Ping(int64_t now,
-            std::unique_ptr<StunByteStringAttribute> delta = nullptr);
+  void Ping(int64_t now);
   void ReceivedPingResponse(
       int rtt,
       absl::string_view request_id,
       const absl::optional<uint32_t>& nomination = absl::nullopt);
-  std::unique_ptr<IceMessage> BuildPingRequest(
-      std::unique_ptr<StunByteStringAttribute> delta)
-      RTC_RUN_ON(network_thread_);
+  std::unique_ptr<IceMessage> BuildPingRequest() RTC_RUN_ON(network_thread_);
 
   int64_t last_ping_response_received() const;
   const absl::optional<std::string>& last_ping_id_received() const;
@@ -333,7 +318,7 @@ class RTC_EXPORT Connection : public CandidatePairInterface {
 
   std::unique_ptr<IceMessage> BuildPingRequestForTest() {
     RTC_DCHECK_RUN_ON(network_thread_);
-    return BuildPingRequest(nullptr);
+    return BuildPingRequest();
   }
 
   // Public for unit tests.
@@ -345,20 +330,6 @@ class RTC_EXPORT Connection : public CandidatePairInterface {
   }
   void set_remote_password_for_test(absl::string_view pwd) {
     remote_candidate_.set_password(pwd);
-  }
-
-  void SetStunDictConsumer(
-      std::function<std::unique_ptr<StunAttribute>(
-          const StunByteStringAttribute*)> goog_delta_consumer,
-      std::function<void(webrtc::RTCErrorOr<const StunUInt64Attribute*>)>
-          goog_delta_ack_consumer) {
-    goog_delta_consumer_ = std::move(goog_delta_consumer);
-    goog_delta_ack_consumer_ = std::move(goog_delta_ack_consumer);
-  }
-
-  void ClearStunDictConsumer() {
-    goog_delta_consumer_ = absl::nullopt;
-    goog_delta_ack_consumer_ = absl::nullopt;
   }
 
  protected:
@@ -503,15 +474,6 @@ class RTC_EXPORT Connection : public CandidatePairInterface {
   const IceFieldTrials* field_trials_;
   rtc::EventBasedExponentialMovingAverage rtt_estimate_
       RTC_GUARDED_BY(network_thread_);
-
-  absl::optional<std::function<std::unique_ptr<StunAttribute>(
-      const StunByteStringAttribute*)>>
-      goog_delta_consumer_;
-  absl::optional<
-      std::function<void(webrtc::RTCErrorOr<const StunUInt64Attribute*>)>>
-      goog_delta_ack_consumer_;
-  absl::AnyInvocable<void(Connection*, const rtc::ReceivedPacket&)>
-      received_packet_callback_;
 };
 
 // ProxyConnection defers all the interesting work to the port.

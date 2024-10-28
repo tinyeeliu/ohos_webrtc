@@ -37,9 +37,8 @@ chromium-metrics-reviews@google.com.
 </variants>
 
 <histogram name="QuickAnswers.ActiveImpression" enum="QuickAnswersResultType"
-    expires_after="2024-04-28">
-  <owner>angelaxiao@chromium.org</owner>
-  <owner>yawano@google.com</owner>
+    expires_after="2023-04-30">
+  <owner>updowndota@chromium.org</owner>
   <owner>llin@google.com</owner>
   <owner>croissant-eng@chromium.org</owner>
   <summary>
@@ -50,9 +49,8 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="QuickAnswers.ActiveImpression.Duration{QuickAnswersClickResultType}"
-    units="ms" expires_after="2024-02-20">
-  <owner>angelaxiao@chromium.org</owner>
-  <owner>yawano@google.com</owner>
+    units="ms" expires_after="2023-01-16">
+  <owner>updowndota@chromium.org</owner>
   <owner>llin@google.com</owner>
   <owner>croissant-eng@chromium.org</owner>
   <summary>
@@ -66,9 +64,8 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="QuickAnswers.Click" enum="QuickAnswersResultType"
-    expires_after="2024-04-28">
-  <owner>angelaxiao@chromium.org</owner>
-  <owner>yawano@google.com</owner>
+    expires_after="2023-03-26">
+  <owner>updowndota@chromium.org</owner>
   <owner>llin@google.com</owner>
   <owner>croissant-eng@chromium.org</owner>
   <summary>
@@ -78,8 +75,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram name="QuickAnswers.Click.Duration{QuickAnswersClickResultType}"
     units="ms" expires_after="2023-10-15">
-  <owner>angelaxiao@chromium.org</owner>
-  <owner>yawano@google.com</owner>
+  <owner>updowndota@chromium.org</owner>
   <owner>llin@google.com</owner>
   <owner>croissant-eng@chromium.org</owner>
   <summary>
@@ -93,9 +89,8 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="QuickAnswers.ContextMenu.Close" enum="BooleanClicked"
-    expires_after="2024-05-26">
-  <owner>angelaxiao@chromium.org</owner>
-  <owner>yawano@google.com</owner>
+    expires_after="2023-03-21">
+  <owner>updowndota@chromium.org</owner>
   <owner>croissant-eng@chromium.org</owner>
   <summary>
     Records whether or not the user interacted (via clicking) with a context
@@ -107,9 +102,8 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="QuickAnswers.ContextMenu.Close.Duration{InteractionType}"
-    units="ms" expires_after="2023-10-31">
-  <owner>angelaxiao@chromium.org</owner>
-  <owner>yawano@google.com</owner>
+    units="ms" expires_after="2022-12-31">
+  <owner>updowndota@chromium.org</owner>
   <owner>croissant-eng@chromium.org</owner>
   <summary>
     Records the amount of time the context menu was shown before close if the
@@ -124,8 +118,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram name="QuickAnswers.DictionaryIntent.Language" enum="LanguageName"
     expires_after="2023-07-01">
-  <owner>angelaxiao@chromium.org</owner>
-  <owner>yawano@google.com</owner>
+  <owner>updowndota@chromium.org</owner>
   <owner>croissant-eng@chromium.org</owner>
   <summary>
     For Quick answers fetch, records the query text language of dictionary
@@ -135,8 +128,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram name="QuickAnswers.DictionaryIntent.Source"
     enum="QuickAnswersDictionaryIntentSource" expires_after="2023-07-01">
-  <owner>angelaxiao@chromium.org</owner>
-  <owner>yawano@google.com</owner>
+  <owner>updowndota@chromium.org</owner>
   <owner>croissant-eng@chromium.org</owner>
   <summary>
     For Quick answers fetch, records the source type of dictionary intent
@@ -146,8 +138,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram name="QuickAnswers.ExitPoint" enum="QuickAnswersExitPoint"
     expires_after="2023-08-15">
-  <owner>angelaxiao@chromium.org</owner>
-  <owner>yawano@google.com</owner>
+  <owner>updowndota@chromium.org</owner>
   <owner>croissant-eng@chromium.org</owner>
   <summary>
     Record the Quick Answers exit point point when the Quick Answers UI is
@@ -156,9 +147,8 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="QuickAnswers.FeatureEnabled" enum="BooleanEnabled"
-    expires_after="2023-10-15">
-  <owner>angelaxiao@chromium.org</owner>
-  <owner>yawano@google.com</owner>
+    expires_after="2023-08-15">
+  <owner>updowndota@chromium.org</owner>
   <owner>croissant-eng@chromium.org</owner>
   <summary>
     Record the Quick Answers feature enabled status when the first user session
@@ -167,9 +157,8 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="QuickAnswers.Intent" enum="QuickAnswersIntentType"
-    expires_after="2023-11-12">
-  <owner>angelaxiao@chromium.org</owner>
-  <owner>yawano@google.com</owner>
+    expires_after="2023-04-30">
+  <owner>updowndota@chromium.org</owner>
   <owner>llin@google.com</owner>
   <owner>croissant-eng@chromium.org</owner>
   <summary>
@@ -179,9 +168,8 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="QuickAnswers.Loading.Duration" units="ms"
-    expires_after="2023-12-01">
-  <owner>angelaxiao@chromium.org</owner>
-  <owner>yawano@google.com</owner>
+    expires_after="2023-01-23">
+  <owner>updowndota@chromium.org</owner>
   <owner>llin@google.com</owner>
   <owner>croissant-eng@chromium.org</owner>
   <summary>
@@ -191,9 +179,8 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="QuickAnswers.Loading.Status" enum="QuickAnswersLoadStatus"
-    expires_after="2024-01-14">
-  <owner>angelaxiao@chromium.org</owner>
-  <owner>yawano@google.com</owner>
+    expires_after="2023-03-05">
+  <owner>updowndota@chromium.org</owner>
   <owner>llin@google.com</owner>
   <owner>croissant-eng@chromium.org</owner>
   <summary>
@@ -202,9 +189,8 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="QuickAnswers.NetworkError.IntentType"
-    enum="QuickAnswersIntentType" expires_after="2023-10-08">
-  <owner>angelaxiao@chromium.org</owner>
-  <owner>yawano@google.com</owner>
+    enum="QuickAnswersIntentType" expires_after="2023-03-21">
+  <owner>updowndota@chromium.org</owner>
   <owner>croissant-eng@chromium.org</owner>
   <summary>
     Records the intent type when network error occurs during the quick answers
@@ -213,9 +199,8 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="QuickAnswers.NetworkError.ResponseCode.{IntentType}"
-    enum="HttpResponseCode" expires_after="2023-10-21">
-  <owner>angelaxiao@chromium.org</owner>
-  <owner>yawano@google.com</owner>
+    enum="HttpResponseCode" expires_after="2023-03-21">
+  <owner>updowndota@chromium.org</owner>
   <owner>croissant-eng@chromium.org</owner>
   <summary>
     Records the Http response codes when network error occurs when fetching
@@ -230,8 +215,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram name="QuickAnswers.RequestTextLength.{IntentType}"
     units="characters" expires_after="2023-08-15">
-  <owner>angelaxiao@chromium.org</owner>
-  <owner>yawano@google.com</owner>
+  <owner>updowndota@chromium.org</owner>
   <owner>croissant-eng@chromium.org</owner>
   <summary>
     For every quick answer request, records the length of the selected text that
@@ -245,9 +229,8 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="QuickAnswers.Result" enum="QuickAnswersResultType"
-    expires_after="2024-05-26">
-  <owner>angelaxiao@chromium.org</owner>
-  <owner>yawano@google.com</owner>
+    expires_after="2023-04-30">
+  <owner>updowndota@chromium.org</owner>
   <owner>llin@google.com</owner>
   <owner>croissant-eng@chromium.org</owner>
   <summary>
@@ -257,9 +240,8 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="QuickAnswers.Result.Duration{QuickAnswersClickResultType}"
-    units="ms" expires_after="2023-10-31">
-  <owner>angelaxiao@chromium.org</owner>
-  <owner>yawano@google.com</owner>
+    units="ms" expires_after="2022-12-31">
+  <owner>updowndota@chromium.org</owner>
   <owner>llin@google.com</owner>
   <owner>croissant-eng@chromium.org</owner>
   <summary>
@@ -273,9 +255,8 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="QuickAnswers.SelectedContent.Length" units="characters"
-    expires_after="2024-05-19">
-  <owner>angelaxiao@chromium.org</owner>
-  <owner>yawano@google.com</owner>
+    expires_after="2023-04-30">
+  <owner>updowndota@chromium.org</owner>
   <owner>llin@google.com</owner>
   <owner>croissant-eng@chromium.org</owner>
   <summary>
@@ -285,9 +266,9 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="QuickAnswers.TextToSpeech.EngineEvent"
-    enum="QuickAnswersTextToSpeechEngineEvent" expires_after="2024-05-05">
+    enum="QuickAnswersTextToSpeechEngineEvent" expires_after="2023-03-21">
+  <owner>updowndota@chromium.org</owner>
   <owner>angelaxiao@chromium.org</owner>
-  <owner>yawano@google.com</owner>
   <owner>croissant-eng@chromium.org</owner>
   <summary>
     Reports the various TTS engine events received by the quick answers TTS
@@ -297,9 +278,8 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="QuickAnswers.V2.Consent" units="impressions"
-    expires_after="2023-10-22">
-  <owner>angelaxiao@chromium.org</owner>
-  <owner>yawano@google.com</owner>
+    expires_after="2023-10-15">
+  <owner>updowndota@chromium.org</owner>
   <owner>croissant-eng@chromium.org</owner>
   <summary>
     For every quick answers consent impression, records how many times the user
@@ -310,8 +290,7 @@ chromium-metrics-reviews@google.com.
 <histogram
     name="QuickAnswers.V2.Consent.Duration{QuickAnswersV2ConsentResultType}"
     units="ms" expires_after="2023-08-15">
-  <owner>angelaxiao@chromium.org</owner>
-  <owner>yawano@google.com</owner>
+  <owner>updowndota@chromium.org</owner>
   <owner>croissant-eng@chromium.org</owner>
   <summary>
     For every quick answers consent result event, records how long the user has
@@ -324,8 +303,7 @@ chromium-metrics-reviews@google.com.
 <histogram
     name="QuickAnswers.V2.Consent.Impression{QuickAnswersV2ConsentResultType}"
     units="impressions" expires_after="2023-08-15">
-  <owner>angelaxiao@chromium.org</owner>
-  <owner>yawano@google.com</owner>
+  <owner>updowndota@chromium.org</owner>
   <owner>croissant-eng@chromium.org</owner>
   <summary>
     For every quick answers consent result event, records how many times the

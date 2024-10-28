@@ -88,7 +88,7 @@ HeartbeatHandler::HeartbeatHandler(absl::string_view log_prefix,
                                    const DcSctpOptions& options,
                                    Context* context,
                                    TimerManager* timer_manager)
-    : log_prefix_(log_prefix),
+    : log_prefix_(std::string(log_prefix) + "heartbeat: "),
       ctx_(context),
       timer_manager_(timer_manager),
       interval_duration_(options.heartbeat_interval),

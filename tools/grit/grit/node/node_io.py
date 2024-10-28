@@ -5,6 +5,7 @@
 '''The <output> and <file> elements.
 '''
 
+from __future__ import print_function
 
 import os
 
@@ -16,7 +17,7 @@ class FileNode(base.Node):
   '''A <file> element.'''
 
   def __init__(self):
-    super().__init__()
+    super(FileNode, self).__init__()
     self.re = None
     self.should_load_ = True
 

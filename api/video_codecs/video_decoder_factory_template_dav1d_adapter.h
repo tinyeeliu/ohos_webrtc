@@ -14,17 +14,13 @@
 #include <memory>
 #include <vector>
 
-#include "api/video_codecs/av1_profile.h"
 #include "api/video_codecs/sdp_video_format.h"
 #include "modules/video_coding/codecs/av1/dav1d_decoder.h"
 
 namespace webrtc {
 struct Dav1dDecoderTemplateAdapter {
   static std::vector<SdpVideoFormat> SupportedFormats() {
-    return {SdpVideoFormat("AV1"),
-            SdpVideoFormat(
-                "AV1", {{kAV1FmtpProfile,
-                         AV1ProfileToString(AV1Profile::kProfile1).data()}})};
+    return {SdpVideoFormat("AV1")};
   }
 
   static std::unique_ptr<VideoDecoder> CreateDecoder(

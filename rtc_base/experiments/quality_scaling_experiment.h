@@ -11,7 +11,6 @@
 #define RTC_BASE_EXPERIMENTS_QUALITY_SCALING_EXPERIMENT_H_
 
 #include "absl/types/optional.h"
-#include "api/field_trials_view.h"
 #include "api/video_codecs/video_encoder.h"
 
 namespace webrtc {
@@ -41,19 +40,17 @@ class QualityScalingExperiment {
   };
 
   // Returns true if the experiment is enabled.
-  static bool Enabled(const FieldTrialsView& field_trials);
+  static bool Enabled();
 
   // Returns settings from field trial.
-  static absl::optional<Settings> ParseSettings(
-      const FieldTrialsView& field_trials);
+  static absl::optional<Settings> ParseSettings();
 
   // Returns QpThresholds for the `codec_type`.
   static absl::optional<VideoEncoder::QpThresholds> GetQpThresholds(
-      VideoCodecType codec_type,
-      const FieldTrialsView& field_trials);
+      VideoCodecType codec_type);
 
   // Returns parsed values. If the parsing fails, default values are returned.
-  static Config GetConfig(const FieldTrialsView& field_trials);
+  static Config GetConfig();
 };
 
 }  // namespace webrtc

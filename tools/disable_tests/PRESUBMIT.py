@@ -7,6 +7,8 @@ See http://dev.chromium.org/developers/how-tos/depottools/presubmit-scripts
 for more details on the presubmit API built into depot_tools.
 """
 
+USE_PYTHON3 = True
+
 
 def _CommonChecks(input_api, output_api):
   results = []
@@ -20,7 +22,10 @@ def _CommonChecks(input_api, output_api):
           output_api,
           input_api.os_path.join(input_api.PresubmitLocalPath()),
           files_to_check=[r'.+_test\.py$'],
-          files_to_skip=['integration_test.py']))
+          files_to_skip=['integration_test.py'],
+          run_on_python2=False,
+          run_on_python3=True,
+          skip_shebang_check=True))
 
   # integration_test.py uses subcommands, so we can't use the standard unit test
   # presubmit API to run it.
@@ -30,6 +35,7 @@ def _CommonChecks(input_api, output_api):
           cmd=['integration_test.py', 'run'],
           kwargs={},
           message=output_api.PresubmitError,
+          python3=True,
       ))
 
   results.extend(input_api.RunTests(commands))

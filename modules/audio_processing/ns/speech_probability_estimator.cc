@@ -11,7 +11,6 @@
 #include "modules/audio_processing/ns/speech_probability_estimator.h"
 
 #include <math.h>
-
 #include <algorithm>
 
 #include "modules/audio_processing/ns/fast_math.h"

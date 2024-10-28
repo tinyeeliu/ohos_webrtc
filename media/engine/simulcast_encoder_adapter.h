@@ -22,7 +22,6 @@
 
 #include "absl/types/optional.h"
 #include "api/fec_controller_override.h"
-#include "api/field_trials_view.h"
 #include "api/sequence_checker.h"
 #include "api/video_codecs/sdp_video_format.h"
 #include "api/video_codecs/video_encoder.h"
@@ -49,8 +48,7 @@ class RTC_EXPORT SimulcastEncoderAdapter : public VideoEncoder {
   // will be used if InitEncode() fails for the primary encoder.
   SimulcastEncoderAdapter(VideoEncoderFactory* primary_factory,
                           VideoEncoderFactory* fallback_factory,
-                          const SdpVideoFormat& format,
-                          const FieldTrialsView& field_trials);
+                          const SdpVideoFormat& format);
   ~SimulcastEncoderAdapter() override;
 
   // Implements VideoEncoder.

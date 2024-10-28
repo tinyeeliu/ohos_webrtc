@@ -39,10 +39,11 @@ void DefaultAudioQualityAnalyzer::Start(std::string test_case_name,
 void DefaultAudioQualityAnalyzer::OnStatsReports(
     absl::string_view pc_label,
     const rtc::scoped_refptr<const RTCStatsReport>& report) {
-  auto stats = report->GetStatsOfType<RTCInboundRtpStreamStats>();
+  auto stats = report->GetStatsOfType<RTCInboundRTPStreamStats>();
 
   for (auto& stat : stats) {
-    if (!stat->kind.is_defined() || !(*stat->kind == "audio")) {
+    if (!stat->kind.is_defined() ||
+        !(*stat->kind == RTCMediaStreamTrackKind::kAudio)) {
       continue;
     }
 
@@ -62,9 +63,6 @@ void DefaultAudioQualityAnalyzer::OnStatsReports(
         TimeDelta::Seconds(stat->jitter_buffer_target_delay.ValueOrDefault(0.));
     sample.jitter_buffer_emitted_count =
         stat->jitter_buffer_emitted_count.ValueOrDefault(0ul);
-    sample.total_samples_duration =
-        stat->total_samples_duration.ValueOrDefault(0.);
-    sample.total_audio_energy = stat->total_audio_energy.ValueOrDefault(0.);
 
     TrackIdStreamInfoMap::StreamInfo stream_info =
         analyzer_helper_->GetStreamInfoFromTrackId(*stat->track_identifier);
@@ -118,9 +116,6 @@ void DefaultAudioQualityAnalyzer::OnStatsReports(
           jitter_buffer_target_delay_diff.ms<double>() /
           jitter_buffer_emitted_count_diff);
     }
-    audio_stream_stats.energy.AddSample(sqrt(
-        (sample.total_audio_energy - prev_sample.total_audio_energy) /
-        (sample.total_samples_duration - prev_sample.total_samples_duration)));
 
     last_stats_sample_[stream_info.stream_label] = sample;
   }
@@ -136,12 +131,10 @@ void DefaultAudioQualityAnalyzer::Stop() {
   for (auto& item : streams_stats_) {
     const TrackIdStreamInfoMap::StreamInfo& stream_info =
         stream_info_[item.first];
-    // TODO(bugs.webrtc.org/14757): Remove kExperimentalTestNameMetadataKey.
     std::map<std::string, std::string> metric_metadata{
         {MetricMetadataKey::kAudioStreamMetadataKey, item.first},
         {MetricMetadataKey::kPeerMetadataKey, stream_info.receiver_peer},
-        {MetricMetadataKey::kReceiverMetadataKey, stream_info.receiver_peer},
-        {MetricMetadataKey::kExperimentalTestNameMetadataKey, test_case_name_}};
+        {MetricMetadataKey::kReceiverMetadataKey, stream_info.receiver_peer}};
 
     metrics_logger_->LogMetric("expand_rate", GetTestCaseName(item.first),
                                item.second.expand_rate, Unit::kUnitless,
@@ -167,10 +160,6 @@ void DefaultAudioQualityAnalyzer::Stop() {
         "preferred_buffer_size_ms", GetTestCaseName(item.first),
         item.second.preferred_buffer_size_ms, Unit::kMilliseconds,
         ImprovementDirection::kNeitherIsBetter, metric_metadata);
-    metrics_logger_->LogMetric("energy", GetTestCaseName(item.first),
-                               item.second.energy, Unit::kUnitless,
-                               ImprovementDirection::kNeitherIsBetter,
-                               metric_metadata);
   }
 }
 

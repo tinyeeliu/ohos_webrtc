@@ -6,6 +6,10 @@
 list.
 '''
 
+from __future__ import print_function
+
+import six
+
 from grit.gather import interface
 from grit import clique
 from grit import exception
@@ -18,7 +22,7 @@ class SkeletonGatherer(interface.GathererBase):
   '''
 
   def __init__(self, *args, **kwargs):
-    super().__init__(*args, **kwargs)
+    super(SkeletonGatherer, self).__init__(*args, **kwargs)
     # List of parts of the document. Translateable parts are
     # clique.MessageClique objects, nontranslateable parts are plain strings.
     # Translated messages are inserted back into the skeleton using the quoting
@@ -74,16 +78,17 @@ class SkeletonGatherer(interface.GathererBase):
 
     out = []
     for ix in range(len(self.skeleton_)):
-      if isinstance(self.skeleton_[ix], str):
+      if isinstance(self.skeleton_[ix], six.string_types):
         if skeleton_gatherer:
           # Make sure the skeleton is like the original
-          assert (isinstance(skeleton_gatherer.skeleton_[ix], str))
+          assert(isinstance(skeleton_gatherer.skeleton_[ix], six.string_types))
           out.append(skeleton_gatherer.skeleton_[ix])
         else:
           out.append(self.skeleton_[ix])
       else:
         if skeleton_gatherer:  # Make sure the skeleton is like the original
-          assert (not isinstance(skeleton_gatherer.skeleton_[ix], str))
+          assert(not isinstance(skeleton_gatherer.skeleton_[ix],
+                                six.string_types))
         msg = self.skeleton_[ix].MessageForLanguage(lang,
                                                     pseudo_if_not_available,
                                                     fallback_to_english)

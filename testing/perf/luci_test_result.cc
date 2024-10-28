@@ -8,7 +8,6 @@
 
 #include "base/check.h"
 #include "base/files/file_util.h"
-#include "base/i18n/time_formatting.h"
 #include "base/json/json_writer.h"
 #include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
@@ -34,6 +33,16 @@ constexpr char kKeyTags[] = "tags";
 constexpr char kKeyKey[] = "key";
 constexpr char kKeyValue[] = "value";
 
+// Returns iso timeformat string of |time| in UTC.
+std::string ToUtcIsoTime(base::Time time) {
+  base::Time::Exploded utc_exploded;
+  time.UTCExplode(&utc_exploded);
+  return base::StringPrintf(
+      "%d-%02d-%02dT%02d:%02d:%02d.%03dZ", utc_exploded.year,
+      utc_exploded.month, utc_exploded.day_of_month, utc_exploded.hour,
+      utc_exploded.minute, utc_exploded.second, utc_exploded.millisecond);
+}
+
 std::string ToString(LuciTestResult::Status status) {
   using Status = LuciTestResult::Status;
   switch (status) {
@@ -56,62 +65,64 @@ base::Value ToValue(const LuciTestResult::Artifact& artifact) {
   // One and only one of the two optional fields must have value.
   DCHECK(artifact.file_path.has_value() != artifact.contents.has_value());
 
-  base::Value::Dict dict;
+  base::Value dict(base::Value::Type::DICTIONARY);
 
   if (artifact.file_path.has_value()) {
-    dict.Set(kKeyFilePath, artifact.file_path->AsUTF8Unsafe());
+    dict.SetStringKey(kKeyFilePath, artifact.file_path->AsUTF8Unsafe());
   } else {
     DCHECK(artifact.contents.has_value());
-    dict.Set(kKeyContents, artifact.contents.value());
+    dict.SetStringKey(kKeyContents, artifact.contents.value());
   }
 
-  dict.Set(kKeyContentType, artifact.content_type);
-  return base::Value(std::move(dict));
+  dict.SetStringKey(kKeyContentType, artifact.content_type);
+  return dict;
 }
 
 base::Value ToValue(const LuciTestResult& result) {
-  base::Value::Dict test_report;
+  base::Value test_report(base::Value::Type::DICTIONARY);
 
-  base::Value::Dict* test_result = test_report.EnsureDict(kKeyTestResult);
-  test_result->Set(kKeyTestPath, result.test_path());
+  base::Value* test_result = test_report.SetKey(
+      kKeyTestResult, base::Value(base::Value::Type::DICTIONARY));
+  test_result->SetStringKey(kKeyTestPath, result.test_path());
 
   if (!result.extra_variant_pairs().empty()) {
-    base::Value::Dict* variant_dict = test_result->EnsureDict(kKeyVariant);
+    base::Value* variant_dict = test_result->SetKey(
+        kKeyVariant, base::Value(base::Value::Type::DICTIONARY));
     for (const auto& pair : result.extra_variant_pairs())
-      variant_dict->Set(pair.first, pair.second);
+      variant_dict->SetStringKey(pair.first, pair.second);
   }
 
-  test_result->Set(kKeyStatus, ToString(result.status()));
-  test_result->Set(kKeyExpected, result.is_expected());
+  test_result->SetStringKey(kKeyStatus, ToString(result.status()));
+  test_result->SetBoolKey(kKeyExpected, result.is_expected());
 
   if (!result.start_time().is_null()) {
-    test_result->Set(kKeyStartTime,
-                     base::TimeFormatAsIso8601(result.start_time()));
+    test_result->SetStringKey(kKeyStartTime, ToUtcIsoTime(result.start_time()));
   }
   if (!result.duration().is_zero()) {
-    test_result->Set(
+    test_result->SetStringKey(
         kKeyRunDuration,
         base::StringPrintf("%.2fs", result.duration().InSecondsF()));
   }
 
   if (!result.output_artifacts().empty()) {
-    base::Value::Dict* artifacts_dict =
-        test_result->EnsureDict(kKeyOutputArtifacts);
+    base::Value* artifacts_dict = test_result->SetKey(
+        kKeyOutputArtifacts, base::Value(base::Value::Type::DICTIONARY));
     for (const auto& pair : result.output_artifacts())
-      artifacts_dict->Set(pair.first, ToValue(pair.second));
+      artifacts_dict->SetKey(pair.first, ToValue(pair.second));
   }
 
   if (!result.tags().empty()) {
-    base::Value::List* tags_list = test_result->EnsureList(kKeyTags);
+    base::Value* tags_list =
+        test_result->SetKey(kKeyTags, base::Value(base::Value::Type::LIST));
     for (const auto& tag : result.tags()) {
-      base::Value::Dict tag_dict;
-      tag_dict.Set(kKeyKey, tag.key);
-      tag_dict.Set(kKeyValue, tag.value);
+      base::Value tag_dict(base::Value::Type::DICTIONARY);
+      tag_dict.SetStringKey(kKeyKey, tag.key);
+      tag_dict.SetStringKey(kKeyValue, tag.value);
       tags_list->Append(std::move(tag_dict));
     }
   }
 
-  return base::Value(std::move(test_report));
+  return test_report;
 }
 
 std::string ToJson(const LuciTestResult& result) {

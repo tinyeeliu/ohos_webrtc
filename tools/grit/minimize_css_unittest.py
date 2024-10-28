@@ -17,7 +17,7 @@ class CSSMinimizerTest(unittest.TestCase):
             }
         """
     minimized = minimize_css.CSSMinimizer.minimize_css(source)
-    self.assertEqual(minimized, "div{color: blue}")
+    self.assertEquals(minimized, "div{color: blue}")
 
   def test_attribute_selectors(self):
     source = """
@@ -26,7 +26,7 @@ class CSSMinimizerTest(unittest.TestCase):
             }
         """
     minimized = minimize_css.CSSMinimizer.minimize_css(source)
-    self.assertEqual(
+    self.assertEquals(
         minimized,
         # pylint: disable=line-too-long
         """input[type="search" i]::-webkit-textfield-decoration-container{direction: ltr}""")
@@ -41,18 +41,18 @@ class CSSMinimizerTest(unittest.TestCase):
         /* footer */
         """
     minimized = minimize_css.CSSMinimizer.minimize_css(source)
-    self.assertEqual(minimized, "html{ display: block}")
+    self.assertEquals(minimized, "html{ display: block}")
 
   def test_no_strip_inside_quotes(self):
     source = """div[foo=' bar ']"""
     minimized = minimize_css.CSSMinimizer.minimize_css(source)
-    self.assertEqual(minimized, source)
+    self.assertEquals(minimized, source)
 
     source = """div[foo=" bar "]"""
     minimized = minimize_css.CSSMinimizer.minimize_css(source)
-    self.assertEqual(minimized, source)
+    self.assertEquals(minimized, source)
 
   def test_escape_string(self):
     source = """content: " <a onclick=\\\"javascript:  alert  ( 'foobar' ); \\\">";"""
     minimized = minimize_css.CSSMinimizer.minimize_css(source)
-    self.assertEqual(minimized, source)
+    self.assertEquals(minimized, source)

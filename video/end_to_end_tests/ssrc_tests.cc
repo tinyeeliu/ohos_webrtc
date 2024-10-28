@@ -12,25 +12,16 @@
 
 #include "api/test/simulated_network.h"
 #include "call/fake_network_pipe.h"
-#include "call/packet_receiver.h"
 #include "call/simulated_network.h"
 #include "modules/rtp_rtcp/source/rtp_packet.h"
-#include "modules/rtp_rtcp/source/rtp_packet_received.h"
 #include "modules/rtp_rtcp/source/rtp_util.h"
 #include "rtc_base/task_queue_for_test.h"
 #include "test/call_test.h"
 #include "test/gtest.h"
 #include "test/rtcp_packet_parser.h"
-#include "test/video_test_constants.h"
 
 namespace webrtc {
 class SsrcEndToEndTest : public test::CallTest {
- public:
-  SsrcEndToEndTest() {
-    RegisterRtpExtension(
-        RtpExtension(RtpExtension::kTransportSequenceNumberUri, 1));
-  }
-
  protected:
   void TestSendsSetSsrcs(size_t num_ssrcs, bool send_single_ssrc_first);
 };
@@ -38,14 +29,12 @@ class SsrcEndToEndTest : public test::CallTest {
 TEST_F(SsrcEndToEndTest, ReceiverUsesLocalSsrc) {
   class SyncRtcpObserver : public test::EndToEndTest {
    public:
-    SyncRtcpObserver()
-        : EndToEndTest(test::VideoTestConstants::kDefaultTimeout) {}
+    SyncRtcpObserver() : EndToEndTest(kDefaultTimeout) {}
 
-    Action OnReceiveRtcp(rtc::ArrayView<const uint8_t> packet) override {
+    Action OnReceiveRtcp(const uint8_t* packet, size_t length) override {
       test::RtcpPacketParser parser;
-      EXPECT_TRUE(parser.Parse(packet));
-      EXPECT_EQ(test::VideoTestConstants::kReceiverLocalVideoSsrc,
-                parser.sender_ssrc());
+      EXPECT_TRUE(parser.Parse(packet, length));
+      EXPECT_EQ(kReceiverLocalVideoSsrc, parser.sender_ssrc());
       observation_complete_.Set();
 
       return SEND_PACKET;
@@ -60,76 +49,70 @@ TEST_F(SsrcEndToEndTest, ReceiverUsesLocalSsrc) {
   RunBaseTest(&test);
 }
 
-TEST_F(SsrcEndToEndTest, UnknownRtpPacketTriggersUndemuxablePacketHandler) {
+TEST_F(SsrcEndToEndTest, UnknownRtpPacketGivesUnknownSsrcReturnCode) {
   class PacketInputObserver : public PacketReceiver {
    public:
     explicit PacketInputObserver(PacketReceiver* receiver)
         : receiver_(receiver) {}
 
-    bool Wait() {
-      return undemuxable_packet_handler_triggered_.Wait(
-          test::VideoTestConstants::kDefaultTimeout);
-    }
+    bool Wait() { return delivered_packet_.Wait(kDefaultTimeout); }
 
    private:
-    void DeliverRtpPacket(
-        MediaType media_type,
-        RtpPacketReceived packet,
-        OnUndemuxablePacketHandler undemuxable_packet_handler) override {
-      PacketReceiver::OnUndemuxablePacketHandler handler =
-          [this](const RtpPacketReceived& packet) {
-            undemuxable_packet_handler_triggered_.Set();
-            // No need to re-attempt deliver the packet.
-            return false;
-          };
-      receiver_->DeliverRtpPacket(media_type, std::move(packet),
-                                  std::move(handler));
+    DeliveryStatus DeliverPacket(MediaType media_type,
+                                 rtc::CopyOnWriteBuffer packet,
+                                 int64_t packet_time_us) override {
+      if (IsRtcpPacket(packet)) {
+        return receiver_->DeliverPacket(media_type, std::move(packet),
+                                        packet_time_us);
+      }
+      DeliveryStatus delivery_status = receiver_->DeliverPacket(
+          media_type, std::move(packet), packet_time_us);
+      EXPECT_EQ(DELIVERY_UNKNOWN_SSRC, delivery_status);
+      delivered_packet_.Set();
+      return delivery_status;
     }
-    void DeliverRtcpPacket(rtc::CopyOnWriteBuffer packet) override {}
 
     PacketReceiver* receiver_;
-    rtc::Event undemuxable_packet_handler_triggered_;
+    rtc::Event delivered_packet_;
   };
 
   std::unique_ptr<test::DirectTransport> send_transport;
   std::unique_ptr<test::DirectTransport> receive_transport;
   std::unique_ptr<PacketInputObserver> input_observer;
 
-  SendTask(task_queue(), [this, &send_transport, &receive_transport,
-                          &input_observer]() {
-    CreateCalls();
+  SendTask(
+      task_queue(),
+      [this, &send_transport, &receive_transport, &input_observer]() {
+        CreateCalls();
 
-    send_transport = std::make_unique<test::DirectTransport>(
-        task_queue(),
-        std::make_unique<FakeNetworkPipe>(
-            Clock::GetRealTimeClock(),
-            std::make_unique<SimulatedNetwork>(BuiltInNetworkBehaviorConfig())),
-        sender_call_.get(), payload_type_map_, GetRegisteredExtensions(),
-        GetRegisteredExtensions());
-    receive_transport = std::make_unique<test::DirectTransport>(
-        task_queue(),
-        std::make_unique<FakeNetworkPipe>(
-            Clock::GetRealTimeClock(),
-            std::make_unique<SimulatedNetwork>(BuiltInNetworkBehaviorConfig())),
-        receiver_call_.get(), payload_type_map_, GetRegisteredExtensions(),
-        GetRegisteredExtensions());
-    input_observer =
-        std::make_unique<PacketInputObserver>(receiver_call_->Receiver());
-    send_transport->SetReceiver(input_observer.get());
-    receive_transport->SetReceiver(sender_call_->Receiver());
+        send_transport = std::make_unique<test::DirectTransport>(
+            task_queue(),
+            std::make_unique<FakeNetworkPipe>(
+                Clock::GetRealTimeClock(), std::make_unique<SimulatedNetwork>(
+                                               BuiltInNetworkBehaviorConfig())),
+            sender_call_.get(), payload_type_map_);
+        receive_transport = std::make_unique<test::DirectTransport>(
+            task_queue(),
+            std::make_unique<FakeNetworkPipe>(
+                Clock::GetRealTimeClock(), std::make_unique<SimulatedNetwork>(
+                                               BuiltInNetworkBehaviorConfig())),
+            receiver_call_.get(), payload_type_map_);
+        input_observer =
+            std::make_unique<PacketInputObserver>(receiver_call_->Receiver());
+        send_transport->SetReceiver(input_observer.get());
+        receive_transport->SetReceiver(sender_call_->Receiver());
 
-    CreateSendConfig(1, 0, 0, send_transport.get());
-    CreateMatchingReceiveConfigs(receive_transport.get());
+        CreateSendConfig(1, 0, 0, send_transport.get());
+        CreateMatchingReceiveConfigs(receive_transport.get());
 
-    CreateVideoStreams();
-    CreateFrameGeneratorCapturer(test::VideoTestConstants::kDefaultFramerate,
-                                 test::VideoTestConstants::kDefaultWidth,
-                                 test::VideoTestConstants::kDefaultHeight);
-    Start();
+        CreateVideoStreams();
+        CreateFrameGeneratorCapturer(kDefaultFramerate, kDefaultWidth,
+                                     kDefaultHeight);
+        Start();
 
-    receiver_call_->DestroyVideoReceiveStream(video_receive_streams_[0]);
-    video_receive_streams_.clear();
-  });
+        receiver_call_->DestroyVideoReceiveStream(video_receive_streams_[0]);
+        video_receive_streams_.clear();
+      });
 
   // Wait() waits for a received packet.
   EXPECT_TRUE(input_observer->Wait());
@@ -151,7 +134,7 @@ void SsrcEndToEndTest::TestSendsSetSsrcs(size_t num_ssrcs,
                   size_t num_ssrcs,
                   bool send_single_ssrc_first,
                   TaskQueueBase* task_queue)
-        : EndToEndTest(test::VideoTestConstants::kDefaultTimeout),
+        : EndToEndTest(kDefaultTimeout),
           num_ssrcs_(num_ssrcs),
           send_single_ssrc_first_(send_single_ssrc_first),
           ssrcs_to_observe_(num_ssrcs),
@@ -163,9 +146,9 @@ void SsrcEndToEndTest::TestSendsSetSsrcs(size_t num_ssrcs,
     }
 
    private:
-    Action OnSendRtp(rtc::ArrayView<const uint8_t> packet) override {
+    Action OnSendRtp(const uint8_t* packet, size_t length) override {
       RtpPacket rtp_packet;
-      EXPECT_TRUE(rtp_packet.Parse(packet));
+      EXPECT_TRUE(rtp_packet.Parse(packet, length));
 
       EXPECT_TRUE(valid_ssrcs_[rtp_packet.Ssrc()])
           << "Received unknown SSRC: " << rtp_packet.Ssrc();
@@ -240,8 +223,7 @@ void SsrcEndToEndTest::TestSendsSetSsrcs(size_t num_ssrcs,
     VideoSendStream* send_stream_;
     VideoEncoderConfig video_encoder_config_all_streams_;
     TaskQueueBase* task_queue_;
-  } test(test::VideoTestConstants::kVideoSendSsrcs, num_ssrcs,
-         send_single_ssrc_first, task_queue());
+  } test(kVideoSendSsrcs, num_ssrcs, send_single_ssrc_first, task_queue());
 
   RunBaseTest(&test);
 }
@@ -251,29 +233,28 @@ TEST_F(SsrcEndToEndTest, SendsSetSsrc) {
 }
 
 TEST_F(SsrcEndToEndTest, SendsSetSimulcastSsrcs) {
-  TestSendsSetSsrcs(test::VideoTestConstants::kNumSimulcastStreams, false);
+  TestSendsSetSsrcs(kNumSimulcastStreams, false);
 }
 
 TEST_F(SsrcEndToEndTest, CanSwitchToUseAllSsrcs) {
-  TestSendsSetSsrcs(test::VideoTestConstants::kNumSimulcastStreams, true);
+  TestSendsSetSsrcs(kNumSimulcastStreams, true);
 }
 
 TEST_F(SsrcEndToEndTest, DISABLED_RedundantPayloadsTransmittedOnAllSsrcs) {
   class ObserveRedundantPayloads : public test::EndToEndTest {
    public:
     ObserveRedundantPayloads()
-        : EndToEndTest(test::VideoTestConstants::kDefaultTimeout),
-          ssrcs_to_observe_(test::VideoTestConstants::kNumSimulcastStreams) {
-      for (size_t i = 0; i < test::VideoTestConstants::kNumSimulcastStreams;
-           ++i) {
-        registered_rtx_ssrc_[test::VideoTestConstants::kSendRtxSsrcs[i]] = true;
+        : EndToEndTest(kDefaultTimeout),
+          ssrcs_to_observe_(kNumSimulcastStreams) {
+      for (size_t i = 0; i < kNumSimulcastStreams; ++i) {
+        registered_rtx_ssrc_[kSendRtxSsrcs[i]] = true;
       }
     }
 
    private:
-    Action OnSendRtp(rtc::ArrayView<const uint8_t> packet) override {
+    Action OnSendRtp(const uint8_t* packet, size_t length) override {
       RtpPacket rtp_packet;
-      EXPECT_TRUE(rtp_packet.Parse(packet));
+      EXPECT_TRUE(rtp_packet.Parse(packet, length));
 
       if (!registered_rtx_ssrc_[rtp_packet.Ssrc()])
         return SEND_PACKET;
@@ -292,9 +273,7 @@ TEST_F(SsrcEndToEndTest, DISABLED_RedundantPayloadsTransmittedOnAllSsrcs) {
       return SEND_PACKET;
     }
 
-    size_t GetNumVideoStreams() const override {
-      return test::VideoTestConstants::kNumSimulcastStreams;
-    }
+    size_t GetNumVideoStreams() const override { return kNumSimulcastStreams; }
 
     void ModifyVideoConfigs(
         VideoSendStream::Config* send_config,
@@ -307,13 +286,10 @@ TEST_F(SsrcEndToEndTest, DISABLED_RedundantPayloadsTransmittedOnAllSsrcs) {
         layer.target_bitrate_bps = 15000;
         layer.max_bitrate_bps = 20000;
       }
-      send_config->rtp.rtx.payload_type =
-          test::VideoTestConstants::kSendRtxPayloadType;
+      send_config->rtp.rtx.payload_type = kSendRtxPayloadType;
 
-      for (size_t i = 0; i < test::VideoTestConstants::kNumSimulcastStreams;
-           ++i)
-        send_config->rtp.rtx.ssrcs.push_back(
-            test::VideoTestConstants::kSendRtxSsrcs[i]);
+      for (size_t i = 0; i < kNumSimulcastStreams; ++i)
+        send_config->rtp.rtx.ssrcs.push_back(kSendRtxSsrcs[i]);
 
       // Significantly higher than max bitrates for all video streams -> forcing
       // padding to trigger redundant padding on all RTX SSRCs.

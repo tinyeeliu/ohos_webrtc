@@ -15,9 +15,10 @@ import signal
 import socket
 import sys
 import tempfile
+import six
 
 # The following non-std imports are fetched via vpython. See the list at
-# //.vpython3
+# //.vpython
 import dateutil.parser  # pylint: disable=import-error
 import jsonlines  # pylint: disable=import-error
 import psutil  # pylint: disable=import-error
@@ -32,8 +33,9 @@ from pylib.base import base_test_result  # pylint: disable=import-error
 from pylib.results import json_results  # pylint: disable=import-error
 
 sys.path.insert(0, os.path.join(CHROMIUM_SRC_PATH, 'build', 'util'))
-# TODO(crbug.com/1421441): Re-enable the 'no-name-in-module' check.
-from lib.results import result_sink  # pylint: disable=import-error,no-name-in-module
+from lib.results import result_sink  # pylint: disable=import-error
+
+assert not six.PY2, 'Py2 not supported for this file.'
 
 import subprocess  # pylint: disable=import-error,wrong-import-order
 
@@ -244,7 +246,6 @@ class TastTest(RemoteTest):
 
     self._suite_name = args.suite_name
     self._tast_vars = args.tast_vars
-    self._tast_retries = args.tast_retries
     self._tests = args.tests
     # The CQ passes in '--gtest_filter' when specifying tests to skip. Store it
     # here and parse it later to integrate it into Tast executions.
@@ -325,7 +326,7 @@ class TastTest(RemoteTest):
       self._attr_expr = '(' + ' || '.join(names) + ')'
 
     if self._attr_expr:
-      # Don't use shlex.quote() here. Something funky happens with the arg
+      # Don't use pipes.quote() here. Something funky happens with the arg
       # as it gets passed down from cros_run_test to tast. (Tast picks up the
       # escaping single quotes and complains that the attribute expression
       # "must be within parentheses".)
@@ -336,9 +337,6 @@ class TastTest(RemoteTest):
 
     for v in self._tast_vars or []:
       self._test_cmd.extend(['--tast-var', v])
-
-    if self._tast_retries:
-      self._test_cmd.append('--tast-retries=%d' % self._tast_retries)
 
     # Mounting ash-chrome gives it enough disk space to not need stripping,
     # but only for one not instrumented with code coverage.
@@ -396,9 +394,6 @@ class TastTest(RemoteTest):
         # inside as an RDB 'artifact'. (This could include system logs, screen
         # shots, etc.)
         artifacts = self.get_artifacts(test['outDir'])
-        html_artifact = debug_link
-        if result == base_test_result.ResultType.SKIP:
-          html_artifact = 'Test was skipped because: ' + test['skipReason']
         self._rdb_client.Post(
             test['name'],
             result,
@@ -407,7 +402,7 @@ class TastTest(RemoteTest):
             None,
             artifacts=artifacts,
             failure_reason=primary_error_message,
-            html_artifact=html_artifact)
+            html_artifact=debug_link)
 
     if self._rdb_client and self._logs_dir:
       # Attach artifacts from the device that don't apply to a single test.
@@ -481,10 +476,6 @@ class GTestTest(RemoteTest):
   def __init__(self, args, unknown_args):
     super().__init__(args, unknown_args)
 
-    self._test_cmd = ['vpython3'] + self._test_cmd
-    if not args.clean:
-      self._test_cmd += ['--no-clean']
-
     self._test_exe = args.test_exe
     self._runtime_deps_path = args.runtime_deps_path
     self._vpython_dir = args.vpython_dir
@@ -493,8 +484,6 @@ class GTestTest(RemoteTest):
     self._env_vars = args.env_var
     self._stop_ui = args.stop_ui
     self._trace_dir = args.trace_dir
-    self._run_test_sudo_helper = args.run_test_sudo_helper
-    self._set_selinux_label = args.set_selinux_label
 
   @property
   def suite_name(self):
@@ -579,30 +568,9 @@ class GTestTest(RemoteTest):
     if self._trace_dir:
       device_test_script_contents.extend([
           'rm -rf %s' % device_trace_dir,
-          'sudo -E -u chronos -- /bin/bash -c "mkdir -p %s"' % device_trace_dir,
+          'su chronos -c -- "mkdir -p %s"' % device_trace_dir,
       ])
       test_invocation += ' --trace-dir=%s' % device_trace_dir
-
-    if self._run_test_sudo_helper:
-      device_test_script_contents.extend([
-          'TEST_SUDO_HELPER_PATH=$(mktemp)',
-          './test_sudo_helper.py --socket-path=${TEST_SUDO_HELPER_PATH} &',
-          'TEST_SUDO_HELPER_PID=$!'
-      ])
-      test_invocation += (
-          ' --test-sudo-helper-socket-path=${TEST_SUDO_HELPER_PATH}')
-
-    # Append the selinux labels. The 'setfiles' command takes a file with each
-    # line consisting of "<file-regex> <file-type> <new-label>", where '--' is
-    # the type of a regular file.
-    if self._set_selinux_label:
-      for label_pair in self._set_selinux_label:
-        filename, label = label_pair.split('=', 1)
-        specfile = filename + '.specfile'
-        device_test_script_contents.extend([
-            'echo %s -- %s > %s' % (filename, label, specfile),
-            'setfiles -F %s %s' % (specfile, filename),
-        ])
 
     if self._additional_args:
       test_invocation += ' %s' % ' '.join(self._additional_args)
@@ -611,17 +579,10 @@ class GTestTest(RemoteTest):
       device_test_script_contents += [
           'stop ui',
       ]
-      # Send a user activity ping to powerd to ensure the display is on.
-      device_test_script_contents += [
-          'dbus-send --system --type=method_call'
-          ' --dest=org.chromium.PowerManager /org/chromium/PowerManager'
-          ' org.chromium.PowerManager.HandleUserActivity int32:0'
-      ]
       # The UI service on the device owns the chronos user session, so shutting
       # it down as chronos kills the entire execution of the test. So we'll have
       # to run as root up until the test invocation.
-      test_invocation = (
-          'sudo -E -u chronos -- /bin/bash -c "%s"' % test_invocation)
+      test_invocation = 'su chronos -c -- "%s"' % test_invocation
       # And we'll need to chown everything since cros_run_test's "--as-chronos"
       # option normally does that for us.
       device_test_script_contents.append('chown -R chronos: ../..')
@@ -633,22 +594,6 @@ class GTestTest(RemoteTest):
       ]
 
     device_test_script_contents.append(test_invocation)
-
-    # (Re)start ui after all tests are done. This is for developer convenienve.
-    # Without this, the device would remain in a black screen which looks like
-    # powered off.
-    if self._stop_ui:
-      device_test_script_contents += [
-          'start ui',
-      ]
-
-    # Stop the crosier helper.
-    if self._run_test_sudo_helper:
-      device_test_script_contents.extend([
-          'pkill -P $TEST_SUDO_HELPER_PID',
-          'kill $TEST_SUDO_HELPER_PID',
-          'unlink ${TEST_SUDO_HELPER_PATH}',
-      ])
 
     self._on_device_script = self.write_test_script_to_disk(
         device_test_script_contents)
@@ -868,11 +813,6 @@ def add_common_args(*parsers):
         help='Will flash the device to the current SDK version before running '
         'the test.')
     parser.add_argument(
-        '--no-flash',
-        action='store_false',
-        dest='flash',
-        help='Will not flash the device before running the test.')
-    parser.add_argument(
         '--public-image',
         action='store_true',
         help='Will flash a public "full" image to the device.')
@@ -928,8 +868,7 @@ def main():
   gtest_parser.add_argument(
       '--stop-ui',
       action='store_true',
-      help='Will stop the UI service in the device before running the test. '
-      'Also start the UI service after all tests are done.')
+      help='Will stop the UI service in the device before running the test.')
   gtest_parser.add_argument(
       '--trace-dir',
       type=str,
@@ -943,27 +882,6 @@ def main():
       help='Env var to set on the device for the duration of the test. '
       'Expected format is "--env-var SOME_VAR_NAME some_var_value". Specify '
       'multiple times for more than one var.')
-  gtest_parser.add_argument(
-      '--run-test-sudo-helper',
-      action='store_true',
-      help='When set, will run test_sudo_helper before the test and stop it '
-      'after test finishes.')
-  gtest_parser.add_argument(
-      "--no-clean",
-      action="store_false",
-      dest="clean",
-      default=True,
-      help="Do not clean up the deployed files after running the test. "
-      "Only supported for --remote-cmd tests")
-  gtest_parser.add_argument(
-      '--set-selinux-label',
-      action='append',
-      default=[],
-      help='Set the selinux label for a file before running. The format is:\n'
-      '  --set-selinux-label=<filename>=<label>\n'
-      'So:\n'
-      '  --set-selinux-label=my_test=u:r:cros_foo_label:s0\n'
-      'You can specify it more than one time to set multiple files tags.')
 
   # Tast test args.
   # pylint: disable=line-too-long
@@ -1000,11 +918,6 @@ def main():
       help='Runtime variables for Tast tests, and the format are expected to '
       'be "key=value" pairs.')
   tast_test_parser.add_argument(
-      '--tast-retries',
-      type=int,
-      dest='tast_retries',
-      help='Number of retries for failed Tast tests on the same DUT.')
-  tast_test_parser.add_argument(
       '--test',
       '-t',
       action='append',
@@ -1019,13 +932,6 @@ def main():
 
   add_common_args(gtest_parser, tast_test_parser, host_cmd_parser)
   args, unknown_args = parser.parse_known_args()
-  # Re-add N-1 -v/--verbose flags to the args we'll pass to whatever we are
-  # running. The assumption is that only one verbosity incrase would be meant
-  # for this script since it's a boolean value instead of increasing verbosity
-  # with more instances.
-  verbose_flags = [a for a in sys.argv if a in ('-v', '--verbose')]
-  if verbose_flags:
-    unknown_args += verbose_flags[1:]
 
   logging.basicConfig(level=logging.DEBUG if args.verbose else logging.WARN)
 

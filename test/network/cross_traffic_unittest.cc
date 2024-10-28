@@ -53,7 +53,6 @@ struct TrafficCounterFixture {
                                     /*id=*/1,
                                     rtc::IPAddress(kTestIpAddress),
                                     EmulatedEndpointConfig(),
-                                    EmulatedNetworkStatsGatheringMode::kDefault,
                                 },
                                 /*is_enabled=*/true, &task_queue_, &clock};
 };
@@ -125,8 +124,7 @@ TEST(CrossTrafficTest, RandomWalkCrossTraffic) {
 }
 
 TEST(TcpMessageRouteTest, DeliveredOnLossyNetwork) {
-  NetworkEmulationManagerImpl net(TimeMode::kSimulated,
-                                  EmulatedNetworkStatsGatheringMode::kDefault);
+  NetworkEmulationManagerImpl net(TimeMode::kSimulated);
   BuiltInNetworkBehaviorConfig send;
   // 800 kbps means that the 100 kB message would be delivered in ca 1 second
   // under ideal conditions and no overhead.

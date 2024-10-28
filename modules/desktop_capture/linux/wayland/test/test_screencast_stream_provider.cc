@@ -20,7 +20,7 @@
 #include <utility>
 #include <vector>
 
-#include "modules/portal/pipewire_utils.h"
+#include "modules/desktop_capture/linux/wayland/pipewire_utils.h"
 #include "rtc_base/logging.h"
 
 namespace webrtc {
@@ -90,10 +90,8 @@ TestScreenCastStreamProvider::TestScreenCastStreamProvider(Observer* observer,
 
     spa_rectangle resolution =
         SPA_RECTANGLE(uint32_t(width_), uint32_t(height_));
-    struct spa_fraction default_frame_rate = SPA_FRACTION(60, 1);
     params.push_back(BuildFormat(&builder, SPA_VIDEO_FORMAT_BGRx,
-                                 /*modifiers=*/{}, &resolution,
-                                 &default_frame_rate));
+                                 /*modifiers=*/{}, &resolution));
 
     auto flags =
         pw_stream_flags(PW_STREAM_FLAG_DRIVER | PW_STREAM_FLAG_ALLOC_BUFFERS);
@@ -312,7 +310,7 @@ void TestScreenCastStreamProvider::OnStreamAddBuffer(void* data,
   spa_data->type = SPA_DATA_MemFd;
   spa_data->fd =
       memfd_create("pipewire-test-memfd", MFD_CLOEXEC | MFD_ALLOW_SEALING);
-  if (spa_data->fd == kInvalidPipeWireFd) {
+  if (spa_data->fd == -1) {
     RTC_LOG(LS_ERROR) << "PipeWire test: Can't create memfd";
     return;
   }

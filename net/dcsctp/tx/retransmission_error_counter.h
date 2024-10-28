@@ -27,7 +27,8 @@ class RetransmissionErrorCounter {
  public:
   RetransmissionErrorCounter(absl::string_view log_prefix,
                              const DcSctpOptions& options)
-      : log_prefix_(log_prefix), limit_(options.max_retransmissions) {}
+      : log_prefix_(std::string(log_prefix) + "rtx-errors: "),
+        limit_(options.max_retransmissions) {}
 
   // Increments the retransmission timer. If the maximum error count has been
   // reached, `false` will be returned.
@@ -41,7 +42,7 @@ class RetransmissionErrorCounter {
   int value() const { return counter_; }
 
  private:
-  const absl::string_view log_prefix_;
+  const std::string log_prefix_;
   const absl::optional<int> limit_;
   int counter_ = 0;
 };

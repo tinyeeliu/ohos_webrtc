@@ -11,33 +11,14 @@
 #ifndef RTC_BASE_PHYSICAL_SOCKET_SERVER_H_
 #define RTC_BASE_PHYSICAL_SOCKET_SERVER_H_
 
-#include "api/async_dns_resolver.h"
 #include "api/units/time_delta.h"
-#include "rtc_base/socket.h"
-#include "rtc_base/socket_address.h"
-#include "rtc_base/third_party/sigslot/sigslot.h"
-
-#if defined(WEBRTC_POSIX)
-#if defined(WEBRTC_LINUX)
-// On Linux, use epoll.
+#if defined(WEBRTC_POSIX) && defined(WEBRTC_LINUX)
 #include <sys/epoll.h>
-
 #define WEBRTC_USE_EPOLL 1
-#elif defined(WEBRTC_FUCHSIA)
-// Fuchsia implements select and poll but not epoll, and testing shows that poll
-// is faster than select.
-#include <poll.h>
-
-#define WEBRTC_USE_POLL 1
-#else
-// On other POSIX systems, use select by default.
-#endif  // WEBRTC_LINUX, WEBRTC_FUCHSIA
-#endif  // WEBRTC_POSIX
+#endif
 
 #include <array>
-#include <cstdint>
 #include <memory>
-#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -108,16 +89,15 @@ class RTC_EXPORT PhysicalSocketServer : public SocketServer {
   static constexpr int kForeverMs = -1;
 
   static int ToCmsWait(webrtc::TimeDelta max_wait_duration);
-
 #if defined(WEBRTC_POSIX)
   bool WaitSelect(int cmsWait, bool process_io);
-
+#endif  // WEBRTC_POSIX
 #if defined(WEBRTC_USE_EPOLL)
   void AddEpoll(Dispatcher* dispatcher, uint64_t key);
   void RemoveEpoll(Dispatcher* dispatcher);
   void UpdateEpoll(Dispatcher* dispatcher, uint64_t key);
   bool WaitEpoll(int cmsWait);
-  bool WaitPollOneDispatcher(int cmsWait, Dispatcher* dispatcher);
+  bool WaitPoll(int cmsWait, Dispatcher* dispatcher);
 
   // This array is accessed in isolation by a thread calling into Wait().
   // It's useless to use a SequenceChecker to guard it because a socket
@@ -125,16 +105,7 @@ class RTC_EXPORT PhysicalSocketServer : public SocketServer {
   // to have to reset the sequence checker on Wait calls.
   std::array<epoll_event, kNumEpollEvents> epoll_events_;
   const int epoll_fd_ = INVALID_SOCKET;
-
-#elif defined(WEBRTC_USE_POLL)
-  void AddPoll(Dispatcher* dispatcher, uint64_t key);
-  void RemovePoll(Dispatcher* dispatcher);
-  void UpdatePoll(Dispatcher* dispatcher, uint64_t key);
-  bool WaitPoll(int cmsWait, bool process_io);
-
-#endif  // WEBRTC_USE_EPOLL, WEBRTC_USE_POLL
-#endif  // WEBRTC_POSIX
-
+#endif  // WEBRTC_USE_EPOLL
   // uint64_t keys are used to uniquely identify a dispatcher in order to avoid
   // the ABA problem during the epoll loop (a dispatcher being destroyed and
   // replaced by one with the same address).
@@ -145,9 +116,9 @@ class RTC_EXPORT PhysicalSocketServer : public SocketServer {
   std::unordered_map<Dispatcher*, uint64_t> key_by_dispatcher_
       RTC_GUARDED_BY(crit_);
   // A list of dispatcher keys that we're interested in for the current
-  // select(), poll(), or WSAWaitForMultipleEvents() loop. Again, used to avoid
-  // the ABA problem (a socket being destroyed and a new one created with the
-  // same handle, erroneously receiving the events from the destroyed socket).
+  // select() or WSAWaitForMultipleEvents() loop. Again, used to avoid the ABA
+  // problem (a socket being destroyed and a new one created with the same
+  // handle, erroneously receiving the events from the destroyed socket).
   //
   // Kept as a member variable just for efficiency.
   std::vector<uint64_t> current_dispatcher_keys_;
@@ -202,8 +173,6 @@ class PhysicalSocket : public Socket, public sigslot::has_slots<> {
 
   SocketServer* socketserver() { return ss_; }
 
-  SOCKET GetSocketFD() const { return s_; }
-
  protected:
   int DoConnect(const SocketAddress& connect_addr);
 
@@ -226,7 +195,7 @@ class PhysicalSocket : public Socket, public sigslot::has_slots<> {
                        SocketAddress* out_addr,
                        int64_t* timestamp);
 
-  void OnResolveResult(const webrtc::AsyncDnsResolverResult& resolver);
+  void OnResolveResult(AsyncResolverInterface* resolver);
 
   void UpdateLastError();
   void MaybeRemapSendError();
@@ -245,7 +214,7 @@ class PhysicalSocket : public Socket, public sigslot::has_slots<> {
   mutable webrtc::Mutex mutex_;
   int error_ RTC_GUARDED_BY(mutex_);
   ConnState state_;
-  std::unique_ptr<webrtc::AsyncDnsResolverInterface> resolver_;
+  AsyncResolver* resolver_;
 
 #if !defined(NDEBUG)
   std::string dbg_addr_;

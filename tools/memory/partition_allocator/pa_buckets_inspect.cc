@@ -17,8 +17,8 @@
 #include <unordered_map>
 #include <vector>
 
-#include "base/allocator/partition_allocator/src/partition_alloc/partition_root.h"
-#include "base/allocator/partition_allocator/src/partition_alloc/thread_cache.h"
+#include "base/allocator/partition_allocator/partition_root.h"
+#include "base/allocator/partition_allocator/thread_cache.h"
 #include "base/check_op.h"
 #include "base/debug/proc_maps_linux.h"
 #include "base/files/file.h"
@@ -52,41 +52,23 @@ void DisplayPerBucketData(
     double allocations_per_second) {
   constexpr BucketIndexLookup lookup{};
   std::cout << "Per-bucket stats:"
-            << "\nIndex\tBucket Size\t#Allocs\tTotal size\tFragmentation"
+            << "\nIndex\tBucket Size\t#Allocs\tTotal Size\tFragmentation"
             << std::string(80, '-') << "\n";
 
-  // Direct mapped allocations have an index of |kNumBuckets|, so add 1 here.
-  size_t alloc_size[kNumBuckets + 1] = {};
-  size_t alloc_nums[kNumBuckets + 1] = {};
-  size_t alt_alloc_size[kNumBuckets + 1] = {};
-  size_t alt_alloc_nums[kNumBuckets + 1] = {};
+  size_t alloc_size[kNumBuckets] = {};
+  size_t alloc_nums[kNumBuckets] = {};
   size_t total_memory = 0;
   for (const auto& pair : live_allocs) {
-    const auto requested_size = pair.second;
-    total_memory += requested_size;
-
-    // We record 2 distributions below. They can be whatever you want; edit the
-    // 2 blocks below to change which distributions are recorded.
-
-    {
-      const auto i =
-          BucketIndexLookup::GetIndexForNeutralBuckets(requested_size);
-      alloc_size[i] += requested_size;
-      alloc_nums[i]++;
-    }
-
-    {
-      const auto j =
-          BucketIndexLookup::GetIndexForDenserBuckets(requested_size);
-      alt_alloc_size[j] += requested_size;
-      alt_alloc_nums[j]++;
-    }
+    total_memory += pair.second;
+    // We use the "denser" (i.e. default) bucket distribution here so we can see
+    // how allocations currently happen in chrome.
+    const auto index = BucketIndexLookup::GetIndexForDenserBuckets(pair.second);
+    alloc_size[index] += pair.second;
+    alloc_nums[index]++;
   }
 
   base::File f(base::FilePath(kTmpDumpName),
                base::File::FLAG_CREATE_ALWAYS | base::File::FLAG_WRITE);
-  // Do not record the direct mapped allocations below, since we only care about
-  // the bucket distribution, which direct mapped allocations do not affect.
   for (size_t i = 0; i < kNumBuckets; i++) {
     const auto bucket_size = lookup.bucket_sizes()[i];
     const size_t fragmentation =
@@ -97,9 +79,9 @@ void DisplayPerBucketData(
               << (alloc_size[i] / 1024) << "KiB"
               << "\t\t" << fragmentation << "%"
               << "\n";
-    std::string written = base::StringPrintf(
-        "%zu,%lu,%zu,%zu,%zu,%zu\n", i, bucket_size, alloc_nums[i],
-        alloc_size[i], alt_alloc_nums[i], alt_alloc_size[i]);
+    std::string written =
+        base::StringPrintf("%zu,%lu,%zu,%zu,%zu\n", i, bucket_size,
+                           alloc_nums[i], alloc_size[i], fragmentation);
     if (f.WriteAtCurrentPos(written.data(), written.size()) !=
         static_cast<int>(written.size())) {
       std::cerr << "WARNING: Unable to write to temp file, data will be "
@@ -111,7 +93,7 @@ void DisplayPerBucketData(
   rename(kTmpDumpName, kDumpName);
 
   std::cout << "\nALL THREADS TOTAL: " << total_memory / 1024 << "kiB"
-            << "\tLive Allocations = " << allocations
+            << "\tAllocations = " << allocations
             << "\tAllocations per second = " << allocations_per_second
             << std::endl;
 }
@@ -165,14 +147,11 @@ int main(int argc, char** argv) {
 
     size_t len = old_index < new_index ? new_index - old_index
                                        : kAllocInfoSize - new_index + old_index;
-
     for (size_t i = 0; i < len; i++) {
       size_t index = i % kAllocInfoSize;
       const auto& entry = alloc_info->allocs[index];
-      // Skip nulls.
-      if (entry.addr == 0x0) {
+      if (entry.addr == 0)
         continue;
-      }
       if (entry.addr & 0x01) {  // alloc
         uintptr_t addr = entry.addr & ~0x01;
         live_allocs.insert({addr, entry.size});
@@ -185,13 +164,14 @@ int main(int argc, char** argv) {
     constexpr const char* kClearScreen = "\033[2J\033[1;1H";
     std::cout << kClearScreen << "Time to gather data = " << gather_time_ms
               << "ms\n";
-    partition_alloc::tools::DisplayPerBucketData(
-        live_allocs, live_allocs.size(), allocations_per_second);
+    partition_alloc::tools::DisplayPerBucketData(live_allocs, alloc_info->index,
+                                                 allocations_per_second);
 
     reader.ReadMemory(registry_address, sizeof(AllocInfo),
                       reinterpret_cast<char*>(alloc_info.get()));
     base::TimeTicks now = base::TimeTicks::Now();
-    allocations_per_second = len / (now - last_collection_time).InSecondsF();
+    allocations_per_second = (alloc_info->index - old_index) /
+                             (now - last_collection_time).InSecondsF();
 
     old_index = new_index;
     new_index = alloc_info->index;

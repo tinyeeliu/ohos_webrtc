@@ -40,7 +40,7 @@ class ScreenCapturerTest : public ::testing::Test {
  protected:
 #if defined(WEBRTC_WIN)
   // Enable allow_directx_capturer in DesktopCaptureOptions, but let
-  // DesktopCapturer::CreateScreenCapturer decide whether a DirectX capturer
+  // DesktopCapturer::CreateScreenCapturer to decide whether a DirectX capturer
   // should be used.
   void MaybeCreateDirectxCapturer() {
     DesktopCaptureOptions options(DesktopCaptureOptions::CreateDefault());
@@ -56,6 +56,12 @@ class ScreenCapturerTest : public ::testing::Test {
 
     MaybeCreateDirectxCapturer();
     return true;
+  }
+
+  void CreateMagnifierCapturer() {
+    DesktopCaptureOptions options(DesktopCaptureOptions::CreateDefault());
+    options.set_allow_use_magnification_api(true);
+    capturer_ = DesktopCapturer::CreateScreenCapturer(options);
   }
 #endif  // defined(WEBRTC_WIN)
 
@@ -167,7 +173,8 @@ TEST_F(ScreenCapturerTest, UseSharedBuffers) {
   EXPECT_EQ(frame->shared_memory()->id(), kTestSharedMemoryId);
 }
 
-TEST_F(ScreenCapturerTest, GdiIsDefault) {
+TEST_F(ScreenCapturerTest, UseMagnifier) {
+  CreateMagnifierCapturer();
   std::unique_ptr<DesktopFrame> frame;
   EXPECT_CALL(callback_,
               OnCaptureResultPtr(DesktopCapturer::Result::SUCCESS, _))
@@ -176,7 +183,6 @@ TEST_F(ScreenCapturerTest, GdiIsDefault) {
   capturer_->Start(&callback_);
   capturer_->CaptureFrame();
   ASSERT_TRUE(frame);
-  EXPECT_EQ(frame->capturer_id(), DesktopCapturerId::kScreenCapturerWinGdi);
 }
 
 TEST_F(ScreenCapturerTest, UseDirectxCapturer) {
@@ -192,7 +198,6 @@ TEST_F(ScreenCapturerTest, UseDirectxCapturer) {
   capturer_->Start(&callback_);
   capturer_->CaptureFrame();
   ASSERT_TRUE(frame);
-  EXPECT_EQ(frame->capturer_id(), DesktopCapturerId::kScreenCapturerWinDirectx);
 }
 
 TEST_F(ScreenCapturerTest, UseDirectxCapturerWithSharedBuffers) {
@@ -212,7 +217,6 @@ TEST_F(ScreenCapturerTest, UseDirectxCapturerWithSharedBuffers) {
   ASSERT_TRUE(frame);
   ASSERT_TRUE(frame->shared_memory());
   EXPECT_EQ(frame->shared_memory()->id(), kTestSharedMemoryId);
-  EXPECT_EQ(frame->capturer_id(), DesktopCapturerId::kScreenCapturerWinDirectx);
 }
 
 #endif  // defined(WEBRTC_WIN)

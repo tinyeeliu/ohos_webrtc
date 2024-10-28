@@ -184,7 +184,7 @@ async function getAudioImpairment(audioTransceiver) {
   const stats = await audioTransceiver.receiver.getStats();
   let currentImpairment;
   stats.forEach(stat => {
-    if (stat.type == 'inbound-rtp') {
+    if (stat.type == 'track') {
       currentImpairment = stat.concealedSamples;
     }
   });

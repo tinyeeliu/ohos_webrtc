@@ -25,6 +25,14 @@ const _PATH_SEP = '/';
  */
 const JSON_MAX_BYTES_TO_READ = 2 ** 26;
 
+/** @type {Object<string, _FLAGS>} */
+const _NAMES_TO_FLAGS = Object.freeze({
+  hot: _FLAGS.HOT,
+  generated: _FLAGS.GENERATED_SOURCE,
+  coverage: _FLAGS.COVERAGE,
+  uncompressed: _FLAGS.UNCOMPRESSED,
+});
+
 /** @type {?Promise} */
 let g_loadTreePromise = null;
 
@@ -128,7 +136,6 @@ function wasmLoadSizeFile(isBefore, sizeBuffer) {
   Module._free(heapBuffer.byteOffset);
 }
 
-/** @return {SizeProperties} */
 function wasmLoadSizeProperties() {
   const cwrapQueryProperty =
       Module.cwrap('QueryProperty', 'number', ['string']);
@@ -143,36 +150,80 @@ function wasmLoadSizeProperties() {
 }
 
 /**
- * @param {number} id
- * @return {QueryAncestryResults}
+ * @typedef {Object} BuildOptions
+ * @property {string} url
+ * @property {string} beforeUrl
+ * @property {boolean} methodCountMode
+ * @property {string} groupBy
+ * @property {string} includeRegex
+ * @property {string} excludeRegex
+ * @property {string} includeSections
+ * @property {number} minSymbolSize
+ * @property {number} flagToFilter
+ * @property {boolean} nonOverhead
+ * @property {boolean} disassemblyMode
  */
-function wasmQueryAncestryById(id) {
-  const cwrapQueryAncestryById =
-      Module.cwrap('QueryAncestryById', 'number', ['number']);
-  const stringPtr = cwrapQueryAncestryById(id);
-  const r = Module.UTF8ToString(stringPtr, 2 ** 16);
-  return /** @type {!QueryAncestryResults} */ (JSON.parse(r));
+
+/**
+ * Parse the options represented as a query string, into an object. Performs
+ * checks for valid values.
+ * @param {string} optionsStr Options encoded as query string.
+ * @return {BuildOptions}
+ */
+function parseOptions(optionsStr) {
+  const ret = /** @type {BuildOptions} */ ({});
+  const params = new URLSearchParams(optionsStr);
+
+  ret.url = params.get('load_url');
+  ret.beforeUrl = params.get('before_url');
+
+  ret.methodCountMode = params.has('method_count');
+  ret.groupBy = params.get('group_by') || 'source_path';
+
+  ret.includeRegex = params.get('include');
+  ret.excludeRegex = params.get('exclude');
+
+  ret.includeSections = params.get('type');
+  if (ret.methodCountMode) {
+    ret.includeSections = _DEX_METHOD_SYMBOL_TYPE;
+  } else if (ret.includeSections === null) {
+    // Exclude native symbols by default.
+    const includeSectionsSet = new Set(_SYMBOL_TYPE_SET);
+    includeSectionsSet.delete('b');
+    ret.includeSections = Array.from(includeSectionsSet.values()).join('');
+  }
+
+  ret.minSymbolSize = Number(params.get('min_size'));
+  if (Number.isNaN(ret.minSymbolSize)) {
+    ret.minSymbolSize = 0;
+  }
+
+  ret.flagToFilter = _NAMES_TO_FLAGS[params.get('flag_filter')] || 0;
+  ret.nonOverhead = params.get('flag_filter') === 'nonoverhead';
+  ret.disassemblyMode = params.get('flag_filter') === 'disassembly';
+
+  return ret;
 }
 
 /**
  * @param {string} input
  * @param {?string} accessToken
- * @param {!BuildOptions} buildOptions
+ * @param {string} optionsStr
  * @return {Promise<!LoadTreeResults, Error>}
  */
-async function loadTreeWorkhorse(input, accessToken, buildOptions) {
+async function loadTreeWorkhorse(input, accessToken, optionsStr) {
   const {
-    loadUrl,
+    url,
     beforeUrl,
-  } = buildOptions;
+  } = parseOptions(optionsStr);
 
   const isUpload = (input !== 'from-url://');
   if (isUpload) {
     console.info('Displaying uploaded data');
   } else {
-    console.info('Displaying data from', loadUrl);
+    console.info('Displaying data from', url);
   }
-  const loadFetcher = new DataFetcher(accessToken, isUpload ? input : loadUrl);
+  const loadFetcher = new DataFetcher(accessToken, isUpload ? input : url);
   let beforeFetcher = null;
   if (beforeUrl) {
     beforeFetcher = new DataFetcher(accessToken, beforeUrl);
@@ -202,11 +253,9 @@ async function loadTreeWorkhorse(input, accessToken, buildOptions) {
     const sizeProperties = wasmLoadSizeProperties();
     isMultiContainer = sizeProperties.isMultiContainer;
     if (!isUpload) {
-      // Revoked in displayOrHideDownloadButton().
       loadBlobUrl = URL.createObjectURL(new Blob(
           [mainSizeBuffer.buffer], {type: 'application/octet-stream'}));
       if (beforeSizeBuffer) {
-        // Revoked in displayOrHideDownloadButton().
         beforeBlobUrl = URL.createObjectURL(new Blob(
             [beforeSizeBuffer.buffer], {type: 'application/octet-stream'}));
       }
@@ -231,10 +280,10 @@ function wasmLoadMetadata() {
 }
 
 /**
- * @param {!BuildOptions} buildOptions
+ * @param {string} optionsStr
  * @return {Promise<boolean>}
  */
-async function wasmBuildTree(buildOptions) {
+async function wasmBuildTree(optionsStr) {
   const {
     methodCountMode,
     groupBy,
@@ -245,7 +294,7 @@ async function wasmBuildTree(buildOptions) {
     flagToFilter,
     nonOverhead,
     disassemblyMode,
-  } = buildOptions;
+  } = parseOptions(optionsStr);
 
   const cwrapBuildTree = Module.cwrap(
       'BuildTree', 'bool',
@@ -277,28 +326,27 @@ async function wasmOpen(name) {
  */
 const actions = {
   /**
-   * @param {{input:string,accessToken:?string,buildOptions:BuildOptions}}
-   *     param0
+   * @param {{input:string,accessToken:?string,optionsStr:string}} param0
    * @return {Promise<BuildTreeResults, Error>}
    */
-  async loadAndBuildTree({input, accessToken, buildOptions}) {
+  async loadAndBuildTree({input, accessToken, optionsStr}) {
     if (g_loadTreePromise) {
       // New loads should create new WebWorkers instead.
       throw new Error('loadTree with input called multiple times.');
     }
-    g_loadTreePromise = loadTreeWorkhorse(input, accessToken, buildOptions);
+    g_loadTreePromise = loadTreeWorkhorse(input, accessToken, optionsStr);
     const loadResults = await g_loadTreePromise;
-    const ret = await actions.buildTree({buildOptions});
+    const ret = await actions.buildTree({optionsStr});
     ret.loadResults = loadResults;
     return ret;
   },
 
   /**
-   * @param {{buildOptions:BuildOptions}} param0
+   * @param {{optionsStr:string}} param0
    * @return {Promise<BuildTreeResults>}
    */
-  async buildTree({buildOptions}) {
-    // Ensure initial load is complete.
+  async buildTree({optionsStr}) {
+    // Ensure iniitial load is complete.
     await g_loadTreePromise;
 
     // Wait for queued up calls to complete. There should not be too many
@@ -308,7 +356,7 @@ const actions = {
     while (g_buildTreePromise) {
       await g_buildTreePromise;
     }
-    g_buildTreePromise = wasmBuildTree(buildOptions);
+    g_buildTreePromise = wasmBuildTree(optionsStr);
 
     const diffMode = await g_buildTreePromise;
     g_buildTreePromise = null;
@@ -325,18 +373,9 @@ const actions = {
 
   /**
    * @param {string} path
-   * @return {Promise<TreeNode>}
-   */
+   * @return {Promise<TreeNode>} */
   async open(path) {
     return wasmOpen(path);
-  },
-
-  /**
-   * @param {number} id
-   * @return {Promise<QueryAncestryResults>}
-   */
-  async queryAncestryById(id) {
-    return wasmQueryAncestryById(id);
   },
 };
 

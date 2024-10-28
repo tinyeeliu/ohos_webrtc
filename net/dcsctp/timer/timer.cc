@@ -33,18 +33,19 @@ DurationMs GetBackoffDuration(const TimerOptions& options,
     case TimerBackoffAlgorithm::kFixed:
       return base_duration;
     case TimerBackoffAlgorithm::kExponential: {
-      DurationMs duration = base_duration;
+      int32_t duration_ms = *base_duration;
 
-      while (expiration_count > 0 && duration < Timer::kMaxTimerDuration) {
-        duration *= 2;
+      while (expiration_count > 0 && duration_ms < *Timer::kMaxTimerDuration) {
+        duration_ms *= 2;
         --expiration_count;
 
-        if (duration > options.max_backoff_duration) {
-          return options.max_backoff_duration;
+        if (options.max_backoff_duration.has_value() &&
+            duration_ms > **options.max_backoff_duration) {
+          return *options.max_backoff_duration;
         }
       }
 
-      return DurationMs(std::min(duration, Timer::kMaxTimerDuration));
+      return DurationMs(std::min(duration_ms, *Timer::kMaxTimerDuration));
     }
   }
 }

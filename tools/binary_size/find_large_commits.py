@@ -52,7 +52,18 @@ def _LookupCommitInfo(rev):
   day, year = re.search(r'Date:\s+\w+\s+(\w+ \d+)\s+.*?\s+(\d+)', desc).groups()
   date = '{} {}'.format(day, year)
   title = re.search(r'\n +(\S.*)', desc).group(1).replace('\t', ' ')
-  return sha1, author, date, title
+  milestone = None
+  releases = subprocess.check_output(['git', 'find-releases', sha1],
+                                     encoding="utf-8")
+  version = re.search('initially in (\d\d)', releases)
+  milestone = ''
+  if version:
+    milestone = 'M{}'.format(version.group(1))
+  version = re.search('initially in branch-heads/(\d\d\d\d)', releases)
+  if version:
+    milestone = version.group(1)
+
+  return sha1, author, date, title, milestone
 
 
 def main():
@@ -77,17 +88,18 @@ def main():
 
   print('Printing info for up to {} commits in the range {}-{}'.format(
       len(big_deltas), revs_and_sizes[0][0], revs_and_sizes[-1][0]))
-  print('Revision,Hash,Title,Author,Delta,Date')
+  print('Revision,Hash,Title,Author,Delta,Date,Milestone')
   num_bad_commits = 0
   for rev, delta, prev_rev in big_deltas:
     if any(rev in r for r in _BAD_COMMIT_RANGES):
       num_bad_commits += 1
       continue
-    sha1, author, date, title = _LookupCommitInfo(rev)
+    sha1, author, date, title, milestone = _LookupCommitInfo(rev)
     rev_str = str(rev)
     if rev - prev_rev > 1:
       rev_str = f'{prev_rev}..{rev}'
-    print('\t'.join([rev_str, sha1, title, author, str(delta), date]))
+    print('\t'.join([rev_str, sha1, title, author,
+                     str(delta), date, milestone]))
 
   if num_bad_commits:
     print(f'Ignored {num_bad_commits} commits from bad ranges')

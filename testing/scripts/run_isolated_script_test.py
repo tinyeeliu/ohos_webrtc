@@ -57,18 +57,6 @@ KNOWN_TYP_VPYTHON3_TEST_RUNNERS = {
 
 # pylint: disable=super-with-arguments
 
-class BareScriptTestAdapter(common.BaseIsolatedScriptArgsAdapter):
-  def __init__(self):
-    super().__init__()
-    # Arguments that are ignored, but added here because it's easier to ignore
-    # them than to update bot configs to not pass them.
-    common.add_emulator_args(self._parser)
-    self._parser.add_argument(
-        '--coverage-dir', type=str, help='Unused')
-    self._parser.add_argument(
-        '--use-persistent-shell', action='store_true', help='Unused')
-
-
 class IsolatedScriptTestAdapter(common.BaseIsolatedScriptArgsAdapter):
   def generate_sharding_args(self, total_shards, shard_index):
     # This script only uses environment variable for sharding.
@@ -134,23 +122,10 @@ class TypUnittestAdapter(common.BaseIsolatedScriptArgsAdapter):
 
 
 def main():
-  parser = argparse.ArgumentParser()
-  parser.add_argument('--script-type', choices=['isolated', 'typ', 'bare'])
-  args, _ = parser.parse_known_args()
-
-  kind = args.script_type
-  if not kind:
-    if any(r in sys.argv[1] for r in KNOWN_ISOLATED_SCRIPT_TEST_RUNNERS):
-      kind = 'isolated'
-    else:
-      kind = 'typ'
-
-  if kind == 'isolated':
+  if any(r in sys.argv[1] for r in KNOWN_ISOLATED_SCRIPT_TEST_RUNNERS):
     adapter = IsolatedScriptTestAdapter()
-  elif kind == 'typ':
-    adapter = TypUnittestAdapter()
   else:
-    adapter = BareScriptTestAdapter()
+    adapter = TypUnittestAdapter()
   return adapter.run_test()
 
 # This is not really a "script test" so does not need to manually add

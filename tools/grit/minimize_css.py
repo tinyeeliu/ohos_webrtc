@@ -6,7 +6,7 @@
 import re
 import sys
 
-class CSSMinimizer:
+class CSSMinimizer(object):
 
   INITIAL = 0
   MAYBE_COMMENT_START = 1

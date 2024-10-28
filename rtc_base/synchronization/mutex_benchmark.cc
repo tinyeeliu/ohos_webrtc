@@ -38,8 +38,7 @@ void BM_LockWithMutex(benchmark::State& state) {
   static PerfTestData test_data;
   for (auto s : state) {
     RTC_UNUSED(s);
-    int add_to_counter = test_data.AddToCounter(2);
-    benchmark::DoNotOptimize(add_to_counter);
+    benchmark::DoNotOptimize(test_data.AddToCounter(2));
   }
 }
 

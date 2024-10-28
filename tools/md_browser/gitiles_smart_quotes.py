@@ -28,13 +28,12 @@ class _GitilesSmartQuotesPattern(Pattern):
 
 
 class _GitilesSmartQuotesExtension(Extension):
-  """Add Gitiles' smart quotes to Markdown, with a priority just higher than
-  that of the builtin 'em_strong'."""
+  """Add Gitiles' smart quotes to Markdown."""
 
   def extendMarkdown(self, md):
-    md.inlinePatterns.register(
-        _GitilesSmartQuotesPattern(r"""(['"])([^\2]+)\2"""),
-        'gitilessmartquotes', 61)
+    md.inlinePatterns.add('gitilessmartquotes',
+                          _GitilesSmartQuotesPattern(r"""(['"])([^\2]+)\2"""),
+                          '<em_strong')
 
 
 def makeExtension(*args, **kwargs):

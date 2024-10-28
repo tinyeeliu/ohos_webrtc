@@ -214,7 +214,7 @@ bool DataTracker::Observe(TSN tsn,
   return !is_duplicate;
 }
 
-bool DataTracker::HandleForwardTsn(TSN new_cumulative_ack) {
+void DataTracker::HandleForwardTsn(TSN new_cumulative_ack) {
   // ForwardTSN is sent to make the receiver (this socket) "forget" about partly
   // received (or not received at all) data, up until `new_cumulative_ack`.
 
@@ -232,7 +232,7 @@ bool DataTracker::HandleForwardTsn(TSN new_cumulative_ack) {
     // indicate the previous SACK was lost in the network."
     UpdateAckState(AckState::kImmediate,
                    "FORWARD_TSN new_cumulative_tsn was behind");
-    return false;
+    return;
   }
 
   // https://tools.ietf.org/html/rfc3758#section-3.6
@@ -271,7 +271,6 @@ bool DataTracker::HandleForwardTsn(TSN new_cumulative_ack) {
     UpdateAckState(AckState::kImmediate,
                    "received FORWARD_TSN when already delayed");
   }
-  return true;
 }
 
 SackChunk DataTracker::CreateSelectiveAck(size_t a_rwnd) {

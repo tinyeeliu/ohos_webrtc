@@ -21,21 +21,15 @@
       </div>
     </MdListItem>
     <MdListItem v-if="selectedClass.buildTargets.length > 0">
-      <div>
-        <ul class="build-target-list">
+      <div class="md-list-item-text">
+        <ul class="buildtarget-list">
           <li
               v-for="buildTarget in selectedClass.buildTargets"
               :key="buildTarget">
-            <LinkToGraph
-                :filter="[buildTarget]"
-                :graph-type="PagePathName.TARGET"
-                :text="buildTarget"/>
-            <div class="md-list-item-text">
-              <span/>
-              <span>Target Graph URL</span>
-            </div>
+            {{ buildTarget }}
           </li>
         </ul>
+        <span>Build Targets</span>
       </div>
     </MdListItem>
   </MdList>
@@ -63,8 +57,7 @@ export default ClassDetailsPanel;
 </script>
 
 <style scoped>
-.build-target-list {
-  list-style-type: none;
+.buildtarget-list {
   padding-left: 0;
 }
 

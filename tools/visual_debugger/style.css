@@ -81,14 +81,13 @@ button#disconnect {
   --mdc-theme-on-primary: white;
 }
 
-.nonzero-orientation {
-  background: rgba(255, 0, 0, 0.2);;
+.default-orientation {
+  background: white;
   color: black;
 }
 
-/* Don't color the option elements */
-.nonzero-orientation > option {
-  background: white;
+.selected-orientation {
+  background: rgba(255, 0, 0, 0.2);;
   color: black;
 }
 
@@ -97,29 +96,4 @@ button#live {
   --mdc-theme-primary:#FF0000;
   --mdc-theme-on-primary:black;
   opacity: 0.8;
-}
-
-.row {
-  display: flex;
-  justify-content: space-between;
-  padding-bottom: 10px;
-}
-
-#filter-container {
-  max-width: 450px;
-  min-width: 350px;
-  font-family: Roboto;
-  font-size: 10pt;
-  background-color: white;
-  padding: 10px;
-}
-
-#saveFilter {
-  margin: 20px 10px;
-  margin-right: 0px;
-}
-
-#opacityVal {
-  display: inline-block;
-  width: 30px;
 }
