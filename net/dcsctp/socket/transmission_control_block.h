@@ -80,8 +80,7 @@ class TransmissionControlBlock : public Context {
     return tx_error_counter_.IsExhausted();
   }
   void Send(SctpPacket::Builder& builder) override {
-    packet_sender_.Send(builder,
-                        /*write_checksum=*/!capabilities_.zero_checksum);
+    packet_sender_.Send(builder);
   }
 
   // Other accessors
@@ -153,7 +152,7 @@ class TransmissionControlBlock : public Context {
   // Will be called when the delayed ack timer expires.
   absl::optional<DurationMs> OnDelayedAckTimerExpiry();
 
-  const absl::string_view log_prefix_;
+  const std::string log_prefix_;
   const DcSctpOptions options_;
   TimerManager& timer_manager_;
   // Negotiated capabilities that both peers support.

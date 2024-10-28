@@ -4,6 +4,9 @@
 
 '''The 'grit menufromparts' tool.'''
 
+from __future__ import print_function
+
+import six
 
 from grit import grd_reader
 from grit import util
@@ -58,7 +61,7 @@ to being one message for the whole menu.'''
 
         contents = message.GetContent()
         for part in contents:
-          if isinstance(part, str):
+          if isinstance(part, six.string_types):
             id = grit.extern.tclib.GenerateMessageId(part)
             if id not in xtb:
               print("WARNING didn't find all translations for menu %s" %

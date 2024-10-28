@@ -13,7 +13,6 @@ import sys
 import zipfile
 
 from util import build_utils
-import zip_helpers
 
 sys.path.append(
     os.path.abspath(os.path.join(sys.path[0], '../../../google_apis')))
@@ -82,7 +81,7 @@ def _DoWriteJarOutput(output_path, constant_definition):
   with zipfile.ZipFile(output_path, 'w') as srcjar:
     path = '%s/%s' % (PACKAGE.replace('.', '/'), CLASSNAME + '.java')
     data = GenerateOutput(constant_definition)
-    zip_helpers.add_to_zip_hermetic(srcjar, path, data=data)
+    build_utils.AddToZipHermetic(srcjar, path, data=data)
 
 
 def _DoMain(argv):

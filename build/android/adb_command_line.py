@@ -5,6 +5,7 @@
 
 """Utility for reading / writing command-line flag files on device(s)."""
 
+from __future__ import print_function
 
 import argparse
 import logging
@@ -68,8 +69,6 @@ Otherwise: Writes command-line file.
     remote_args = []
     action = 'Deleted command line file. '
   else:
-    if remote_args[0] == '--':
-      remote_args.pop(0)
     action = 'Wrote command line file. '
 
   def update_flags(device):

@@ -232,10 +232,8 @@ class PseudoTcpTest : public PseudoTcpTestBase {
     // Create some dummy data to send.
     send_stream_.ReserveSize(size);
     for (int i = 0; i < size; ++i) {
-      uint8_t ch = static_cast<uint8_t>(i);
-      size_t written;
-      int error;
-      send_stream_.Write(rtc::MakeArrayView(&ch, 1), written, error);
+      char ch = static_cast<char>(i);
+      send_stream_.Write(&ch, 1, NULL, NULL);
     }
     send_stream_.Rewind();
     // Prepare the receive stream.
@@ -294,19 +292,15 @@ class PseudoTcpTest : public PseudoTcpTestBase {
   void ReadData() {
     char block[kBlockSize];
     size_t position;
-    int received;
+    int rcvd;
     do {
-      received = remote_.Recv(block, sizeof(block));
-      if (received != -1) {
-        size_t written;
-        int error;
-        recv_stream_.Write(
-            rtc::MakeArrayView(reinterpret_cast<uint8_t*>(block), received),
-            written, error);
+      rcvd = remote_.Recv(block, sizeof(block));
+      if (rcvd != -1) {
+        recv_stream_.Write(block, rcvd, NULL, NULL);
         recv_stream_.GetPosition(&position);
         RTC_LOG(LS_VERBOSE) << "Received: " << position;
       }
-    } while (received > 0);
+    } while (rcvd > 0);
   }
   void WriteData(bool* done) {
     size_t position, tosend;
@@ -314,10 +308,8 @@ class PseudoTcpTest : public PseudoTcpTestBase {
     char block[kBlockSize];
     do {
       send_stream_.GetPosition(&position);
-      int error;
-      if (send_stream_.Read(
-              rtc::MakeArrayView(reinterpret_cast<uint8_t*>(block), kBlockSize),
-              tosend, error) != rtc::SR_EOS) {
+      if (send_stream_.Read(block, sizeof(block), &tosend, NULL) !=
+          rtc::SR_EOS) {
         sent = local_.Send(block, tosend);
         UpdateLocalClock();
         if (sent != -1) {
@@ -355,10 +347,8 @@ class PseudoTcpTestPingPong : public PseudoTcpTestBase {
     // Create some dummy data to send.
     send_stream_.ReserveSize(size);
     for (int i = 0; i < size; ++i) {
-      uint8_t ch = static_cast<uint8_t>(i);
-      size_t written;
-      int error;
-      send_stream_.Write(rtc::MakeArrayView(&ch, 1), written, error);
+      char ch = static_cast<char>(i);
+      send_stream_.Write(&ch, 1, NULL, NULL);
     }
     send_stream_.Rewind();
     // Prepare the receive stream.
@@ -417,20 +407,15 @@ class PseudoTcpTestPingPong : public PseudoTcpTestBase {
   void ReadData() {
     char block[kBlockSize];
     size_t position;
-    int received;
+    int rcvd;
     do {
-      received = receiver_->Recv(block, sizeof(block));
-      if (received != -1) {
-        size_t written;
-        int error;
-        recv_stream_.Write(
-            rtc::MakeArrayView(reinterpret_cast<const uint8_t*>(block),
-                               received),
-            written, error);
+      rcvd = receiver_->Recv(block, sizeof(block));
+      if (rcvd != -1) {
+        recv_stream_.Write(block, rcvd, NULL, NULL);
         recv_stream_.GetPosition(&position);
         RTC_LOG(LS_VERBOSE) << "Received: " << position;
       }
-    } while (received > 0);
+    } while (rcvd > 0);
   }
   void WriteData() {
     size_t position, tosend;
@@ -439,10 +424,7 @@ class PseudoTcpTestPingPong : public PseudoTcpTestBase {
     do {
       send_stream_.GetPosition(&position);
       tosend = bytes_per_send_ ? bytes_per_send_ : sizeof(block);
-      int error;
-      if (send_stream_.Read(
-              rtc::MakeArrayView(reinterpret_cast<uint8_t*>(block), tosend),
-              tosend, error) != rtc::SR_EOS) {
+      if (send_stream_.Read(block, tosend, &tosend, NULL) != rtc::SR_EOS) {
         sent = sender_->Send(block, tosend);
         UpdateLocalClock();
         if (sent != -1) {
@@ -476,10 +458,8 @@ class PseudoTcpTestReceiveWindow : public PseudoTcpTestBase {
     // Create some dummy data to send.
     send_stream_.ReserveSize(size);
     for (int i = 0; i < size; ++i) {
-      uint8_t ch = static_cast<uint8_t>(i);
-      size_t written;
-      int error;
-      send_stream_.Write(rtc::MakeArrayView(&ch, 1), written, error);
+      char ch = static_cast<char>(i);
+      send_stream_.Write(&ch, 1, NULL, NULL);
     }
     send_stream_.Rewind();
 
@@ -525,20 +505,16 @@ class PseudoTcpTestReceiveWindow : public PseudoTcpTestBase {
   void ReadUntilIOPending() {
     char block[kBlockSize];
     size_t position;
-    int received;
+    int rcvd;
 
     do {
-      received = remote_.Recv(block, sizeof(block));
-      if (received != -1) {
-        size_t written;
-        int error;
-        recv_stream_.Write(
-            rtc::MakeArrayView(reinterpret_cast<uint8_t*>(block), received),
-            written, error);
+      rcvd = remote_.Recv(block, sizeof(block));
+      if (rcvd != -1) {
+        recv_stream_.Write(block, rcvd, NULL, NULL);
         recv_stream_.GetPosition(&position);
         RTC_LOG(LS_VERBOSE) << "Received: " << position;
       }
-    } while (received > 0);
+    } while (rcvd > 0);
 
     recv_stream_.GetPosition(&position);
     recv_position_.push_back(position);
@@ -558,11 +534,8 @@ class PseudoTcpTestReceiveWindow : public PseudoTcpTestBase {
     char block[kBlockSize];
     do {
       send_stream_.GetPosition(&position);
-      int error;
-      if (send_stream_.Read(
-              rtc::MakeArrayView(reinterpret_cast<uint8_t*>(block),
-                                 sizeof(block)),
-              tosend, error) != rtc::SR_EOS) {
+      if (send_stream_.Read(block, sizeof(block), &tosend, NULL) !=
+          rtc::SR_EOS) {
         sent = local_.Send(block, tosend);
         UpdateLocalClock();
         if (sent != -1) {

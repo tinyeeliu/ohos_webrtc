@@ -18,13 +18,11 @@
 #include <vector>
 
 #include "absl/types/optional.h"
-#include "api/units/time_delta.h"
-#include "api/units/timestamp.h"
+#include "modules/include/module_common_types_public.h"
 #include "modules/rtp_rtcp/include/receive_statistics.h"
 #include "modules/rtp_rtcp/source/rtcp_packet/report_block.h"
-#include "rtc_base/bitrate_tracker.h"
 #include "rtc_base/containers/flat_map.h"
-#include "rtc_base/numerics/sequence_number_unwrapper.h"
+#include "rtc_base/rate_statistics.h"
 #include "rtc_base/synchronization/mutex.h"
 #include "rtc_base/thread_annotations.h"
 
@@ -65,22 +63,22 @@ class StreamStatisticianImpl : public StreamStatisticianImplInterface {
 
  private:
   bool IsRetransmitOfOldPacket(const RtpPacketReceived& packet,
-                               Timestamp now) const;
-  void UpdateJitter(const RtpPacketReceived& packet, Timestamp receive_time);
+                               int64_t now_ms) const;
+  void UpdateJitter(const RtpPacketReceived& packet, int64_t receive_time_ms);
   void ReviseFrequencyAndJitter(int payload_type_frequency);
   // Updates StreamStatistician for out of order packets.
   // Returns true if packet considered to be out of order.
   bool UpdateOutOfOrder(const RtpPacketReceived& packet,
                         int64_t sequence_number,
-                        Timestamp now);
+                        int64_t now_ms);
   // Checks if this StreamStatistician received any rtp packets.
-  bool ReceivedRtpPacket() const { return last_receive_time_.has_value(); }
+  bool ReceivedRtpPacket() const { return received_seq_first_ >= 0; }
 
   const uint32_t ssrc_;
   Clock* const clock_;
   // Delta used to map internal timestamps to Unix epoch ones.
-  const TimeDelta delta_internal_unix_epoch_;
-  BitrateTracker incoming_bitrate_;
+  const int64_t delta_internal_unix_epoch_ms_;
+  RateStatistics incoming_bitrate_;
   // In number of packets or sequence numbers.
   int max_reordering_threshold_;
   bool enable_retransmit_detection_;
@@ -96,9 +94,9 @@ class StreamStatisticianImpl : public StreamStatisticianImplInterface {
   // senders, in particular, our own loss-based bandwidth estimator.
   int32_t cumulative_loss_rtcp_offset_;
 
-  absl::optional<Timestamp> last_receive_time_;
+  int64_t last_receive_time_ms_;
   uint32_t last_received_timestamp_;
-  RtpSequenceNumberUnwrapper seq_unwrapper_;
+  SequenceNumberUnwrapper seq_unwrapper_;
   int64_t received_seq_first_;
   int64_t received_seq_max_;
   // Assume that the other side restarted when there are two sequential packets

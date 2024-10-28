@@ -67,8 +67,8 @@ struct EmulatedNetworkOutgoingStats {
 
   DataSize bytes_sent = DataSize::Zero();
 
-  // Sizes of all sent packets.
-  // Collected iff EmulatedNetworkStatsGatheringMode::kDebug is enabled.
+  // Sizes of all sent packets if EmulatedEndpointConfig::stats_gatherming_mode
+  // was set to StatsGatheringMode::kDebug; empty otherwise.
   SamplesStatsCounter sent_packets_size;
 
   DataSize first_sent_packet_size = DataSize::Zero();
@@ -90,8 +90,9 @@ struct EmulatedNetworkIncomingStats {
   // Total amount of bytes in received packets.
   DataSize bytes_received = DataSize::Zero();
 
-  // Sizes of all received packets.
-  // Collected iff EmulatedNetworkStatsGatheringMode::kDebug is enabled.
+  // Sizes of all received packets if
+  // EmulatedEndpointConfig::stats_gatherming_mode was set to
+  // StatsGatheringMode::kDebug; empty otherwise.
   SamplesStatsCounter received_packets_size;
 
   // Total amount of packets that were received, but no destination was found.
@@ -100,8 +101,9 @@ struct EmulatedNetworkIncomingStats {
   // Total amount of bytes in discarded packets.
   DataSize bytes_discarded_no_receiver = DataSize::Zero();
 
-  // Sizes of all packets that were received, but no destination was found.
-  // Collected iff EmulatedNetworkStatsGatheringMode::kDebug is enabled.
+  // Sizes of all packets that were received, but no destination was found if
+  // EmulatedEndpointConfig::stats_gatherming_mode was set to
+  // StatsGatheringMode::kDebug; empty otherwise.
   SamplesStatsCounter packets_discarded_no_receiver_size;
 
   DataSize first_received_packet_size = DataSize::Zero();
@@ -122,9 +124,10 @@ struct EmulatedNetworkStats {
 
   DataSize BytesSent() const { return overall_outgoing_stats.bytes_sent; }
 
-  // Returns the timestamped sizes of all sent packets.
+  // Returns the timestamped sizes of all sent packets if
+  // EmulatedEndpointConfig::stats_gatherming_mode was set to
+  // StatsGatheringMode::kDebug; otherwise, the returned value will be empty.
   // Returned reference is valid until the next call to a non-const method.
-  // Collected iff EmulatedNetworkStatsGatheringMode::kDebug is enabled.
   const SamplesStatsCounter& SentPacketsSizeCounter() const {
     return overall_outgoing_stats.sent_packets_size;
   }
@@ -159,9 +162,10 @@ struct EmulatedNetworkStats {
     return overall_incoming_stats.bytes_received;
   }
 
-  // Returns the timestamped sizes of all received packets.
+  // Returns the timestamped sizes of all received packets if
+  // EmulatedEndpointConfig::stats_gatherming_mode was set to
+  // StatsGatheringMode::kDebug; otherwise, the returned value will be empty.
   // Returned reference is valid until the next call to a non-const method.
-  // Collected iff EmulatedNetworkStatsGatheringMode::kDebug is enabled.
   const SamplesStatsCounter& ReceivedPacketsSizeCounter() const {
     return overall_incoming_stats.received_packets_size;
   }
@@ -177,9 +181,10 @@ struct EmulatedNetworkStats {
   }
 
   // Returns counter with timestamped sizes of all packets that were received,
-  // but no destination was found.
+  // but no destination was found if
+  // EmulatedEndpointConfig::stats_gatherming_mode was set to
+  // StatsGatheringMode::kDebug; otherwise, the returned value will be empty.
   // Returned reference is valid until the next call to a non-const method.
-  // Collected iff EmulatedNetworkStatsGatheringMode::kDebug is enabled.
   const SamplesStatsCounter& PacketsDiscardedNoReceiverSizeCounter() const {
     return overall_incoming_stats.packets_discarded_no_receiver_size;
   }
@@ -221,23 +226,10 @@ struct EmulatedNetworkStats {
       incoming_stats_per_source;
 
   // Duration between packet was received on network interface and was
-  // dispatched to the network in microseconds.
-  // Collected iff EmulatedNetworkStatsGatheringMode::kDebug is enabled.
+  // dispatched to the network in microseconds if
+  // EmulatedEndpointConfig::stats_gatherming_mode was set to
+  // StatsGatheringMode::kDebug; empty otherwise.
   SamplesStatsCounter sent_packets_queue_wait_time_us;
-};
-
-struct EmulatedNetworkNodeStats {
-  // Amount of time each packet spent in the emulated network node for which
-  // stats were collected.
-  //
-  // Collected iff EmulatedNetworkStatsGatheringMode::kDebug is enabled.
-  SamplesStatsCounter packet_transport_time;
-
-  // For each packet contains its size divided on the amount of time which it
-  // spent in the emulated network node for which stats were collected.
-  //
-  // Collected iff EmulatedNetworkStatsGatheringMode::kDebug is enabled.
-  SamplesStatsCounter size_to_packet_transport_time;
 };
 
 // EmulatedEndpoint is an abstraction for network interface on device. Instances

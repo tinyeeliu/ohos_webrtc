@@ -5,11 +5,15 @@
 '''Base types for nodes in a GRIT resource tree.
 '''
 
+from __future__ import print_function
+
 import ast
 import os
 import struct
 import sys
 from xml.sax import saxutils
+
+import six
 
 from grit import constants
 from grit import clique
@@ -19,7 +23,7 @@ from grit.node import brotli_util
 import grit.format.gzip_string
 
 
-class Node:
+class Node(object):
   '''An item in the tree that has children.'''
 
   # Valid content types that can be returned by _ContentType()
@@ -49,7 +53,7 @@ class Node:
     self.mixed_content = []   # A list of u'' and/or child elements (this
     # duplicates 'children' but
     # is needed to preserve markup-type content).
-    self.name = ''           # The name of this element
+    self.name = u''           # The name of this element
     self.attrs = {}           # The set of attributes (keys to values)
     self.parent = None        # Our parent unless we are the root element.
     self.uberclique = None    # Allows overriding uberclique for parts of tree
@@ -63,7 +67,7 @@ class Node:
 
   def __exit__(self, exc_type, exc_value, traceback):
     if exc_type is not None:
-      print('Error processing node %s: %s' % (str(self), exc_value))
+      print(u'Error processing node %s: %s' % (six.text_type(self), exc_value))
 
   def __iter__(self):
     '''A preorder iteration through the tree that this node is the root of.'''
@@ -74,7 +78,8 @@ class Node:
     any child nodes.'''
     yield self
     for child in self.children:
-      yield from child.Preorder()
+      for iterchild in child.Preorder():
+        yield iterchild
 
   def ActiveChildren(self):
     '''Returns the children of this node that should be included in the current
@@ -86,7 +91,8 @@ class Node:
     the current configuration, in preorder.'''
     yield self
     for child in self.ActiveChildren():
-      yield from child.ActiveDescendants()
+      for descendant in child.ActiveDescendants():
+        yield descendant
 
   def GetRoot(self):
     '''Returns the root Node in the tree this Node belongs to.'''
@@ -114,7 +120,7 @@ class Node:
       name: u'elementname'
       parent: grit.node.base.Node or subclass or None
     '''
-    assert isinstance(name, str)
+    assert isinstance(name, six.string_types)
     assert not parent or isinstance(parent, Node)
     self.name = name
     self.parent = parent
@@ -157,7 +163,7 @@ class Node:
     Return:
       None
     '''
-    assert isinstance(content, str)
+    assert isinstance(content, six.string_types)
     if self._ContentType() != self._CONTENT_TYPE_NONE:
       self.mixed_content.append(content)
     elif content.strip() != '':
@@ -174,8 +180,8 @@ class Node:
     Return:
       None
     '''
-    assert isinstance(attrib, str)
-    assert isinstance(value, str)
+    assert isinstance(attrib, six.string_types)
+    assert isinstance(value, six.string_types)
     if self._IsValidAttribute(attrib, value):
       self.attrs[attrib] = value
     else:
@@ -186,32 +192,34 @@ class Node:
 
     # TODO(joi) Rewrite this, it's extremely ugly!
     if len(self.mixed_content):
-      if isinstance(self.mixed_content[0], str):
+      if isinstance(self.mixed_content[0], six.string_types):
         # Remove leading and trailing chunks of pure whitespace.
-        while (len(self.mixed_content)
-               and isinstance(self.mixed_content[0], str)
-               and self.mixed_content[0].strip() == ''):
+        while (len(self.mixed_content) and
+               isinstance(self.mixed_content[0], six.string_types) and
+               self.mixed_content[0].strip() == ''):
           self.mixed_content = self.mixed_content[1:]
         # Strip leading and trailing whitespace from mixed content chunks
         # at front and back.
-        if (len(self.mixed_content) and isinstance(self.mixed_content[0], str)):
+        if (len(self.mixed_content) and
+            isinstance(self.mixed_content[0], six.string_types)):
           self.mixed_content[0] = self.mixed_content[0].lstrip()
         # Remove leading and trailing ''' (used to demarcate whitespace)
-        if (len(self.mixed_content) and isinstance(self.mixed_content[0], str)):
+        if (len(self.mixed_content) and
+            isinstance(self.mixed_content[0], six.string_types)):
           if self.mixed_content[0].startswith("'''"):
             self.mixed_content[0] = self.mixed_content[0][3:]
     if len(self.mixed_content):
-      if isinstance(self.mixed_content[-1], str):
+      if isinstance(self.mixed_content[-1], six.string_types):
         # Same stuff all over again for the tail end.
-        while (len(self.mixed_content)
-               and isinstance(self.mixed_content[-1], str)
-               and self.mixed_content[-1].strip() == ''):
+        while (len(self.mixed_content) and
+               isinstance(self.mixed_content[-1], six.string_types) and
+               self.mixed_content[-1].strip() == ''):
           self.mixed_content = self.mixed_content[:-1]
-        if (len(self.mixed_content)
-            and isinstance(self.mixed_content[-1], str)):
+        if (len(self.mixed_content) and
+            isinstance(self.mixed_content[-1], six.string_types)):
           self.mixed_content[-1] = self.mixed_content[-1].rstrip()
-        if (len(self.mixed_content)
-            and isinstance(self.mixed_content[-1], str)):
+        if (len(self.mixed_content) and
+            isinstance(self.mixed_content[-1], six.string_types)):
           if self.mixed_content[-1].endswith("'''"):
             self.mixed_content[-1] = self.mixed_content[-1][:-3]
 
@@ -250,75 +258,76 @@ class Node:
   def GetCdata(self):
     '''Returns all CDATA of this element, concatenated into a single
     string.  Note that this ignores any elements embedded in CDATA.'''
-    return ''.join([c for c in self.mixed_content if isinstance(c, str)])
+    return ''.join([c for c in self.mixed_content
+                    if isinstance(c, six.string_types)])
 
   def __str__(self):
     '''Returns this node and all nodes below it as an XML document in a Unicode
     string.'''
-    header = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    header = u'<?xml version="1.0" encoding="UTF-8"?>\n'
     return header + self.FormatXml()
 
   # Some Python 2 glue.
   __unicode__ = __str__
 
-  def FormatXml(self, indent = '', one_line = False):
+  def FormatXml(self, indent = u'', one_line = False):
     '''Returns this node and all nodes below it as an XML
     element in a Unicode string.  This differs from __unicode__ in that it does
     not include the <?xml> stuff at the top of the string.  If one_line is true,
     children and CDATA are layed out in a way that preserves internal
     whitespace.
     '''
-    assert isinstance(indent, str)
+    assert isinstance(indent, six.string_types)
 
     content_one_line = (one_line or
                         self._ContentType() == self._CONTENT_TYPE_MIXED)
     inside_content = self.ContentsAsXml(indent, content_one_line)
 
     # Then the attributes for this node.
-    attribs = ''
+    attribs = u''
     default_attribs = self.DefaultAttributes()
     for attrib, value in sorted(self.attrs.items()):
       # Only print an attribute if it is other than the default value.
       if attrib not in default_attribs or value != default_attribs[attrib]:
-        attribs += ' %s=%s' % (attrib, saxutils.quoteattr(value))
+        attribs += u' %s=%s' % (attrib, saxutils.quoteattr(value))
 
     # Finally build the XML for our node and return it
     if len(inside_content) > 0:
       if one_line:
-        return '<%s%s>%s</%s>' % (self.name, attribs, inside_content,
+        return u'<%s%s>%s</%s>' % (self.name, attribs, inside_content,
                                    self.name)
       elif content_one_line:
-        return '%s<%s%s>\n%s  %s\n%s</%s>' % (
+        return u'%s<%s%s>\n%s  %s\n%s</%s>' % (
           indent, self.name, attribs,
           indent, inside_content,
           indent, self.name)
       else:
-        return '%s<%s%s>\n%s\n%s</%s>' % (
+        return u'%s<%s%s>\n%s\n%s</%s>' % (
           indent, self.name, attribs,
           inside_content,
           indent, self.name)
     else:
-      return '%s<%s%s />' % (indent, self.name, attribs)
+      return u'%s<%s%s />' % (indent, self.name, attribs)
 
   def ContentsAsXml(self, indent, one_line):
     '''Returns the contents of this node (CDATA and child elements) in XML
     format.  If 'one_line' is true, the content will be laid out on one line.'''
-    assert isinstance(indent, str)
+    assert isinstance(indent, six.string_types)
 
     # Build the contents of the element.
     inside_parts = []
     last_item = None
     for mixed_item in self.mixed_content:
       if isinstance(mixed_item, Node):
-        inside_parts.append(mixed_item.FormatXml(indent + '  ', one_line))
+        inside_parts.append(mixed_item.FormatXml(indent + u'  ', one_line))
         if not one_line:
-          inside_parts.append('\n')
+          inside_parts.append(u'\n')
       else:
         message = mixed_item
         # If this is the first item and it starts with whitespace, we add
         # the ''' delimiter.
         if not last_item and message.lstrip() != message:
-          message = "'''" + message
+          message = u"'''" + message
         inside_parts.append(util.EncodeCdata(message))
       last_item = mixed_item
 
@@ -329,10 +338,11 @@ class Node:
 
     # If the last item is a string (not a node) and ends with whitespace,
     # we need to add the ''' delimiter.
-    if (isinstance(last_item, str) and last_item.rstrip() != last_item):
-      inside_parts[-1] = inside_parts[-1] + "'''"
+    if (isinstance(last_item, six.string_types) and
+        last_item.rstrip() != last_item):
+      inside_parts[-1] = inside_parts[-1] + u"'''"
 
-    return ''.join(inside_parts)
+    return u''.join(inside_parts)
 
   def SubstituteMessages(self, substituter):
     '''Applies substitutions to all messages in the tree.
@@ -657,6 +667,9 @@ class Node:
                                self._COMPRESS_BY_DEFAULT_EXTENSIONS))
 
     if compress == 'gzip' or compress_by_default:
+      # We only use rsyncable compression for platforms built on Linux.
+      if sys.platform == 'linux':
+        return grit.format.gzip_string.GzipStringRsyncable(data)
       return grit.format.gzip_string.GzipString(data)
 
     if compress == 'brotli':

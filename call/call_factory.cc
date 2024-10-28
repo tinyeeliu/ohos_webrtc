@@ -17,6 +17,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/memory/memory.h"
 #include "absl/types/optional.h"
 #include "api/test/simulated_network.h"
 #include "api/units/time_delta.h"
@@ -82,7 +83,7 @@ CallFactory::CallFactory() {
   call_thread_.Detach();
 }
 
-std::unique_ptr<Call> CallFactory::CreateCall(const CallConfig& config) {
+Call* CallFactory::CreateCall(const Call::Config& config) {
   RTC_DCHECK_RUN_ON(&call_thread_);
   RTC_DCHECK(config.trials);
 
@@ -94,22 +95,22 @@ std::unique_ptr<Call> CallFactory::CreateCall(const CallConfig& config) {
 
   RtpTransportConfig transportConfig = config.ExtractTransportConfig();
 
-  std::unique_ptr<Call> call =
+  Call* call =
       Call::Create(config, Clock::GetRealTimeClock(),
                    config.rtp_transport_controller_send_factory->Create(
                        transportConfig, Clock::GetRealTimeClock()));
 
   if (!send_degradation_configs.empty() ||
       !receive_degradation_configs.empty()) {
-    return std::make_unique<DegradedCall>(
-        std::move(call), send_degradation_configs, receive_degradation_configs);
+    return new DegradedCall(absl::WrapUnique(call), send_degradation_configs,
+                            receive_degradation_configs);
   }
 
   return call;
 }
 
 std::unique_ptr<CallFactoryInterface> CreateCallFactory() {
-  return std::make_unique<CallFactory>();
+  return std::unique_ptr<CallFactoryInterface>(new CallFactory());
 }
 
 }  // namespace webrtc

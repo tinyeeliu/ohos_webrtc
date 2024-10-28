@@ -15,6 +15,7 @@
 
 #include <memory>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -49,10 +50,12 @@ namespace {
 
 class PeerConnectionIntegrationTest
     : public PeerConnectionIntegrationBaseTest,
-      public ::testing::WithParamInterface<SdpSemantics> {
+      public ::testing::WithParamInterface<
+          std::tuple<SdpSemantics, std::string>> {
  protected:
   PeerConnectionIntegrationTest()
-      : PeerConnectionIntegrationBaseTest(GetParam()) {}
+      : PeerConnectionIntegrationBaseTest(std::get<0>(GetParam()),
+                                          std::get<1>(GetParam())) {}
 };
 
 // Fake clock must be set before threads are started to prevent race on
@@ -67,7 +70,7 @@ class FakeClockForTest : public rtc::ScopedFakeClock {
     // Some things use a time of "0" as a special value, so we need to start out
     // the fake clock at a nonzero time.
     // TODO(deadbeef): Fix this.
-    AdvanceTime(webrtc::TimeDelta::Seconds(1000));
+    AdvanceTime(webrtc::TimeDelta::Seconds(1));
   }
 
   // Explicit handle.
@@ -480,10 +483,13 @@ TEST_P(PeerConnectionIntegrationTest, CallTransferredForCaller) {
   ASSERT_TRUE(ExpectNewFrames(media_expectations));
 }
 
-INSTANTIATE_TEST_SUITE_P(PeerConnectionIntegrationTest,
-                         PeerConnectionIntegrationTest,
-                         Values(SdpSemantics::kPlanB_DEPRECATED,
-                                SdpSemantics::kUnifiedPlan));
+INSTANTIATE_TEST_SUITE_P(
+    PeerConnectionIntegrationTest,
+    PeerConnectionIntegrationTest,
+    Combine(Values(SdpSemantics::kPlanB_DEPRECATED, SdpSemantics::kUnifiedPlan),
+            Values("WebRTC-FrameBuffer3/arm:FrameBuffer2/",
+                   "WebRTC-FrameBuffer3/arm:FrameBuffer3/",
+                   "WebRTC-FrameBuffer3/arm:SyncDecoding/")));
 
 constexpr uint32_t kFlagsIPv4NoStun = cricket::PORTALLOCATOR_DISABLE_TCP |
                                       cricket::PORTALLOCATOR_DISABLE_STUN |

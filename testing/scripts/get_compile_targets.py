@@ -36,6 +36,7 @@ def main(argv):
                     'PRESUBMIT.py',
                     'sizes_common.py',
                     'variations_seed_access_helper.py',
+                    'wpt_common.py',
                     'run_variations_smoke_tests.py',
                     'run_performance_tests_unittest.py'):
       continue

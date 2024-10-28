@@ -9,7 +9,6 @@
  */
 
 #include "p2p/base/transport_description.h"
-
 #include "test/gtest.h"
 
 using webrtc::RTCErrorType;

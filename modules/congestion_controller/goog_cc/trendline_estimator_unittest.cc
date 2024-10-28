@@ -11,13 +11,11 @@
 #include "modules/congestion_controller/goog_cc/trendline_estimator.h"
 
 #include <algorithm>
-#include <cstddef>
-#include <cstdint>
+#include <numeric>
 #include <vector>
 
-#include "api/network_state_predictor.h"
 #include "api/transport/field_trial_based_config.h"
-#include "rtc_base/checks.h"
+#include "rtc_base/random.h"
 #include "test/gtest.h"
 
 namespace webrtc {

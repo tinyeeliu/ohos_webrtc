@@ -63,11 +63,6 @@ const I210BufferInterface* VideoFrameBuffer::GetI210() const {
   return static_cast<const I210BufferInterface*>(this);
 }
 
-const I410BufferInterface* VideoFrameBuffer::GetI410() const {
-  RTC_CHECK(type() == Type::kI410);
-  return static_cast<const I410BufferInterface*>(this);
-}
-
 const NV12BufferInterface* VideoFrameBuffer::GetNV12() const {
   RTC_CHECK(type() == Type::kNV12);
   return static_cast<const NV12BufferInterface*>(this);
@@ -99,8 +94,6 @@ const char* VideoFrameBufferTypeToString(VideoFrameBuffer::Type type) {
       return "kI010";
     case VideoFrameBuffer::Type::kI210:
       return "kI210";
-    case VideoFrameBuffer::Type::kI410:
-      return "kI410";
     case VideoFrameBuffer::Type::kNV12:
       return "kNV12";
     default:
@@ -199,18 +192,6 @@ int I210BufferInterface::ChromaWidth() const {
 }
 
 int I210BufferInterface::ChromaHeight() const {
-  return height();
-}
-
-VideoFrameBuffer::Type I410BufferInterface::type() const {
-  return Type::kI410;
-}
-
-int I410BufferInterface::ChromaWidth() const {
-  return width();
-}
-
-int I410BufferInterface::ChromaHeight() const {
   return height();
 }
 

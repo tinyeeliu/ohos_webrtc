@@ -6,7 +6,6 @@
 from pylib.base import base_test_result
 
 
-
 class InstrumentationTestResult(base_test_result.BaseTestResult):
   """Result information for a single instrumentation test."""
 

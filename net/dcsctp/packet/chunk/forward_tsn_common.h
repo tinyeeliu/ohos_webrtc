@@ -24,9 +24,12 @@ class AnyForwardTsnChunk : public Chunk {
  public:
   struct SkippedStream {
     SkippedStream(StreamID stream_id, SSN ssn)
-        : stream_id(stream_id), ssn(ssn), unordered(false), mid(0) {}
-    SkippedStream(IsUnordered unordered, StreamID stream_id, MID mid)
-        : stream_id(stream_id), ssn(0), unordered(unordered), mid(mid) {}
+        : stream_id(stream_id), ssn(ssn), unordered(false), message_id(0) {}
+    SkippedStream(IsUnordered unordered, StreamID stream_id, MID message_id)
+        : stream_id(stream_id),
+          ssn(0),
+          unordered(unordered),
+          message_id(message_id) {}
 
     StreamID stream_id;
 
@@ -35,11 +38,11 @@ class AnyForwardTsnChunk : public Chunk {
 
     // Set for I-FORWARD_TSN
     IsUnordered unordered;
-    MID mid;
+    MID message_id;
 
     bool operator==(const SkippedStream& other) const {
       return stream_id == other.stream_id && ssn == other.ssn &&
-             unordered == other.unordered && mid == other.mid;
+             unordered == other.unordered && message_id == other.message_id;
     }
   };
 

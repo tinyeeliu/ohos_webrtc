@@ -12,7 +12,6 @@
 
 #include <string>
 
-#include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
 #include "rtc_base/system/rtc_export.h"
 
@@ -33,13 +32,17 @@ class RTC_EXPORT FieldTrialsView {
   virtual std::string Lookup(absl::string_view key) const = 0;
 
   bool IsEnabled(absl::string_view key) const {
-    return absl::StartsWith(Lookup(key), "Enabled");
+    return Lookup(key).find("Enabled") == 0;
   }
 
   bool IsDisabled(absl::string_view key) const {
-    return absl::StartsWith(Lookup(key), "Disabled");
+    return Lookup(key).find("Disabled") == 0;
   }
 };
+
+// TODO(bugs.webrtc.org/10335): Remove once all migrated to
+// api/field_trials_view.h
+typedef FieldTrialsView WebRtcKeyValueConfig;
 
 }  // namespace webrtc
 

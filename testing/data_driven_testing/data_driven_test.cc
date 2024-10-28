@@ -26,7 +26,9 @@ bool ReadFile(const base::FilePath& file, std::string* content) {
 
 // Write |content| to |file|. Returns true on success.
 bool WriteFile(const base::FilePath& file, const std::string& content) {
-  return base::WriteFile(file, content);
+  int write_size = base::WriteFile(file, content.c_str(),
+                                   static_cast<int>(content.length()));
+  return write_size == static_cast<int>(content.length());
 }
 
 // Removes lines starting with (optional) whitespace and a #.

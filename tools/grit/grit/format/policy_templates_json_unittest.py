@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# coding: utf-8
 # Copyright 2017 The Chromium Authors
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -6,6 +7,7 @@
 """Unittest for policy_templates_json.py.
 """
 
+from __future__ import print_function
 
 import os
 import sys
@@ -17,7 +19,7 @@ import json
 import tempfile
 import unittest
 
-from io import StringIO
+from six import StringIO
 
 from grit import grd_reader
 from grit.tool import build
@@ -149,7 +151,7 @@ class PolicyTemplatesJsonUnittest(unittest.TestCase):
     # Caption and message texts get taken from xtb.
     # desc is 'translated' to some pseudo-English
     #   'ThïPïs pôPôlïPïcýPý dôéPôés stüPüff'.
-    expected = """{
+    expected = u"""{
   "policy_definitions": [
     {
       "caption": "%s",
@@ -192,7 +194,7 @@ class PolicyTemplatesJsonUnittest(unittest.TestCase):
     self.assertEqual(expected, output)
 
 
-class DummyOutput:
+class DummyOutput(object):
 
   def __init__(self, type, language):
     self.type = type

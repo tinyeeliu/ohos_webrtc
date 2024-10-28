@@ -25,7 +25,7 @@ class TargetDelayTest : public ::testing::Test {
  protected:
   TargetDelayTest()
       : receiver_(
-            acm2::AcmReceiver::Config(CreateBuiltinAudioDecoderFactory())) {}
+            AudioCodingModule::Config(CreateBuiltinAudioDecoderFactory())) {}
 
   ~TargetDelayTest() {}
 

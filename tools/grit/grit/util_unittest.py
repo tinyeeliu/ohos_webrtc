@@ -6,6 +6,7 @@
 '''Unit test that checks some of util functions.
 '''
 
+from __future__ import print_function
 
 import os
 import sys
@@ -13,6 +14,8 @@ if __name__ == '__main__':
   sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 import unittest
+
+import six
 
 from grit import util
 
@@ -26,35 +29,35 @@ class UtilUnittest(unittest.TestCase):
     # Should fail, it is not supported by the function now (as documented)
     cls = util.NewClassInstance('grit.util.TestClassToLoad',
                                 TestBaseClassToLoad)
-    self.assertTrue(cls == None)
+    self.failUnless(cls == None)
 
     # Test non existent class name
     cls = util.NewClassInstance('grit.util_unittest.NotExistingClass',
                                 TestBaseClassToLoad)
-    self.assertTrue(cls == None)
+    self.failUnless(cls == None)
 
     # Test valid class name and valid base class
     cls = util.NewClassInstance('grit.util_unittest.TestClassToLoad',
                                 TestBaseClassToLoad)
-    self.assertTrue(isinstance(cls, TestBaseClassToLoad))
+    self.failUnless(isinstance(cls, TestBaseClassToLoad))
 
     # Test valid class name with wrong hierarchy
     cls = util.NewClassInstance('grit.util_unittest.TestClassNoBase',
                                 TestBaseClassToLoad)
-    self.assertTrue(cls == None)
+    self.failUnless(cls == None)
 
   def testCanonicalLanguage(self):
-    self.assertTrue(util.CanonicalLanguage('en') == 'en')
-    self.assertTrue(util.CanonicalLanguage('pt_br') == 'pt-BR')
-    self.assertTrue(util.CanonicalLanguage('pt-br') == 'pt-BR')
-    self.assertTrue(util.CanonicalLanguage('pt-BR') == 'pt-BR')
-    self.assertTrue(util.CanonicalLanguage('pt/br') == 'pt-BR')
-    self.assertTrue(util.CanonicalLanguage('pt/BR') == 'pt-BR')
-    self.assertTrue(util.CanonicalLanguage('no_no_bokmal') == 'no-NO-BOKMAL')
+    self.failUnless(util.CanonicalLanguage('en') == 'en')
+    self.failUnless(util.CanonicalLanguage('pt_br') == 'pt-BR')
+    self.failUnless(util.CanonicalLanguage('pt-br') == 'pt-BR')
+    self.failUnless(util.CanonicalLanguage('pt-BR') == 'pt-BR')
+    self.failUnless(util.CanonicalLanguage('pt/br') == 'pt-BR')
+    self.failUnless(util.CanonicalLanguage('pt/BR') == 'pt-BR')
+    self.failUnless(util.CanonicalLanguage('no_no_bokmal') == 'no-NO-BOKMAL')
 
   def testUnescapeHtml(self):
-    self.assertTrue(util.UnescapeHtml('&#1010;') == chr(1010))
-    self.assertTrue(util.UnescapeHtml('&#xABcd;') == chr(43981))
+    self.failUnless(util.UnescapeHtml('&#1010;') == six.unichr(1010))
+    self.failUnless(util.UnescapeHtml('&#xABcd;') == six.unichr(43981))
 
   def testRelativePath(self):
     """ Verify that MakeRelativePath works in some tricky cases."""
@@ -66,7 +69,7 @@ class UtilUnittest(unittest.TestCase):
       for path1 in [base_path, base_path + os.path.sep]:
         for path2 in [other_path, other_path + os.path.sep]:
           result = util.MakeRelativePath(path1, path2)
-          self.assertTrue(result == expected_result)
+          self.failUnless(result == expected_result)
 
     # set-up variables
     root_dir = 'c:%sa' % os.path.sep
@@ -101,13 +104,13 @@ class UtilUnittest(unittest.TestCase):
         self.assertRaises(UnicodeDecodeError, Test, b'\x80', 'utf-8', None)
 
 
-class TestBaseClassToLoad:
+class TestBaseClassToLoad(object):
   pass
 
 class TestClassToLoad(TestBaseClassToLoad):
   pass
 
-class TestClassNoBase:
+class TestClassNoBase(object):
   pass
 
 

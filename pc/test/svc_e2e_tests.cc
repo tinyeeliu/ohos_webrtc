@@ -13,7 +13,6 @@
 #include <vector>
 
 #include "api/media_stream_interface.h"
-#include "api/stats/rtcstats_objects.h"
 #include "api/test/create_network_emulation_manager.h"
 #include "api/test/create_peer_connection_quality_test_frame_generator.h"
 #include "api/test/create_peerconnection_quality_test_fixture.h"
@@ -47,7 +46,6 @@ using ::cricket::kH264CodecName;
 using ::cricket::kVp8CodecName;
 using ::cricket::kVp9CodecName;
 using ::testing::Combine;
-using ::testing::Optional;
 using ::testing::UnitTest;
 using ::testing::Values;
 using ::testing::ValuesIn;
@@ -128,7 +126,7 @@ class SvcTest : public testing::TestWithParam<
           {{kVP9FmtpProfileId, VP9ProfileToString(VP9Profile::kProfile0)}});
     }
 
-    return VideoCodecConfig(codec);
+    return VideoCodecConfig(std::string(codec));
   }
 
   const SvcTestParameters& SvcTestParameters() const {
@@ -205,32 +203,16 @@ class SvcVideoQualityAnalyzer : public DefaultVideoQualityAnalyzer {
                                                   input_image);
   }
 
-  void OnStatsReports(
-      absl::string_view pc_label,
-      const rtc::scoped_refptr<const RTCStatsReport>& report) override {
-    // Extract the scalability mode reported in the stats.
-    auto outbound_stats = report->GetStatsOfType<RTCOutboundRtpStreamStats>();
-    for (const auto& stat : outbound_stats) {
-      if (stat->scalability_mode.is_defined()) {
-        reported_scalability_mode_ = *stat->scalability_mode;
-      }
-    }
-  }
-
   const SpatialTemporalLayerCounts& encoder_layers_seen() const {
     return encoder_layers_seen_;
   }
   const SpatialTemporalLayerCounts& decoder_layers_seen() const {
     return decoder_layers_seen_;
   }
-  const absl::optional<std::string> reported_scalability_mode() const {
-    return reported_scalability_mode_;
-  }
 
  private:
   SpatialTemporalLayerCounts encoder_layers_seen_;
   SpatialTemporalLayerCounts decoder_layers_seen_;
-  absl::optional<std::string> reported_scalability_mode_;
 };
 
 MATCHER_P2(HasSpatialAndTemporalLayers,
@@ -344,7 +326,7 @@ TEST_P(SvcTest, ScalabilityModeSupported) {
         alice->SetVideoCodecs({video_codec_config});
       },
       [](PeerConfigurer* bob) {}, std::move(analyzer));
-  fixture->Run(RunParams(TimeDelta::Seconds(10)));
+  fixture->Run(RunParams(TimeDelta::Seconds(5)));
   EXPECT_THAT(analyzer_ptr->encoder_layers_seen(),
               HasSpatialAndTemporalLayers(
                   SvcTestParameters().expected_spatial_layers,
@@ -360,8 +342,6 @@ TEST_P(SvcTest, ScalabilityModeSupported) {
                     SvcTestParameters().expected_spatial_layers,
                     SvcTestParameters().expected_temporal_layers));
   }
-  EXPECT_THAT(analyzer_ptr->reported_scalability_mode(),
-              Optional(SvcTestParameters().scalability_mode));
 
   RTC_LOG(LS_INFO) << "Encoder layers seen: "
                    << analyzer_ptr->encoder_layers_seen().size();

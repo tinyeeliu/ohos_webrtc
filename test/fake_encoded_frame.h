@@ -51,7 +51,7 @@ MATCHER_P(FrameWithSize, id, "") {
 }
 
 MATCHER_P(RtpTimestamp, ts, "") {
-  return ts == arg.RtpTimestamp();
+  return ts == arg.Timestamp();
 }
 
 class FakeFrameBuilder {

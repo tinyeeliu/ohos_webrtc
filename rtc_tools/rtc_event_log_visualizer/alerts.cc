@@ -13,18 +13,15 @@
 #include <stdio.h>
 
 #include <algorithm>
-#include <cstdint>
-#include <cstdlib>
-#include <functional>
+#include <limits>
 #include <map>
 #include <string>
 
-#include "absl/types/optional.h"
-#include "api/units/timestamp.h"
-#include "logging/rtc_event_log/events/logged_rtp_rtcp.h"
-#include "logging/rtc_event_log/rtc_event_log_parser.h"
-#include "rtc_base/numerics/sequence_number_unwrapper.h"
-#include "rtc_tools/rtc_event_log_visualizer/analyzer_common.h"
+#include "logging/rtc_event_log/rtc_event_processor.h"
+#include "rtc_base/checks.h"
+#include "rtc_base/logging.h"
+#include "rtc_base/numerics/sequence_number_util.h"
+#include "rtc_base/strings/string_builder.h"
 
 namespace webrtc {
 

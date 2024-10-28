@@ -22,6 +22,7 @@ namespace webrtc {
 size_t CalcBufferSize(VideoType type, int width, int height) {
   RTC_DCHECK_GE(width, 0);
   RTC_DCHECK_GE(height, 0);
+  size_t buffer_size = 0;
   switch (type) {
     case VideoType::kI420:
     case VideoType::kIYUV:
@@ -29,25 +30,26 @@ size_t CalcBufferSize(VideoType type, int width, int height) {
     case VideoType::kNV12: {
       int half_width = (width + 1) >> 1;
       int half_height = (height + 1) >> 1;
-      return width * height + half_width * half_height * 2;
+      buffer_size = width * height + half_width * half_height * 2;
+      break;
     }
     case VideoType::kRGB565:
     case VideoType::kYUY2:
     case VideoType::kUYVY:
-      return width * height * 2;
+      buffer_size = width * height * 2;
+      break;
     case VideoType::kRGB24:
-    case VideoType::kBGR24:
-      return width * height * 3;
+      buffer_size = width * height * 3;
+      break;
     case VideoType::kBGRA:
     case VideoType::kARGB:
-    case VideoType::kABGR:
-      return width * height * 4;
-    case VideoType::kMJPEG:
-    case VideoType::kUnknown:
+      buffer_size = width * height * 4;
+      break;
+    default:
+      RTC_DCHECK_NOTREACHED();
       break;
   }
-  RTC_DCHECK_NOTREACHED() << "Unexpected pixel format " << type;
-  return 0;
+  return buffer_size;
 }
 
 int ExtractBuffer(const rtc::scoped_refptr<I420BufferInterface>& input_frame,
@@ -92,10 +94,6 @@ int ConvertVideoType(VideoType video_type) {
       return libyuv::FOURCC_YV12;
     case VideoType::kRGB24:
       return libyuv::FOURCC_24BG;
-    case VideoType::kBGR24:
-      return libyuv::FOURCC_RAW;
-    case VideoType::kABGR:
-      return libyuv::FOURCC_ABGR;
     case VideoType::kRGB565:
       return libyuv::FOURCC_RGBP;
     case VideoType::kYUY2:
@@ -111,7 +109,7 @@ int ConvertVideoType(VideoType video_type) {
     case VideoType::kNV12:
       return libyuv::FOURCC_NV12;
   }
-  RTC_DCHECK_NOTREACHED() << "Unexpected pixel format " << video_type;
+  RTC_DCHECK_NOTREACHED();
   return libyuv::FOURCC_ANY;
 }
 

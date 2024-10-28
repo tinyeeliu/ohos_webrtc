@@ -129,10 +129,10 @@ DxgiDuplicatorController::Result DxgiDuplicatorController::DuplicateMonitor(
   return DoDuplicate(frame, monitor_id);
 }
 
-DesktopVector DxgiDuplicatorController::system_dpi() {
+DesktopVector DxgiDuplicatorController::dpi() {
   MutexLock lock(&mutex_);
   if (Initialize()) {
-    return system_dpi_;
+    return dpi_;
   }
   return DesktopVector();
 }
@@ -174,7 +174,7 @@ DxgiDuplicatorController::Result DxgiDuplicatorController::DoDuplicate(
   // TODO(zijiehe): Confirm whether IDXGIOutput::GetDesc() and
   // IDXGIOutputDuplication::GetDesc() can detect the resolution change without
   // reinitialization.
-  if (display_configuration_monitor_.IsChanged(frame->source_id_)) {
+  if (display_configuration_monitor_.IsChanged()) {
     Deinitialize();
   }
 
@@ -286,8 +286,7 @@ bool DxgiDuplicatorController::DoInitialize() {
   HDC hdc = GetDC(nullptr);
   // Use old DPI value if failed.
   if (hdc) {
-    system_dpi_.set(GetDeviceCaps(hdc, LOGPIXELSX),
-                    GetDeviceCaps(hdc, LOGPIXELSY));
+    dpi_.set(GetDeviceCaps(hdc, LOGPIXELSX), GetDeviceCaps(hdc, LOGPIXELSY));
     ReleaseDC(nullptr, hdc);
   }
 
@@ -344,7 +343,7 @@ bool DxgiDuplicatorController::DoDuplicateUnlocked(Context* context,
   }
 
   if (result) {
-    target->set_dpi(system_dpi_);
+    target->set_dpi(dpi_);
     return true;
   }
 

@@ -10,7 +10,6 @@
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Lex/Lexer.h"
 #include "clang/Sema/Sema.h"
-#include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace clang;
@@ -130,9 +129,6 @@ FindBadConstructsConsumer::FindBadConstructsConsumer(CompilerInstance& instance,
   if (options.check_layout_object_methods) {
     layout_visitor_.reset(new CheckLayoutObjectMethodsVisitor(instance));
   }
-  if (options.check_stack_allocated) {
-    stack_allocated_checker_.reset(new StackAllocatedChecker(instance));
-  }
 
   // Messages for virtual methods.
   diag_method_requires_override_ = diagnostic().getCustomDiagID(
@@ -245,14 +241,6 @@ bool FindBadConstructsConsumer::TraverseDecl(Decl* decl) {
   if (ipc_visitor_)
     ipc_visitor_->EndDecl();
   return result;
-}
-
-bool FindBadConstructsConsumer::VisitCXXRecordDecl(
-    clang::CXXRecordDecl* cxx_record_decl) {
-  if (stack_allocated_checker_) {
-    stack_allocated_checker_->Check(cxx_record_decl);
-  }
-  return true;
 }
 
 bool FindBadConstructsConsumer::VisitEnumDecl(clang::EnumDecl* decl) {
@@ -683,7 +671,7 @@ void FindBadConstructsConsumer::CheckVirtualBodies(
         SourceLocation loc = cs->getLBracLoc();
         // CR_BEGIN_MSG_MAP_EX and BEGIN_SAFE_MSG_MAP_EX try to be compatible
         // to BEGIN_MSG_MAP(_EX).  So even though they are in chrome code,
-        // we can't easily fix them, so explicitly allowlist them here.
+        // we can't easily fix them, so explicitly whitelist them here.
         bool emit = true;
         if (loc.isMacroID()) {
           SourceManager& manager = instance().getSourceManager();

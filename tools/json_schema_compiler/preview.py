@@ -5,8 +5,10 @@
 """Server for viewing the compiled C++ code from tools/json_schema_compiler.
 """
 
+from __future__ import print_function
+
 import cc_generator
-import code_util
+import code
 import cpp_type_generator
 import cpp_util
 import h_generator
@@ -33,11 +35,11 @@ class CompilerHandler(BaseHTTPRequestHandler):
 
     chromium_favicon = 'http://codereview.chromium.org/static/favicon.ico'
 
-    head = code_util.Code()
+    head = code.Code()
     head.Append('<link rel="icon" href="%s">' % chromium_favicon)
     head.Append('<link rel="shortcut icon" href="%s">' % chromium_favicon)
 
-    body = code_util.Code()
+    body = code.Code()
 
     try:
       if os.path.isdir(request_path):
@@ -242,7 +244,7 @@ updateEverything();
     files at |path| with the appropriate onclick handlers to open either
     subdirectories or JSON files.
     """
-    html = code_util.Code()
+    html = code.Code()
 
     # Highlighter chooser.
     html.Append('<select id="highlighters" onChange="updateEverything()">')

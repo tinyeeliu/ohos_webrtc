@@ -26,26 +26,18 @@ import java.util.Set;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.Modifier;
 
-/** Triggers an error for {@link org.chromium.base.TraceEvent} usages with non string literals. */
+/**
+ * Triggers an error for {@link org.chromium.base.TraceEvent} usages with non string literals.
+ */
 @AutoService(BugChecker.class)
-@BugPattern(
-        name = "NoDynamicStringsInTraceEventCheck",
+@BugPattern(name = "NoDynamicStringsInTraceEventCheck",
         summary = "Only use of string literals are allowed in trace events.",
-        severity = BugPattern.SeverityLevel.ERROR,
-        linkType = BugPattern.LinkType.CUSTOM,
+        severity = BugPattern.SeverityLevel.ERROR, linkType = BugPattern.LinkType.CUSTOM,
         link = "https://crbug.com/984827")
-public class NoDynamicStringsInTraceEventCheck extends BugChecker
-        implements BugChecker.MethodInvocationTreeMatcher {
-    private static final Set<String> sTracingFunctions =
-            new HashSet<>(
-                    Arrays.asList(
-                            "begin",
-                            "end",
-                            "scoped",
-                            "startAsync",
-                            "finishAsync",
-                            "instant",
-                            "TraceEvent"));
+public class NoDynamicStringsInTraceEventCheck
+        extends BugChecker implements BugChecker.MethodInvocationTreeMatcher {
+    private static final Set<String> sTracingFunctions = new HashSet<>(Arrays.asList(
+            "begin", "end", "scoped", "startAsync", "finishAsync", "instant", "TraceEvent"));
 
     private static final ParameterVisitor sVisitor = new ParameterVisitor();
 
@@ -73,9 +65,8 @@ public class NoDynamicStringsInTraceEventCheck extends BugChecker
         if (r.success) return Description.NO_MATCH;
 
         return buildDescription(tree)
-                .setMessage(
-                        "Calling TraceEvent.begin() without a constant String object. "
-                                + r.errorMessage)
+                .setMessage("Calling TraceEvent.begin() without a constant String object. "
+                        + r.errorMessage)
                 .build();
     }
 
@@ -106,8 +97,7 @@ public class NoDynamicStringsInTraceEventCheck extends BugChecker
                 }
                 return this;
             }
-        }
-        ;
+        };
 
         @Override
         protected Result defaultAction(Tree tree, Void p) {
@@ -148,6 +138,5 @@ public class NoDynamicStringsInTraceEventCheck extends BugChecker
             }
             return Result.createError("Unhandled identifier kind: " + node.getKind() + '.');
         }
-    }
-    ;
+    };
 }

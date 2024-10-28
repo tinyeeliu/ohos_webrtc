@@ -4,5 +4,7 @@
 
 package org.chromium.tools.errorprone.plugin;
 
-/** Empty class. */
+/**
+ * Empty class.
+ */
 public class Empty {}

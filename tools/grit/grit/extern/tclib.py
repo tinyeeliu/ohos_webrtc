@@ -10,6 +10,7 @@
 # for creating Windows .rc and .h files.  These are the only parts needed by
 # the Chrome build process.
 
+from __future__ import print_function
 
 from grit.extern import FP
 
@@ -55,7 +56,7 @@ class MessageTranslationError(Exception):
 # -----------------------------------------------------------
 # The Placeholder class represents a placeholder in a message.
 
-class Placeholder:
+class Placeholder(object):
   # String representation
   def __str__(self):
     return '%s, "%s", "%s"' % \
@@ -99,7 +100,7 @@ class Placeholder:
 # BaseMessage is the common parent class of Message and Translation.
 # It is not meant for direct use.
 
-class BaseMessage:
+class BaseMessage(object):
   # Three types of message construction is supported. If the message text is a
   # simple string with no dynamic content, you can pass it to the constructor
   # as the "text" parameter. Otherwise, you can omit "text" and assemble the

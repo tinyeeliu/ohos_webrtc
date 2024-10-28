@@ -11,6 +11,7 @@ import os
 import re
 
 
+USE_PYTHON3 = True
 
 
 def _CheckFilterFileFormat(input_api, output_api):

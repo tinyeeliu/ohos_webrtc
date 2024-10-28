@@ -1,7 +1,7 @@
-<!-- go/cmark -->
-<!--* freshness: {owner: 'danilchap' reviewed: '2022-01-17'} *-->
-
 # WebRTC coding style guide
+
+<?% config.freshness.owner = 'danilchap' %?>
+<?% config.freshness.reviewed = '2022-01-17' %?>
 
 ## General advice
 
@@ -127,19 +127,6 @@ For example,
 See the [source code for `rtc::ArrayView`](api/array_view.h) for more detailed
 docs.
 
-### Strings
-
-WebRTC uses std::string, with content assumed to be UTF-8. Note that this
-has to be verified whenever accepting external input.
-
-For concatenation of strings, use rtc::SimpleStringBuilder.
-
-The following string building tools are NOT recommended:
-* The + operator. See https://abseil.io/tips/3 for why not.
-* absl::StrCat, absl::StrAppend, absl::StrJoin. These are optimized for
-  speed, not code size, and have significant code size overhead.
-* strcat. It is too easy to create buffer overflows.
-
 ### sigslot
 
 SIGSLOT IS DEPRECATED.
@@ -235,27 +222,16 @@ guide.
 
 ### <a name="webrtc-gn-templates"></a>WebRTC-specific GN templates
 
-As shown in the table below, for library targets (`source_set` and
-`static_library`), you should default on using `rtc_library` (which abstracts
-away the complexity of using the correct target type for Chromium component
-builds).
+Use the following [GN templates][gn-templ] to ensure that all our
+[GN targets][gn-target] are built with the same configuration:
 
-The general rule is for library targets is:
-1. Use `rtc_library`.
-2. If the library is a header only target use `rtc_source_set`.
-3. If you really need to generate a static library, use `rtc_static_library`
-   (same for shared libraries, in such case use `rtc_shared_library`).
-
-To ensure that all our [GN targets][gn-target] are built with the same
-configuration, only use the following [GN templates][gn-templ].
-
-| instead of       | use                                                                                     |
-|------------------|-----------------------------------------------------------------------------------------|
-| `executable`     | `rtc_executable`                                                                        |
-| `shared_library` | `rtc_shared_library`                                                                    |
-| `source_set`     | `rtc_source_set` (only for header only libraries, for everything else use `rtc_library` |
-| `static_library` | `rtc_static_library` (use `rtc_library` unless you really need `rtc_static_library`     |
-| `test`           | `rtc_test`                                                                              |
+| instead of       | use                  |
+|------------------|----------------------|
+| `executable`     | `rtc_executable`     |
+| `shared_library` | `rtc_shared_library` |
+| `source_set`     | `rtc_source_set`     |
+| `static_library` | `rtc_static_library` |
+| `test`           | `rtc_test`           |
 
 
 [gn-templ]: https://gn.googlesource.com/gn/+/HEAD/docs/language.md#Templates

@@ -12,7 +12,6 @@
 
 #include <utility>
 
-#include "api/field_trials_view.h"
 #include "rtc_base/checks.h"
 #include "rtc_base/experiments/balanced_degradation_settings.h"
 #include "rtc_base/time_utils.h"
@@ -38,12 +37,11 @@ bool QualityScalerResource::is_started() const {
 }
 
 void QualityScalerResource::StartCheckForOveruse(
-    VideoEncoder::QpThresholds qp_thresholds,
-    const FieldTrialsView& field_trials) {
+    VideoEncoder::QpThresholds qp_thresholds) {
   RTC_DCHECK_RUN_ON(encoder_queue());
   RTC_DCHECK(!is_started());
-  quality_scaler_ = std::make_unique<QualityScaler>(
-      this, std::move(qp_thresholds), field_trials);
+  quality_scaler_ =
+      std::make_unique<QualityScaler>(this, std::move(qp_thresholds));
 }
 
 void QualityScalerResource::StopCheckForOveruse() {

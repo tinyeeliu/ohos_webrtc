@@ -153,8 +153,7 @@ class VideoStreamEncoderResourceManager
   void OnQualityRampUp() override;
 
   static bool IsSimulcastOrMultipleSpatialLayers(
-      const VideoEncoderConfig& encoder_config,
-      const VideoCodec& video_codec);
+      const VideoEncoderConfig& encoder_config);
 
  private:
   class InitialFrameDropper;

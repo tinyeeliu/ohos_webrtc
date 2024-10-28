@@ -10,6 +10,7 @@
 
 #include "modules/audio_coding/neteq/audio_multi_vector.h"
 
+
 #include <algorithm>
 
 #include "rtc_base/checks.h"

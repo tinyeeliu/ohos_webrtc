@@ -8,50 +8,38 @@
 #include <stddef.h>
 #include <stdint.h>
 
-namespace base {
-
-template <typename T>
-class WeakPtr {
- public:
-  ~WeakPtr() {}
-  operator T*() const { return 0; }
-  T* operator->() const { return 0; }
-};
-
-template <typename T>
-class WeakPtrFactory {
- public:
-  explicit WeakPtrFactory(T*) {}
-  ~WeakPtrFactory() {}
-  WeakPtr<T> GetWeakPtr() { return WeakPtr<T>(); }
-};
-
-}  // namespace base
 namespace WTF {
 
 template<typename T> class RefCounted { };
 
 template<typename T> class RawPtr {
- public:
-  operator T*() const { return 0; }
-  T* operator->() const { return 0; }
+public:
+    operator T*() const { return 0; }
+    T* operator->() const { return 0; }
 };
 
 template<typename T> class scoped_refptr {
- public:
-  ~scoped_refptr() {}
-  operator T*() const { return 0; }
-  T* operator->() const { return 0; }
+public:
+    ~scoped_refptr() { }
+    operator T*() const { return 0; }
+    T* operator->() const { return 0; }
 };
 
-class PartitionAllocator {
- public:
-  static const bool isGarbageCollected = false;
+template<typename T> class WeakPtr {
+public:
+    ~WeakPtr() { }
+    operator T*() const { return 0; }
+    T* operator->() const { return 0; }
+};
+
+class DefaultAllocator {
+public:
+    static const bool isGarbageCollected = false;
 };
 
 template <typename T,
           size_t inlineCapacity = 0,
-          typename Allocator = PartitionAllocator>
+          typename Allocator = DefaultAllocator>
 class Vector {
  public:
   using iterator = T*;
@@ -67,7 +55,7 @@ class Vector {
 
 template <typename T,
           size_t inlineCapacity = 0,
-          typename Allocator = PartitionAllocator>
+          typename Allocator = DefaultAllocator>
 class Deque {
  public:
   using iterator = T*;
@@ -79,8 +67,9 @@ class Deque {
 };
 
 template <typename ValueArg,
+          typename HashArg = void,
           typename TraitsArg = void,
-          typename Allocator = PartitionAllocator>
+          typename Allocator = DefaultAllocator>
 class HashSet {
  public:
   typedef ValueArg* iterator;
@@ -93,7 +82,7 @@ class HashSet {
 
 template <typename ValueArg,
           typename TraitsArg = void,
-          typename Allocator = PartitionAllocator>
+          typename Allocator = DefaultAllocator>
 class LinkedHashSet {
  public:
   typedef ValueArg* iterator;
@@ -105,8 +94,9 @@ class LinkedHashSet {
 };
 
 template <typename ValueArg,
+          typename HashArg = void,
           typename TraitsArg = void,
-          typename Allocator = PartitionAllocator>
+          typename Allocator = DefaultAllocator>
 class HashCountedSet {
  public:
   ~HashCountedSet() {}
@@ -114,9 +104,10 @@ class HashCountedSet {
 
 template <typename KeyArg,
           typename MappedArg,
+          typename HashArg = void,
           typename KeyTraitsArg = void,
           typename MappedTraitsArg = void,
-          typename Allocator = PartitionAllocator>
+          typename Allocator = DefaultAllocator>
 class HashMap {
  public:
   typedef MappedArg* iterator;
@@ -137,35 +128,16 @@ namespace std {
 namespace std {
 
 template<typename T> class unique_ptr {
- public:
-  ~unique_ptr() {}
-  operator T*() const { return 0; }
-  T* operator->() const { return 0; }
+public:
+    ~unique_ptr() { }
+    operator T*() const { return 0; }
+    T* operator->() const { return 0; }
 };
 
 template <typename T, typename... Args>
 unique_ptr<T> make_unique(Args&&... args) {
   return unique_ptr<T>();
 }
-
-template <typename Key>
-class set {};
-template <typename Key>
-class unordered_set {};
-template <typename Key, typename Value>
-class map {};
-template <typename Key, typename Value>
-class unordered_map {};
-template <typename Elem>
-class vector {};
-template <typename Elem, size_t N>
-class array {};
-template <typename T1, typename T2>
-class pair {};
-template <typename T>
-class optional {};
-template <class... Ts>
-class variant {};
 
 }  // namespace std
 
@@ -188,6 +160,8 @@ class variant {};
 
 }  // namespace absl
 
+#if defined(USE_V8_OILPAN)
+
 namespace cppgc {
 
 class Visitor {
@@ -200,25 +174,13 @@ class Visitor {
 };
 
 namespace internal {
-class WriteBarrierPolicyImpl;
-class NoWriteBarrierPolicyImpl;
-class CheckingPolicyImpl;
-class StorateTypeImpl;
-class LocationPolicyImpl;
-
 class StrongMemberTag;
 class WeakMemberTag;
-class UntracedMemberTag;
 
-template <typename StorageType>
 class MemberBase {};
 
-template <typename T,
-          typename WeaknessTag,
-          typename WriteBarrierPolicy,
-          typename CheckingPolicy,
-          typename StorageType>
-class BasicMember : public MemberBase<StorageType> {
+template <typename T, typename Tag>
+class BasicMember : public MemberBase {
  public:
   operator T*() const { return 0; }
   T* operator->() const { return 0; }
@@ -230,10 +192,7 @@ class WeakPersistentPolicy;
 
 class PersistentBase {};
 
-template <typename T,
-          typename WeaknessPolicy,
-          typename LocationPolicy,
-          typename CheckingPolicy>
+template <typename T, typename Tag>
 class BasicPersistent : public PersistentBase {
  public:
   operator T*() const { return 0; }
@@ -244,13 +203,8 @@ class BasicPersistent : public PersistentBase {
 class StrongCrossThreadPersistentPolicy;
 class WeakCrossThreadPersistentPolicy;
 
-class CrossThreadPersistentBase : public PersistentBase {};
-
-template <typename T,
-          typename WeaknessPolicy,
-          typename LocationPolicy,
-          typename CheckingPolicy>
-class BasicCrossThreadPersistent : public CrossThreadPersistentBase {
+template <typename T, typename Tag>
+class BasicCrossThreadPersistent : public PersistentBase {
  public:
   operator T*() const { return 0; }
   T* operator->() const { return 0; }
@@ -282,50 +236,25 @@ class GarbageCollectedMixin {
 };
 
 template <typename T>
-using Member = internal::BasicMember<T,
-                                     internal::StrongMemberTag,
-                                     internal::WriteBarrierPolicyImpl,
-                                     internal::CheckingPolicyImpl,
-                                     internal::StorateTypeImpl>;
+using Member = internal::BasicMember<T, internal::StrongMemberTag>;
 template <typename T>
-using WeakMember = internal::BasicMember<T,
-                                         internal::WeakMemberTag,
-                                         internal::WriteBarrierPolicyImpl,
-                                         internal::CheckingPolicyImpl,
-                                         internal::StorateTypeImpl>;
+using WeakMember = internal::BasicMember<T, internal::WeakMemberTag>;
 
 template <typename T>
-using UntracedMember = internal::BasicMember<T,
-                                             internal::UntracedMemberTag,
-                                             internal::NoWriteBarrierPolicyImpl,
-                                             internal::CheckingPolicyImpl,
-                                             internal::StorateTypeImpl>;
-
+using Persistent =
+    internal::BasicPersistent<T, internal::StrongPersistentPolicy>;
 template <typename T>
-using Persistent = internal::BasicPersistent<T,
-                                             internal::StrongPersistentPolicy,
-                                             internal::LocationPolicyImpl,
-                                             internal::CheckingPolicyImpl>;
-template <typename T>
-using WeakPersistent = internal::BasicPersistent<T,
-                                                 internal::WeakPersistentPolicy,
-                                                 internal::LocationPolicyImpl,
-                                                 internal::CheckingPolicyImpl>;
+using WeakPersistent =
+    internal::BasicPersistent<T, internal::WeakPersistentPolicy>;
 
 namespace subtle {
 
 template <typename T>
-using CrossThreadPersistent = internal::BasicCrossThreadPersistent<
-    T,
-    internal::StrongCrossThreadPersistentPolicy,
-    internal::LocationPolicyImpl,
-    internal::CheckingPolicyImpl>;
+using CrossThreadPersistent = internal::
+    BasicCrossThreadPersistent<T, internal::StrongCrossThreadPersistentPolicy>;
 template <typename T>
-using CrossThreadWeakPersistent = internal::BasicCrossThreadPersistent<
-    T,
-    internal::WeakCrossThreadPersistentPolicy,
-    internal::LocationPolicyImpl,
-    internal::CheckingPolicyImpl>;
+using CrossThreadWeakPersistent = internal::
+    BasicCrossThreadPersistent<T, internal::WeakCrossThreadPersistentPolicy>;
 
 }  // namespace subtle
 
@@ -349,8 +278,6 @@ using Member = cppgc::Member<T>;
 template <typename T>
 using WeakMember = cppgc::WeakMember<T>;
 template <typename T>
-using UntracedMember = cppgc::UntracedMember<T>;
-template <typename T>
 using Persistent = cppgc::Persistent<T>;
 template <typename T>
 using WeakPersistent = cppgc::WeakPersistent<T>;
@@ -358,6 +285,88 @@ template <typename T>
 using CrossThreadPersistent = cppgc::subtle::CrossThreadPersistent<T>;
 template <typename T>
 using CrossThreadWeakPersistent = cppgc::subtle::CrossThreadWeakPersistent<T>;
+
+#else  // !defined(USE_V8_OILPAN)
+
+namespace blink {
+
+class Visitor {
+ public:
+  template <typename T, void (T::*method)(Visitor*)>
+  void RegisterWeakMembers(const T* obj);
+
+  template <typename T>
+  void Trace(const T&);
+};
+
+template <typename T>
+class GarbageCollected {
+ public:
+  void* operator new(size_t, void* location) { return location; }
+
+ private:
+  void* operator new(size_t) = delete;
+  void* operator new[](size_t) = delete;
+};
+
+template <typename T, typename... Args>
+T* MakeGarbageCollected(Args&&... args) {
+  return new (reinterpret_cast<void*>(0x87654321)) T(args...);
+}
+
+class GarbageCollectedMixin {
+ public:
+  virtual void AdjustAndMark(Visitor*) const = 0;
+  virtual bool IsHeapObjectAlive(Visitor*) const = 0;
+  virtual void Trace(Visitor*) const {}
+};
+
+template<typename T> class Member {
+public:
+    operator T*() const { return 0; }
+    T* operator->() const { return 0; }
+    bool operator!() const { return false; }
+
+   private:
+    uint32_t compressed;
+};
+
+template<typename T> class WeakMember {
+public:
+    operator T*() const { return 0; }
+    T* operator->() const { return 0; }
+    bool operator!() const { return false; }
+};
+
+template<typename T> class Persistent {
+public:
+    operator T*() const { return 0; }
+    T* operator->() const { return 0; }
+    bool operator!() const { return false; }
+};
+
+template<typename T> class WeakPersistent {
+public:
+    operator T*() const { return 0; }
+    T* operator->() const { return 0; }
+    bool operator!() const { return false; }
+};
+
+template<typename T> class CrossThreadPersistent {
+public:
+    operator T*() const { return 0; }
+    T* operator->() const { return 0; }
+    bool operator!() const { return false; }
+};
+
+template<typename T> class CrossThreadWeakPersistent {
+public:
+    operator T*() const { return 0; }
+    T* operator->() const { return 0; }
+    bool operator!() const { return false; }
+};
+
+#endif  // !defined(USE_V8_OILPAN)
 
 using namespace WTF;
 
@@ -405,7 +414,7 @@ class HeapDeque : public GarbageCollected<HeapDeque<T, inlineCapacity>>,
 
 template <typename T>
 class HeapHashSet : public GarbageCollected<HeapHashSet<T>>,
-                    public HashSet<T, void, HeapAllocator> {};
+                    public HashSet<T, void, void, HeapAllocator> {};
 
 template <typename T>
 class HeapLinkedHashSet : public GarbageCollected<HeapLinkedHashSet<T>>,
@@ -413,11 +422,12 @@ class HeapLinkedHashSet : public GarbageCollected<HeapLinkedHashSet<T>>,
 
 template <typename T>
 class HeapHashCountedSet : public GarbageCollected<HeapHashCountedSet<T>>,
-                           public HashCountedSet<T, void, HeapAllocator> {};
+                           public HashCountedSet<T, void, void, HeapAllocator> {
+};
 
 template <typename K, typename V>
 class HeapHashMap : public GarbageCollected<HeapHashMap<K, V>>,
-                    public HashMap<K, V, void, void, HeapAllocator> {};
+                    public HashMap<K, V, void, void, void, HeapAllocator> {};
 
 template<typename T>
 struct TraceIfNeeded {

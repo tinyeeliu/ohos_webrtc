@@ -6,8 +6,11 @@
 collections of cliques (uber-cliques).
 '''
 
+from __future__ import print_function
 
 import re
+
+import six
 
 from grit import constants
 from grit import exception
@@ -17,7 +20,7 @@ from grit import pseudolocales
 from grit import tclib
 
 
-class UberClique:
+class UberClique(object):
   '''A factory (NOT a singleton factory) for making cliques.  It has several
   methods for working with the cliques created using the factory.
   '''
@@ -192,7 +195,8 @@ class UberClique:
     with the same ID.
     '''
     for cliques in self.cliques_.values():
-      yield from cliques
+      for c in cliques:
+        yield c
 
   def GenerateXtbParserCallback(self, lang, debug=False):
     '''Creates a callback function as required by grit.xtb_reader.Parse().
@@ -238,7 +242,7 @@ class UberClique:
     return Callback
 
 
-class CustomType:
+class CustomType(object):
   '''A base class you should implement if you wish to specify a custom type
   for a message clique (i.e. custom validation and optional modification of
   translations).'''
@@ -270,7 +274,7 @@ class CustomType:
     '''
     contents = translation.GetContent()
     for ix in range(len(contents)):
-      if (isinstance(contents[ix], str)):
+      if (isinstance(contents[ix], six.string_types)):
         contents[ix] = self.ModifyTextPart(lang, contents[ix])
 
 
@@ -295,7 +299,7 @@ class OneOffCustomType(CustomType):
              })
 
 
-class MessageClique:
+class MessageClique(object):
   '''A message along with all of its translations.  Also code to bring
   translations together with their original message.'''
 

@@ -12,7 +12,6 @@
 #define SDK_ANDROID_SRC_JNI_PC_SESSION_DESCRIPTION_H_
 
 #include <jni.h>
-
 #include <memory>
 #include <string>
 

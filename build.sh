@@ -29,7 +29,7 @@ function downlaod_thirdparty() {
         return 0
     fi
 
-    git clone https://gitee.com/zhong-luping/webrtc_third_party.git
+    git clone https://gitee.com/zhong-luping/webrtc_third_party.git -b m109 --depth=1
     if [ $? -ne 0 ]
     then
         echo "git clone webrtc third_party failed!!"
@@ -53,8 +53,6 @@ then
     echo "use ./build.sh OHOS_SDK_NATIVE_PATH"
     exit 1
 fi
-
-git submodule update --init --recursive            ## git clone submodules
 
 check_depot_tools
 if [ $? -ne 0 ]
