@@ -21,7 +21,7 @@ native API header files.
 
 1. How to build WebRTC with OHOS SDK followed [this article](./docs/ohos/webrtc_adapter_ohos.md).
 2. OHOS Audio adapter code: [ohos audio](./modules/audio_device/ohos)
-3. How to use OHOS Video for webrtc followed [this project](https://gitee.com/han_jin_fei/oh_web-rtc)
+3. How to use OHOS Video for webrtc followed [this project](https://gitee.com/han_jin_fei/oh_web-rtc/tree/m109/)
 
 ### More info
 
