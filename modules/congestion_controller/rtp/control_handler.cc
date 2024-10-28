@@ -30,7 +30,9 @@ bool IsPacerEmergencyStopDisabled() {
 
 }  // namespace
 CongestionControlHandler::CongestionControlHandler()
-    : disable_pacer_emergency_stop_(IsPacerEmergencyStopDisabled()) {}
+    : disable_pacer_emergency_stop_(IsPacerEmergencyStopDisabled()) {
+  sequenced_checker_.Detach();
+}
 
 CongestionControlHandler::~CongestionControlHandler() {}
 

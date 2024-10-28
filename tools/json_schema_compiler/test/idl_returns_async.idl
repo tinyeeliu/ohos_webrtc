@@ -8,8 +8,7 @@ namespace idl_returns_async {
   callback MyCallback = void(long x);
 
   interface Functions {
-    static void supportsPromises(MyCallback callback);
-    [doesNotSupportPromises="Test"]
+    [supportsPromises] static void supportsPromises(MyCallback callback);
     static void doesNotSupportPromises(MyCallback callback);
   };
 };

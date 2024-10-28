@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-mod more;
-
 fn main() {
     println!("Hello, world!");
     #[cfg(is_new_rustc)]
@@ -14,6 +12,4 @@ fn main() {
     println!("Is android!");
     #[cfg(is_mac)]
     println!("Is darwin!");
-
-    more::hello();
 }

@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -28,7 +29,6 @@
 #include "api/stats/rtcstats_objects.h"
 #include "call/call.h"
 #include "media/base/media_channel.h"
-#include "modules/audio_device/include/audio_device.h"
 #include "pc/data_channel_utils.h"
 #include "pc/peer_connection_internal.h"
 #include "pc/rtp_receiver.h"
@@ -38,12 +38,12 @@
 #include "pc/track_media_info_map.h"
 #include "pc/transport_stats.h"
 #include "rtc_base/checks.h"
-#include "rtc_base/containers/flat_set.h"
 #include "rtc_base/event.h"
 #include "rtc_base/ref_count.h"
 #include "rtc_base/ssl_certificate.h"
 #include "rtc_base/ssl_identity.h"
 #include "rtc_base/synchronization/mutex.h"
+#include "rtc_base/third_party/sigslot/sigslot.h"
 #include "rtc_base/thread.h"
 #include "rtc_base/time_utils.h"
 
@@ -56,7 +56,8 @@ class RtpReceiverInternal;
 // Stats are gathered on the signaling, worker and network threads
 // asynchronously. The callback is invoked on the signaling thread. Resulting
 // reports are cached for `cache_lifetime_` ms.
-class RTCStatsCollector : public rtc::RefCountInterface {
+class RTCStatsCollector : public rtc::RefCountInterface,
+                          public sigslot::has_slots<> {
  public:
   static rtc::scoped_refptr<RTCStatsCollector> Create(
       PeerConnectionInternal* pc,
@@ -90,10 +91,6 @@ class RTCStatsCollector : public rtc::RefCountInterface {
   // completed. Must be called on the signaling thread.
   void WaitForPendingRequest();
 
-  // Called by the PeerConnection instance when data channel states change.
-  void OnSctpDataChannelStateChanged(int channel_id,
-                                     DataChannelInterface::DataState state);
-
  protected:
   RTCStatsCollector(PeerConnectionInternal* pc, int64_t cache_lifetime_us);
   ~RTCStatsCollector();
@@ -107,10 +104,10 @@ class RTCStatsCollector : public rtc::RefCountInterface {
 
   // Stats gathering on a particular thread. Virtual for the sake of testing.
   virtual void ProducePartialResultsOnSignalingThreadImpl(
-      Timestamp timestamp,
+      int64_t timestamp_us,
       RTCStatsReport* partial_report);
   virtual void ProducePartialResultsOnNetworkThreadImpl(
-      Timestamp timestamp,
+      int64_t timestamp_us,
       const std::map<std::string, cricket::TransportStats>&
           transport_stats_by_name,
       const std::map<std::string, CertificateStatsPair>& transport_cert_stats,
@@ -173,7 +170,6 @@ class RTCStatsCollector : public rtc::RefCountInterface {
     absl::optional<std::string> mid;
     absl::optional<std::string> transport_name;
     TrackMediaInfoMap track_media_info_map;
-    absl::optional<RtpTransceiverDirection> current_direction;
   };
 
   void DeliverCachedReport(
@@ -182,47 +178,50 @@ class RTCStatsCollector : public rtc::RefCountInterface {
 
   // Produces `RTCCertificateStats`.
   void ProduceCertificateStats_n(
-      Timestamp timestamp,
+      int64_t timestamp_us,
       const std::map<std::string, CertificateStatsPair>& transport_cert_stats,
       RTCStatsReport* report) const;
   // Produces `RTCDataChannelStats`.
-  void ProduceDataChannelStats_n(Timestamp timestamp,
+  void ProduceDataChannelStats_s(int64_t timestamp_us,
                                  RTCStatsReport* report) const;
   // Produces `RTCIceCandidatePairStats` and `RTCIceCandidateStats`.
   void ProduceIceCandidateAndPairStats_n(
-      Timestamp timestamp,
+      int64_t timestamp_us,
       const std::map<std::string, cricket::TransportStats>&
           transport_stats_by_name,
       const Call::Stats& call_stats,
       RTCStatsReport* report) const;
+  // Produces `RTCMediaStreamStats`.
+  void ProduceMediaStreamStats_s(int64_t timestamp_us,
+                                 RTCStatsReport* report) const;
+  // Produces `RTCMediaStreamTrackStats`.
+  void ProduceMediaStreamTrackStats_s(int64_t timestamp_us,
+                                      RTCStatsReport* report) const;
   // Produces RTCMediaSourceStats, including RTCAudioSourceStats and
   // RTCVideoSourceStats.
-  void ProduceMediaSourceStats_s(Timestamp timestamp,
+  void ProduceMediaSourceStats_s(int64_t timestamp_us,
                                  RTCStatsReport* report) const;
   // Produces `RTCPeerConnectionStats`.
-  void ProducePeerConnectionStats_s(Timestamp timestamp,
+  void ProducePeerConnectionStats_s(int64_t timestamp_us,
                                     RTCStatsReport* report) const;
-  // Produces `RTCAudioPlayoutStats`.
-  void ProduceAudioPlayoutStats_s(Timestamp timestamp,
-                                  RTCStatsReport* report) const;
-  // Produces `RTCInboundRtpStreamStats`, `RTCOutboundRtpStreamStats`,
+  // Produces `RTCInboundRTPStreamStats`, `RTCOutboundRTPStreamStats`,
   // `RTCRemoteInboundRtpStreamStats`, `RTCRemoteOutboundRtpStreamStats` and any
   // referenced `RTCCodecStats`. This has to be invoked after transport stats
   // have been created because some metrics are calculated through lookup of
   // other metrics.
   void ProduceRTPStreamStats_n(
-      Timestamp timestamp,
+      int64_t timestamp_us,
       const std::vector<RtpTransceiverStatsInfo>& transceiver_stats_infos,
       RTCStatsReport* report) const;
-  void ProduceAudioRTPStreamStats_n(Timestamp timestamp,
+  void ProduceAudioRTPStreamStats_n(int64_t timestamp_us,
                                     const RtpTransceiverStatsInfo& stats,
                                     RTCStatsReport* report) const;
-  void ProduceVideoRTPStreamStats_n(Timestamp timestamp,
+  void ProduceVideoRTPStreamStats_n(int64_t timestamp_us,
                                     const RtpTransceiverStatsInfo& stats,
                                     RTCStatsReport* report) const;
   // Produces `RTCTransportStats`.
   void ProduceTransportStats_n(
-      Timestamp timestamp,
+      int64_t timestamp_us,
       const std::map<std::string, cricket::TransportStats>&
           transport_stats_by_name,
       const std::map<std::string, CertificateStatsPair>& transport_cert_stats,
@@ -237,19 +236,19 @@ class RTCStatsCollector : public rtc::RefCountInterface {
   void PrepareTransceiverStatsInfosAndCallStats_s_w_n();
 
   // Stats gathering on a particular thread.
-  void ProducePartialResultsOnSignalingThread(Timestamp timestamp);
+  void ProducePartialResultsOnSignalingThread(int64_t timestamp_us);
   void ProducePartialResultsOnNetworkThread(
-      Timestamp timestamp,
+      int64_t timestamp_us,
       absl::optional<std::string> sctp_transport_name);
   // Merges `network_report_` into `partial_report_` and completes the request.
   // This is a NO-OP if `network_report_` is null.
   void MergeNetworkReport_s();
 
-  rtc::scoped_refptr<RTCStatsReport> CreateReportFilteredBySelector(
-      bool filter_by_sender_selector,
-      rtc::scoped_refptr<const RTCStatsReport> report,
-      rtc::scoped_refptr<RtpSenderInternal> sender_selector,
-      rtc::scoped_refptr<RtpReceiverInternal> receiver_selector);
+  // Slots for signals (sigslot) that are wired up to `pc_`.
+  void OnSctpDataChannelCreated(SctpDataChannel* channel);
+  // Slots for signals (sigslot) that are wired up to `channel`.
+  void OnDataChannelOpened(DataChannelInterface* channel);
+  void OnDataChannelClosed(DataChannelInterface* channel);
 
   PeerConnectionInternal* const pc_;
   rtc::Thread* const signaling_thread_;
@@ -293,8 +292,6 @@ class RTCStatsCollector : public rtc::RefCountInterface {
 
   Call::Stats call_stats_;
 
-  absl::optional<AudioDeviceModule::Stats> audio_device_stats_;
-
   // A timestamp, in microseconds, that is based on a timer that is
   // monotonically increasing. That is, even if the system clock is modified the
   // difference between the timer and this timestamp is how fresh the cached
@@ -315,9 +312,9 @@ class RTCStatsCollector : public rtc::RefCountInterface {
     // before reaching the open state does not affect these counters.
     uint32_t data_channels_opened;
     uint32_t data_channels_closed;
-    // Identifies channels that have been opened, whose internal id is stored in
-    // the set until they have been fully closed.
-    webrtc::flat_set<int> opened_data_channels;
+    // Identifies by address channels that have been opened, which remain in the
+    // set until they have been fully closed.
+    std::set<uintptr_t> opened_data_channels;
   };
   InternalRecord internal_record_;
 };

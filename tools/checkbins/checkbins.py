@@ -45,7 +45,6 @@ EXCLUDED_FILES = [
 CETCOMPAT_NOT_REQUIRED = [
     'chrome_proxy.exe',
     'chrome_pwa_launcher.exe',
-    'dxcompiler.dll',  # TODO(crbug.com/1473950)
     'elevation_service.exe',
     'nacl64.exe',
     'notification_helper.exe',

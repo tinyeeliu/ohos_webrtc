@@ -1,4 +1,2 @@
-# cc/metrics Owner
-jonross@chromium.org
-# The entire Chrome Graphics team is allowed to administer these scripts.
-file://gpu/GRAPHICS_TEAM_OWNERS
+behdadb@chromium.org
+sadrul@chromium.org

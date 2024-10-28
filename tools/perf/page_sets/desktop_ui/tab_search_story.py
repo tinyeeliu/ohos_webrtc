@@ -61,13 +61,7 @@ class TabSearchStory(MultiTabStory):
                                     'tab_search:used_js_heap_size_end')
 
   def ToggleTabSearch(self, index=0):
-    # Click a little bit into the button instead of the extreme top-left corner.
-    # The button's corners are not included in its hit test mask.
-    ClickOn(self._devtools,
-            element_id=kTabSearchButtonElementId,
-            index=index,
-            x=10,
-            y=10)
+    ClickOn(self._devtools, element_id=kTabSearchButtonElementId, index=index)
 
   def InteractWithPage(self, action_runner):
     self.ScrollTabs(action_runner)
@@ -347,7 +341,5 @@ class TabSearchStoryMeasureMemory3TabSearch(TabSearchStoryMeasureMemory):
 
 
 SCROLL_ELEMENT_FUNCTION = '''
-document.querySelector('tab-search-app').shadowRoot
-        .querySelector('tab-search-page').shadowRoot
-        .getElementById('tabsList')
+document.querySelector('tab-search-app').shadowRoot.getElementById('tabsList')
 '''

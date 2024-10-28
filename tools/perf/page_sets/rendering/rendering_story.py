@@ -35,7 +35,6 @@ class RenderingStory(six.with_metaclass(_MetaRenderingStory, page.Page)):
   PLATFORM_SPECIFIC = False
   YEAR = None
   DISABLE_TRACING = False
-  EXTRA_BROWSER_ARGUMENTS = None
 
   def __init__(self,
                page_set,

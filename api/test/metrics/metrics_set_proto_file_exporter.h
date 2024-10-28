@@ -11,7 +11,6 @@
 #ifndef API_TEST_METRICS_METRICS_SET_PROTO_FILE_EXPORTER_H_
 #define API_TEST_METRICS_METRICS_SET_PROTO_FILE_EXPORTER_H_
 
-#include <map>
 #include <string>
 
 #include "api/array_view.h"
@@ -28,16 +27,12 @@ class MetricsSetProtoFileExporter : public MetricsExporter {
   struct Options {
     explicit Options(absl::string_view export_file_path);
     Options(absl::string_view export_file_path, bool export_whole_time_series);
-    Options(absl::string_view export_file_path,
-            std::map<std::string, std::string> metadata);
 
     // File to export proto.
     std::string export_file_path;
     // If true will write all time series values to the output proto file,
     // otherwise will write stats only.
     bool export_whole_time_series = true;
-    // Metadata associated to the whole MetricsSet.
-    std::map<std::string, std::string> metadata;
   };
 
   explicit MetricsSetProtoFileExporter(const Options& options)

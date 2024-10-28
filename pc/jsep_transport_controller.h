@@ -21,7 +21,6 @@
 #include <utility>
 #include <vector>
 
-#include "absl/functional/any_invocable.h"
 #include "absl/types/optional.h"
 #include "api/async_dns_resolver.h"
 #include "api/candidate.h"
@@ -125,11 +124,9 @@ class JsepTransportController : public sigslot::has_slots<> {
     Observer* transport_observer = nullptr;
     // Must be provided and valid for the lifetime of the
     // JsepTransportController instance.
-    absl::AnyInvocable<void(const rtc::CopyOnWriteBuffer& packet,
-                            int64_t packet_time_us) const>
+    std::function<void(const rtc::CopyOnWriteBuffer& packet,
+                       int64_t packet_time_us)>
         rtcp_handler;
-    absl::AnyInvocable<void(const RtpPacketReceived& parsed_packet) const>
-        un_demuxable_packet_handler;
     // Initial value for whether DtlsTransport reset causes a reset
     // of SRTP parameters.
     bool active_reset_srtp_params = false;
@@ -452,8 +449,6 @@ class JsepTransportController : public sigslot::has_slots<> {
 
   void OnRtcpPacketReceived_n(rtc::CopyOnWriteBuffer* packet,
                               int64_t packet_time_us)
-      RTC_RUN_ON(network_thread_);
-  void OnUnDemuxableRtpPacketReceived_n(const webrtc::RtpPacketReceived& packet)
       RTC_RUN_ON(network_thread_);
 
   void OnDtlsHandshakeError(rtc::SSLHandshakeError error);

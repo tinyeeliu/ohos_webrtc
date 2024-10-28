@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+from __future__ import print_function
+
 import argparse
 import copy
 from datetime import datetime
@@ -12,7 +14,7 @@ import posixpath
 import re
 import sys
 
-from code_util import Code
+from code import Code
 import json_parse
 
 # The template for the header file of the generated FeatureProvider.
@@ -56,9 +58,7 @@ CC_FILE_BEGIN = """
 #include "extensions/common/features/feature_provider.h"
 #include "extensions/common/features/manifest_feature.h"
 #include "extensions/common/features/permission_feature.h"
-#include "extensions/common/mojom/context_type.mojom.h"
 #include "extensions/common/mojom/feature_session_type.mojom.h"
-#include "printing/buildflags/buildflags.h"
 
 namespace extensions {
 
@@ -107,9 +107,9 @@ def ListContainsOnlySha1Hashes(l):
 #                a value of "all" for a list value, and will replace it with
 #                the collection of all possible values. For instance, if a
 #                feature specifies 'contexts': 'all', the generated C++ will
-#                assign the list of mojom::ContextType::kPrivilegedExtension,
-#                mojom::ContextType::kPrivilegedWebPage et al for contexts. If
-#                not specified, defaults to false.
+#                assign the list of Feature::BLESSED_EXTENSION_CONTEXT,
+#                Feature::BLESSED_WEB_PAGE_CONTEXT et al for contexts. If not
+#                specified, defaults to false.
 #   'allow_empty': Only applicable for lists. Whether an empty list is a valid
 #                  value. If omitted, empty lists are prohibited.
 #   'validators': A list of (function, str) pairs with a function to run on the
@@ -169,19 +169,16 @@ FEATURE_GRAMMAR = ({
     'contexts': {
         list: {
             'enum_map': {
-                'blessed_extension': 'mojom::ContextType::kPrivilegedExtension',
-                'blessed_web_page': 'mojom::ContextType::kPrivilegedWebPage',
-                'content_script': 'mojom::ContextType::kContentScript',
+                'blessed_extension': 'Feature::BLESSED_EXTENSION_CONTEXT',
+                'blessed_web_page': 'Feature::BLESSED_WEB_PAGE_CONTEXT',
+                'content_script': 'Feature::CONTENT_SCRIPT_CONTEXT',
                 'lock_screen_extension':
-                    'mojom::ContextType::kLockscreenExtension',
-                'offscreen_extension':
-                    'mojom::ContextType::kOffscreenExtension',
-                'user_script': 'mojom::ContextType::kUserScript',
-                'web_page': 'mojom::ContextType::kWebPage',
-                'webui': 'mojom::ContextType::kWebUi',
-                'webui_untrusted': 'mojom::ContextType::kUntrustedWebUi',
-                'unblessed_extension':
-                    'mojom::ContextType::kUnprivilegedExtension',
+                'Feature::LOCK_SCREEN_EXTENSION_CONTEXT',
+                'offscreen_extension': 'Feature::OFFSCREEN_EXTENSION_CONTEXT',
+                'web_page': 'Feature::WEB_PAGE_CONTEXT',
+                'webui': 'Feature::WEBUI_CONTEXT',
+                'webui_untrusted': 'Feature::WEBUI_UNTRUSTED_CONTEXT',
+                'unblessed_extension': 'Feature::UNBLESSED_EXTENSION_CONTEXT',
             },
             'allow_all': True,
             'allow_empty': True
@@ -257,11 +254,6 @@ FEATURE_GRAMMAR = ({
             'values': [2, 3]
         }
     },
-    'requires_delegated_availability_check': {
-        bool: {
-            'values': [True]
-        }
-    },
     'noparent': {
         bool: {
             'values': [True]
@@ -277,11 +269,6 @@ FEATURE_GRAMMAR = ({
                 'mac': 'Feature::MACOSX_PLATFORM',
                 'win': 'Feature::WIN_PLATFORM',
             }
-        }
-    },
-    'required_buildflags': {
-        list: {
-            'values': ['use_cups']
         }
     },
     'session_types': {
@@ -314,13 +301,6 @@ def DoesNotHaveAllProperties(property_names, value):
 
 def DoesNotHaveProperty(property_name, value):
   return property_name not in value
-
-def DoesNotHavePropertyInComplexFeature(property_name, feature, all_features):
-  if type(feature) is ComplexFeature:
-    for child_feature in feature.feature_list:
-      if child_feature.GetValue(property_name):
-        return False
-  return True
 
 def IsEmptyContextsAllowed(feature, all_features):
   # An alias feature wouldn't have the 'contexts' feature value.
@@ -438,7 +418,7 @@ VALIDATION = ({
     (partial(HasAtLeastOneProperty, ['channel', 'dependencies']),
      'Features must specify either a channel or dependencies'),
     (DoesNotHaveAllowlistForHostedApps,
-     'Hosted apps are not allowed to use restricted features'),
+     'Hosted apps are not allowed to use restricted features')
   ],
   'APIFeature': [
     (partial(HasProperty, 'contexts'),
@@ -455,24 +435,12 @@ VALIDATION = ({
      'ManifestFeatures do not support alias.'),
     (partial(DoesNotHaveProperty, 'source'),
      'ManifestFeatures do not support source.'),
-    # The `required_buildflags` field is intended to be used to toggle the
-    # availability of certain APIs; if we support this for feature types other
-    # than APIFeature, we may emit warnings that are visible to developers which
-    # is not desirable.
-    (partial(DoesNotHaveProperty, 'required_buildflags'),
-     'ManifestFeatures do not support required_buildflags.'),
   ],
   'BehaviorFeature': [
     (partial(DoesNotHaveProperty, 'alias'),
      'BehaviorFeatures do not support alias.'),
     (partial(DoesNotHaveProperty, 'source'),
      'BehaviorFeatures do not support source.'),
-    (partial(DoesNotHaveProperty, 'required_buildflags'),
-    # The `required_buildflags` field is intended to be used to toggle the
-    # availability of certain APIs; if we support this for feature types other
-    # than APIFeature, we may emit warnings that are visible to developers which
-    # is not desirable.
-     'BehaviorFeatures do not support required_buildflags.'),
    ],
   'PermissionFeature': [
     (partial(HasProperty, 'extension_types'),
@@ -483,23 +451,11 @@ VALIDATION = ({
      'PermissionFeatures do not support alias.'),
     (partial(DoesNotHaveProperty, 'source'),
      'PermissionFeatures do not support source.'),
-    (partial(DoesNotHaveProperty, 'required_buildflags'),
-    # The `required_buildflags` field is intended to be used to toggle the
-    # availability of certain APIs; if we support this for feature types other
-    # than APIFeature, we may emit warnings that are visible to developers which
-    # is not desirable.
-     'PermissionFeatures do not support required_buildflags.'),
   ],
 })
 
 FINAL_VALIDATION = ({
-  'all': [
-    # A complex feature requires at least one child entry at all times; with
-    # `required_buildflags` it becomes harder to guarantee that this holds for
-    # every potential combination of the provided flags.
-    (partial(DoesNotHavePropertyInComplexFeature, 'required_buildflags'),
-     'required_buildflags cannot be nested in a ComplexFeature'),
-  ],
+  'all': [],
   'APIFeature': [
     (partial(IsFeatureCrossReference, 'alias', 'source'),
      'A feature alias property should reference a feature whose source '
@@ -515,8 +471,9 @@ FINAL_VALIDATION = ({
   'PermissionFeature': []
 })
 
-# These keys can not be set on a feature and are hence ignored.
-IGNORED_KEYS = ['default_parent', 'required_buildflags']
+# These keys are used to find the parents of different features, but are not
+# compiled into the features themselves.
+IGNORED_KEYS = ['default_parent']
 
 # By default, if an error is encountered, assert to stop the compilation. This
 # can be disabled for testing.
@@ -527,7 +484,7 @@ def GetCodeForFeatureValues(feature_values):
   c = Code()
   for key in sorted(feature_values.keys()):
     if key in IGNORED_KEYS:
-      continue
+      continue;
 
     c.Append('feature->set_%s(%s);' % (key, feature_values[key]))
   return c
@@ -542,6 +499,16 @@ class Feature(object):
     self.errors = []
     self.feature_values = {}
     self.shared_values = {}
+
+  def _GetType(self, value):
+    """Returns the type of the given value.
+    """
+    # For Py3 compatibility we use str in the grammar and treat unicode as str
+    # in Py2.
+    if sys.version_info.major == 2 and type(value) is unicode:
+      return str
+
+    return type(value)
 
   def AddError(self, error):
     """Adds an error to the feature. If ENABLE_ASSERTIONS is active, this will
@@ -578,7 +545,7 @@ class Feature(object):
       self._AddKeyError(key, 'Illegal value: "%s"' % value)
       valid = False
 
-    t = type(value)
+    t = self._GetType(value)
     if expected_type and t is not expected_type:
       self._AddKeyError(key, 'Illegal value: "%s"' % value)
       valid = False
@@ -590,8 +557,6 @@ class Feature(object):
       return enum_map[value]
 
     if t is str:
-      if key == 'required_buildflags':
-        return value
       return '"%s"' % str(value)
     if t is int:
       return str(value)
@@ -621,7 +586,7 @@ class Feature(object):
       self._AddKeyError(key, 'Key can be set at most once per feature.')
       return
 
-    value_type = type(v)
+    value_type = self._GetType(v)
     if value_type not in grammar:
       self._AddKeyError(key, 'Illegal value: "%s"' % v)
       return
@@ -661,8 +626,7 @@ class Feature(object):
                                               sub_value)
         if cpp_sub_value:
           cpp_value.append(cpp_sub_value)
-      if key != 'required_buildflags':
-        cpp_value = '{' + ','.join(cpp_value) + '}'
+      cpp_value = '{' + ','.join(cpp_value) + '}'
     else:
       cpp_value = self._GetCheckedValue(key, expected_type, expected_values,
                                         enum_map, v)
@@ -872,13 +836,6 @@ class FeatureCompiler(object):
 
     # Handle complex features, which are lists of simple features.
     if type(feature_value) is list:
-      assert len(feature_value) > 1, (
-          'Error parsing feature "%s": A complex feature ' % feature_name +
-          'definition is only needed when there are multiple objects ' +
-          'specifying different groups of properties for feature ' +
-          'availability. You can reduce it down to a single object on the ' +
-          'feature key instead of a list.')
-
       feature = ComplexFeature(feature_name)
 
       # This doesn't handle nested complex features. I think that's probably for
@@ -922,16 +879,8 @@ class FeatureCompiler(object):
     for k in sorted(self._features.keys()):
       c.Sblock('{')
       feature = self._features[k]
-      required_buildflags = feature.GetValue('required_buildflags')
-      if required_buildflags:
-        formatted_buildflags = [
-          'BUILDFLAG(%s)' % format(flag.upper()) for flag in required_buildflags
-        ]
-        c.Append('#if %s' % format(' && '.join(formatted_buildflags)))
       c.Concat(feature.GetCode(self._feature_type))
       c.Append('provider->AddFeature("%s", feature);' % k)
-      if required_buildflags:
-        c.Append('#endif')
       c.Eblock('}')
     c.Eblock()
     return c

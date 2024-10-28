@@ -10,6 +10,30 @@
       "use_remoteexec": true
     }
   },
+  "mac10.13-blink-rel": {
+    "gn_args": {
+      "dcheck_always_on": false,
+      "enable_nacl": false,
+      "ffmpeg_branding": "Chrome",
+      "is_component_build": false,
+      "is_debug": false,
+      "proprietary_codecs": true,
+      "symbol_level": 1,
+      "use_goma": true
+    }
+  },
+  "mac10.14-blink-rel": {
+    "gn_args": {
+      "dcheck_always_on": false,
+      "enable_nacl": false,
+      "ffmpeg_branding": "Chrome",
+      "is_component_build": false,
+      "is_debug": false,
+      "proprietary_codecs": true,
+      "symbol_level": 1,
+      "use_goma": true
+    }
+  },
   "mac10.15-blink-rel": {
     "gn_args": {
       "dcheck_always_on": false,
@@ -19,7 +43,7 @@
       "is_debug": false,
       "proprietary_codecs": true,
       "symbol_level": 1,
-      "use_remoteexec": true
+      "use_goma": true
     }
   },
   "mac11.0-blink-rel": {
@@ -31,7 +55,7 @@
       "is_debug": false,
       "proprietary_codecs": true,
       "symbol_level": 1,
-      "use_remoteexec": true
+      "use_goma": true
     }
   },
   "mac11.0.arm64-blink-rel": {
@@ -43,7 +67,7 @@
       "proprietary_codecs": true,
       "symbol_level": 1,
       "target_cpu": "arm64",
-      "use_remoteexec": true
+      "use_goma": true
     }
   },
   "mac12.0-blink-rel": {
@@ -55,7 +79,7 @@
       "is_debug": false,
       "proprietary_codecs": true,
       "symbol_level": 1,
-      "use_remoteexec": true
+      "use_goma": true
     }
   },
   "mac12.0.arm64-blink-rel": {
@@ -67,31 +91,7 @@
       "proprietary_codecs": true,
       "symbol_level": 1,
       "target_cpu": "arm64",
-      "use_remoteexec": true
-    }
-  },
-  "mac13-blink-rel": {
-    "gn_args": {
-      "dcheck_always_on": false,
-      "enable_nacl": false,
-      "ffmpeg_branding": "Chrome",
-      "is_component_build": false,
-      "is_debug": false,
-      "proprietary_codecs": true,
-      "symbol_level": 1,
-      "use_remoteexec": true
-    }
-  },
-  "mac13.arm64-blink-rel": {
-    "gn_args": {
-      "dcheck_always_on": false,
-      "ffmpeg_branding": "Chrome",
-      "is_component_build": false,
-      "is_debug": false,
-      "proprietary_codecs": true,
-      "symbol_level": 1,
-      "target_cpu": "arm64",
-      "use_remoteexec": true
+      "use_goma": true
     }
   },
   "win10.20h2-blink-rel": {
@@ -103,19 +103,7 @@
       "proprietary_codecs": true,
       "symbol_level": 1,
       "target_cpu": "x86",
-      "use_remoteexec": true
-    }
-  },
-  "win11-arm64-blink-rel": {
-    "gn_args": {
-      "dcheck_always_on": false,
-      "ffmpeg_branding": "Chrome",
-      "is_component_build": false,
-      "is_debug": false,
-      "proprietary_codecs": true,
-      "symbol_level": 1,
-      "target_cpu": "arm64",
-      "use_remoteexec": true
+      "use_goma": true
     }
   },
   "win11-blink-rel": {
@@ -127,7 +115,7 @@
       "proprietary_codecs": true,
       "symbol_level": 1,
       "target_cpu": "x64",
-      "use_remoteexec": true
+      "use_goma": true
     }
   }
 }

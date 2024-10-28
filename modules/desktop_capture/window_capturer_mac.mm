@@ -73,9 +73,6 @@ class WindowCapturerMac : public DesktopCapturer {
   const rtc::scoped_refptr<DesktopConfigurationMonitor> configuration_monitor_;
 
   WindowFinderMac window_finder_;
-
-  // Used to make sure that we only log the usage of fullscreen detection once.
-  bool fullscreen_usage_logged_ = false;
 };
 
 WindowCapturerMac::WindowCapturerMac(
@@ -127,7 +124,8 @@ bool WindowCapturerMac::FocusOnSelectedSource() {
   // TODO(jiayl): this will bring the process main window to the front. We
   // should find a way to bring only the window to the front.
   bool result =
-      [[NSRunningApplication runningApplicationWithProcessIdentifier:pid] activateWithOptions:0];
+      [[NSRunningApplication runningApplicationWithProcessIdentifier: pid]
+          activateWithOptions: NSApplicationActivateIgnoringOtherApps];
 
   CFRelease(window_id_array);
   CFRelease(window_array);
@@ -180,14 +178,7 @@ void WindowCapturerMac::CaptureFrame() {
 
     CGWindowID full_screen_window = full_screen_window_detector_->FindFullScreenWindow(window_id_);
 
-    if (full_screen_window != kCGNullWindowID) {
-      // If this is the first time this happens, report to UMA that the feature is active.
-      if (!fullscreen_usage_logged_) {
-        LogDesktopCapturerFullscreenDetectorUsage();
-        fullscreen_usage_logged_ = true;
-      }
-      on_screen_window = full_screen_window;
-    }
+    if (full_screen_window != kCGNullWindowID) on_screen_window = full_screen_window;
   }
 
   std::unique_ptr<DesktopFrame> frame = DesktopFrameCGImage::CreateForWindow(on_screen_window);

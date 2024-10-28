@@ -130,27 +130,6 @@ class ExpectationUnittest(unittest.TestCase):
                                'Pass')
     self.assertFalse(e.AppliesToResult(r))
 
-  def testAsExpectationFileString(self) -> None:
-    e = data_types.Expectation('foo/test', ['tag2', 'tag1'], 'Failure')
-    self.assertEqual(e.AsExpectationFileString(),
-                     '[ tag1 tag2 ] foo/test [ Failure ]')
-    e = data_types.Expectation('foo/test', ['tag2', 'tag1'], 'Failure', 'bug')
-    self.assertEqual(e.AsExpectationFileString(),
-                     'bug [ tag1 tag2 ] foo/test [ Failure ]')
-    e = data_types.Expectation('foo/*', ['tag2', 'tag1'], 'Failure', 'bug')
-    self.assertEqual(e.AsExpectationFileString(),
-                     'bug [ tag1 tag2 ] foo/* [ Failure ]')
-
-  def testWildcard(self) -> None:
-    e = data_types.Expectation('foo/test', ['tag1'], 'Failure')
-    self.assertFalse(e._IsWildcard())
-    e = data_types.Expectation('foo/\\*', ['tag1'], 'Failure')
-    self.assertFalse(e._IsWildcard())
-    e = data_types.Expectation('foo/*', ['tag1'], 'Failure')
-    self.assertTrue(e._IsWildcard())
-    e = data_types.Expectation('foo/\\*bar/*', ['tag1'], 'Failure')
-    self.assertTrue(e._IsWildcard())
-
 
 class ResultUnittest(unittest.TestCase):
   def testEquality(self) -> None:
@@ -184,8 +163,8 @@ class ResultUnittest(unittest.TestCase):
 class BuildStatsUnittest(unittest.TestCase):
   def CreateGenericBuildStats(self) -> data_types.BuildStats:
     stats = data_types.BuildStats()
-    stats.AddPassedBuild(frozenset())
-    stats.AddFailedBuild('', frozenset())
+    stats.AddPassedBuild()
+    stats.AddFailedBuild('')
     return stats
 
   def testEquality(self) -> None:
@@ -200,27 +179,14 @@ class BuildStatsUnittest(unittest.TestCase):
     other = self.CreateGenericBuildStats()
     other.failure_links = frozenset()
     self.assertNotEqual(s, other)
-    other = self.CreateGenericBuildStats()
-    other.tag_sets = {frozenset(['tag'])}
-    self.assertNotEqual(s, other)
-
-  def testAddPassedBuild(self) -> None:
-    s = data_types.BuildStats()
-    s.AddPassedBuild(frozenset(['tag']))
-    s.AddPassedBuild(frozenset(['other_tag']))
-    self.assertEqual(s.total_builds, 2)
-    self.assertEqual(s.failed_builds, 0)
-    self.assertEqual(s.failure_links, set())
-    self.assertEqual(s.tag_sets, {frozenset(['tag']), frozenset(['other_tag'])})
 
   def testAddFailedBuild(self) -> None:
     s = data_types.BuildStats()
-    s.AddFailedBuild('build_id', frozenset(['tag']))
-    s.AddFailedBuild('build_id', frozenset(['other_tag']))
-    self.assertEqual(s.total_builds, 2)
-    self.assertEqual(s.failed_builds, 2)
-    self.assertEqual(s.failure_links, {'http://ci.chromium.org/b/build_id'})
-    self.assertEqual(s.tag_sets, {frozenset(['tag']), frozenset(['other_tag'])})
+    s.AddFailedBuild('build_id')
+    self.assertEqual(s.total_builds, 1)
+    self.assertEqual(s.failed_builds, 1)
+    self.assertEqual(s.failure_links,
+                     frozenset(['http://ci.chromium.org/b/build_id']))
 
   def testGetStatsAsString(self) -> None:
     s = self.CreateGenericBuildStats()
@@ -305,7 +271,7 @@ class MapTypeUnittest(unittest.TestCase):
     for i in range(8):
       bs = data_types.BuildStats()
       for _ in range(i):
-        bs.AddPassedBuild(frozenset())
+        bs.AddPassedBuild()
       build_stats.append(bs)
     return build_stats
 
@@ -347,13 +313,13 @@ class MapTypeUnittest(unittest.TestCase):
     """Tests that iterating to BuilderStepMap works as expected."""
     test_expectation_map = self._GetSampleTestExpectationMap()
     expected_values = []
-    for expectation_file, expectation_map in test_expectation_map.items():
+    for test_name, expectation_map in test_expectation_map.items():
       for expectation, builder_map in expectation_map.items():
-        expected_values.append((expectation_file, expectation, builder_map))
+        expected_values.append((test_name, expectation, builder_map))
     returned_values = []
-    for (expectation_file, expectation,
+    for (test_name, expectation,
          builder_map) in test_expectation_map.IterBuilderStepMaps():
-      returned_values.append((expectation_file, expectation, builder_map))
+      returned_values.append((test_name, expectation, builder_map))
     self.assertEqual(len(returned_values), len(expected_values))
     for rv in returned_values:
       self.assertIn(rv, expected_values)
@@ -508,7 +474,7 @@ class TypedMapMergeUnittest(unittest.TestCase):
         }),
     })
     merge_stats = data_types.BuildStats()
-    merge_stats.AddFailedBuild('1', frozenset())
+    merge_stats.AddFailedBuild('1')
     merge_map = data_types.TestExpectationMap({
         'foo':
         data_types.ExpectationBuilderMap({
@@ -522,7 +488,7 @@ class TypedMapMergeUnittest(unittest.TestCase):
         }),
     })
     expected_stats = data_types.BuildStats()
-    expected_stats.AddFailedBuild('1', frozenset())
+    expected_stats.AddFailedBuild('1')
     expected_base_map = {
         'foo': {
             data_types.Expectation('foo', ['win'], 'Failure'): {
@@ -550,7 +516,7 @@ class TypedMapMergeUnittest(unittest.TestCase):
         }),
     })
     merge_stats = data_types.BuildStats()
-    merge_stats.AddFailedBuild('1', frozenset())
+    merge_stats.AddFailedBuild('1')
     merge_map = data_types.TestExpectationMap({
         'foo':
         data_types.ExpectationBuilderMap({
@@ -601,13 +567,13 @@ class TestExpectationMapAddResultListUnittest(unittest.TestCase):
   def GetPassedMapForExpectation(self, expectation: data_types.Expectation
                                  ) -> data_types.TestExpectationMap:
     stats = data_types.BuildStats()
-    stats.AddPassedBuild(expectation.tags)
+    stats.AddPassedBuild()
     return self.GetMapForExpectationAndStats(expectation, stats)
 
   def GetFailedMapForExpectation(self, expectation: data_types.Expectation
                                  ) -> data_types.TestExpectationMap:
     stats = data_types.BuildStats()
-    stats.AddFailedBuild('build_id', expectation.tags)
+    stats.AddFailedBuild('build_id')
     return self.GetMapForExpectationAndStats(expectation, stats)
 
   def GetMapForExpectationAndStats(self, expectation: data_types.Expectation,
@@ -729,7 +695,7 @@ class TestExpectationMapAddGroupedResultsUnittest(unittest.TestCase):
         grouped_results, 'builder', None)
     self.assertEqual(matched_results, set([r]))
     stats = data_types.BuildStats()
-    stats.AddPassedBuild(frozenset(['win', 'win10']))
+    stats.AddPassedBuild()
     expected_expectation_map = {
         'expectation_file': {
             e: {
@@ -759,7 +725,7 @@ class TestExpectationMapAddGroupedResultsUnittest(unittest.TestCase):
         grouped_results, 'builder', None)
     self.assertEqual(matched_results, set([r]))
     stats = data_types.BuildStats()
-    stats.AddFailedBuild('build_id', frozenset(['win', 'win10']))
+    stats.AddFailedBuild('build_id')
     expected_expectation_map = {
         'expectation_file': {
             e: {
@@ -777,7 +743,7 @@ class TestExpectationMapAddGroupedResultsUnittest(unittest.TestCase):
                           'pixel_tests', 'build_id')
     e = data_types.Expectation('some/test/*', ['win10'], 'Failure')
     stats = data_types.BuildStats()
-    stats.AddFailedBuild('build_id', frozenset(['win', 'win10']))
+    stats.AddFailedBuild('build_id')
     expectation_map = data_types.TestExpectationMap({
         'expectation_file':
         data_types.ExpectationBuilderMap({
@@ -797,8 +763,8 @@ class TestExpectationMapAddGroupedResultsUnittest(unittest.TestCase):
         grouped_results, 'builder', None)
     self.assertEqual(matched_results, set([r]))
     stats = data_types.BuildStats()
-    stats.AddFailedBuild('build_id', frozenset(['win', 'win10']))
-    stats.AddPassedBuild(frozenset(['win', 'win10']))
+    stats.AddFailedBuild('build_id')
+    stats.AddPassedBuild()
     expected_expectation_map = {
         'expectation_file': {
             e: {
@@ -816,7 +782,7 @@ class TestExpectationMapAddGroupedResultsUnittest(unittest.TestCase):
                           'pixel_tests', 'build_id')
     e = data_types.Expectation('some/test/*', ['win10'], 'Failure')
     stats = data_types.BuildStats()
-    stats.AddPassedBuild(frozenset(['win', 'win10']))
+    stats.AddPassedBuild()
     expectation_map = data_types.TestExpectationMap({
         'expectation_file':
         data_types.ExpectationBuilderMap({
@@ -836,8 +802,8 @@ class TestExpectationMapAddGroupedResultsUnittest(unittest.TestCase):
         grouped_results, 'builder', None)
     self.assertEqual(matched_results, set([r]))
     stats = data_types.BuildStats()
-    stats.AddFailedBuild('build_id', frozenset(['win', 'win10']))
-    stats.AddPassedBuild(frozenset(['win', 'win10']))
+    stats.AddFailedBuild('build_id')
+    stats.AddPassedBuild()
     expected_expectation_map = {
         'expectation_file': {
             e: {
@@ -869,7 +835,7 @@ class TestExpectationMapAddGroupedResultsUnittest(unittest.TestCase):
         grouped_results, 'builder', None)
     self.assertEqual(matched_results, set([r]))
     stats = data_types.BuildStats()
-    stats.AddPassedBuild(frozenset(['win', 'win10']))
+    stats.AddPassedBuild()
     expected_expectation_map = {
         'expectation_file': {
             e: {
@@ -924,7 +890,7 @@ class TestExpectationMapAddGroupedResultsUnittest(unittest.TestCase):
         grouped_results, 'builder', ['bar_expectations'])
     self.assertEqual(matched_results, set([r]))
     stats = data_types.BuildStats()
-    stats.AddPassedBuild(frozenset(['win']))
+    stats.AddPassedBuild()
     expected_expectation_map = {
         'foo_expectations': {
             e: {},
@@ -973,10 +939,10 @@ class TestExpectationMapAddGroupedResultsUnittest(unittest.TestCase):
         grouped_results, 'builder', None)
     self.assertEqual(matched_results, set([r1, r2, r3]))
     stats1 = data_types.BuildStats()
-    stats1.AddPassedBuild(frozenset(['win']))
-    stats1.AddPassedBuild(frozenset(['linux']))
+    stats1.AddPassedBuild()
+    stats1.AddPassedBuild()
     stats2 = data_types.BuildStats()
-    stats2.AddPassedBuild(frozenset(['win']))
+    stats2.AddPassedBuild()
     expected_expectation_map = {
         'expectation_file': {
             e1: {

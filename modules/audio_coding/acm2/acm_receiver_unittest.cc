@@ -13,7 +13,6 @@
 #include <algorithm>  // std::min
 #include <memory>
 
-#include "absl/types/optional.h"
 #include "api/audio_codecs/builtin_audio_decoder_factory.h"
 #include "api/audio_codecs/builtin_audio_encoder_factory.h"
 #include "modules/audio_coding/codecs/cng/audio_encoder_cng.h"
@@ -44,10 +43,11 @@ class AcmReceiverTestOldApi : public AudioPacketizationCallback,
   ~AcmReceiverTestOldApi() {}
 
   void SetUp() override {
-    acm_ = AudioCodingModule::Create();
+    acm_.reset(AudioCodingModule::Create(config_));
     receiver_.reset(new AcmReceiver(config_));
     ASSERT_TRUE(receiver_.get() != NULL);
     ASSERT_TRUE(acm_.get() != NULL);
+    acm_->InitializeReceiver();
     acm_->RegisterTransportCallback(this);
 
     rtp_header_.sequenceNumber = 0;
@@ -64,14 +64,12 @@ class AcmReceiverTestOldApi : public AudioPacketizationCallback,
                             const SdpAudioFormat& format,
                             const std::map<int, int> cng_payload_types = {}) {
     // Create the speech encoder.
-    absl::optional<AudioCodecInfo> info =
-        encoder_factory_->QueryAudioEncoder(format);
-    RTC_CHECK(info.has_value());
+    AudioCodecInfo info = encoder_factory_->QueryAudioEncoder(format).value();
     std::unique_ptr<AudioEncoder> enc =
         encoder_factory_->MakeAudioEncoder(payload_type, format, absl::nullopt);
 
     // If we have a compatible CN specification, stack a CNG on top.
-    auto it = cng_payload_types.find(info->sample_rate_hz);
+    auto it = cng_payload_types.find(info.sample_rate_hz);
     if (it != cng_payload_types.end()) {
       AudioEncoderCngConfig config;
       config.speech_encoder = std::move(enc);
@@ -83,7 +81,7 @@ class AcmReceiverTestOldApi : public AudioPacketizationCallback,
 
     // Actually start using the new encoder.
     acm_->SetEncoder(std::move(enc));
-    return *info;
+    return info;
   }
 
   int InsertOnePacketOfSilence(const AudioCodecInfo& info) {
@@ -134,7 +132,7 @@ class AcmReceiverTestOldApi : public AudioPacketizationCallback,
       CreateBuiltinAudioEncoderFactory();
   const rtc::scoped_refptr<AudioDecoderFactory> decoder_factory_ =
       CreateBuiltinAudioDecoderFactory();
-  acm2::AcmReceiver::Config config_;
+  AudioCodingModule::Config config_;
   std::unique_ptr<AcmReceiver> receiver_;
   std::unique_ptr<AudioCodingModule> acm_;
   RTPHeader rtp_header_;
@@ -150,7 +148,8 @@ class AcmReceiverTestOldApi : public AudioPacketizationCallback,
 #define MAYBE_SampleRate SampleRate
 #endif
 TEST_F(AcmReceiverTestOldApi, MAYBE_SampleRate) {
-  const std::map<int, SdpAudioFormat> codecs = {{0, {"OPUS", 48000, 2}}};
+  const std::map<int, SdpAudioFormat> codecs = {{0, {"ISAC", 16000, 1}},
+                                                {1, {"ISAC", 32000, 1}}};
   receiver_->SetCodecs(codecs);
 
   constexpr int kOutSampleRateHz = 8000;  // Different than codec sample rate.
@@ -234,6 +233,15 @@ TEST_F(AcmReceiverTestFaxModeOldApi, MAYBE_VerifyAudioFramePCMU) {
 }
 
 #if defined(WEBRTC_ANDROID)
+#define MAYBE_VerifyAudioFrameISAC DISABLED_VerifyAudioFrameISAC
+#else
+#define MAYBE_VerifyAudioFrameISAC VerifyAudioFrameISAC
+#endif
+TEST_F(AcmReceiverTestFaxModeOldApi, MAYBE_VerifyAudioFrameISAC) {
+  RunVerifyAudioFrame({"ISAC", 16000, 1});
+}
+
+#if defined(WEBRTC_ANDROID)
 #define MAYBE_VerifyAudioFrameOpus DISABLED_VerifyAudioFrameOpus
 #else
 #define MAYBE_VerifyAudioFrameOpus VerifyAudioFrameOpus
@@ -302,10 +310,12 @@ TEST_F(AcmReceiverTestPostDecodeVadPassiveOldApi, MAYBE_PostdecodingVad) {
 #else
 #define MAYBE_LastAudioCodec LastAudioCodec
 #endif
-#if defined(WEBRTC_CODEC_OPUS)
+#if defined(WEBRTC_CODEC_ISAC)
 TEST_F(AcmReceiverTestOldApi, MAYBE_LastAudioCodec) {
-  const std::map<int, SdpAudioFormat> codecs = {
-      {0, {"PCMU", 8000, 1}}, {1, {"PCMA", 8000, 1}}, {2, {"L16", 32000, 1}}};
+  const std::map<int, SdpAudioFormat> codecs = {{0, {"ISAC", 16000, 1}},
+                                                {1, {"PCMA", 8000, 1}},
+                                                {2, {"ISAC", 32000, 1}},
+                                                {3, {"L16", 32000, 1}}};
   const std::map<int, int> cng_payload_types = {
       {8000, 100}, {16000, 101}, {32000, 102}};
   {
@@ -382,24 +392,6 @@ TEST_F(AcmReceiverTestOldApi, MAYBE_InitializedToZero) {
   EXPECT_EQ(0, stats.decoded_muted_output);
 }
 
-#if defined(WEBRTC_ANDROID)
-#define MAYBE_VerifyOutputFrame DISABLED_VerifyOutputFrame
-#else
-#define MAYBE_VerifyOutputFrame VerifyOutputFrame
-#endif
-TEST_F(AcmReceiverTestOldApi, MAYBE_VerifyOutputFrame) {
-  AudioFrame audio_frame;
-  const int kSampleRateHz = 32000;
-  bool muted;
-  EXPECT_EQ(0, receiver_->GetAudio(kSampleRateHz, &audio_frame, &muted));
-  ASSERT_FALSE(muted);
-  EXPECT_EQ(0u, audio_frame.timestamp_);
-  EXPECT_GT(audio_frame.num_channels_, 0u);
-  EXPECT_EQ(static_cast<size_t>(kSampleRateHz / 100),
-            audio_frame.samples_per_channel_);
-  EXPECT_EQ(kSampleRateHz, audio_frame.sample_rate_hz_);
-}
-
 // Insert some packets and pull audio. Check statistics are valid. Then,
 // simulate packet loss and check if PLC and PLC-to-CNG statistics are
 // correctly updated.
@@ -429,6 +421,7 @@ TEST_F(AcmReceiverTestOldApi, MAYBE_NetEqCalls) {
   rtp_header.markerBit = false;
   rtp_header.ssrc = 0x1234;
   rtp_header.numCSRCs = 0;
+  rtp_header.payload_type_frequency = kSampleRateHz;
 
   for (int num_calls = 0; num_calls < kNumNormalCalls; ++num_calls) {
     const uint8_t kPayload[kPayloadSizeBytes] = {0};

@@ -68,17 +68,17 @@ void VideoQualityMetricsReporter::OnStatsReports(
   const RTCIceCandidatePairStats ice_candidate_pair_stats =
       report->Get(selected_ice_id)->cast_to<const RTCIceCandidatePairStats>();
 
-  auto outbound_rtp_stats = report->GetStatsOfType<RTCOutboundRtpStreamStats>();
+  auto outbound_rtp_stats = report->GetStatsOfType<RTCOutboundRTPStreamStats>();
   StatsSample sample;
   for (auto& s : outbound_rtp_stats) {
     if (!s->kind.is_defined()) {
       continue;
     }
-    if (!(*s->kind == "video")) {
+    if (!(*s->kind == RTCMediaStreamTrackKind::kVideo)) {
       continue;
     }
-    if (s->timestamp() > sample.sample_time) {
-      sample.sample_time = s->timestamp();
+    if (s->timestamp_us() > sample.sample_time.us()) {
+      sample.sample_time = Timestamp::Micros(s->timestamp_us());
     }
     sample.retransmitted_bytes_sent +=
         DataSize::Bytes(s->retransmitted_bytes_sent.ValueOrDefault(0ul));
@@ -136,10 +136,8 @@ void VideoQualityMetricsReporter::ReportVideoBweResults(
     const std::string& peer_name,
     const VideoBweStats& video_bwe_stats) {
   std::string test_case_name = GetTestCaseName(peer_name);
-  // TODO(bugs.webrtc.org/14757): Remove kExperimentalTestNameMetadataKey.
   std::map<std::string, std::string> metric_metadata{
-      {MetricMetadataKey::kPeerMetadataKey, peer_name},
-      {MetricMetadataKey::kExperimentalTestNameMetadataKey, test_case_name_}};
+      {MetricMetadataKey::kPeerMetadataKey, peer_name}};
 
   metrics_logger_->LogMetric(
       "available_send_bandwidth", test_case_name,

@@ -11,8 +11,6 @@ import argparse
 import sys
 
 from util import build_utils
-import action_helpers
-import zip_helpers
 
 
 def main(argv):
@@ -34,8 +32,7 @@ def main(argv):
     build_utils.CheckOutput([options.flatc, '-j', '-o', temp_dir] +
                             import_args + options.flatbuffers)
 
-    with action_helpers.atomic_output(options.srcjar) as f:
-      zip_helpers.zip_directory(f, temp_dir)
+    build_utils.ZipDir(options.srcjar, temp_dir)
 
 
 if __name__ == '__main__':

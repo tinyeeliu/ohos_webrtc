@@ -4,6 +4,7 @@
 
 """The 'grit android2grd' tool."""
 
+from __future__ import print_function
 
 import getopt
 import os.path
@@ -11,7 +12,8 @@ import sys
 from xml.dom import Node
 import xml.dom.minidom
 
-from io import StringIO
+import six
+from six import StringIO
 
 import grit.node.empty
 from grit.node import node_io
@@ -174,7 +176,7 @@ OPTIONS may be any of the following:
 
     # Do the hard work -- convert the Android dom to grd file contents.
     grd_dom = self.AndroidDomToGrdDom(android_dom)
-    grd_string = str(grd_dom)
+    grd_string = six.text_type(grd_dom)
 
     # Write the grd string to a file in grd_dir.
     grd_filename = self.name + '.grd'
@@ -404,7 +406,7 @@ OPTIONS may be any of the following:
     xtb_file = os.path.normpath(os.path.join(
         self.xtb_dir, '%s_%s.xtb' % (self.name, lang)))
     fnode = node_io.FileNode()
-    fnode.StartParsing('file', translations_node)
+    fnode.StartParsing(u'file', translations_node)
     fnode.HandleAttribute('path', xtb_file)
     fnode.HandleAttribute('lang', lang)
     fnode.EndParsing()
@@ -415,11 +417,11 @@ OPTIONS may be any of the following:
     """Creates the <output> element corresponding to the generated c header."""
     header_file_name = os.path.join(header_dir, self.name + '.h')
     header_node = node_io.OutputNode()
-    header_node.StartParsing('output', outputs_node)
+    header_node.StartParsing(u'output', outputs_node)
     header_node.HandleAttribute('filename', header_file_name)
     header_node.HandleAttribute('type', 'rc_header')
     emit_node = node_io.EmitNode()
-    emit_node.StartParsing('emit', header_node)
+    emit_node.StartParsing(u'emit', header_node)
     emit_node.HandleAttribute('emit_type', 'prepend')
     emit_node.EndParsing()
     header_node.AddChild(emit_node)
@@ -432,7 +434,7 @@ OPTIONS may be any of the following:
     rc_file_name = self.name + '_' + lang + ".rc"
     rc_path = os.path.join(rc_dir, rc_file_name)
     node = node_io.OutputNode()
-    node.StartParsing('output', outputs_node)
+    node.StartParsing(u'output', outputs_node)
     node.HandleAttribute('filename', rc_path)
     node.HandleAttribute('lang', lang)
     node.HandleAttribute('type', 'rc_all')
@@ -460,7 +462,7 @@ OPTIONS may be any of the following:
         xml_res_dir, values, 'strings.xml'))
 
     node = node_io.OutputNode()
-    node.StartParsing('output', outputs_node)
+    node.StartParsing(u'output', outputs_node)
     node.HandleAttribute('filename', xml_path)
     node.HandleAttribute('lang', locale)
     node.HandleAttribute('type', 'android')

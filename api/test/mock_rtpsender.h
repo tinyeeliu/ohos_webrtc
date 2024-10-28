@@ -46,10 +46,6 @@ class MockRtpSender : public RtpSenderInterface {
               (const, override));
   MOCK_METHOD(RtpParameters, GetParameters, (), (const, override));
   MOCK_METHOD(RTCError, SetParameters, (const RtpParameters&), (override));
-  MOCK_METHOD(void,
-              SetParametersAsync,
-              (const RtpParameters&, SetParametersCallback),
-              (override));
   MOCK_METHOD(rtc::scoped_refptr<DtmfSenderInterface>,
               GetDtmfSender,
               (),

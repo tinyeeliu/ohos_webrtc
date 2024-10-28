@@ -12,7 +12,6 @@
 #define SDK_ANDROID_NATIVE_API_CODECS_WRAPPER_H_
 
 #include <jni.h>
-
 #include <memory>
 #include <vector>
 

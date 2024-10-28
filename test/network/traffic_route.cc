@@ -32,7 +32,9 @@ class ActionReceiver : public EmulatedNetworkReceiverInterface {
   explicit ActionReceiver(std::function<void()> action) : action_(action) {}
   ~ActionReceiver() override = default;
 
-  void OnPacketReceived(EmulatedIpPacket packet) override { action_(); }
+  void OnPacketReceived(EmulatedIpPacket packet) override {
+    action_();
+  }
 
  private:
   std::function<void()> action_;

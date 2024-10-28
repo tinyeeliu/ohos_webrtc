@@ -15,22 +15,24 @@ namespace ap = test::api::additional_properties;
 TEST(JsonSchemaCompilerAdditionalPropertiesTest,
     AdditionalPropertiesTypePopulate) {
   {
-    base::Value::List list_value;
+    base::Value list_value(base::Value::Type::LIST);
     list_value.Append("asdf");
     list_value.Append(4);
-    base::Value::Dict type_value;
-    type_value.Set("string", "value");
-    type_value.Set("other", 9);
-    type_value.Set("another", std::move(list_value));
-    auto type = ap::AdditionalPropertiesType::FromValue(type_value);
-    ASSERT_TRUE(type);
+    base::Value type_value(base::Value::Type::DICTIONARY);
+    type_value.SetStringPath("string", "value");
+    type_value.SetIntPath("other", 9);
+    type_value.SetKey("another", std::move(list_value));
+    auto type = std::make_unique<ap::AdditionalPropertiesType>();
+    ASSERT_TRUE(ap::AdditionalPropertiesType::Populate(type_value, type.get()));
     EXPECT_EQ(type->additional_properties, type_value);
   }
   {
     base::Value::Dict type_dict;
     type_dict.Set("string", 3);
-    auto type = ap::AdditionalPropertiesType::FromValue(type_dict);
-    EXPECT_FALSE(type);
+    base::Value type_value(std::move(type_dict));
+    auto type = std::make_unique<ap::AdditionalPropertiesType>();
+    EXPECT_FALSE(
+        ap::AdditionalPropertiesType::Populate(type_value, type.get()));
   }
 }
 
@@ -42,9 +44,9 @@ TEST(JsonSchemaCompilerAdditionalPropertiesTest,
   base::Value param_object_value(std::move(param_object_dict));
   base::Value::List params_value;
   params_value.Append(param_object_value.Clone());
-  std::optional<ap::AdditionalProperties::Params> params(
+  std::unique_ptr<ap::AdditionalProperties::Params> params(
       ap::AdditionalProperties::Params::Create(params_value));
-  EXPECT_TRUE(params.has_value());
+  EXPECT_TRUE(params.get());
   EXPECT_EQ(params->param_object.additional_properties, param_object_value);
 }
 
@@ -56,9 +58,9 @@ TEST(JsonSchemaCompilerAdditionalPropertiesTest,
 
   base::Value::List expected;
   {
-    base::Value::Dict dict;
-    dict.Set("integer", 5);
-    dict.Set("key", "value");
+    base::Value dict(base::Value::Type::DICTIONARY);
+    dict.SetIntKey("integer", 5);
+    dict.SetStringKey("key", "value");
     expected.Append(std::move(dict));
   }
 

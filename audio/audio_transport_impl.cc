@@ -107,35 +107,35 @@ AudioTransportImpl::~AudioTransportImpl() {}
 
 int32_t AudioTransportImpl::RecordedDataIsAvailable(
     const void* audio_data,
-    size_t number_of_frames,
-    size_t bytes_per_sample,
-    size_t number_of_channels,
-    uint32_t sample_rate,
-    uint32_t audio_delay_milliseconds,
-    int32_t clock_drift,
-    uint32_t volume,
-    bool key_pressed,
+    const size_t number_of_frames,
+    const size_t bytes_per_sample,
+    const size_t number_of_channels,
+    const uint32_t sample_rate,
+    const uint32_t audio_delay_milliseconds,
+    const int32_t clock_drift,
+    const uint32_t volume,
+    const bool key_pressed,
     uint32_t& new_mic_volume) {  // NOLINT: to avoid changing APIs
   return RecordedDataIsAvailable(
       audio_data, number_of_frames, bytes_per_sample, number_of_channels,
       sample_rate, audio_delay_milliseconds, clock_drift, volume, key_pressed,
-      new_mic_volume, /*estimated_capture_time_ns=*/absl::nullopt);
+      new_mic_volume, /* estimated_capture_time_ns */ 0);
 }
 
 // Not used in Chromium. Process captured audio and distribute to all sending
 // streams, and try to do this at the lowest possible sample rate.
 int32_t AudioTransportImpl::RecordedDataIsAvailable(
     const void* audio_data,
-    size_t number_of_frames,
-    size_t bytes_per_sample,
-    size_t number_of_channels,
-    uint32_t sample_rate,
-    uint32_t audio_delay_milliseconds,
-    int32_t /*clock_drift*/,
-    uint32_t /*volume*/,
-    bool key_pressed,
+    const size_t number_of_frames,
+    const size_t bytes_per_sample,
+    const size_t number_of_channels,
+    const uint32_t sample_rate,
+    const uint32_t audio_delay_milliseconds,
+    const int32_t /*clock_drift*/,
+    const uint32_t /*volume*/,
+    const bool key_pressed,
     uint32_t& /*new_mic_volume*/,
-    absl::optional<int64_t>
+    const int64_t
         estimated_capture_time_ns) {  // NOLINT: to avoid changing APIs
   RTC_DCHECK(audio_data);
   RTC_DCHECK_GE(number_of_channels, 1);
@@ -166,11 +166,8 @@ int32_t AudioTransportImpl::RecordedDataIsAvailable(
   ProcessCaptureFrame(audio_delay_milliseconds, key_pressed,
                       swap_stereo_channels, audio_processing_,
                       audio_frame.get());
-
-  if (estimated_capture_time_ns) {
-    audio_frame->set_absolute_capture_timestamp_ms(*estimated_capture_time_ns /
-                                                   1000000);
-  }
+  audio_frame->set_absolute_capture_timestamp_ms(estimated_capture_time_ns /
+                                                 1000000);
 
   RTC_DCHECK_GT(audio_frame->samples_per_channel_, 0);
   if (async_audio_processing_)

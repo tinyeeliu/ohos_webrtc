@@ -9,6 +9,8 @@ import json
 import logging
 import time
 
+import six
+
 from pylib.base import base_test_result
 
 def GenerateResultsDict(test_run_results, global_tags=None):
@@ -93,14 +95,14 @@ def GenerateResultsDict(test_run_results, global_tags=None):
       result_dict = {
           'status': r.GetType(),
           'elapsed_time_ms': r.GetDuration(),
-          'output_snippet': r.GetLog(),
+          'output_snippet': six.ensure_text(r.GetLog(), errors='replace'),
           'losless_snippet': True,
           'output_snippet_base64': '',
           'links': r.GetLinks(),
       }
       iteration_data[r.GetName()].append(result_dict)
 
-    all_tests = all_tests.union(set(iteration_data.keys()))
+    all_tests = all_tests.union(set(six.iterkeys(iteration_data)))
     per_iteration_data.append(iteration_data)
 
   return {
@@ -227,7 +229,7 @@ def ParseResultsFromJson(json_results):
   results_list = []
   testsuite_runs = json_results['per_iteration_data']
   for testsuite_run in testsuite_runs:
-    for test, test_runs in testsuite_run.items():
+    for test, test_runs in six.iteritems(testsuite_run):
       results_list.extend(
           [base_test_result.BaseTestResult(test,
                                            string_as_status(tr['status']),

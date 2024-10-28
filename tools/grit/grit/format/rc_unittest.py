@@ -5,15 +5,18 @@
 
 '''Unit tests for grit.format.rc'''
 
-import io
+from __future__ import print_function
+
 import os
 import re
 import sys
+if __name__ == '__main__':
+  sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
+
 import tempfile
 import unittest
 
-if __name__ == '__main__':
-  sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
+from six import StringIO
 
 from grit import grd_reader
 from grit import util
@@ -31,7 +34,7 @@ _PREAMBLE = '''\
 '''
 
 
-class DummyOutput:
+class DummyOutput(object):
   def __init__(self, type, language, file = 'hello.gif'):
     self.type = type
     self.language = language
@@ -48,10 +51,6 @@ class DummyOutput:
 
 
 class FormatRcUnittest(unittest.TestCase):
-  @classmethod
-  def setUpClass(cls):
-    os.environ["root_gen_dir"] = "gen"
-
   def testMessages(self):
     root = util.ParseGrdForUnittest("""
       <messages>
@@ -70,10 +69,10 @@ Sting sting
       </messages>
       """)
 
-    buf = io.StringIO()
+    buf = StringIO()
     build.RcBuilder.ProcessNode(root, DummyOutput('rc_all', 'en'), buf)
     output = util.StripBlankLinesAndComments(buf.getvalue())
-    self.assertEqual(_PREAMBLE + '''\
+    self.assertEqual(_PREAMBLE + u'''\
 STRINGTABLE
 BEGIN
   IDS_BTN_GO      "Go!"
@@ -92,10 +91,10 @@ END''', output)
     root.SetOutputLanguage('en')
     root.RunGatherers()
 
-    buf = io.StringIO()
+    buf = StringIO()
     build.RcBuilder.ProcessNode(root, DummyOutput('rc_all', 'en'), buf)
     output = util.StripBlankLinesAndComments(buf.getvalue())
-    expected = _PREAMBLE + '''\
+    expected = _PREAMBLE + u'''\
 IDC_KLONKMENU MENU
 BEGIN
     POPUP "&File"
@@ -169,12 +168,12 @@ END'''.strip()
       </structures>''', base_dir = '/temp')
     # We do not run gatherers as it is not needed and wouldn't find the file
 
-    buf = io.StringIO()
+    buf = StringIO()
     build.RcBuilder.ProcessNode(root, DummyOutput('rc_all', 'en'), buf)
     output = util.StripBlankLinesAndComments(buf.getvalue())
     expected = (_PREAMBLE +
-                'IDR_HTML           HTML               "%s"\n'
-                'IDR_HTML2          HTML               "%s"'
+                u'IDR_HTML           HTML               "%s"\n'
+                u'IDR_HTML2          HTML               "%s"'
                 % (util.normpath('/temp/bingo.html').replace('\\', '\\\\'),
                    util.normpath('/temp/bingo2.html').replace('\\', '\\\\')))
     # hackety hack to work on win32&lin
@@ -188,12 +187,12 @@ END'''.strip()
         <include type="TXT" name="TEXT_TWO" file="bingo2.txt"  filenameonly="true" />
       </includes>''', base_dir = '/temp')
 
-    buf = io.StringIO()
+    buf = StringIO()
     build.RcBuilder.ProcessNode(root, DummyOutput('rc_all', 'en'), buf)
     output = util.StripBlankLinesAndComments(buf.getvalue())
     expected = (_PREAMBLE +
-                'TEXT_ONE           TXT                "%s"\n'
-                'TEXT_TWO           TXT                "%s"'
+                u'TEXT_ONE           TXT                "%s"\n'
+                u'TEXT_TWO           TXT                "%s"'
                 % (util.normpath('/temp/bingo.txt').replace('\\', '\\\\'),
                    'bingo2.txt'))
     # hackety hack to work on win32&lin
@@ -208,13 +207,13 @@ END'''.strip()
         <include name="HTML_FILE1" flattenhtml="true" file="%s" type="BINDATA" />
       </includes>''' % input_file)
 
-    buf = io.StringIO()
+    buf = StringIO()
     build.RcBuilder.ProcessNode(root, DummyOutput('rc_all', 'en', output_file),
                                 buf)
     output = util.StripBlankLinesAndComments(buf.getvalue())
 
     expected = (_PREAMBLE +
-        'HTML_FILE1         BINDATA            "HTML_FILE1_include_test.html"')
+        u'HTML_FILE1         BINDATA            "HTML_FILE1_include_test.html"')
     # hackety hack to work on win32&lin
     output = re.sub(r'"[c-zC-Z]:', '"', output)
     self.assertEqual(expected, output)
@@ -222,19 +221,19 @@ END'''.strip()
     file_contents = util.ReadFile(output_file, 'utf-8')
 
     # Check for the content added by the <include> tag.
-    self.assertTrue(file_contents.find('Hello Include!') != -1)
+    self.failUnless(file_contents.find('Hello Include!') != -1)
     # Check for the content that was removed by if tag.
-    self.assertTrue(file_contents.find('should be removed') == -1)
+    self.failUnless(file_contents.find('should be removed') == -1)
     # Check for the content that was kept in place by if.
-    self.assertTrue(file_contents.find('should be kept') != -1)
-    self.assertTrue(file_contents.find('in the middle...') != -1)
-    self.assertTrue(file_contents.find('at the end...') != -1)
+    self.failUnless(file_contents.find('should be kept') != -1)
+    self.failUnless(file_contents.find('in the middle...') != -1)
+    self.failUnless(file_contents.find('at the end...') != -1)
     # Check for nested content that was kept
-    self.assertTrue(file_contents.find('nested true should be kept') != -1)
-    self.assertTrue(file_contents.find('silbing true should be kept') != -1)
+    self.failUnless(file_contents.find('nested true should be kept') != -1)
+    self.failUnless(file_contents.find('silbing true should be kept') != -1)
     # Check for removed "<if>" and "</if>" tags.
-    self.assertTrue(file_contents.find('<if expr=') == -1)
-    self.assertTrue(file_contents.find('</if>') == -1)
+    self.failUnless(file_contents.find('<if expr=') == -1)
+    self.failUnless(file_contents.find('</if>') == -1)
     os.remove(output_file)
 
   def testStructureNodeOutputfile(self):
@@ -251,14 +250,14 @@ END'''.strip()
 
     output_dir = tempfile.gettempdir()
     en_file = struct.FileForLanguage('en', output_dir)
-    self.assertTrue(en_file == input_file)
+    self.failUnless(en_file == input_file)
     fr_file = struct.FileForLanguage('fr', output_dir)
-    self.assertTrue(fr_file == os.path.join(output_dir, 'fr_simple.html'))
+    self.failUnless(fr_file == os.path.join(output_dir, 'fr_simple.html'))
 
     contents = util.ReadFile(fr_file, 'utf-8')
 
-    self.assertTrue(contents.find('<p>') != -1)  # should contain the markup
-    self.assertTrue(contents.find('Hello!') == -1)  # should be translated
+    self.failUnless(contents.find('<p>') != -1)  # should contain the markup
+    self.failUnless(contents.find('Hello!') == -1)  # should be translated
     os.remove(fr_file)
 
   def testChromeHtmlNodeOutputfile(self):
@@ -275,12 +274,12 @@ END'''.strip()
     root.SetOutputLanguage('en')
     root.RunGatherers()
 
-    buf = io.StringIO()
+    buf = StringIO()
     build.RcBuilder.ProcessNode(root, DummyOutput('rc_all', 'en', output_file),
                                 buf)
     output = util.StripBlankLinesAndComments(buf.getvalue())
     expected = (_PREAMBLE +
-        'HTML_FILE1         BINDATA            "HTML_FILE1_chrome_html.html"')
+        u'HTML_FILE1         BINDATA            "HTML_FILE1_chrome_html.html"')
     # hackety hack to work on win32&lin
     output = re.sub(r'"[c-zC-Z]:', '"', output)
     self.assertEqual(expected, output)
@@ -288,15 +287,14 @@ END'''.strip()
     file_contents = util.ReadFile(output_file, 'utf-8')
 
     # Check for the content added by the <include> tag.
-    self.assertTrue(file_contents.find('Hello Include!') != -1)
-    # Check for inserted image-set.
-    self.assertTrue(file_contents.find('content: image-set') != -1)
+    self.failUnless(file_contents.find('Hello Include!') != -1)
+    # Check for inserted -webkit-image-set.
+    self.failUnless(file_contents.find('content: -webkit-image-set') != -1)
     os.remove(output_file)
 
   def testSubstitutionHtml(self):
     input_file = util.PathFromRoot('grit/testdata/toolbar_about.html')
-    root = grd_reader.Parse(
-        io.StringIO('''<?xml version="1.0" encoding="UTF-8"?>
+    root = grd_reader.Parse(StringIO('''<?xml version="1.0" encoding="UTF-8"?>
       <grit latest_public_release="2" source_lang_id="en-US" current_release="3" base_dir=".">
         <release seq="1" allow_pseudo="False">
           <structures fallback_to_english="True">
@@ -313,12 +311,12 @@ END'''.strip()
     output_dir = tempfile.gettempdir()
     struct, = root.GetChildrenOfType(structure.StructureNode)
     ar_file = struct.FileForLanguage('ar', output_dir)
-    self.assertTrue(ar_file == os.path.join(output_dir,
+    self.failUnless(ar_file == os.path.join(output_dir,
                                             'ar_toolbar_about.html'))
 
     contents = util.ReadFile(ar_file, 'utf-8')
 
-    self.assertTrue(contents.find('dir="RTL"') != -1)
+    self.failUnless(contents.find('dir="RTL"') != -1)
     os.remove(ar_file)
 
   def testFallbackToEnglish(self):
@@ -329,7 +327,7 @@ END'''.strip()
     root.SetOutputLanguage('en')
     root.RunGatherers()
 
-    buf = io.StringIO()
+    buf = StringIO()
     formatter = build.RcBuilder.ProcessNode(
         root, DummyOutput('rc_all', 'bingobongo'), buf)
     output = util.StripBlankLinesAndComments(buf.getvalue())
@@ -350,8 +348,7 @@ END''', output)
 
 
   def testSubstitutionRc(self):
-    root = grd_reader.Parse(
-        io.StringIO(r'''<?xml version="1.0" encoding="UTF-8"?>
+    root = grd_reader.Parse(StringIO(r'''<?xml version="1.0" encoding="UTF-8"?>
     <grit latest_public_release="2" source_lang_id="en-US" current_release="3"
           base_dir=".">
       <outputs>
@@ -374,7 +371,7 @@ END''', output)
     root.SetOutputLanguage('en')
     root.RunGatherers()
 
-    buf = io.StringIO()
+    buf = StringIO()
     build.RcBuilder.ProcessNode(root, DummyOutput('rc_all', 'en'), buf)
     output = buf.getvalue()
     self.assertEqual('''

@@ -5,16 +5,20 @@
 '''Utilities used by GRIT.
 '''
 
+from __future__ import print_function
+
 import codecs
-import html.entities
 import io
 import os
 import re
 import shutil
 import sys
 import tempfile
-
 from xml.sax import saxutils
+
+import six
+from six import StringIO
+from six.moves import html_entities as entities
 
 from grit import lazy_re
 
@@ -207,7 +211,7 @@ def ReadFile(filename, encoding):
   else:
     mode = 'r'
 
-  with open(filename, mode, encoding=encoding) as f:
+  with io.open(filename, mode, encoding=encoding) as f:
     return f.read()
 
 
@@ -220,7 +224,7 @@ def WrapOutputStream(stream, encoding = 'utf-8'):
 def ChangeStdoutEncoding(encoding = 'utf-8'):
   '''Changes STDOUT to print characters using the specified encoding.'''
   # If we're unittesting, don't reconfigure.
-  if isinstance(sys.stdout, io.StringIO):
+  if isinstance(sys.stdout, StringIO):
     return
 
   if sys.version_info.major < 3:
@@ -266,16 +270,16 @@ def UnescapeHtml(text, replace_nbsp=True):
   def Replace(match):
     groups = match.groupdict()
     if groups['hex']:
-      return chr(int(groups['hex'], 16))
+      return six.unichr(int(groups['hex'], 16))
     elif groups['decimal']:
-      return chr(int(groups['decimal'], 10))
+      return six.unichr(int(groups['decimal'], 10))
     else:
       name = groups['named']
       if name == 'nbsp' and not replace_nbsp:
         return match.group()  # Don't replace &nbsp;
       assert name != None
-      if name in html.entities.name2codepoint:
-        return chr(html.entities.name2codepoint[name])
+      if name in entities.name2codepoint:
+        return six.unichr(entities.name2codepoint[name])
       else:
         return match.group()  # Unknown HTML character entity - don't replace
 
@@ -343,7 +347,7 @@ def ParseGrdForUnittest(body, base_dir=None, predetermined_ids_file=None,
     base_dir: The base_dir attribute of the <grit> tag.
   '''
   from grit import grd_reader
-  if isinstance(body, str):
+  if isinstance(body, six.text_type):
     body = body.encode('utf-8')
   if base_dir is None:
     base_dir = PathFromRoot('.')
@@ -527,7 +531,7 @@ def ParseDefine(define):
   return (name, val)
 
 
-class Substituter:
+class Substituter(object):
   '''Finds and substitutes variable names in text strings.
 
   Given a dictionary of variable names and values, prepares to
@@ -644,7 +648,7 @@ class Substituter:
       return msg
 
 
-class TempDir:
+class TempDir(object):
   '''Creates files with the specified contents in a temporary directory,
   for unit testing.
   '''
@@ -677,7 +681,7 @@ class TempDir:
   def AsCurrentDir(self):
     return self._AsCurrentDirClass(self.GetPath())
 
-  class _AsCurrentDirClass:
+  class _AsCurrentDirClass(object):
     def __init__(self, path):
       self.path = path
     def __enter__(self):

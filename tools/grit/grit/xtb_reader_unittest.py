@@ -5,6 +5,7 @@
 
 '''Unit tests for grit.xtb_reader'''
 
+from __future__ import print_function
 
 import io
 import os
@@ -39,10 +40,10 @@ and another after a blank line.</translation>
     def Callback(id, structure):
       messages.append((id, structure))
     xtb_reader.Parse(xtb_file, Callback)
-    self.assertTrue(len(messages[0][1]) == 1)
-    self.assertTrue(messages[3][1][0])  # PROBLEM_REPORT placeholder
-    self.assertTrue(messages[4][0] == '7729135689895381486')
-    self.assertTrue(messages[4][1][7][1] == 'and another after a blank line.')
+    self.failUnless(len(messages[0][1]) == 1)
+    self.failUnless(messages[3][1][0])  # PROBLEM_REPORT placeholder
+    self.failUnless(messages[4][0] == '7729135689895381486')
+    self.failUnless(messages[4][1][7][1] == 'and another after a blank line.')
 
   def testParsingIntoMessages(self):
     root = util.ParseGrdForUnittest('''
@@ -70,7 +71,7 @@ and another after a blank line.</translation>
                      msgs.UberClique().GenerateXtbParserCallback('is'))
     self.assertEqual('Meirihattar!',
                      clique_mega.MessageForLanguage('is').GetRealContent())
-    self.assertTrue('Saelir %s',
+    self.failUnless('Saelir %s',
                     clique_hello_user.MessageForLanguage('is').GetRealContent())
 
   def testIfNodesWithUseNameForId(self):

@@ -20,15 +20,16 @@ class _V8LoadingBenchmark(v8_helper.V8PerfMixin, perf_benchmark.PerfBenchmark):
 
 
 @benchmark.Info(emails=[
-    'cbruni@chromium.org', 'vahl@chromium.org', 'almuthanna@chromium.org'
+    'cbruni@chromium.org', 'tmrts@chromium.org', 'almuthanna@chromium.org'
 ],
                 component='Blink>JavaScript',
                 documentation_url='https://bit.ly/system-health-v8-benchmarks')
 class V8DesktopLoadingBenchmark(_V8LoadingBenchmark):
   """See _V8BrowsingBenchmark."""
   PLATFORM = 'desktop'
-  # TODO(johnchen): Remove either the SUPPORTED_PLATFORMS or
-  # SUPPORTED_PLATFORMS_TAGS lists. Only one is necessary.
+  # TODO(rmhasan): Remove the SUPPORTED_PLATFORMS lists.
+  # SUPPORTED_PLATFORMS is deprecated, please put system specifier tags
+  # from expectations.config in SUPPORTED_PLATFORM_TAGS.
   SUPPORTED_PLATFORMS = [story.expectations.ALL_DESKTOP]
   SUPPORTED_PLATFORM_TAGS = [platforms.DESKTOP]
 
@@ -41,14 +42,16 @@ class V8DesktopLoadingBenchmark(_V8LoadingBenchmark):
 
 
 @benchmark.Info(emails=[
-    'cbruni@chromium.org', 'leszeks@chromium.org'],
+    'cbruni@chromium.org', 'leszeks@chromium.org', 'tmrts@chromium.org'
+],
                 component='Blink>JavaScript',
                 documentation_url='https://bit.ly/system-health-v8-benchmarks')
 class V8MobileLoadingBenchmark(_V8LoadingBenchmark):
   """See _V8BrowsingBenchmark."""
   PLATFORM = 'mobile'
-  # TODO(johnchen): Remove either the SUPPORTED_PLATFORMS or
-  # SUPPORTED_PLATFORMS_TAGS lists. Only one is necessary.
+  # TODO(rmhasan): Remove the SUPPORTED_PLATFORMS lists.
+  # SUPPORTED_PLATFORMS is deprecated, please put system specifier tags
+  # from expectations.config in SUPPORTED_PLATFORM_TAGS.
   SUPPORTED_PLATFORMS = [story.expectations.ALL_MOBILE]
   SUPPORTED_PLATFORM_TAGS = [platforms.MOBILE]
 

@@ -15,7 +15,6 @@
 #include <utility>
 
 #include "net/dcsctp/common/internal_types.h"
-#include "rtc_base/numerics/sequence_number_unwrapper.h"
 
 namespace dcsctp {
 
@@ -43,7 +42,7 @@ class UnwrappedSequenceNumber {
   // unwrapped ones.
   class Unwrapper {
    public:
-    Unwrapper() = default;
+    Unwrapper() : largest_(kValueLimit) {}
     Unwrapper(const Unwrapper&) = default;
     Unwrapper& operator=(const Unwrapper&) = default;
 
@@ -54,21 +53,40 @@ class UnwrappedSequenceNumber {
     // This will also update the Unwrapper's state, to track the last seen
     // largest value.
     UnwrappedSequenceNumber<WrappedType> Unwrap(WrappedType value) {
-      return UnwrappedSequenceNumber<WrappedType>(unwrapper_.Unwrap(*value));
+      WrappedType wrapped_largest =
+          static_cast<WrappedType>(largest_ % kValueLimit);
+      int64_t result = largest_ + Delta(value, wrapped_largest);
+      if (largest_ < result) {
+        largest_ = result;
+      }
+      return UnwrappedSequenceNumber<WrappedType>(result);
     }
 
     // Similar to `Unwrap`, but will not update the Unwrappers's internal state.
     UnwrappedSequenceNumber<WrappedType> PeekUnwrap(WrappedType value) const {
-      return UnwrappedSequenceNumber<WrappedType>(
-          unwrapper_.PeekUnwrap(*value));
+      WrappedType uint32_largest =
+          static_cast<WrappedType>(largest_ % kValueLimit);
+      int64_t result = largest_ + Delta(value, uint32_largest);
+      return UnwrappedSequenceNumber<WrappedType>(result);
     }
 
     // Resets the Unwrapper to its pristine state. Used when a sequence number
     // is to be reset to zero.
-    void Reset() { unwrapper_.Reset(); }
+    void Reset() { largest_ = kValueLimit; }
 
    private:
-    webrtc::SeqNumUnwrapper<typename WrappedType::UnderlyingType> unwrapper_;
+    static int64_t Delta(WrappedType value, WrappedType prev_value) {
+      static constexpr typename WrappedType::UnderlyingType kBreakpoint =
+          kValueLimit / 2;
+      typename WrappedType::UnderlyingType diff = *value - *prev_value;
+      diff %= kValueLimit;
+      if (diff < kBreakpoint) {
+        return static_cast<int64_t>(diff);
+      }
+      return static_cast<int64_t>(diff) - kValueLimit;
+    }
+
+    int64_t largest_;
   };
 
   // Returns the wrapped value this type represents.
@@ -100,14 +118,6 @@ class UnwrappedSequenceNumber {
   bool operator<=(const UnwrappedSequenceNumber<WrappedType>& other) const {
     return value_ <= other.value_;
   }
-
-  // Const accessors for underlying value.
-  constexpr const int64_t* operator->() const { return &value_; }
-  constexpr const int64_t& operator*() const& { return value_; }
-  constexpr const int64_t&& operator*() const&& { return std::move(value_); }
-  constexpr const int64_t& value() const& { return value_; }
-  constexpr const int64_t&& value() const&& { return std::move(value_); }
-  constexpr explicit operator const int64_t&() const& { return value_; }
 
   // Increments the value.
   void Increment() { ++value_; }

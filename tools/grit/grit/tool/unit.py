@@ -4,6 +4,7 @@
 
 '''GRIT tool that runs the unit test suite for GRIT.'''
 
+from __future__ import print_function
 
 import getopt
 import sys

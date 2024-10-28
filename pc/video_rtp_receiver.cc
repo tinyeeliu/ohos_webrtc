@@ -76,10 +76,8 @@ RtpParameters VideoRtpReceiver::GetParameters() const {
   RTC_DCHECK_RUN_ON(worker_thread_);
   if (!media_channel_)
     return RtpParameters();
-  auto current_ssrc = ssrc();
-  return current_ssrc.has_value()
-             ? media_channel_->GetRtpReceiverParameters(current_ssrc.value())
-             : media_channel_->GetDefaultRtpReceiveParameters();
+  return ssrc_ ? media_channel_->GetRtpReceiveParameters(*ssrc_)
+               : media_channel_->GetDefaultRtpReceiveParameters();
 }
 
 void VideoRtpReceiver::SetFrameDecryptor(
@@ -87,8 +85,8 @@ void VideoRtpReceiver::SetFrameDecryptor(
   RTC_DCHECK_RUN_ON(worker_thread_);
   frame_decryptor_ = std::move(frame_decryptor);
   // Special Case: Set the frame decryptor to any value on any existing channel.
-  if (media_channel_ && signaled_ssrc_) {
-    media_channel_->SetFrameDecryptor(*signaled_ssrc_, frame_decryptor_);
+  if (media_channel_ && ssrc_) {
+    media_channel_->SetFrameDecryptor(*ssrc_, frame_decryptor_);
   }
 }
 
@@ -104,7 +102,7 @@ void VideoRtpReceiver::SetDepacketizerToDecoderFrameTransformer(
   frame_transformer_ = std::move(frame_transformer);
   if (media_channel_) {
     media_channel_->SetDepacketizerToDecoderFrameTransformer(
-        signaled_ssrc_.value_or(0), frame_transformer_);
+        ssrc_.value_or(0), frame_transformer_);
   }
 }
 
@@ -136,7 +134,7 @@ void VideoRtpReceiver::RestartMediaChannel_w(
   const bool encoded_sink_enabled = saved_encoded_sink_enabled_;
 
   if (state != MediaSourceInterface::kInitializing) {
-    if (ssrc == signaled_ssrc_)
+    if (ssrc == ssrc_)
       return;
 
     // Disconnect from a previous ssrc.
@@ -147,7 +145,7 @@ void VideoRtpReceiver::RestartMediaChannel_w(
   }
 
   // Set up the new ssrc.
-  signaled_ssrc_ = std::move(ssrc);
+  ssrc_ = std::move(ssrc);
   SetSink(source_->sink());
   if (encoded_sink_enabled) {
     SetEncodedSinkEnabled(true);
@@ -155,23 +153,22 @@ void VideoRtpReceiver::RestartMediaChannel_w(
 
   if (frame_transformer_ && media_channel_) {
     media_channel_->SetDepacketizerToDecoderFrameTransformer(
-        signaled_ssrc_.value_or(0), frame_transformer_);
+        ssrc_.value_or(0), frame_transformer_);
   }
 
-  if (media_channel_ && signaled_ssrc_) {
+  if (media_channel_ && ssrc_) {
     if (frame_decryptor_) {
-      media_channel_->SetFrameDecryptor(*signaled_ssrc_, frame_decryptor_);
+      media_channel_->SetFrameDecryptor(*ssrc_, frame_decryptor_);
     }
 
-    media_channel_->SetBaseMinimumPlayoutDelayMs(*signaled_ssrc_,
-                                                 delay_.GetMs());
+    media_channel_->SetBaseMinimumPlayoutDelayMs(*ssrc_, delay_.GetMs());
   }
 }
 
 void VideoRtpReceiver::SetSink(rtc::VideoSinkInterface<VideoFrame>* sink) {
   RTC_DCHECK_RUN_ON(worker_thread_);
-  if (signaled_ssrc_) {
-    media_channel_->SetSink(*signaled_ssrc_, sink);
+  if (ssrc_) {
+    media_channel_->SetSink(*ssrc_, sink);
   } else {
     media_channel_->SetDefaultSink(sink);
   }
@@ -187,12 +184,9 @@ void VideoRtpReceiver::SetupUnsignaledMediaChannel() {
   RestartMediaChannel(absl::nullopt);
 }
 
-absl::optional<uint32_t> VideoRtpReceiver::ssrc() const {
+uint32_t VideoRtpReceiver::ssrc() const {
   RTC_DCHECK_RUN_ON(worker_thread_);
-  if (!signaled_ssrc_.has_value() && media_channel_) {
-    return media_channel_->GetUnsignaledSsrc();
-  }
-  return signaled_ssrc_;
+  return ssrc_.value_or(0);
 }
 
 void VideoRtpReceiver::set_stream_ids(std::vector<std::string> stream_ids) {
@@ -253,13 +247,11 @@ void VideoRtpReceiver::SetJitterBufferMinimumDelay(
     absl::optional<double> delay_seconds) {
   RTC_DCHECK_RUN_ON(worker_thread_);
   delay_.Set(delay_seconds);
-  if (media_channel_ && signaled_ssrc_)
-    media_channel_->SetBaseMinimumPlayoutDelayMs(*signaled_ssrc_,
-                                                 delay_.GetMs());
+  if (media_channel_ && ssrc_)
+    media_channel_->SetBaseMinimumPlayoutDelayMs(*ssrc_, delay_.GetMs());
 }
 
-void VideoRtpReceiver::SetMediaChannel(
-    cricket::MediaReceiveChannelInterface* media_channel) {
+void VideoRtpReceiver::SetMediaChannel(cricket::MediaChannel* media_channel) {
   RTC_DCHECK_RUN_ON(worker_thread_);
   RTC_DCHECK(media_channel == nullptr ||
              media_channel->media_type() == media_type());
@@ -267,8 +259,7 @@ void VideoRtpReceiver::SetMediaChannel(
   SetMediaChannel_w(media_channel);
 }
 
-void VideoRtpReceiver::SetMediaChannel_w(
-    cricket::MediaReceiveChannelInterface* media_channel) {
+void VideoRtpReceiver::SetMediaChannel_w(cricket::MediaChannel* media_channel) {
   RTC_DCHECK_RUN_ON(worker_thread_);
   if (media_channel == media_channel_)
     return;
@@ -283,16 +274,12 @@ void VideoRtpReceiver::SetMediaChannel_w(
     SetEncodedSinkEnabled(false);
   }
 
-  if (media_channel) {
-    media_channel_ = media_channel->AsVideoReceiveChannel();
-  } else {
-    media_channel_ = nullptr;
-  }
+  media_channel_ = static_cast<cricket::VideoMediaChannel*>(media_channel);
 
   if (media_channel_) {
     if (saved_generate_keyframe_) {
       // TODO(bugs.webrtc.org/8694): Stop using 0 to mean unsignalled SSRC
-      media_channel_->RequestRecvKeyFrame(signaled_ssrc_.value_or(0));
+      media_channel_->RequestRecvKeyFrame(ssrc_.value_or(0));
       saved_generate_keyframe_ = false;
     }
     if (encoded_sink_enabled) {
@@ -300,7 +287,7 @@ void VideoRtpReceiver::SetMediaChannel_w(
     }
     if (frame_transformer_) {
       media_channel_->SetDepacketizerToDecoderFrameTransformer(
-          signaled_ssrc_.value_or(0), frame_transformer_);
+          ssrc_.value_or(0), frame_transformer_);
     }
   }
 
@@ -318,16 +305,13 @@ void VideoRtpReceiver::NotifyFirstPacketReceived() {
 
 std::vector<RtpSource> VideoRtpReceiver::GetSources() const {
   RTC_DCHECK_RUN_ON(worker_thread_);
-  auto current_ssrc = ssrc();
-  if (!media_channel_ || !current_ssrc.has_value()) {
-    return {};
-  }
-  return media_channel_->GetSources(current_ssrc.value());
+  if (!ssrc_ || !media_channel_)
+    return std::vector<RtpSource>();
+  return media_channel_->GetSources(*ssrc_);
 }
 
-void VideoRtpReceiver::SetupMediaChannel(
-    absl::optional<uint32_t> ssrc,
-    cricket::MediaReceiveChannelInterface* media_channel) {
+void VideoRtpReceiver::SetupMediaChannel(absl::optional<uint32_t> ssrc,
+                                         cricket::MediaChannel* media_channel) {
   RTC_DCHECK_RUN_ON(&signaling_thread_checker_);
   RTC_DCHECK(media_channel);
   MediaSourceInterface::SourceState state = source_->state();
@@ -347,7 +331,7 @@ void VideoRtpReceiver::OnGenerateKeyFrame() {
     return;
   }
   // TODO(bugs.webrtc.org/8694): Stop using 0 to mean unsignalled SSRC
-  media_channel_->RequestRecvKeyFrame(signaled_ssrc_.value_or(0));
+  media_channel_->RequestRecvKeyFrame(ssrc_.value_or(0));
   // We need to remember to request generation of a new key frame if the media
   // channel changes, because there's no feedback whether the keyframe
   // generation has completed on the channel.
@@ -368,7 +352,7 @@ void VideoRtpReceiver::SetEncodedSinkEnabled(bool enable) {
     return;
 
   // TODO(bugs.webrtc.org/8694): Stop using 0 to mean unsignalled SSRC
-  const auto ssrc = signaled_ssrc_.value_or(0);
+  const auto ssrc = ssrc_.value_or(0);
 
   if (enable) {
     media_channel_->SetRecordableEncodedFrameCallback(

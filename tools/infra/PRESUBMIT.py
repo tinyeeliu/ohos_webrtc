@@ -8,6 +8,7 @@ See http://dev.chromium.org/developers/how-tos/depottools/presubmit-scripts
 for more details on the presubmit API built into depot_tools.
 """
 
+USE_PYTHON3 = True
 
 
 def _CommonChecks(input_api, output_api):
@@ -22,7 +23,10 @@ def _CommonChecks(input_api, output_api):
           output_api,
           input_api.os_path.join(input_api.PresubmitLocalPath()),
           files_to_check=[r'.+_unittest\.py$'],
-          files_to_skip=[]))
+          files_to_skip=[],
+          run_on_python2=False,
+          run_on_python3=True,
+          skip_shebang_check=True))
   results.extend(input_api.RunTests(commands))
 
   return results

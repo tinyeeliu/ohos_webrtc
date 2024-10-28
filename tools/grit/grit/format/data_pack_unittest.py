@@ -5,6 +5,7 @@
 
 '''Unit tests for grit.format.data_pack'''
 
+from __future__ import print_function
 
 import os
 import sys
@@ -57,7 +58,7 @@ class FormatDataPackUnittest(unittest.TestCase):
         10: b'this is id 4',
     }
     data = data_pack.WriteDataPackToString(input_resources, data_pack.UTF8)
-    self.assertEqual(data, expected_data)
+    self.assertEquals(data, expected_data)
 
     expected_data_pack = data_pack.DataPackContents({
         1: b'',

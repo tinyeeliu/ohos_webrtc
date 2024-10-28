@@ -13,7 +13,6 @@
 
 #include <stddef.h>
 #include <stdint.h>
-
 #include <algorithm>
 
 #include "rtc_base/checks.h"

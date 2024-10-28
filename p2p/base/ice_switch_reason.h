@@ -13,12 +13,9 @@
 
 #include <string>
 
-#include "rtc_base/system/rtc_export.h"
-
 namespace cricket {
 
 enum class IceSwitchReason {
-  UNKNOWN,
   REMOTE_CANDIDATE_GENERATION_CHANGE,
   NETWORK_PREFERENCE_CHANGE,
   NEW_CONNECTION_FROM_LOCAL_CANDIDATE,
@@ -32,11 +29,9 @@ enum class IceSwitchReason {
   // P2PTransportChannel to recheck a switch periodically without an event
   // taking place.
   ICE_CONTROLLER_RECHECK,
-  // The webrtc application requested a connection switch.
-  APPLICATION_REQUESTED,
 };
 
-RTC_EXPORT std::string IceSwitchReasonToString(IceSwitchReason reason);
+std::string IceSwitchReasonToString(IceSwitchReason reason);
 
 }  // namespace cricket
 

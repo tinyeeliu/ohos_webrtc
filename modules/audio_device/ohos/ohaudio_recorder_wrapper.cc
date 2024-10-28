@@ -325,6 +325,7 @@ void OHAudioRecorderWrapper::SetStreamConfiguration(OH_AudioStreamBuilder* build
     OH_AudioStreamBuilder_SetSamplingRate(builder, audio_parameters().sample_rate());
     OH_AudioStreamBuilder_SetChannelCount(builder, audio_parameters().channels());
     OH_AudioStreamBuilder_SetSampleFormat(builder, AUDIOSTREAM_SAMPLE_S16LE);
+//    OH_AudioStreamBuilder_SetFrameSizeInCallback(builder, 960);
     OH_AudioStreamBuilder_SetLatencyMode(builder, AUDIOSTREAM_LATENCY_MODE_FAST);
 
     OH_AudioCapturer_Callbacks callbacks;

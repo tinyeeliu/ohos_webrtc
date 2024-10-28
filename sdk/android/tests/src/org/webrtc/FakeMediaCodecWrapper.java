@@ -12,7 +12,6 @@ package org.webrtc;
 
 import android.graphics.SurfaceTexture;
 import android.media.MediaCodec;
-import android.media.MediaCodecInfo;
 import android.media.MediaCodecInfo.CodecCapabilities;
 import android.media.MediaCrypto;
 import android.media.MediaFormat;
@@ -105,13 +104,18 @@ public class FakeMediaCodecWrapper implements MediaCodecWrapper {
   private State state = State.STOPPED_UNINITIALIZED;
   private @Nullable MediaFormat configuredFormat;
   private int configuredFlags;
+  private final MediaFormat inputFormat;
+  private final MediaFormat outputFormat;
   private final ByteBuffer[] inputBuffers = new ByteBuffer[NUM_INPUT_BUFFERS];
   private final ByteBuffer[] outputBuffers = new ByteBuffer[NUM_OUTPUT_BUFFERS];
   private final boolean[] inputBufferReserved = new boolean[NUM_INPUT_BUFFERS];
   private final boolean[] outputBufferReserved = new boolean[NUM_OUTPUT_BUFFERS];
   private final List<QueuedOutputBufferInfo> queuedOutputBuffers = new ArrayList<>();
 
-  public FakeMediaCodecWrapper() {}
+  public FakeMediaCodecWrapper(MediaFormat inputFormat, MediaFormat outputFormat) {
+    this.inputFormat = inputFormat;
+    this.outputFormat = outputFormat;
+  }
 
   /** Returns the current simulated state of MediaCodec. */
   public State getState() {
@@ -299,17 +303,12 @@ public class FakeMediaCodecWrapper implements MediaCodecWrapper {
 
   @Override
   public MediaFormat getInputFormat() {
-    return new MediaFormat();
+    return inputFormat;
   }
 
   @Override
   public MediaFormat getOutputFormat() {
-    return new MediaFormat();
-  }
-
-  @Override
-  public MediaFormat getOutputFormat(int index) {
-    return new MediaFormat();
+    return outputFormat;
   }
 
   @Override
@@ -319,9 +318,4 @@ public class FakeMediaCodecWrapper implements MediaCodecWrapper {
 
   @Override
   public void setParameters(Bundle params) {}
-
-  @Override
-  public MediaCodecInfo getCodecInfo() {
-    return null;
-  }
 }

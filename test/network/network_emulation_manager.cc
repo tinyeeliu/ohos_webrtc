@@ -16,6 +16,7 @@
 #include "api/units/time_delta.h"
 #include "api/units/timestamp.h"
 #include "call/simulated_network.h"
+#include "rtc_base/fake_network.h"
 #include "test/network/emulated_turn_server.h"
 #include "test/network/traffic_route.h"
 #include "test/time_controller/real_time_controller.h"
@@ -44,11 +45,8 @@ std::unique_ptr<TimeController> CreateTimeController(TimeMode mode) {
 }
 }  // namespace
 
-NetworkEmulationManagerImpl::NetworkEmulationManagerImpl(
-    TimeMode mode,
-    EmulatedNetworkStatsGatheringMode stats_gathering_mode)
+NetworkEmulationManagerImpl::NetworkEmulationManagerImpl(TimeMode mode)
     : time_mode_(mode),
-      stats_gathering_mode_(stats_gathering_mode),
       time_controller_(CreateTimeController(mode)),
       clock_(time_controller_->GetClock()),
       next_node_id_(1),
@@ -76,7 +74,7 @@ EmulatedNetworkNode* NetworkEmulationManagerImpl::CreateEmulatedNode(
 EmulatedNetworkNode* NetworkEmulationManagerImpl::CreateEmulatedNode(
     std::unique_ptr<NetworkBehaviorInterface> network_behavior) {
   auto node = std::make_unique<EmulatedNetworkNode>(
-      clock_, &task_queue_, std::move(network_behavior), stats_gathering_mode_);
+      clock_, &task_queue_, std::move(network_behavior));
   EmulatedNetworkNode* out = node.get();
   task_queue_.PostTask([this, node = std::move(node)]() mutable {
     network_nodes_.push_back(std::move(node));
@@ -109,8 +107,7 @@ EmulatedEndpointImpl* NetworkEmulationManagerImpl::CreateEndpoint(
   bool res = used_ip_addresses_.insert(*ip).second;
   RTC_CHECK(res) << "IP=" << ip->ToString() << " already in use";
   auto node = std::make_unique<EmulatedEndpointImpl>(
-      EmulatedEndpointImpl::Options(next_node_id_++, *ip, config,
-                                    stats_gathering_mode_),
+      EmulatedEndpointImpl::Options(next_node_id_++, *ip, config),
       config.start_as_enabled, &task_queue_, clock_);
   EmulatedEndpointImpl* out = node.get();
   endpoints_.push_back(std::move(node));
@@ -282,8 +279,8 @@ NetworkEmulationManagerImpl::CreateEmulatedNetworkManagerInterface(
   for (EmulatedEndpoint* endpoint : endpoints) {
     endpoint_impls.push_back(static_cast<EmulatedEndpointImpl*>(endpoint));
   }
-  auto endpoints_container = std::make_unique<EndpointsContainer>(
-      endpoint_impls, stats_gathering_mode_);
+  auto endpoints_container =
+      std::make_unique<EndpointsContainer>(endpoint_impls);
   auto network_manager = std::make_unique<EmulatedNetworkManager>(
       time_controller_.get(), &task_queue_, endpoints_container.get());
   for (auto* endpoint : endpoints) {
@@ -305,10 +302,26 @@ NetworkEmulationManagerImpl::CreateEmulatedNetworkManagerInterface(
 
 void NetworkEmulationManagerImpl::GetStats(
     rtc::ArrayView<EmulatedEndpoint* const> endpoints,
+    std::function<void(std::unique_ptr<EmulatedNetworkStats>)> stats_callback) {
+  task_queue_.PostTask([endpoints, stats_callback]() {
+    EmulatedNetworkStatsBuilder stats_builder;
+    for (auto* endpoint : endpoints) {
+      // It's safe to cast here because EmulatedEndpointImpl can be the only
+      // implementation of EmulatedEndpoint, because only it has access to
+      // EmulatedEndpoint constructor.
+      auto endpoint_impl = static_cast<EmulatedEndpointImpl*>(endpoint);
+      stats_builder.AddEmulatedNetworkStats(endpoint_impl->stats());
+    }
+    stats_callback(
+        std::make_unique<EmulatedNetworkStats>(stats_builder.Build()));
+  });
+}
+
+void NetworkEmulationManagerImpl::GetStats(
+    rtc::ArrayView<EmulatedEndpoint* const> endpoints,
     std::function<void(EmulatedNetworkStats)> stats_callback) {
-  task_queue_.PostTask([endpoints, stats_callback,
-                        stats_gathering_mode = stats_gathering_mode_]() {
-    EmulatedNetworkStatsBuilder stats_builder(stats_gathering_mode);
+  task_queue_.PostTask([endpoints, stats_callback]() {
+    EmulatedNetworkStatsBuilder stats_builder;
     for (auto* endpoint : endpoints) {
       // It's safe to cast here because EmulatedEndpointImpl can be the only
       // implementation of EmulatedEndpoint, because only it has access to
@@ -318,19 +331,6 @@ void NetworkEmulationManagerImpl::GetStats(
     }
     stats_callback(stats_builder.Build());
   });
-}
-
-void NetworkEmulationManagerImpl::GetStats(
-    rtc::ArrayView<EmulatedNetworkNode* const> nodes,
-    std::function<void(EmulatedNetworkNodeStats)> stats_callback) {
-  task_queue_.PostTask(
-      [nodes, stats_callback, stats_gathering_mode = stats_gathering_mode_]() {
-        EmulatedNetworkNodeStatsBuilder stats_builder(stats_gathering_mode);
-        for (auto* node : nodes) {
-          stats_builder.AddEmulatedNetworkNodeStats(node->stats());
-        }
-        stats_callback(stats_builder.Build());
-      });
 }
 
 absl::optional<rtc::IPAddress>

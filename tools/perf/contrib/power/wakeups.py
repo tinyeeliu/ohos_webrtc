@@ -4,13 +4,13 @@
 
 from core import platforms
 import contrib.power.stories as stories
-from contrib.power.power_perf_benchmark_base import PowerPerfBenchmarkBase
+from contrib.power.power_perf_benchmark_base import _PowerPerfBenchmarkBase
 from telemetry import benchmark
 from telemetry import story
 
 
 @benchmark.Info(emails=['chrometto-team@google.com'])
-class ContribPowerWakeups(PowerPerfBenchmarkBase):
+class ContribPowerWakeups(_PowerPerfBenchmarkBase):
 
   SUPPORTED_PLATFORMS = [story.expectations.ALL_ANDROID]
   SUPPORTED_PLATFORM_TAGS = [platforms.ANDROID]
@@ -59,14 +59,7 @@ class ContribPowerWakeups(PowerPerfBenchmarkBase):
           config {
               name: "org.chromium.trace_event"
               chrome_config {
-                  trace_config: "{
-                    \\"record_mode\\": \\"record-until-full\\",
-                    \\"included_categories\\": [
-                      \\"toplevel.flow\\",
-                      \\"toplevel\\"
-                    ],
-                    \\"memory_dump_config\\": {}
-                  }"
+                  trace_config: "{\\\"record_mode\\":\\"record-until-full\\",\\"included_categories\\":[\\"toplevel.flow\\",\\"toplevel\\"],\\"memory_dump_config\\":{}}"
                   client_priority: USER_INITIATED
               }
           }
@@ -75,14 +68,7 @@ class ContribPowerWakeups(PowerPerfBenchmarkBase):
           config {
               name: "org.chromium.trace_metadata"
               chrome_config {
-                  trace_config: "{
-                    \\"record_mode\\": \\"record-until-full\\",
-                    \\"included_categories\\": [
-                      \\"toplevel.flow\\",
-                      \\"toplevel\\"
-                    ],
-                    \\"memory_dump_config\\": {}
-                  }"
+                  trace_config: "{\\"record_mode\\":\\"record-until-full\\",\\"included_categories\\":[\\"toplevel.flow\\",\\"toplevel\\"],\\"memory_dump_config\\":{}}"
                   client_priority: USER_INITIATED
               }
           }

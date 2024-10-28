@@ -23,8 +23,7 @@ if __name__ == '__main__':
 
   source_file = 'third_party/blink/public/mojom/permissions_policy/' \
                 'permissions_policy_feature.mojom'
-  UpdateHistogramEnum('tools/metrics/histograms/enums.xml',
-                      histogram_enum_name='FeaturePolicyFeature',
+  UpdateHistogramEnum(histogram_enum_name='FeaturePolicyFeature',
                       source_enum_path=source_file,
                       start_marker='^enum PermissionsPolicyFeature {',
                       end_marker='^};',

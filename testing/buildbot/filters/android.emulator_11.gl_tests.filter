@@ -2,7 +2,8 @@
 # Not applicable to emulator due to not supporting VK_KHR_external_memory_fd
 -CopyType/GLCopyTextureCHROMIUMES3Test.CopyTextureCubeMap/0
 -CopyType/GLCopyTextureCHROMIUMES3Test.CopyTextureLevel/0
--CopyType/GLCopyTextureCHROMIUMES3Test.FormatCombinations*
+-CopyType/GLCopyTextureCHROMIUMES3Test.FormatCombinations/0
+-CopyType/GLCopyTextureCHROMIUMES3Test.FormatCombinations/1
 -CopyType/GLCopyTextureCHROMIUMTest.ImmutableTexture/0
 -CopyType/GLCopyTextureCHROMIUMTest.ImmutableTexture/1
 -GLBGRAMipMapTest.GenerateMipmapsSucceeds
@@ -14,6 +15,3 @@
 -AHardwareBufferImageBackingFactoryTest.GLSkiaGL
 -AHardwareBufferImageBackingFactoryTest.InitialData
 -AHardwareBufferImageBackingFactoryTest.Overlay
-
-# BGRA_8888 support is poor in Android emulator.
--GLTextureImageBackingFactory*/BGRA_8888

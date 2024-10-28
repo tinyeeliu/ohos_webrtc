@@ -17,27 +17,24 @@ from telemetry.web_perf import timeline_based_measurement
 RENDERING_BENCHMARK_UMA = [
     'Compositing.Display.DrawToSwapUs',
     'CompositorLatency.TotalLatency',
+    'CompositorLatency.Type',
     'EventLatency.FirstGestureScrollUpdate.Touchscreen.TotalLatency',
     'EventLatency.FirstGestureScrollUpdate.Wheel.TotalLatency',
     'EventLatency.GestureScrollUpdate.Touchscreen.TotalLatency',
     'EventLatency.GestureScrollUpdate.Wheel.TotalLatency',
-    'Graphics.Smoothness.Checkerboarding3.AllAnimations',
-    'Graphics.Smoothness.Checkerboarding3.AllInteractions',
-    'Graphics.Smoothness.Checkerboarding3.AllSequences',
-    'Graphics.Smoothness.Jank3.AllAnimations',
-    'Graphics.Smoothness.Jank3.AllInteractions',
-    'Graphics.Smoothness.Jank3.AllSequences',
+    'Graphics.Smoothness.Checkerboarding.AllAnimations',
+    'Graphics.Smoothness.Checkerboarding.AllInteractions',
+    'Graphics.Smoothness.Checkerboarding.AllSequences',
+    'Graphics.Smoothness.Checkerboarding.TouchScroll',
+    'Graphics.Smoothness.Checkerboarding.WheelScroll',
+    'Graphics.Smoothness.Jank.AllAnimations',
+    'Graphics.Smoothness.Jank.AllInteractions',
+    'Graphics.Smoothness.Jank.AllSequences',
     'Graphics.Smoothness.PercentDroppedFrames3.AllAnimations',
     'Graphics.Smoothness.PercentDroppedFrames3.AllInteractions',
     'Graphics.Smoothness.PercentDroppedFrames3.AllSequences',
     'Memory.GPU.PeakMemoryUsage2.Scroll',
     'Memory.GPU.PeakMemoryUsage2.PageLoad',
-    'Event.ScrollJank.DelayedFramesPercentage.FixedWindow',
-    'Event.ScrollJank.DelayedFramesPercentage.PerScroll',
-    'Event.ScrollJank.MissedVsyncsSum.FixedWindow',
-    'Event.ScrollJank.MissedVsyncsSum.PerScroll',
-    'Event.ScrollJank.MissedVsyncsPercentage.FixedWindow',
-    'Event.ScrollJank.MissedVsyncsPercentage.PerScroll',
 ]
 
 
@@ -109,8 +106,9 @@ class _RenderingBenchmark(perf_benchmark.PerfBenchmark):
     documentation_url='https://bit.ly/rendering-benchmarks',
     component='Internals>GPU>Metrics')
 class RenderingDesktop(_RenderingBenchmark):
-  # TODO(johnchen): Remove either the SUPPORTED_PLATFORMS or
-  # SUPPORTED_PLATFORMS_TAGS lists. Only one is necessary.
+  # TODO(rmhasan): Remove the SUPPORTED_PLATFORMS lists.
+  # SUPPORTED_PLATFORMS is deprecated, please put system specifier tags
+  # from expectations.config in SUPPORTED_PLATFORM_TAGS.
   SUPPORTED_PLATFORMS = [story_module.expectations.ALL_DESKTOP]
   SUPPORTED_PLATFORM_TAGS = [core_platforms.DESKTOP]
   PLATFORM_NAME = platforms.DESKTOP
@@ -129,11 +127,6 @@ class RenderingDesktop(_RenderingBenchmark):
     if sys.platform == 'darwin':
       options.AppendExtraBrowserArgs(
           '--use-gpu-high-thread-priority-for-perf-tests')
-      # Mac bots without a physical display fallbacks to SRGB. This flag forces
-      # them to use a color profile (P3), which matches the usual color profile
-      # on Mac monitors and changes the cost of some overlay operations to match
-      # real conditions more closely.
-      options.AppendExtraBrowserArgs('--force-color-profile=display-p3-d65')
 
 
 @benchmark.Info(
@@ -161,8 +154,9 @@ class RenderingDesktopNoTracing(RenderingDesktop):
     documentation_url='https://bit.ly/rendering-benchmarks',
     component='Internals>GPU>Metrics')
 class RenderingMobile(_RenderingBenchmark):
-  # TODO(johnchen): Remove either the SUPPORTED_PLATFORMS or
-  # SUPPORTED_PLATFORMS_TAGS lists. Only one is necessary.
+  # TODO(rmhasan): Remove the SUPPORTED_PLATFORMS lists.
+  # SUPPORTED_PLATFORMS is deprecated, please put system specifier tags
+  # from expectations.config in SUPPORTED_PLATFORM_TAGS.
   SUPPORTED_PLATFORMS = [
       story_module.expectations.ALL_MOBILE,
       story_module.expectations.FUCHSIA_ASTRO,

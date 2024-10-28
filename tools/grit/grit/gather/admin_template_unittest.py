@@ -5,13 +5,16 @@
 
 '''Unit tests for the admin template gatherer.'''
 
-import io
+from __future__ import print_function
+
 import os
 import sys
-import unittest
-
 if __name__ == '__main__':
   sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
+
+import unittest
+
+from six import StringIO
 
 from grit.gather import admin_template
 from grit import util
@@ -22,27 +25,27 @@ from grit.tool import build
 
 class AdmGathererUnittest(unittest.TestCase):
   def testParsingAndTranslating(self):
-    pseudofile = io.StringIO(
-        'bingo bongo\n'
-        'ding dong\n'
-        '[strings] \n'
-        'whatcha="bingo bongo"\n'
-        'gotcha = "bingolabongola "the wise" fingulafongula" \n')
+    pseudofile = StringIO(
+      'bingo bongo\n'
+      'ding dong\n'
+      '[strings] \n'
+      'whatcha="bingo bongo"\n'
+      'gotcha = "bingolabongola "the wise" fingulafongula" \n')
     gatherer = admin_template.AdmGatherer(pseudofile)
     gatherer.Parse()
-    self.assertTrue(len(gatherer.GetCliques()) == 2)
-    self.assertTrue(gatherer.GetCliques()[1].GetMessage().GetRealContent() ==
+    self.failUnless(len(gatherer.GetCliques()) == 2)
+    self.failUnless(gatherer.GetCliques()[1].GetMessage().GetRealContent() ==
                     'bingolabongola "the wise" fingulafongula')
 
     translation = gatherer.Translate('en')
-    self.assertTrue(translation == gatherer.GetText().strip())
+    self.failUnless(translation == gatherer.GetText().strip())
 
   def testErrorHandling(self):
-    pseudofile = io.StringIO(
-        'bingo bongo\n'
-        'ding dong\n'
-        'whatcha="bingo bongo"\n'
-        'gotcha = "bingolabongola "the wise" fingulafongula" \n')
+    pseudofile = StringIO(
+      'bingo bongo\n'
+      'ding dong\n'
+      'whatcha="bingo bongo"\n'
+      'gotcha = "bingolabongola "the wise" fingulafongula" \n')
     gatherer = admin_template.AdmGatherer(pseudofile)
     self.assertRaises(admin_template.MalformedAdminTemplateException,
                       gatherer.Parse)
@@ -57,10 +60,10 @@ class AdmGathererUnittest(unittest.TestCase):
   )
 
   def VerifyCliquesFromAdmFile(self, cliques):
-    self.assertTrue(len(cliques) > 20)
+    self.failUnless(len(cliques) > 20)
     for clique, expected in zip(cliques, self._TRANSLATABLES_FROM_FILE):
       text = clique.GetMessage().GetRealContent()
-      self.assertTrue(text == expected)
+      self.failUnless(text == expected)
 
   def testFromFile(self):
     fname = util.PathFromRoot('grit/testdata/GoogleDesktop.adm')
@@ -70,8 +73,7 @@ class AdmGathererUnittest(unittest.TestCase):
     self.VerifyCliquesFromAdmFile(cliques)
 
   def MakeGrd(self):
-    grd = grd_reader.Parse(
-        io.StringIO('''<?xml version="1.0" encoding="UTF-8"?>
+    grd = grd_reader.Parse(StringIO('''<?xml version="1.0" encoding="UTF-8"?>
       <grit latest_public_release="2" source_lang_id="en-US" current_release="3">
         <release seq="3">
           <structures>
@@ -104,8 +106,8 @@ class AdmGathererUnittest(unittest.TestCase):
       tool.res = grd
       tool.Process()
 
-      self.assertTrue(os.path.isfile(dirname.GetPath('de_GoogleDesktop.adm')))
-      self.assertTrue(os.path.isfile(dirname.GetPath('de_README.txt')))
+      self.failUnless(os.path.isfile(dirname.GetPath('de_GoogleDesktop.adm')))
+      self.failUnless(os.path.isfile(dirname.GetPath('de_README.txt')))
     finally:
       dirname.CleanUp()
 

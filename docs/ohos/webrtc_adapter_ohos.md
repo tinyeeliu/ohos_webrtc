@@ -9,8 +9,8 @@ WebRTC (Web Real-Time Communications) 是一项实时通讯技术，它允许网
 ### 编译环境
 
 - ubuntu 20.04.1
-- webrtc版本（m120，commitid:b0cc68e6）
-- OpenHarmony SDK版本(4.0.10)
+- webrtc版本（m109，branch/5414, commitid:4e8a5ac68e8a4ae0588f54f2fdb8cbd1eb5fa50d）
+- OpenHarmony SDK版本(5.0.0.68)
 
 ### 源码准备
 
@@ -19,9 +19,9 @@ WebRTC (Web Real-Time Communications) 是一项实时通讯技术，它允许网
   创建工作目录webrtc，cd  到自己创建的工作目录，拉取工具：
 
   ```shell
-  #mkdir webrtc
-  #cd webrtc
-  #git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
+  # mkdir webrtc
+  # cd webrtc
+  # git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
   ```
 
   成功后，将工具路径添加到环境变量中：
@@ -48,24 +48,25 @@ WebRTC (Web Real-Time Communications) 是一项实时通讯技术，它允许网
 
   ```shell
   cd src 
-  #git checkout branch-heads/6099    # 切到对应的分支
+  # git checkout branch-heads/5414    # 切到对应的分支
+  # gclient sync                      # 同步分支代码
   ```
 
   切完分支后可以查看对应的log：
 
   ```shell
-  #git log     # 执行git log命令，以下为对应log信息
-  commit b0cc68e61205fd11a7256a6e85307ec17ad95790 (HEAD, branch-heads/6099_56, branch-heads/6099_43, branch-heads/6099, main)
-  Author: henrika <henrika@webrtc.org>
-  Date:   Thu Nov 2 10:16:00 2023 +0100
+  # git log       # 执行git log命令，以下为对应log信息
+  commit 4e8a5ac68e8a4ae0588f54f2fdb8cbd1eb5fa50d (HEAD, branch-heads/5414)
+  Author: Tommi <tommi@webrtc.org>
+  Date:   Sun Dec 11 13:04:40 2022 +0100
   ...
   ```
 
 - 安装依赖
   
   ```shell
-  #cd src
-  #./build/install-build-deps.sh
+  # cd src
+  # ./build/install-build-deps.sh
   ```
 
 - OpenHarmony SDK获取
@@ -77,27 +78,27 @@ WebRTC (Web Real-Time Communications) 是一项实时通讯技术，它允许网
 **1. 添加OHOS平台**
 
 ```shell
-diff -uprN src/build/config/BUILDCONFIG.gn src_ohos/build/config/BUILDCONFIG.gn
---- src/build/config/BUILDCONFIG.gn	2023-12-15 19:46:40.000000000 -0800
-+++ src_ohos/build/config/BUILDCONFIG.gn	2023-12-18 00:17:52.679868987 -0800
-@@ -235,6 +235,8 @@ _default_toolchain = ""
+diff -Naur src/build/config/BUILDCONFIG.gn src_ohos/build/config/BUILDCONFIG.gn
+--- src/build/config/BUILDCONFIG.gn	2024-10-24 09:22:02.223442391 +0800
++++ src_ohos/build/config/BUILDCONFIG.gn	2024-10-24 14:05:49.277571954 +0800
+@@ -235,6 +235,8 @@
  if (target_os == "android") {
    assert(host_os == "linux", "Android builds are only supported on Linux.")
    _default_toolchain = "//build/toolchain/android:android_clang_$target_cpu"
 +} else if (target_os == "ohos") {  # OHOS-LOCAL
-+ _default_toolchain = "//build/toolchain/ohos:ohos_clang_$target_cpu"
++  _default_toolchain = "//build/toolchain/ohos:ohos_clang_$target_cpu"
  } else if (target_os == "chromeos" || target_os == "linux") {
    # See comments in build/toolchain/cros/BUILD.gn about board compiles.
    if (is_clang) {
-@@ -298,6 +300,7 @@ if (custom_toolchain != "") {
+@@ -298,6 +300,7 @@
  # aix or one of the BSDs. If you need to check these, just check the
  # current_os value directly.
-
+ 
 +is_ohos = current_os == "ohos"
  is_android = current_os == "android"
  is_chromeos = current_os == "chromeos"
  is_fuchsia = current_os == "fuchsia"
-@@ -384,6 +387,10 @@ if (is_android) {
+@@ -381,6 +384,10 @@
        [ "//build/config/android:default_orderfile_instrumentation" ]
  }
  
@@ -113,19 +114,19 @@ diff -uprN src/build/config/BUILDCONFIG.gn src_ohos/build/config/BUILDCONFIG.gn
 **2. 设置ohos平台clang 工具链相关路径**
 
 ```shell
-diff -uprN src/build/config/clang/clang.gni src_ohos/build/config/clang/clang.gni
---- src/build/config/clang/clang.gni	2023-12-15 19:46:40.000000000 -0800
-+++ src_ohos/build/config/clang/clang.gni	2023-12-18 01:10:11.634508775 -0800
-@@ -7,14 +7,23 @@ import("//build/toolchain/toolchain.gni"
+diff -Naur src/build/config/clang/clang.gni src_ohos/build/config/clang/clang.gni
+--- src/build/config/clang/clang.gni	2024-10-24 09:22:02.253193770 +0800
++++ src_ohos/build/config/clang/clang.gni	2024-10-24 14:07:45.506620083 +0800
+@@ -6,13 +6,25 @@
  
  default_clang_base_path = "//third_party/llvm-build/Release+Asserts"
  
 +if (is_ohos) {
-+  declare_args() {
-+    ohos_sdk_native_root = "//buildtools/ohos-sdk/linux/native"
-+  }
-+  default_clang_base_path = "${ohos_sdk_native_root}/llvm"
-+  clang_lib_path = "${default_clang_base_path}/lib"
++    declare_args() {
++        ohos_sdk_native_root = "//buildtools/ohos-sdk/linux/native"
++    }
++    default_clang_base_path = "${ohos_sdk_native_root}/llvm"
++    clang_lib_path = "${default_clang_base_path}/lib"
 +}
 +
  declare_args() {
@@ -135,17 +136,16 @@ diff -uprN src/build/config/clang/clang.gni src_ohos/build/config/clang/clang.gn
 -  clang_use_chrome_plugins =
 -      is_clang && !is_nacl && current_os != "zos" &&
 -      default_toolchain != "//build/toolchain/cros:target"
--
-+  if (is_ohos) {
++   if (is_ohos) {
 +    clang_use_chrome_plugins = false
 +  } else {
 +    clang_use_chrome_plugins =
 +        is_clang && !is_nacl && current_os != "zos" &&
 +        default_toolchain != "//build/toolchain/cros:target"
 +  }
-   enable_check_raw_ptr_fields =
-       build_with_chromium && !is_official_build &&
-       ((is_linux && !is_castos) || (is_android && !is_cast_android) || is_mac ||
+ 
+   clang_base_path = default_clang_base_path
+ }
 ```
 
 **特别声明：此处`ohos_sdk_native_root`配置默认的路径，用户需将ohos的SDK拷贝到buildtools目录，且目录需要和配置的保持一致，或者可以在编译时手动配置ohos sdk路径**
@@ -153,10 +153,10 @@ diff -uprN src/build/config/clang/clang.gni src_ohos/build/config/clang/clang.gn
 **3. 设置ohos平台的sysroot**
 
 ```shell
-diff -uprN src/build/config/sysroot.gni src_ohos/build/config/sysroot.gni
---- src/build/config/sysroot.gni	2023-12-15 19:46:40.000000000 -0800
-+++ src_ohos/build/config/sysroot.gni	2023-12-18 00:24:42.832573268 -0800
-@@ -34,6 +34,9 @@ if (sysroot == "") {
+diff -Naur src/build/config/sysroot.gni src_ohos/build/config/sysroot.gni
+--- src/build/config/sysroot.gni	2024-10-24 09:22:02.337489344 +0800
++++ src_ohos/build/config/sysroot.gni	2024-10-24 14:08:53.731491294 +0800
+@@ -33,6 +33,9 @@
  
      # Android uses unified headers, and thus a single compile time sysroot
      sysroot = "$android_toolchain_root/sysroot"
@@ -171,21 +171,22 @@ diff -uprN src/build/config/sysroot.gni src_ohos/build/config/sysroot.gni
 **4. 设置ohos平台clang版本**
 
 ```shell
-diff -uprN src/build/toolchain/toolchain.gni src_ohos/build/toolchain/toolchain.gni
---- src/build/toolchain/toolchain.gni	2023-12-15 19:46:40.000000000 -0800
-+++ src_ohos/build/toolchain/toolchain.gni	2023-12-18 00:26:19.154065809 -0800
-@@ -47,7 +47,11 @@ declare_args() {
-   if (llvm_android_mainline) {  # https://crbug.com/1481060
-     clang_version = "17"
-   } else {
--    clang_version = "18"
-+    if (is_ohos) {
-+      clang_version = "15.0.4"
-+    } else {
-+      clang_version = "18"
-+    }
-   }
+diff -Naur src/build/toolchain/toolchain.gni src_ohos/build/toolchain/toolchain.gni
+--- src/build/toolchain/toolchain.gni	2024-10-24 09:22:02.457486573 +0800
++++ src_ohos/build/toolchain/toolchain.gni	2024-10-24 14:10:30.133633570 +0800
+@@ -33,7 +33,11 @@
  }
+ 
+ declare_args() {
+-  clang_version = "16.0.0"
++  if (is_ohos) {
++    clang_version = "15.0.4"
++  } else {
++    clang_version = "16.0.0"
++  }
+ }
+ 
+ # Extension for shared library files (including leading dot).
 ```
 
 **5. 扩充原本的gcc_toolchain模板功能**
@@ -193,10 +194,10 @@ diff -uprN src/build/toolchain/toolchain.gni src_ohos/build/toolchain/toolchain.
 这里主要是添加了ohos的用于启动引导程序的.o，gcc_toolchain.gni中template("single_gcc_toolchain")添加这几个参数的识别：
 
 ```shell
-diff -uprN src/build/toolchain/gcc_toolchain.gni src_ohos/build/toolchain/gcc_toolchain.gni
---- src/build/toolchain/gcc_toolchain.gni	2023-12-15 19:46:40.000000000 -0800
-+++ src_ohos/build/toolchain/gcc_toolchain.gni	2023-12-18 00:31:56.269865976 -0800
-@@ -126,6 +126,30 @@ template("single_gcc_toolchain") {
+diff -Naur src/build/toolchain/gcc_toolchain.gni src_ohos/build/toolchain/gcc_toolchain.gni
+--- src/build/toolchain/gcc_toolchain.gni	2024-10-24 09:22:02.451536297 +0800
++++ src_ohos/build/toolchain/gcc_toolchain.gni	2024-10-24 14:37:10.727901585 +0800
+@@ -122,6 +122,30 @@
        rebuild_string = ""
      }
  
@@ -229,20 +230,20 @@ diff -uprN src/build/toolchain/gcc_toolchain.gni src_ohos/build/toolchain/gcc_to
 修改tool("solink")和tool("solink_module")中rspfile_content：
 
 ```shell
-@@ -503,7 +527,7 @@ template("single_gcc_toolchain") {
+@@ -487,7 +511,7 @@
          # ld.
-         rspfile_content = "{{inputs}} {{solibs}} {{libs}}"
+         rspfile_content = "{{inputs}} {{solibs}} {{libs}} {{rlibs}}"
        } else {
--        rspfile_content = "-Wl,--whole-archive {{inputs}} {{solibs}} -Wl,--no-whole-archive {{libs}}"
+-        rspfile_content = "-Wl,--whole-archive {{inputs}} {{solibs}} -Wl,--no-whole-archive {{libs}} -Wl,--whole-archive {{rlibs}} -Wl,--no-whole-archive"
 +        rspfile_content = "-Wl,--whole-archive {{inputs}} {{solibs}} -Wl,--no-whole-archive $solink_libs_section_prefix {{libs}} $solink_libs_section_postfix"
        }
  
        description = "SOLINK $sofile"
-@@ -582,7 +606,7 @@ template("single_gcc_toolchain") {
+@@ -565,7 +589,7 @@
          strip_command = "${invoker.strip} -o \"$sofile\" \"$unstripped_sofile\""
          command += " && " + strip_command
        }
--      rspfile_content = "$whole_archive_flag {{inputs}} {{solibs}} $no_whole_archive_flag {{libs}} {{rlibs}}"
+-      rspfile_content = "$whole_archive_flag {{inputs}} {{solibs}} $no_whole_archive_flag {{libs}} $whole_archive_flag {{rlibs}} $no_whole_archive_flag"
 +      rspfile_content = "-Wl,--whole-archive {{inputs}} {{solibs}} -Wl,--no-whole-archive $solink_libs_section_prefix {{libs}} $solink_libs_section_postfix"
  
        description = "SOLINK_MODULE $sofile"
@@ -251,7 +252,11 @@ diff -uprN src/build/toolchain/gcc_toolchain.gni src_ohos/build/toolchain/gcc_to
 修改tool("link")中link_command：
 
 ```shell
--      link_command = "$ld {{ldflags}}${extra_ldflags} -o \"$unstripped_outfile\" $start_group_flag @\"$rspfile\" {{solibs}} $end_group_flag {{libs}} {{rlibs}}"
+@@ -618,7 +642,7 @@
+         start_group_flag = "-Wl,--start-group"
+         end_group_flag = "-Wl,--end-group "
+       }
+-      link_command = "$ld {{ldflags}}${extra_ldflags} -o \"$unstripped_outfile\" $start_group_flag @\"$rspfile\" {{solibs}} $end_group_flag {{libs}}"
 +      link_command = "$ld {{ldflags}}${extra_ldflags} -o \"$unstripped_outfile\" $libs_section_prefix $start_group_flag @\"$rspfile\" {{solibs}} {{libs}} $end_group_flag  $libs_section_postfix"
 ```
 
@@ -457,7 +462,7 @@ config("compiler") {
 **8. build/config/compiler/BUILD.gn 增加对is_ohos得判断**
 
 ```shell
-@@ -1576,9 +1570,12 @@ config("compiler_deterministic") {
+@@ -1334,9 +1334,13 @@
  config("clang_revision") {
    if (is_clang && clang_base_path == default_clang_base_path) {
      update_args = [
@@ -469,6 +474,7 @@ config("compiler") {
 +    if (!is_ohos) {
 +      update_args += [ "--verify-version=$clang_version" ]
 +    }
++
      if (llvm_force_head_revision) {
        update_args += [ "--llvm-force-head-revision" ]
      }
@@ -477,53 +483,85 @@ config("compiler") {
 为了避免编译中出现因警告而造成出错，需要将`-Werror`去掉
 
 ```shell
-@@ -1707,12 +1704,10 @@ config("treat_warnings_as_errors") {
-   if (is_win) {
-     cflags = [ "/WX" ]
+@@ -1643,12 +1647,12 @@
    } else {
--    cflags = [ "-Werror" ]
+     cflags = [ "-Wall" ]
+     if (treat_warnings_as_errors) {
+-      cflags += [ "-Werror" ]
++     # cflags += [ "-Werror" ]
  
-     # The compiler driver can sometimes (rarely) emit warnings before calling
-     # the actual linker.  Make sure these warnings are treated as errors as
-     # well.
--    ldflags = [ "-Werror" ]
-   }
+       # The compiler driver can sometimes (rarely) emit warnings before calling
+       # the actual linker.  Make sure these warnings are treated as errors as
+       # well.
+-      ldflags = [ "-Werror" ]
++     # ldflags = [ "-Werror" ]
+     }
+     if (is_clang) {
+       # Enable extra warnings for chromium_code when we control the compiler.
+@@ -1732,8 +1736,8 @@
+     # GCC may emit unsuppressible warnings so don't add -Werror for no chromium
+     # code. crbug.com/589724
+     if (treat_warnings_as_errors && is_clang) {
+-      cflags += [ "-Werror" ]
+-      ldflags = [ "-Werror" ]
++     # cflags += [ "-Werror" ]
++     # ldflags = [ "-Werror" ]
+     }
+     if (is_clang && !is_nacl) {
+       # TODO(thakis): Remove !is_nacl once
 ```
 
 编译过程中会提示部分配置不识别，因此也需要将这些配置项删除：
 
 ```shell
-@@ -610,9 +610,7 @@ config("compiler") {
+@@ -530,14 +530,14 @@
+     # TODO(hans): Remove this once Clang generates better optimized debug info
+     # by default. https://crbug.com/765793
+     cflags += [
+-      "-mllvm",
+-      "-instcombine-lower-dbg-declare=0",
++    #  "-mllvm",
++    #  "-instcombine-lower-dbg-declare=0",
      ]
      if (!is_debug && use_thin_lto && is_a_target_toolchain) {
        if (is_win) {
--        ldflags += [ "-mllvm:-instcombine-lower-dbg-declare=0" ]
+         ldflags += [ "-mllvm:-instcombine-lower-dbg-declare=0" ]
        } else {
 -        ldflags += [ "-Wl,-mllvm,-instcombine-lower-dbg-declare=0" ]
++      #  ldflags += [ "-Wl,-mllvm,-instcombine-lower-dbg-declare=0" ]
        }
      }
  
-@@ -622,14 +620,10 @@ config("compiler") {
-     if (default_toolchain != "//build/toolchain/cros:target" &&
-         !llvm_android_mainline) {
-       cflags += [
--        "-mllvm",
--        "-split-threshold-for-reg-with-hint=0",
-       ]
-       if (use_thin_lto && is_a_target_toolchain) {
-         if (is_win) {
--          ldflags += [ "-mllvm:-split-threshold-for-reg-with-hint=0" ]
-         } else {
--          ldflags += [ "-Wl,-mllvm,-split-threshold-for-reg-with-hint=0" ]
-         }
+@@ -703,7 +703,7 @@
+         import_instr_limit = 5
        }
+ 
+-      ldflags += [ "-Wl,-mllvm,-import-instr-limit=$import_instr_limit" ]
++      # ldflags += [ "-Wl,-mllvm,-import-instr-limit=$import_instr_limit" ]
      }
+ 
+     # TODO(https://crbug.com/1211155): investigate why this isn't effective on
+
+@@ -2082,8 +2091,8 @@
+ 
+       if (use_ml_inliner && is_a_target_toolchain) {
+         cflags += [
+-          "-mllvm",
+-          "-enable-ml-inliner=release",
++        #  "-mllvm",
++        #  "-enable-ml-inliner=release",
+         ]
+       }
+     } else {
 ```
 
 **9. build/config/clang/BUILD.gn 删除不支持的选项**
 
 ```shell
-@@ -16,38 +16,38 @@ config("find_bad_constructs") {
+diff -Naur src/build/config/clang/BUILD.gn src_ohos/build/config/clang/BUILD.gn
+--- src/build/config/clang/BUILD.gn	2024-10-24 09:22:02.252202058 +0800
++++ src_ohos/build/config/clang/BUILD.gn	2024-10-24 14:55:59.145429642 +0800
+@@ -11,15 +11,15 @@
      # The plugin is built directly into clang, so there's no need to load it
      # dynamically.
      cflags += [
@@ -536,57 +574,33 @@ config("compiler") {
 -      "-plugin-arg-find-bad-constructs",
 -      "-Xclang",
 -      "raw-ref-template-as-trivial-member",
--
--      "-Xclang",
--      "-plugin-arg-find-bad-constructs",
--      "-Xclang",
--      "check-stack-allocated",
--
--      "-Xclang",
--      "-plugin-arg-find-bad-constructs",
--      "-Xclang",
--      "check-raw-ptr-to-stack-allocated",
-+      #"-Xclang",
-+      #"-add-plugin",
-+      #"-Xclang",
-+      #"find-bad-constructs",
++    #  "-Xclang",
++    #  "-add-plugin",
++    #  "-Xclang",
++    #  "find-bad-constructs",
 +
-+      #"-Xclang",
-+      #"-plugin-arg-find-bad-constructs",
-+      #"-Xclang",
-+      #"raw-ref-template-as-trivial-member",
-+
-+      #"-Xclang",
-+      #"-plugin-arg-find-bad-constructs",
-+      #"-Xclang",
-+      #"check-stack-allocated",
-+
-+      #"-Xclang",
-+      #"-plugin-arg-find-bad-constructs",
-+      #"-Xclang",
-+      #"check-raw-ptr-to-stack-allocated",
- 
-       # TODO(https://crbug.com/1449812): This option should be removed after
-       #   next clang roll.
--      "-Xclang",
--      "-plugin-arg-find-bad-constructs",
--      "-Xclang",
--      "raw-ptr-fix-crbug-1449812",
-+      #"-Xclang",
-+      #"-plugin-arg-find-bad-constructs",
-+      #"-Xclang",
-+      #"raw-ptr-fix-crbug-1449812",
- 
-       # TODO(https://crbug.com/1504043): Remove when raw_ptr check has been enabled for the dawn repo.
--      "-Xclang",
--      "-plugin-arg-find-bad-constructs",
--      "-Xclang",
--      "raw-ptr-exclude-path=/third_party/dawn/",
-+      #"-Xclang",
-+      #"-plugin-arg-find-bad-constructs",
-+      #"-Xclang",
-+      #"raw-ptr-exclude-path=/third_party/dawn/",
++    #  "-Xclang",
++    #  "-plugin-arg-find-bad-constructs",
++    #  "-Xclang",
++    #  "raw-ref-template-as-trivial-member",
      ]
+ 
+     if (is_linux || is_chromeos || is_android || is_fuchsia) {
+@@ -37,12 +37,12 @@
+ # compile with these so may want to remove this config.
+ config("extra_warnings") {
+   cflags = [
+-    "-Wheader-hygiene",
++  #  "-Wheader-hygiene",
+ 
+     # Warns when a const char[] is converted to bool.
+-    "-Wstring-conversion",
++  #  "-Wstring-conversion",
+ 
+-    "-Wtautological-overlap-compare",
++  #  "-Wtautological-overlap-compare",
+   ]
+ }
 ```
 
 **10. 其他业务代码修改**
@@ -596,22 +610,22 @@ config("compiler") {
   1. 修改libevent中的BUILD.gn
 
   ```shell
-  diff -uprN src/third_party/libevent/BUILD.gn src_ohos/third_party/libevent/BUILD.gn
-  --- src/third_party/libevent/BUILD.gn	2023-12-15 21:08:23.000000000 -0800
-  +++ src_ohos/third_party/libevent/BUILD.gn	2023-12-18 00:40:20.090099934 -0800
-  @@ -37,13 +37,13 @@ static_library("libevent") {
-       "mac/event-config.h",
-     ]
-     include_dirs += [ "mac" ]
+  diff -Naur src/third_party/libevent/BUILD.gn src_ohos/third_party/libevent/BUILD.gn
+  --- src/third_party/libevent/BUILD.gn	2024-10-24 09:22:25.466802965 +0800
+  +++ src_ohos/third_party/libevent/BUILD.gn	2024-10-24 14:57:37.673306420 +0800
+  @@ -43,13 +43,13 @@
+         "mac/event-config.h",
+       ]
+       include_dirs = [ "mac" ]
   -  } else if (is_linux || is_chromeos) {
   +  } else if (is_linux || is_chromeos || is_ohos) {
-     sources += [
+       sources += [
          "epoll.c",
          "linux/config.h",
          "linux/event-config.h",
        ]
-  -    include_dirs += [ "linux" ]
-  +    include_dirs += [ "linux", "compat" ]
+  -    include_dirs = [ "linux" ]
+  +    include_dirs = [ "linux", "compat" ]
      } else if (is_android) {
        sources += [
          "android/config.h",
@@ -620,16 +634,16 @@ config("compiler") {
   2. 修改video_capture的BUILD.gn
 
   ```shell
-  diff -uprN src/modules/video_capture/BUILD.gn src_ohos/modules/video_capture/BUILD.gn
-  --- src/modules/video_capture/BUILD.gn	2023-12-15 19:42:56.000000000 -0800
-  +++ src_ohos/modules/video_capture/BUILD.gn	2023-12-18 17:43:10.824354213 -0800
-  @@ -71,7 +71,7 @@ if (!build_with_chromium || is_linux ||
-         "video_capture_options.h",
+  diff -Naur src/modules/video_capture/BUILD.gn src_ohos/modules/video_capture/BUILD.gn
+  --- src/modules/video_capture/BUILD.gn	2024-10-24 10:06:45.106063829 +0800
+  +++ src_ohos/modules/video_capture/BUILD.gn	2024-10-24 15:10:49.503095752 +0800
+  @@ -62,7 +62,7 @@
+         "../../system_wrappers",
        ]
-   
+ 
   -    if (is_linux || is_chromeos) {
   +    if (is_linux || is_chromeos || is_ohos) {
-         sources += [
+         sources = [
            "linux/device_info_linux.cc",
            "linux/device_info_v4l2.cc",
   ```
@@ -637,18 +651,18 @@ config("compiler") {
   3. 修改zlib的BUILD.gn
 
    ```shell
-   diff -uprN src/third_party/zlib/BUILD.gn src_ohos/third_party/zlib/BUILD.gn
-  --- src/third_party/zlib/BUILD.gn	2023-12-15 21:08:26.000000000 -0800
-  +++ src_ohos/third_party/zlib/BUILD.gn	2023-12-18 00:47:21.237890949 -0800
-  @@ -127,7 +127,7 @@ if (use_arm_neon_optimizations) {
-       defines = [ "CRC32_ARMV8_CRC32" ]
-       if (is_android) {
-         defines += [ "ARMV8_OS_ANDROID" ]
-  -    } else if (is_linux || is_chromeos) {
-  +    } else if (is_linux || is_chromeos || is_ohos) {
-         defines += [ "ARMV8_OS_LINUX" ]
-       } else if (is_mac) {
-         defines += [ "ARMV8_OS_MACOS" ]
+   diff -Naur src/third_party/zlib/BUILD.gn src_ohos/third_party/zlib/BUILD.gn
+   --- src/third_party/zlib/BUILD.gn	2024-10-24 09:22:32.935042341 +0800
+   +++ src_ohos/third_party/zlib/BUILD.gn	2024-10-24 15:12:16.479317436 +0800
+   @@ -121,7 +121,7 @@
+         defines = [ "CRC32_ARMV8_CRC32" ]
+         if (is_android) {
+           defines += [ "ARMV8_OS_ANDROID" ]
+   -      } else if (is_linux || is_chromeos) {
+   +      } else if (is_linux || is_chromeos || is_ohos) {
+            defines += [ "ARMV8_OS_LINUX" ]
+          } else if (is_mac) {
+            defines += [ "ARMV8_OS_MACOS" ]
   
    ```
 
@@ -659,10 +673,10 @@ config("compiler") {
   首先需要在根目录的BUILD.gn中配置识别ohos系统的变量：
 
   ```shell
-  diff -uprN src/BUILD.gn src_ohos/BUILD.gn
-  --- src/BUILD.gn	2023-12-15 19:42:56.000000000 -0800
-  +++ src_ohos/BUILD.gn	2023-12-18 01:12:39.553298189 -0800
-  @@ -214,6 +214,9 @@ config("common_inherited_config") {
+  diff -Naur src/BUILD.gn src_ohos/BUILD.gn
+  --- src/BUILD.gn	2024-10-24 10:06:44.716202585 +0800
+  +++ src_ohos/BUILD.gn	2024-10-24 15:14:40.329478789 +0800
+  @@ -205,6 +205,9 @@
          "WEBRTC_IOS",
        ]
      }

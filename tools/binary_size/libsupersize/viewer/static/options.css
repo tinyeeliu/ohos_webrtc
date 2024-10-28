@@ -7,7 +7,7 @@
   grid-template-columns: auto 306px;
 }
 
-.show-options #frm-options {
+.show-options .options {
   visibility: visible;
 }
 .show-options .settings {
@@ -26,7 +26,7 @@
 }
 
 /** Options side panel */
-#frm-options {
+.options {
   z-index: 5; /* Side panel layer */
   grid-area: options;
   padding: 0 16px;
@@ -45,7 +45,7 @@ fieldset {
   padding: 0;
   margin: 1em 0;
 }
-#frm-options fieldset:first-of-type {
+.options fieldset:first-of-type {
   margin-top: 1em;
 }
 legend {

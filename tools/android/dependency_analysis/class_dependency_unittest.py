@@ -4,7 +4,6 @@
 # found in the LICENSE file.
 """Unit tests for dependency_analysis.class_dependency."""
 
-import unittest
 import unittest.mock
 
 import class_dependency

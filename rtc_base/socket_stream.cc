@@ -60,36 +60,42 @@ StreamState SocketStream::GetState() const {
   }
 }
 
-StreamResult SocketStream::Read(rtc::ArrayView<uint8_t> buffer,
-                                size_t& read,
-                                int& error) {
+StreamResult SocketStream::Read(void* buffer,
+                                size_t buffer_len,
+                                size_t* read,
+                                int* error) {
   RTC_DCHECK(socket_ != nullptr);
-  int result = socket_->Recv(buffer.data(), buffer.size(), nullptr);
+  int result = socket_->Recv(buffer, buffer_len, nullptr);
   if (result < 0) {
     if (socket_->IsBlocking())
       return SR_BLOCK;
-    error = socket_->GetError();
+    if (error)
+      *error = socket_->GetError();
     return SR_ERROR;
   }
-  if ((result > 0) || (buffer.size() == 0)) {
-    read = result;
+  if ((result > 0) || (buffer_len == 0)) {
+    if (read)
+      *read = result;
     return SR_SUCCESS;
   }
   return SR_EOS;
 }
 
-StreamResult SocketStream::Write(rtc::ArrayView<const uint8_t> data,
-                                 size_t& written,
-                                 int& error) {
+StreamResult SocketStream::Write(const void* data,
+                                 size_t data_len,
+                                 size_t* written,
+                                 int* error) {
   RTC_DCHECK(socket_ != nullptr);
-  int result = socket_->Send(data.data(), data.size());
+  int result = socket_->Send(data, data_len);
   if (result < 0) {
     if (socket_->IsBlocking())
       return SR_BLOCK;
-    error = socket_->GetError();
+    if (error)
+      *error = socket_->GetError();
     return SR_ERROR;
   }
-  written = result;
+  if (written)
+    *written = result;
   return SR_SUCCESS;
 }
 

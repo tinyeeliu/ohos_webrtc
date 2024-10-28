@@ -12,7 +12,7 @@ namespace nested {
 void foo();
 }  // namespace nested
 
-// blink::protocol namespace is blocklisted.
+// blink::protocol namespace is blacklisted.
 namespace protocol {
 void foo();
 }  // namespace protocol

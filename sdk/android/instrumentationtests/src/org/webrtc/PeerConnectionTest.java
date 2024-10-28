@@ -18,7 +18,7 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 
-import androidx.test.InstrumentationRegistry;
+import android.support.test.InstrumentationRegistry;
 import androidx.test.filters.SmallTest;
 import java.util.Arrays;
 import java.util.List;

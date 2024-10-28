@@ -18,7 +18,7 @@ namespace webrtc {
 FeedbackGeneratorImpl::FeedbackGeneratorImpl(
     FeedbackGeneratorImpl::Config config)
     : conf_(config),
-      net_(TimeMode::kSimulated, EmulatedNetworkStatsGatheringMode::kDefault),
+      net_(TimeMode::kSimulated),
       send_link_{new SimulatedNetwork(conf_.send_link)},
       ret_link_{new SimulatedNetwork(conf_.return_link)},
       route_(this,

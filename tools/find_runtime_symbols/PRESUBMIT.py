@@ -10,6 +10,8 @@ for more details on the presubmit API built into depot_tools.
 
 import sys
 
+USE_PYTHON3 = True
+
 
 def CommonChecks(input_api, output_api):
   def join(*args):
@@ -31,7 +33,9 @@ def CommonChecks(input_api, output_api):
           input_api,
           output_api,
           input_api.os_path.join(input_api.PresubmitLocalPath(), 'tests'),
-          files_to_check=[r'.+_test\.py$']))
+          files_to_check=[r'.+_test\.py$'],
+          run_on_python2=False,
+          skip_shebang_check=True))
   return output
 
 

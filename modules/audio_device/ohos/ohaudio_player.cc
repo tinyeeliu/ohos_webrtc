@@ -155,7 +155,7 @@ int32_t OHAudioPlayer::OnDataCallback(void* audio_data, int32_t num_frames)
                          << ohaudio_.device_id();
         first_data_callback_ = false;
     }
-    RTC_LOG(LS_INFO) << "num_frames=" << num_frames;
+  //  RTC_LOG(LS_INFO) << "num_frames=" << num_frames;
     const int32_t underrun_count = ohaudio_.xrun_count();
     if (underrun_count > underrun_count_) {
         RTC_LOG(LS_ERROR) << "Underrun detected: " << underrun_count;

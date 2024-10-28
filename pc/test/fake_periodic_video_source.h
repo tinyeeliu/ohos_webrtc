@@ -46,18 +46,18 @@ class FakePeriodicVideoSource final
             config.timestamp_offset_ms * rtc::kNumMicrosecsPerMillisec),
         task_queue_(std::make_unique<TaskQueueForTest>(
             "FakePeriodicVideoTrackSource")) {
+    thread_checker_.Detach();
     frame_source_.SetRotation(config.rotation);
 
     TimeDelta frame_interval = TimeDelta::Millis(config.frame_interval_ms);
-    repeating_task_handle_ =
-        RepeatingTaskHandle::Start(task_queue_->Get(), [this, frame_interval] {
-          if (broadcaster_.wants().rotation_applied) {
-            broadcaster_.OnFrame(frame_source_.GetFrameRotationApplied());
-          } else {
-            broadcaster_.OnFrame(frame_source_.GetFrame());
-          }
-          return frame_interval;
-        });
+    RepeatingTaskHandle::Start(task_queue_->Get(), [this, frame_interval] {
+      if (broadcaster_.wants().rotation_applied) {
+        broadcaster_.OnFrame(frame_source_.GetFrameRotationApplied());
+      } else {
+        broadcaster_.OnFrame(frame_source_.GetFrame());
+      }
+      return frame_interval;
+    });
   }
 
   rtc::VideoSinkWants wants() const {
@@ -82,12 +82,11 @@ class FakePeriodicVideoSource final
 
   void Stop() {
     RTC_DCHECK(task_queue_);
-    task_queue_->SendTask([&]() { repeating_task_handle_.Stop(); });
     task_queue_.reset();
   }
 
  private:
-  SequenceChecker thread_checker_{SequenceChecker::kDetached};
+  SequenceChecker thread_checker_;
 
   rtc::VideoBroadcaster broadcaster_;
   cricket::FakeFrameSource frame_source_;
@@ -95,7 +94,6 @@ class FakePeriodicVideoSource final
   rtc::VideoSinkWants wants_ RTC_GUARDED_BY(&mutex_);
 
   std::unique_ptr<TaskQueueForTest> task_queue_;
-  RepeatingTaskHandle repeating_task_handle_;
 };
 
 }  // namespace webrtc

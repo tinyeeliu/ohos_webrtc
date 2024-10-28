@@ -12,7 +12,6 @@
 
 #include <errno.h>
 #include <sys/socket.h>
-
 #include <algorithm>
 #include <map>
 #include <memory>
@@ -427,9 +426,10 @@ void AndroidVoipClient::SendRtpPacket(const std::vector<uint8_t>& packet_copy) {
   }
 }
 
-bool AndroidVoipClient::SendRtp(rtc::ArrayView<const uint8_t> packet,
+bool AndroidVoipClient::SendRtp(const uint8_t* packet,
+                                size_t length,
                                 const webrtc::PacketOptions& options) {
-  std::vector<uint8_t> packet_copy(packet.begin(), packet.end());
+  std::vector<uint8_t> packet_copy(packet, packet + length);
   voip_thread_->PostTask([this, packet_copy = std::move(packet_copy)] {
     SendRtpPacket(packet_copy);
   });
@@ -446,8 +446,8 @@ void AndroidVoipClient::SendRtcpPacket(
   }
 }
 
-bool AndroidVoipClient::SendRtcp(rtc::ArrayView<const uint8_t> packet) {
-  std::vector<uint8_t> packet_copy(packet.begin(), packet.end());
+bool AndroidVoipClient::SendRtcp(const uint8_t* packet, size_t length) {
+  std::vector<uint8_t> packet_copy(packet, packet + length);
   voip_thread_->PostTask([this, packet_copy = std::move(packet_copy)] {
     SendRtcpPacket(packet_copy);
   });

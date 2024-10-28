@@ -134,7 +134,7 @@ RtpCapabilities PeerConnectionFactory::GetRtpSenderCapabilities(
     }
     case cricket::MEDIA_TYPE_VIDEO: {
       cricket::VideoCodecs cricket_codecs;
-      cricket_codecs = media_engine()->video().send_codecs(context_->use_rtx());
+      cricket_codecs = media_engine()->video().send_codecs();
       auto extensions =
           GetDefaultEnabledRtpHeaderExtensions(media_engine()->video());
       return ToRtpCapabilities(cricket_codecs, extensions);
@@ -224,6 +224,11 @@ PeerConnectionFactory::CreatePeerConnectionOrError(
         configuration.port_allocator_config.flags);
   }
 
+  if (!dependencies.async_resolver_factory) {
+    dependencies.async_resolver_factory =
+        std::make_unique<webrtc::BasicAsyncResolverFactory>();
+  }
+
   if (!dependencies.ice_transport_factory) {
     dependencies.ice_transport_factory =
         std::make_unique<DefaultIceTransportFactory>();
@@ -238,8 +243,8 @@ PeerConnectionFactory::CreatePeerConnectionOrError(
   const FieldTrialsView* trials =
       dependencies.trials ? dependencies.trials.get() : &field_trials();
   std::unique_ptr<Call> call =
-      worker_thread()->BlockingCall([this, &event_log, trials, &configuration] {
-        return CreateCall_w(event_log.get(), *trials, configuration);
+      worker_thread()->BlockingCall([this, &event_log, trials] {
+        return CreateCall_w(event_log.get(), *trials);
       });
 
   auto result = PeerConnection::Create(context_, options_, std::move(event_log),
@@ -268,11 +273,12 @@ PeerConnectionFactory::CreateLocalMediaStream(const std::string& stream_id) {
 }
 
 rtc::scoped_refptr<VideoTrackInterface> PeerConnectionFactory::CreateVideoTrack(
-    rtc::scoped_refptr<VideoTrackSourceInterface> source,
-    absl::string_view id) {
+    const std::string& id,
+    VideoTrackSourceInterface* source) {
   RTC_DCHECK(signaling_thread()->IsCurrent());
-  rtc::scoped_refptr<VideoTrackInterface> track =
-      VideoTrack::Create(id, source, worker_thread());
+  rtc::scoped_refptr<VideoTrackInterface> track = VideoTrack::Create(
+      id, rtc::scoped_refptr<VideoTrackSourceInterface>(source),
+      worker_thread());
   return VideoTrackProxy::Create(signaling_thread(), worker_thread(), track);
 }
 
@@ -288,20 +294,19 @@ rtc::scoped_refptr<AudioTrackInterface> PeerConnectionFactory::CreateAudioTrack(
 std::unique_ptr<RtcEventLog> PeerConnectionFactory::CreateRtcEventLog_w() {
   RTC_DCHECK_RUN_ON(worker_thread());
 
-  auto encoding_type = RtcEventLog::EncodingType::NewFormat;
-  if (field_trials().IsDisabled("WebRTC-RtcEventLogNewFormat"))
-    encoding_type = RtcEventLog::EncodingType::Legacy;
+  auto encoding_type = RtcEventLog::EncodingType::Legacy;
+  if (IsTrialEnabled("WebRTC-RtcEventLogNewFormat"))
+    encoding_type = RtcEventLog::EncodingType::NewFormat;
   return event_log_factory_ ? event_log_factory_->Create(encoding_type)
                             : std::make_unique<RtcEventLogNull>();
 }
 
 std::unique_ptr<Call> PeerConnectionFactory::CreateCall_w(
     RtcEventLog* event_log,
-    const FieldTrialsView& field_trials,
-    const PeerConnectionInterface::RTCConfiguration& configuration) {
+    const FieldTrialsView& field_trials) {
   RTC_DCHECK_RUN_ON(worker_thread());
 
-  CallConfig call_config(event_log, network_thread());
+  webrtc::Call::Config call_config(event_log, network_thread());
   if (!media_engine() || !context_->call_factory()) {
     return nullptr;
   }
@@ -341,8 +346,8 @@ std::unique_ptr<Call> PeerConnectionFactory::CreateCall_w(
   call_config.rtp_transport_controller_send_factory =
       transport_controller_send_factory_.get();
   call_config.metronome = metronome_.get();
-  call_config.pacer_burst_interval = configuration.pacer_burst_interval;
-  return context_->call_factory()->CreateCall(call_config);
+  return std::unique_ptr<Call>(
+      context_->call_factory()->CreateCall(call_config));
 }
 
 bool PeerConnectionFactory::IsTrialEnabled(absl::string_view key) const {

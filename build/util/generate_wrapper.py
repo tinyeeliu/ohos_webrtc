@@ -40,7 +40,7 @@ SCRIPT_TEMPLATES = {
 }
 
 
-PY_TEMPLATE = textwrap.dedent(r"""
+PY_TEMPLATE = textwrap.dedent("""\
     import os
     import re
     import shlex

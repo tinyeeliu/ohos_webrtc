@@ -23,12 +23,11 @@ AUTOLINK_RE = (r'(https?://[a-zA-Z0-9$_.+!*\',%;:@=?#/~<>-]+'
 
 
 class _GitilesSmartQuotesExtension(Extension):
-  """Add Gitiles' simpler linkifier to Markdown, with a priority just higher
-  than that of the builtin ''autolink''."""
+  """Add Gitiles' simpler linkifier to Markdown."""
 
   def extendMarkdown(self, md):
-    md.inlinePatterns.register(AutolinkInlineProcessor(AUTOLINK_RE, md),
-                               'gitilesautolink', 122)
+    md.inlinePatterns.add('gitilesautolink',
+                          AutolinkInlineProcessor(AUTOLINK_RE, md), '<autolink')
 
 
 def makeExtension(*args, **kwargs):

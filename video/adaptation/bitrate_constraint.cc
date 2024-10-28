@@ -58,8 +58,7 @@ bool BitrateConstraint::IsAdaptationUpAllowed(
     }
 
     if (VideoStreamEncoderResourceManager::IsSimulcastOrMultipleSpatialLayers(
-            encoder_settings_->encoder_config(),
-            encoder_settings_->video_codec())) {
+            encoder_settings_->encoder_config())) {
       // Resolution bitrate limits usage is restricted to singlecast.
       return true;
     }

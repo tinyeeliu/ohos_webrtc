@@ -132,6 +132,25 @@ TEST(PacketArrivalMapTest, GrowsBufferAndRemoveOld) {
   EXPECT_FALSE(map.has_received(kLargeSeq + 1));
 }
 
+TEST(PacketArrivalMapTest, GrowsBufferAndRemoveOldTrimsBeginning) {
+  PacketArrivalTimeMap map;
+
+  constexpr int64_t kLargeSeq = 42 + PacketArrivalTimeMap::kMaxNumberOfPackets;
+  map.AddPacket(42, Timestamp::Millis(10));
+  // Missing: 43, 44
+  map.AddPacket(45, Timestamp::Millis(13));
+  map.AddPacket(kLargeSeq, Timestamp::Millis(12));
+
+  EXPECT_EQ(map.begin_sequence_number(), 45);
+  EXPECT_EQ(map.end_sequence_number(), kLargeSeq + 1);
+
+  EXPECT_FALSE(map.has_received(44));
+  EXPECT_TRUE(map.has_received(45));
+  EXPECT_FALSE(map.has_received(46));
+  EXPECT_TRUE(map.has_received(kLargeSeq));
+  EXPECT_FALSE(map.has_received(kLargeSeq + 1));
+}
+
 TEST(PacketArrivalMapTest, SequenceNumberJumpsDeletesAll) {
   PacketArrivalTimeMap map;
 
@@ -243,29 +262,6 @@ TEST(PacketArrivalMapTest, EraseAllRemembersBeginningSeqNbr) {
   EXPECT_FALSE(map.has_received(49));
   EXPECT_TRUE(map.has_received(50));
   EXPECT_FALSE(map.has_received(51));
-}
-
-TEST(PacketArrivalMapTest, EraseToMissingSequenceNumber) {
-  PacketArrivalTimeMap map;
-
-  map.AddPacket(37, Timestamp::Millis(10));
-  map.AddPacket(39, Timestamp::Millis(11));
-  map.AddPacket(40, Timestamp::Millis(12));
-  map.AddPacket(41, Timestamp::Millis(13));
-
-  map.EraseTo(38);
-
-  map.AddPacket(42, Timestamp::Millis(40));
-
-  EXPECT_EQ(map.begin_sequence_number(), 38);
-  EXPECT_EQ(map.end_sequence_number(), 43);
-
-  EXPECT_FALSE(map.has_received(37));
-  EXPECT_FALSE(map.has_received(38));
-  EXPECT_TRUE(map.has_received(39));
-  EXPECT_TRUE(map.has_received(40));
-  EXPECT_TRUE(map.has_received(41));
-  EXPECT_TRUE(map.has_received(42));
 }
 
 }  // namespace
