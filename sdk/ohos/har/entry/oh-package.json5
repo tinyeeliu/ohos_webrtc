@@ -1,0 +1,12 @@
+{
+  "name": "entry",
+  "version": "1.0.0",
+  "description": "WebRTC demo for OpenHarmony/HarmonyOS",
+  "main": "",
+  "author": "",
+  "license": "",
+  "dependencies": {
+    "ohos_webrtc": "../ohos_webrtc"
+  }
+}
+

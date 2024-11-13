@@ -1,0 +1,11 @@
+{
+  "name": "ohos_webrtc",
+  "version": "0.1.0",
+  "description": "ArkTS interfaces of webrtc for OHOS.",
+  "main": "Index.ets",
+  "author": "",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "libohos_webrtc.so": "file:./src/main/libohos_webrtc"
+  }
+}
