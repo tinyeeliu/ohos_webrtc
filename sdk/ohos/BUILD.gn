@@ -1,0 +1,138 @@
+
+if (is_ohos) {
+  import("../../webrtc.gni")
+
+  group("ohos") {
+    if (!build_with_chromium && is_ohos) {
+      public_deps = [
+        ":libohos_webrtc",
+      ]
+    }
+  }
+
+  ohos_webrtc_src_path = "src/ohos_webrtc"
+
+  rtc_shared_library("libohos_webrtc") {
+    sources = [
+        "$ohos_webrtc_src_path/audio_processing_factory.cpp",
+        "$ohos_webrtc_src_path/certificate.cpp",
+        "$ohos_webrtc_src_path/configuration.cpp",
+        "$ohos_webrtc_src_path/data_channel.cpp",
+        "$ohos_webrtc_src_path/dtls_transport.cpp",
+        "$ohos_webrtc_src_path/dtmf_sender.cpp",
+        "$ohos_webrtc_src_path/ice_candidate.cpp",
+        "$ohos_webrtc_src_path/ice_transport.cpp",
+        "$ohos_webrtc_src_path/media_devices.cpp",
+        "$ohos_webrtc_src_path/media_source.cpp",
+        "$ohos_webrtc_src_path/media_stream.cpp",
+        "$ohos_webrtc_src_path/media_stream_track.cpp",
+        "$ohos_webrtc_src_path/media_track_constraints.cpp",
+        "$ohos_webrtc_src_path/napi_module.cpp",
+        "$ohos_webrtc_src_path/peer_connection.cpp",
+        "$ohos_webrtc_src_path/peer_connection_factory.cpp",
+        "$ohos_webrtc_src_path/rtp_parameters.cpp",
+        "$ohos_webrtc_src_path/rtp_receiver.cpp",
+        "$ohos_webrtc_src_path/rtp_sender.cpp",
+        "$ohos_webrtc_src_path/rtp_transceiver.cpp",
+        "$ohos_webrtc_src_path/sctp_transport.cpp",
+        "$ohos_webrtc_src_path/session_description.cpp",
+        "$ohos_webrtc_src_path/stats_observer.cpp",
+        "$ohos_webrtc_src_path/video_decoder_factory.cpp",
+        "$ohos_webrtc_src_path/video_encoder_factory.cpp",
+        "$ohos_webrtc_src_path/async_work/async_worker_enumerate_devices.cpp",
+        "$ohos_webrtc_src_path/async_work/async_worker_get_display_media.cpp",
+        "$ohos_webrtc_src_path/async_work/async_worker_get_stats.cpp",
+        "$ohos_webrtc_src_path/async_work/async_worker_get_user_media.cpp",
+        "$ohos_webrtc_src_path/audio_device/audio_capturer.cpp",
+        "$ohos_webrtc_src_path/audio_device/audio_device_enumerator.cpp",
+        "$ohos_webrtc_src_path/audio_device/audio_device_module.cpp",
+        "$ohos_webrtc_src_path/audio_device/audio_renderer.cpp",
+        "$ohos_webrtc_src_path/camera/camera_capturer.cpp",
+        "$ohos_webrtc_src_path/camera/camera_device_info.cpp",
+        "$ohos_webrtc_src_path/camera/camera_enumerator.cpp",
+        "$ohos_webrtc_src_path/desktop_capture/desktop_capturer.cpp",
+        "$ohos_webrtc_src_path/helper/camera.cpp",
+        "$ohos_webrtc_src_path/logging/hilog_sink.cpp",
+        "$ohos_webrtc_src_path/logging/log_sink.cpp",
+        "$ohos_webrtc_src_path/logging/native_logging.cpp",
+        "$ohos_webrtc_src_path/render/egl_context.cpp",
+        "$ohos_webrtc_src_path/render/egl_env.cpp",
+        "$ohos_webrtc_src_path/render/gl_drawer.cpp",
+        "$ohos_webrtc_src_path/render/gl_shader.cpp",
+        "$ohos_webrtc_src_path/render/native_video_renderer.cpp",
+        "$ohos_webrtc_src_path/render/native_window_renderer.cpp",
+        "$ohos_webrtc_src_path/render/native_window_renderer_gl.cpp",
+        "$ohos_webrtc_src_path/render/native_window_renderer_raster.cpp",
+        "$ohos_webrtc_src_path/render/video_frame_drawer.cpp",
+        "$ohos_webrtc_src_path/render/yuv_converter.cpp",
+        "$ohos_webrtc_src_path/user_media/media_constraints.cpp",
+        "$ohos_webrtc_src_path/user_media/media_constraints_util.cpp",
+        "$ohos_webrtc_src_path/user_media/media_settings.cpp",
+        "$ohos_webrtc_src_path/video/texture_buffer.cpp",
+        "$ohos_webrtc_src_path/video/video_frame_receiver_gl.cpp",
+        "$ohos_webrtc_src_path/video/video_frame_receiver_native.cpp",
+        "$ohos_webrtc_src_path/video/video_track_source.cpp",
+        "$ohos_webrtc_src_path/video_codec/hardware_video_decoder.cpp",
+        "$ohos_webrtc_src_path/video_codec/hardware_video_decoder_factory.cpp",
+        "$ohos_webrtc_src_path/video_codec/hardware_video_encoder.cpp",
+        "$ohos_webrtc_src_path/video_codec/hardware_video_encoder_factory.cpp",
+        "$ohos_webrtc_src_path/video_codec/media_codec_utils.cpp",
+        "$ohos_webrtc_src_path/video_codec/software_video_decoder_factory.cpp",
+        "$ohos_webrtc_src_path/video_codec/software_video_encoder_factory.cpp",
+    ]
+   
+    include_dirs = [
+        "$ohos_webrtc_src_path",
+        "src/node-addon-api",
+    ]
+
+    defines = [
+        "NODE_ADDON_API_DISABLE_DEPRECATED",
+        "NAPI_DISABLE_CPP_EXCEPTIONS",
+        "NDK_HELPER_DISABLE_CPP_EXCEPTIONS",
+        "NODE_ADDON_API_ENABLE_TYPE_CHECK_ON_AS",
+    ]
+
+    cflags = [
+        "-g",
+        "-O0",
+    ]
+
+    ldflags = [
+        "-lace_napi.z",
+        "-lhilog_ndk.z",
+        "-lohaudio",
+        "-lohcamera",
+        "-lohimage",
+        "-limage_receiver",
+        "-lnative_buffer",
+        "-lnative_window",
+        "-lnative_image",
+        "-lEGL",
+        "-lGLESv3",
+        "-lnative_media_codecbase",
+        "-lnative_media_core",
+        "-lnative_media_venc",
+        "-lnative_media_vdec",
+        "-lnative_avscreen_capture",
+        "-static-libstdc++",
+    ]
+
+    deps = [
+      "../../pc:libjingle_peerconnection",
+      "../../api:create_peerconnection_factory",
+      "../../api/audio_codecs:builtin_audio_decoder_factory",
+      "../../api/audio_codecs:builtin_audio_encoder_factory",
+      "../../modules/video_coding:webrtc_h264",
+      "../../modules/video_coding:webrtc_vp8",
+      "../../modules/video_coding:webrtc_vp9",
+      "../../modules/video_coding/codecs/av1:libaom_av1_encoder",
+      "../../modules/video_coding/codecs/av1:dav1d_decoder",
+      "../../rtc_base:checks",
+      "//third_party/libyuv",
+    ]
+
+    output_extension = "so"
+  }
+
+}
