@@ -550,10 +550,10 @@ bool YuvConverter::PrepareFrameBuffer(int width, int height)
     if (textureId_ == 0) {
         glGenTextures(1, &textureId_);
         glBindTexture(GL_TEXTURE_2D, textureId_);
-        glTexParameterf(textureId_, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameterf(textureId_, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameterf(textureId_, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameterf(textureId_, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     }
 
     if (frameBufferId_ == 0) {
@@ -567,7 +567,7 @@ bool YuvConverter::PrepareFrameBuffer(int width, int height)
     glBindTexture(GL_TEXTURE_2D, 0);
     GLenum error = glGetError();
     if (error != GL_NO_ERROR) {
-        RTC_LOG(LS_ERROR) << "Failed to call glBindFramebuffer: " << error;
+        RTC_LOG(LS_ERROR) << "Failed to prepare frame buffer: " << error;
         return false;
     }
     
