@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
     <oatconfig>
+        <policylist>
+            <policy name="defaultPolicy" desc="">
+                <policyitem type="copyright" name="Archermind Technology (Nanjing) Co. Ltd." path=".*" rule="may" group="defaultGroup" filefilter="copyrightPolicyFilter" desc=""/>
+            </policy>
+        </policylist>
         <filefilterlist>
             <filefilter name="binaryFileTypePolicyFilter" desc="Filters for resources files policies">
                 <filteritem type="filename" name="*.png" desc="指导文档需要的png图片"/>
@@ -41,6 +46,12 @@
                         desc="上游库信息，不修改"
                         name="tools/.*"
                         type="filepath"/>
+                <filteritem type="filename" name="app.json5" desc="OpenHarmony工程编译配置文件，无需添加版权头"/>
+                <filteritem type="filename" name="oh-package.json5" desc="OpenHarmony工程编译配置文件，无需添加版权头"/>
+                <filteritem type="filename" name="hvigorfile.ts" desc="OpenHarmony工程编译配置文件，无需添加版权头"/>
+                <filteritem type="filename" name="hvigor-config.json5" desc="OpenHarmony工程编译配置文件，无需添加版权头"/>
+                <filteritem type="filename" name="module.json5" desc="OpenHarmony工程编译配置文件，无需添加版权头"/>
+                <filteritem type="filename" name="build-profile.json5" desc="OpenHarmony工程编译配置文件，无需添加版权头"/>
             </filefilter>
             <filefilter
                 desc="Filters for compatibility，license header policies"
@@ -57,6 +68,12 @@
                         desc="上游库信息，不修改"
                         name="tools/.*"
                         type="filepath"/>
+                <filteritem type="filename" name="app.json5" desc="OpenHarmony工程编译配置文件，无需添加版权头"/>
+                <filteritem type="filename" name="oh-package.json5" desc="OpenHarmony工程编译配置文件，无需添加版权头"/>
+                <filteritem type="filename" name="hvigorfile.ts" desc="OpenHarmony工程编译配置文件，无需添加版权头"/>
+                <filteritem type="filename" name="hvigor-config.json5" desc="OpenHarmony工程编译配置文件，无需添加版权头"/>
+                <filteritem type="filename" name="module.json5" desc="OpenHarmony工程编译配置文件，无需添加版权头"/>
+                <filteritem type="filename" name="build-profile.json5" desc="OpenHarmony工程编译配置文件，无需添加版权头"/>
             </filefilter>
         </filefilterlist>
     </oatconfig>
