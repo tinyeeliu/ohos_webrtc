@@ -343,6 +343,8 @@ void OHAudioPlayerWrapper::SetStreamConfiguration(OH_AudioStreamBuilder* builder
     OH_AudioRenderer_Callbacks callbacks;
     callbacks.OH_AudioRenderer_OnWriteData = DataCallback;
     callbacks.OH_AudioRenderer_OnError = ErrorCallback;
+    callbacks.OH_AudioRenderer_OnInterruptEvent = nullptr;
+    callbacks.OH_AudioRenderer_OnStreamEvent = nullptr;
     OH_AudioStreamBuilder_SetRendererCallback(builder, callbacks, this);
 }
 
