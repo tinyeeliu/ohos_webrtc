@@ -49,6 +49,6 @@ sdk/ohos/
 
 接口说明及使用方法请参阅[文档](./api/libwebrtc.md)，实现代码在src/ohos_webrtc目录下，其中NAPI接口的使用借助了开源项目[node-addon-api](https://github.com/nodejs/node-addon-api)。
 
-通过[BUILD.gn](./BUILD.gn)可编译得到动态库libohos_webrtc.so，之后可用于构建HAR包以供其它应用模块使用，完整的HAR及示例工程在har目录下。动态库的编译方法请参阅[文档](/docs/ohos/webrtc_build.md)。
+通过[BUILD.gn](./BUILD.gn)可编译得到动态库`libohos_webrtc.so`，之后可用于构建HAR包以供其它应用模块使用，完整的HAR及示例工程在`har_hap`目录下。动态库的编译方法请参阅[文档](/docs/ohos/webrtc_build.md)。
 
 **OHOS SDK要求12及以上**。
