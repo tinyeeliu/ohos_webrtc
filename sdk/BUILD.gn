@@ -25,6 +25,9 @@ group("sdk") {
     if (is_ios) {
       public_deps += [ ":framework_objc" ]
     }
+    if (is_ohos) {
+      public_deps += [ "ohos" ]
+    }
   }
 }
 
