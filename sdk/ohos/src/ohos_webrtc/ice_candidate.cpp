@@ -93,6 +93,10 @@ NapiIceCandidate::NapiIceCandidate(const Napi::CallbackInfo& info) : ObjectWrap<
             if (!SdpDeserializeCandidate(sdpMid, sdp, &candidate_, nullptr)) {
                 NAPI_THROW_VOID(Error::New(info.Env(), "SdpDescrializeCandidate failed with sdp"));
             }
+
+            if (from.Has("usernameFragment")) {
+                candidate_.set_username(from.Get("usernameFragment").As<String>().Utf8Value());
+            }
         }
     } else {
         NAPI_THROW_VOID(Error::New(info.Env(), "candidate is null"));

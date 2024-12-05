@@ -16,6 +16,7 @@
 import { describe, beforeAll, beforeEach, afterEach, afterAll, it, expect } from '@ohos/hypium'
 import webrtc from 'libohos_webrtc.so';
 import { Logging, LoggingSeverity } from '../../../main/ets/log/Logging';
+import { sleep } from './Helper';
 
 const DEFAULT = 0
 const TAG: string = '[RTCDtmfSenderTest]';
@@ -91,10 +92,6 @@ async function createDtmfSender(caller: webrtc.RTCPeerConnection,
   return sender;
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
 export default function RTCDtmfSenderTest() {
   describe('RTCDtmfSenderTest', () => {
     // Defines a test suite. Two parameters are supported: test suite name and test suite function.
@@ -135,7 +132,6 @@ export default function RTCDtmfSenderTest() {
     it("toneBufferAfterCreateDtmfSender", DEFAULT, async () => {
       let sender = await createDtmfSender(caller, callee);
       let dtmfSender = sender?.dtmf;
-      await sleep(1000);
       expect(dtmfSender!.toneBuffer).assertEqual("");
     })
 
@@ -187,15 +183,17 @@ export default function RTCDtmfSenderTest() {
       let sender = await createDtmfSender(caller, callee);
       let dtmfSender = sender?.dtmf;
       let res: string;
-      dtmfSender!.ontonechange = async (event) => {
-        if (event.tone == 'A') {
-          res = event.tone;
-        }
-        console.info(TAG, "Tone changed:", event.tone);
-      };
+      let promise = new Promise<void>((resolve) => {
+        dtmfSender!.ontonechange = async (event) => {
+          if (event.tone == 'A') {
+            res = event.tone;
+            resolve();
+          }
+        };
+      })
       await sleep(1000);
       dtmfSender?.insertDTMF('A');
-      await sleep(1000);
+      await promise;
       expect(res!).assertEqual('A')
     })
 
@@ -215,7 +213,5 @@ export default function RTCDtmfSenderTest() {
       expect(res).not().assertEqual('F')
     })
 
-  }
-
-  )
+  })
 }

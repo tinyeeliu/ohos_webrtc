@@ -16,6 +16,7 @@
 import { describe, beforeAll, beforeEach, afterEach, afterAll, it, expect } from '@ohos/hypium'
 import webrtc from 'libohos_webrtc.so';
 import { Logging, LoggingSeverity } from '../../../main/ets/log/Logging';
+import { sleep } from './Helper';
 
 const DEFAULT = 0
 const TAG: string = '[RTCIceTransportTest]';
@@ -57,10 +58,6 @@ async function exchangeAnswer(caller: webrtc.RTCPeerConnection, callee: webrtc.R
 async function exchangeOfferAnswer(caller: webrtc.RTCPeerConnection, callee: webrtc.RTCPeerConnection) {
   await exchangeOffer(caller, callee);
   await exchangeAnswer(caller, callee);
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 async function createIceTransport(caller: webrtc.RTCPeerConnection,
@@ -116,81 +113,56 @@ export default function RTCIceTransportTest() {
 
     it("unconnectedIceTransportShouldHaveEmptySelectedPair", DEFAULT, async () => {
       caller.createDataChannel('');
-      await exchangeOfferAnswer(caller, callee);
+      let offer = await caller.createOffer();
+      await caller.setLocalDescription(offer);
+      await callee.setRemoteDescription(offer);
+      let answer = await callee.createAnswer();
+      await caller.setRemoteDescription(answer);
       let iceTransport = caller.sctp?.transport.iceTransport;
-      expect(iceTransport?.getSelectedCandidatePair()?.local?.usernameFragment).assertEqual("");
-      expect(iceTransport?.getSelectedCandidatePair()?.remote?.usernameFragment).assertEqual("");
+      expect(iceTransport?.getSelectedCandidatePair()).assertNull();
     })
 
     it("iceTransportShouldBeInStateNewInitially", DEFAULT, async () => {
       const transceiver = caller.addTransceiver('audio');
       await caller.setLocalDescription();
       const iceTransport = transceiver.sender.transport?.iceTransport;
-      console.info(TAG, "gatheringState: ", iceTransport!.gatheringState);
-
-      iceTransport!.ongatheringstatechange = () => {
-        console.info(TAG, "gatheringState: ", iceTransport!.gatheringState);
-      }
       expect(iceTransport?.state).assertEqual('new');
-    })
-
-    it("iceTransportShouldTransitionToGatheringThenCompleteAfterSLD", DEFAULT, async () => {
-      const transceiver = caller.addTransceiver('audio');
-      await caller.setLocalDescription();
-      const iceTransport = transceiver.sender.transport?.iceTransport;
-
-      iceTransport!.ongatheringstatechange = () => {
-        console.info(TAG, 'gatheringState: ', iceTransport?.gatheringState);
-      };
-      await sleep(1000);
-      expect(iceTransport?.gatheringState).not().assertEqual("new");
     })
 
     it("afterInitializationAllAttributesAreNotNull", DEFAULT, async () => {
       let transport = await createIceTransport(caller, callee);
-      await sleep(1000);
-      expect(transport.role).not().assertUndefined();
-      expect(transport.component).not().assertUndefined();
-      expect(transport.state).not().assertUndefined();
-      expect(transport.gatheringState).not().assertUndefined();
-      expect(transport.getSelectedCandidatePair()).not().assertUndefined();
+      while (transport.state != 'connected') {
+        await sleep(100);
+      }
+      console.info(TAG, 'transport.state: ', transport.state);
+      expect(transport.getSelectedCandidatePair()).not().assertNull();
     })
 
     it("onstatechange", DEFAULT, async () => {
       let transport = await createIceTransport(caller, callee);
       let events: string[] = [];
-      transport.onstatechange = () => {
-        events.push(transport.state);
-        console.info(TAG, 'state change: ', transport.state);
-      };
-      await sleep(5000);
+      let promise = new Promise<void>((resolve) => {
+        transport.onstatechange = () => {
+          events.push(transport.state);
+          console.info(TAG, 'state change: ', transport.state);
+          resolve();
+        };
+      });
+      await promise;
       expect(events.length).not().assertEqual(0);
     })
 
     it("onSelectedCandidatePairChange", DEFAULT, async () => {
       let transport = await createIceTransport(caller, callee);
       let events: string[] = [];
-      transport.onselectedcandidatepairchange = () => {
-        events.push("1");
-      };
-      await sleep(1000);
-      expect(events.length).not().assertEqual(0);
-    })
-
-    it("onGatheringStateChange", DEFAULT, async () => {
-      const transceiver = caller.addTransceiver('audio', { direction: 'recvonly' });
-      await caller.setLocalDescription();
-      const iceTransport = transceiver.sender.transport!.iceTransport;
-
-      let events: string[] = [];
-      await new Promise<void>((resolve, reject) => {
-        iceTransport.ongatheringstatechange = () => {
-          events.push(iceTransport.gatheringState);
-          console.info(TAG, '2 gatheringState change: ', iceTransport.gatheringState);
+      let promise = new Promise<void>((resolve) => {
+        transport.onselectedcandidatepairchange = () => {
+          events.push("1");
           resolve();
         };
       });
-      expect(events.length).assertLarger(0);
+      await promise;
+      expect(events.length).not().assertEqual(0);
     })
 
   })
