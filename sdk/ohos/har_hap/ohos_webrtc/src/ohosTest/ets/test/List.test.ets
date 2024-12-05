@@ -25,6 +25,7 @@ import RTCSctpTransportTest from './RTCSctpTransport.test';
 import RTCCertificateTest from './RTCCertificate.test';
 import RTCIceTransportTest from './RTCIceTransport.test';
 import RTCDtlsTransportTest from './RTCDtlsTransport.test';
+import RTCIceCandidateTest from './RTCIceCandidate.test';
 
 export default function testsuite() {
   abilityTest();
@@ -39,4 +40,5 @@ export default function testsuite() {
   RTCCertificateTest();
   RTCIceTransportTest();
   RTCDtlsTransportTest();
+  RTCIceCandidateTest();
 }

@@ -273,8 +273,8 @@ void NapiIceTransport::SetEventHandler(const Napi::CallbackInfo& info, const Nap
 
         EventHandler handler;
         handler.ref = Persistent(fn);
-        handler.tsfn = ThreadSafeFunction::New(
-            fn.Env(), fn, type, 0, 1, context, [](Napi::Env env, Reference<Napi::Value>* ctx) {
+        handler.tsfn =
+            ThreadSafeFunction::New(fn.Env(), fn, type, 0, 1, context, [](Napi::Env env, Reference<Napi::Value>* ctx) {
                 ctx->Reset();
                 delete ctx;
             });
@@ -292,20 +292,18 @@ Napi::Value NapiIceTransport::GetSelectedCandidatePair(const Napi::CallbackInfo&
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
     auto factoryWrapper = pcWrapper_->GetPeerConnectionFactoryWrapper();
-    cricket::CandidatePair candidatePair;
+
+    absl::optional<cricket::CandidatePair> candidatePair;
+    factoryWrapper->GetNetworkThread()->BlockingCall(
+        [&candidatePair, this] { candidatePair = iceTransport_->internal()->GetSelectedCandidatePair(); });
+
+    if (!candidatePair) {
+        return info.Env().Null();
+    }
+
     auto obj = Object::New(info.Env());
-
-    factoryWrapper->GetNetworkThread()->BlockingCall([&candidatePair, this] {
-        auto candidate = iceTransport_->internal()->GetSelectedCandidatePair();
-        if (candidate) {
-            candidatePair.local = candidate->local_candidate();
-            candidatePair.remote = candidate->remote_candidate();
-        }
-    });
-
-    obj.Set("local", NativeToJsCandidate(info.Env(), candidatePair.local));
-    obj.Set("remote", NativeToJsCandidate(info.Env(), candidatePair.remote));
-
+    obj.Set("local", NativeToJsCandidate(info.Env(), candidatePair->local_candidate()));
+    obj.Set("remote", NativeToJsCandidate(info.Env(), candidatePair->remote_candidate()));
     return obj;
 }
 

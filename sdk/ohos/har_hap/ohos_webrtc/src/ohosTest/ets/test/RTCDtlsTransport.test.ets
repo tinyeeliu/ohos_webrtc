@@ -16,6 +16,7 @@
 import { describe, beforeAll, beforeEach, afterEach, afterAll, it, expect } from '@ohos/hypium'
 import webrtc from 'libohos_webrtc.so';
 import { Logging, LoggingSeverity } from '../../../main/ets/log/Logging';
+import { sleep } from './Helper';
 
 const DEFAULT = 0
 const TAG: string = '[RTCDtlsTransportTest]';
@@ -57,10 +58,6 @@ async function exchangeAnswer(caller: webrtc.RTCPeerConnection, callee: webrtc.R
 async function exchangeOfferAnswer(caller: webrtc.RTCPeerConnection, callee: webrtc.RTCPeerConnection) {
   await exchangeOffer(caller, callee);
   await exchangeAnswer(caller, callee);
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 async function createDtlsTransport(caller: webrtc.RTCPeerConnection, callee: webrtc.RTCPeerConnection) {
@@ -111,8 +108,7 @@ export default function RTCDtlsTransportTest() {
     })
 
     it("transportGoesToConnectedState", DEFAULT, async () => {
-      createDtlsTransport(caller, callee);
-      await sleep(300);
+      await createDtlsTransport(caller, callee);
       let transport1 = caller.getTransceivers()[0].sender.transport;
       let transport2 = callee.getTransceivers()[0].sender.transport;
       let flag1: string | undefined = "";
@@ -135,25 +131,26 @@ export default function RTCDtlsTransportTest() {
     })
 
     it("closeCausesTheLocalTransportToCloseImmediately", DEFAULT, async () => {
-      createDtlsTransport(caller, callee);
-      await sleep(300);
+      await createDtlsTransport(caller, callee);
       let transport1 = caller.getTransceivers()[0].sender.transport;
       let transport2 = callee.getTransceivers()[0].sender.transport;
       let flag: string | undefined = "";
-      transport1!.onstatechange = () => {
-        console.info(TAG, "state: ", transport1?.state);
-        if (transport1?.state == "closed") {
-          flag = transport1?.state;
+      let promise = new Promise<void>((resolve) => {
+        transport1!.onstatechange = () => {
+          console.info(TAG, "state: ", transport1?.state);
+          if (transport1?.state == "closed") {
+            flag = transport1?.state;
+            resolve();
+          }
         }
-      }
+      });
       caller.close();
-      await sleep(1000);
+      await promise;
       expect(flag).assertEqual("closed");
     })
 
     it("closeCausesTheOtherEndTransportToClose", DEFAULT, async () => {
-      createDtlsTransport(caller, callee);
-      await sleep(300);
+      await createDtlsTransport(caller, callee);
       let transport1 = caller.getTransceivers()[0].sender.transport;
       let transport2 = callee.getTransceivers()[0].sender.transport;
       let flag: string | undefined = "";
@@ -173,20 +170,18 @@ export default function RTCDtlsTransportTest() {
     })
 
     it("iceTransportIsNotNullAfterCreateDtlsTransport", DEFAULT, async () => {
-      createDtlsTransport(caller, callee);
-      await sleep(1000);
+      await createDtlsTransport(caller, callee);
       expect(caller.getSenders()[0]!.transport).not().assertNull();
     })
 
     it("stateIsNotNullAfterCreateDtlsTransport", DEFAULT, async () => {
-      createDtlsTransport(caller, callee);
-      await sleep(1000);
+      await createDtlsTransport(caller, callee);
       console.info(TAG, "state: ", caller.getSenders()[0]!.transport!.state);
       expect(caller.getSenders()[0]!.transport!.state).not().assertNull();
     })
 
     it("getRemoteCertificatesIsNotNullAfterCreateDtlsTransport", DEFAULT, async () => {
-      createDtlsTransport(caller, callee);
+      await createDtlsTransport(caller, callee);
       await sleep(1000);
       console.info(TAG, "getRemoteCertificates: ",
         JSON.stringify(caller.getSenders()[0]?.transport?.getRemoteCertificates()));
