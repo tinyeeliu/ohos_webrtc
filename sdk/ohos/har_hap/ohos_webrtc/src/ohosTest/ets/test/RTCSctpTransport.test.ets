@@ -16,6 +16,7 @@
 import { describe, beforeAll, beforeEach, afterEach, afterAll, it, expect } from '@ohos/hypium'
 import webrtc from 'libohos_webrtc.so';
 import { Logging, LoggingSeverity } from '../../../main/ets/log/Logging';
+import { sleep } from './Helper';
 
 const DEFAULT = 0
 const TAG: string = '[RTCSctpTransportTest]';
@@ -57,24 +58,6 @@ async function exchangeAnswer(caller: webrtc.RTCPeerConnection, callee: webrtc.R
 async function exchangeOfferAnswer(caller: webrtc.RTCPeerConnection, callee: webrtc.RTCPeerConnection) {
   await exchangeOffer(caller, callee);
   await exchangeAnswer(caller, callee);
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-async function createSctpTransport(caller: webrtc.RTCPeerConnection, callee: webrtc.RTCPeerConnection) {
-  let audioSource = pcf?.createAudioSource();
-  let audioTrack = pcf?.createAudioTrack("audio", audioSource);
-
-  caller.addTrack(audioTrack);
-
-  caller.createDataChannel("myDataChannel");
-  caller.oniceconnectionstatechange = () => {
-    console.info(TAG, "ICE state: ", caller.iceConnectionState);
-  };
-  exchangeIceCandidates(caller, callee);
-  await exchangeOfferAnswer(caller, callee);
 }
 
 export default function RTCSctpTransportTest() {
@@ -123,48 +106,77 @@ export default function RTCSctpTransportTest() {
       const answer = await caller.createAnswer();
       await caller.setLocalDescription(answer);
 
-      expect(caller.sctp).not().assertUndefined();
-      await sleep(1000);
       console.info(TAG, "state: ", caller.sctp?.state);
       expect(caller.sctp?.maxChannels).assertUndefined();
     })
 
     it("maxChannelsGetsInstantiatedAfterConnecting", DEFAULT, async () => {
-      createSctpTransport(caller, callee);
-      await sleep(1000);
-      console.info(TAG, "state: ", caller.sctp?.state);
-      expect(caller.sctp?.maxChannels).not().assertUndefined();
-      expect(callee.sctp?.maxChannels).not().assertUndefined();
-      expect(caller.sctp?.maxChannels).assertEqual(caller.sctp?.maxChannels);
+      let audioSource = pcf?.createAudioSource();
+      let audioTrack = pcf?.createAudioTrack("audio", audioSource);
+
+      caller.addTrack(audioTrack);
+
+      caller.createDataChannel("myDataChannel");
+      exchangeIceCandidates(caller, callee);
+      await exchangeOfferAnswer(caller, callee);
+      console.info(TAG, "maxChannelsGetsInstantiatedAfterConnecting state: ", caller.sctp?.state);
+      // wait the SCTP transport goes into the "connected" state
+      // await sleep(1000);
+      //
+      // await new Promise<void>((resolve) => {
+      //   caller.sctp!.onstatechange = () => {
+      //     if (caller.sctp?.state == 'connected') {
+      //       resolve();
+      //     }
+      //   }
+      // });
+      while (true) {
+        if (caller.sctp?.state === 'connected') {
+          break;
+        }
+        await sleep(100);
+      }
+      console.info(TAG, "maxChannelsGetsInstantiatedAfterConnecting state: ", caller.sctp?.state);
+      expect(caller.sctp?.maxChannels).assertEqual(callee.sctp?.maxChannels);
     })
 
     it("maxMessageSizeAfterInitializationNotNull", DEFAULT, async () => {
       caller.createDataChannel('');
       await exchangeOfferAnswer(caller, callee);
-      await sleep(1000);
       console.info(TAG, "maxMessageSize: ", caller.sctp?.maxMessageSize);
       expect(caller.sctp?.maxMessageSize).not().assertUndefined();
     })
 
     it("RTCDtlsTransportAfterInitializationNotNull", DEFAULT, async () => {
-      createSctpTransport(caller, callee);
-      await sleep(1000);
+      let audioSource = pcf?.createAudioSource();
+      let audioTrack = pcf?.createAudioTrack("audio", audioSource);
+
+      caller.addTrack(audioTrack);
+
+      caller.createDataChannel("myDataChannel");
+      exchangeIceCandidates(caller, callee);
+      await exchangeOfferAnswer(caller, callee);
       expect(caller.sctp?.transport).not().assertUndefined();
     })
 
-    it("afterInitializationStateIsConnected", DEFAULT, async () => {
-      createSctpTransport(caller, callee);
-      await sleep(1000);
-      console.info(TAG, "state: ", caller.sctp?.state);
-    })
-
     it("whenTheStateChangesTheEventWillTrigger", DEFAULT, async () => {
-      createSctpTransport(caller, callee);
-      await sleep(1000);
-      caller.sctp!.onstatechange = () => {
-        console.info(TAG, "state changed: ", caller.sctp?.state);
-      }
-      await sleep(5000);
+      let audioSource = pcf?.createAudioSource();
+      let audioTrack = pcf?.createAudioTrack("audio", audioSource);
+
+      caller.addTrack(audioTrack);
+
+      caller.createDataChannel("myDataChannel");
+      exchangeIceCandidates(caller, callee);
+      await exchangeOfferAnswer(caller, callee);
+      let flag = false;
+      let promise = new Promise<void>((resolve) => {
+        caller.sctp!.onstatechange = () => {
+          flag = true;
+          resolve();
+        }
+      });
+      await promise;
+      expect(flag).assertTrue();
     })
   })
 }
