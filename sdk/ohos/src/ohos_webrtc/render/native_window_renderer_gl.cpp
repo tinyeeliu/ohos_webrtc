@@ -120,7 +120,8 @@ void NativeWindowRendererGl::OnFrame(const VideoFrame& frame)
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        drawMatrix_ = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+        drawMatrix_ = kMatrix4fv_Identity;
+        drawMatrix_[5] = -1.0f; // turn upside down
         videoFrameDrawer_->DrawFrame(
             frame, *textureDrawer_, drawMatrix_, 0, 0, eglEnv_->GetSurfaceWidth(), eglEnv_->GetSurfaceHeight());
         eglEnv_->SwapBuffers();

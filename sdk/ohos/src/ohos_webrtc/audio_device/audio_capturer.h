@@ -38,6 +38,8 @@ public:
     static std::unique_ptr<AudioCapturer>
     Create(int32_t source, int32_t format, int32_t sampleRate, bool useStereoInput, bool useLowLatency);
 
+    // Do not use this constructor directly, use 'Create' above.
+    AudioCapturer(int32_t source, int32_t format, int32_t sampleRate, bool useStereoInput, bool useLowLatency);
     ~AudioCapturer() override;
 
     int32_t Init() override;
@@ -60,8 +62,6 @@ public:
     void UnregisterObserver(Observer* obs) override;
 
 protected:
-    AudioCapturer(int32_t source, int32_t format, int32_t sampleRate, bool useStereoInput, bool useLowLatency);
-
     static int32_t OnReadData1(OH_AudioCapturer* stream, void* userData, void* buffer, int32_t lenth);
     static int32_t OnStreamEvent1(OH_AudioCapturer* capturer, void* userData, OH_AudioStream_Event event);
     static int32_t OnInterruptEvent1(

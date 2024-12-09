@@ -99,15 +99,7 @@ void OhosVideoTrackSource::SetState(SourceState state)
         if (rtc::Thread::Current() == signalingThread_) {
             FireOnChanged();
         } else {
-            signalingThread_->PostTask([this] {
-#ifndef NDEBUG
-                std::list<ObserverInterface*> observers = observers_;
-                for (std::list<ObserverInterface*>::iterator it = observers.begin(); it != observers.end(); ++it) {
-                    RTC_DLOG(LS_VERBOSE) << "observer: " << *it;
-                }
-#endif
-                FireOnChanged();
-            });
+            signalingThread_->PostTask([this] { FireOnChanged(); });
         }
     }
 }
@@ -148,6 +140,7 @@ bool OhosVideoTrackSource::AdaptFrame(
 
     *crop_x = (width - *crop_width) / 2;
     *crop_y = (height - *crop_height) / 2;
+
     return true;
 }
 
@@ -156,7 +149,7 @@ void OhosVideoTrackSource::AddOrUpdateSink(rtc::VideoSinkInterface<VideoFrame>* 
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
     broadcaster_.AddOrUpdateSink(sink, wants);
-    videoAdapter_.OnSinkWants(wants);
+    videoAdapter_.OnSinkWants(broadcaster_.wants());
 
     if (broadcaster_.frame_wanted()) {
         thread_->PostTask([this] { capturer_->Start(); });
@@ -269,7 +262,7 @@ void OhosVideoTrackSource::OnFrameCaptured(
     int crop_y = 0;
     bool drop;
 
-    if (rotation % 180 == 0) {
+    if (rotation % kVideoRotation_180 == 0) {
         drop = !AdaptFrame(
             buffer->width(), buffer->height(), timestampUs, &adapted_width, &adapted_height, &crop_width, &crop_height,
             &crop_x, &crop_y);

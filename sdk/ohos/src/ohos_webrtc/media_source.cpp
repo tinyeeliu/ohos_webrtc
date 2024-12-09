@@ -66,7 +66,7 @@ NapiAudioSource::~NapiAudioSource()
 Napi::Value NapiAudioSource::GetState(const Napi::CallbackInfo& info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-    
+
     if (!source_) {
         NAPI_THROW(Error::New(info.Env(), "Illegal state"), info.Env().Undefined());
     }
@@ -91,13 +91,13 @@ Napi::Value NapiAudioSource::GetState(const Napi::CallbackInfo& info)
 Napi::Value NapiAudioSource::Release(const Napi::CallbackInfo& info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-    
+
     if (!source_) {
         NAPI_THROW(Error::New(info.Env(), "Illegal state"), info.Env().Undefined());
     }
 
     source_ = nullptr;
-    
+
     return info.Env().Undefined();
 }
 
@@ -112,7 +112,7 @@ Napi::Value NapiAudioSource::SetVolume(const Napi::CallbackInfo& info)
     if (!info[0].IsNumber()) {
         NAPI_THROW(TypeError::New(info.Env(), "The argument is not number"), info.Env().Undefined());
     }
-    
+
     if (!source_) {
         NAPI_THROW(Error::New(info.Env(), "Illegal state"), info.Env().Undefined());
     }
@@ -163,7 +163,7 @@ Napi::Object NapiVideoSource::NewInstance(Napi::Env env, rtc::scoped_refptr<Ohos
 
     auto external = External<OhosVideoTrackSource>::New(
         env, source.release(), [](Napi::Env /*env*/, OhosVideoTrackSource* source) { source->Release(); });
-    
+
     return constructor_.New({external});
 }
 
@@ -173,7 +173,7 @@ NapiVideoSource::NapiVideoSource(const Napi::CallbackInfo& info) : NapiMediaSour
         auto source = info[0].As<External<OhosVideoTrackSource>>().Data();
         source_ = rtc::scoped_refptr<OhosVideoTrackSource>(source);
     }
-    
+
     if (source_) {
         source_->SetCapturerObserver(this);
     }
@@ -182,21 +182,21 @@ NapiVideoSource::NapiVideoSource(const Napi::CallbackInfo& info) : NapiMediaSour
 NapiVideoSource::~NapiVideoSource()
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-    
+
     source_->SetCapturerObserver(nullptr);
     source_ = nullptr;
-    
+
     RemoveAllEventHandlers();
 }
 
 Napi::Value NapiVideoSource::GetState(const Napi::CallbackInfo& info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-    
+
     if (!source_) {
         NAPI_THROW(Error::New(info.Env(), "Illegal state"), info.Env().Undefined());
     }
-    
+
     auto source = static_cast<VideoTrackSourceInterface*>(source_.get());
     auto state = source->state();
     switch (state) {
@@ -218,25 +218,25 @@ Napi::Value NapiVideoSource::GetState(const Napi::CallbackInfo& info)
 Napi::Value NapiVideoSource::Release(const Napi::CallbackInfo& info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-    
+
     if (!source_) {
         NAPI_THROW(Error::New(info.Env(), "Illegal state"), info.Env().Undefined());
     }
-    
+
     source_->AddRef();
 
     source_->SetCapturerObserver(nullptr);
     source_ = nullptr;
-    
+
     RemoveAllEventHandlers();
-    
+
     return info.Env().Undefined();
 }
 
 Napi::Value NapiVideoSource::GetEventHandler(const Napi::CallbackInfo& info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-    
+
     if (!source_) {
         NAPI_THROW(Error::New(info.Env(), "Illegal state"), info.Env().Undefined());
     }
@@ -252,7 +252,7 @@ Napi::Value NapiVideoSource::GetEventHandler(const Napi::CallbackInfo& info)
 void NapiVideoSource::SetEventHandler(const Napi::CallbackInfo& info, const Napi::Value& value)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-    
+
     if (!source_) {
         NAPI_THROW_VOID(Error::New(info.Env(), "Illegal state"));
     }
@@ -270,26 +270,26 @@ void NapiVideoSource::SetEventHandler(const Napi::CallbackInfo& info, const Napi
 Napi::Value NapiVideoSource::StartCapture(const Napi::CallbackInfo& info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-    
+
     if (!source_) {
         NAPI_THROW(Error::New(info.Env(), "Illegal state"), info.Env().Undefined());
     }
-    
+
     source_->Start();
-    
+
     return info.Env().Undefined();
 }
 
 Napi::Value NapiVideoSource::StopCapture(const Napi::CallbackInfo& info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-    
+
     if (!source_) {
         NAPI_THROW(Error::New(info.Env(), "Illegal state"), info.Env().Undefined());
     }
 
     source_->Stop();
-    
+
     return info.Env().Undefined();
 }
 
@@ -306,7 +306,7 @@ Value NapiVideoSource::ToJson(const CallbackInfo& info)
 void NapiVideoSource::OnCapturerStarted(bool success)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-    
+
     ThreadSafeFunction tsfn;
     if (!GetEventHandler(kEventNameCapturerStarted, tsfn)) {
         return;
@@ -319,7 +319,7 @@ void NapiVideoSource::OnCapturerStarted(bool success)
         jsEvent.Set("success", Boolean::New(env, success));
         jsCallback.Call(context ? context->Value() : env.Undefined(), {jsEvent});
     });
-    
+
     if (status != napi_ok) {
         RTC_LOG(LS_ERROR) << "tsfn call error: " << status;
     }
@@ -328,7 +328,7 @@ void NapiVideoSource::OnCapturerStarted(bool success)
 void NapiVideoSource::OnCapturerStopped()
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-    
+
     ThreadSafeFunction tsfn;
     if (!GetEventHandler(kEventNameCapturerStopped, tsfn)) {
         return;
@@ -340,7 +340,7 @@ void NapiVideoSource::OnCapturerStopped()
         jsEvent.Set("type", String::New(env, "Event"));
         jsCallback.Call(context ? context->Value() : env.Undefined(), {jsEvent});
     });
-    
+
     if (status != napi_ok) {
         RTC_LOG(LS_ERROR) << "tsfn call error: " << status;
     }

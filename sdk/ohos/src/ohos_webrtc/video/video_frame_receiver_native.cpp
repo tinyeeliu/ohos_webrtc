@@ -22,17 +22,18 @@
 
 namespace webrtc {
 
+constexpr int32_t kBufferCount_Default = 8;
+
 std::map<OH_ImageReceiverNative*, VideoFrameReceiverNative*> VideoFrameReceiverNative::receiverMap_;
 
 std::unique_ptr<VideoFrameReceiverNative> VideoFrameReceiverNative::Create(const std::string& threadName)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    return std::unique_ptr<VideoFrameReceiverNative>(new VideoFrameReceiverNative(threadName));
+    return std::make_unique<VideoFrameReceiverNative>(threadName);
 }
 
-VideoFrameReceiverNative::VideoFrameReceiverNative(const std::string& threadName)
-    : thread_(rtc::Thread::Create())
+VideoFrameReceiverNative::VideoFrameReceiverNative(const std::string& threadName) : thread_(rtc::Thread::Create())
 {
     thread_->SetName(threadName, this);
     thread_->Start();
@@ -49,7 +50,7 @@ VideoFrameReceiverNative::~VideoFrameReceiverNative()
 uint64_t VideoFrameReceiverNative::GetSurfaceId() const
 {
     uint64_t surfaceId = 0;
-    
+
     if (imageReceiver_) {
         Image_ErrorCode ret = OH_ImageReceiverNative_GetReceivingSurfaceId(imageReceiver_, &surfaceId);
         if (ret != IMAGE_SUCCESS) {
@@ -68,15 +69,15 @@ void VideoFrameReceiverNative::SetVideoFrameSize(int32_t width, int32_t height)
         RTC_LOG(LS_ERROR) << "invalid size";
         return;
     }
-    
+
     if (width_ == width && height_ == height) {
         RTC_LOG(LS_VERBOSE) << "Same size";
         return;
     }
-    
+
     width_ = width;
     height_ = height;
-    
+
     ReleaseImageReceiver();
     CreateImageReceiver();
 }
@@ -84,7 +85,7 @@ void VideoFrameReceiverNative::SetVideoFrameSize(int32_t width, int32_t height)
 void VideoFrameReceiverNative::CreateImageReceiver()
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-    
+
     Image_ErrorCode ret = IMAGE_SUCCESS;
     OH_ImageReceiverOptions* options = nullptr;
     OH_ImageReceiverNative* imageReceiver = nullptr;
@@ -102,7 +103,7 @@ void VideoFrameReceiverNative::CreateImageReceiver()
             break;
         }
 
-        ret = OH_ImageReceiverOptions_SetCapacity(options, 8);
+        ret = OH_ImageReceiverOptions_SetCapacity(options, kBufferCount_Default);
         if (ret != IMAGE_SUCCESS) {
             RTC_LOG(LS_ERROR) << "Failed to set capacity of image receiver options";
             break;
@@ -133,7 +134,7 @@ void VideoFrameReceiverNative::CreateImageReceiver()
 void VideoFrameReceiverNative::ReleaseImageReceiver()
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-    
+
     if (imageReceiver_) {
         Image_ErrorCode ret = OH_ImageReceiverNative_Off(imageReceiver_);
         if (ret != IMAGE_SUCCESS) {
@@ -144,7 +145,7 @@ void VideoFrameReceiverNative::ReleaseImageReceiver()
         if (ret != IMAGE_SUCCESS) {
             RTC_LOG(LS_ERROR) << "Failed to release image receiver";
         }
-            
+
         receiverMap_.erase(imageReceiver_);
         imageReceiver_ = nullptr;
     }

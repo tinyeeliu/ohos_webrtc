@@ -22,12 +22,13 @@
 namespace webrtc {
 
 rtc::scoped_refptr<TextureBuffer>
-TextureBuffer::Create(std::weak_ptr<TextureData> texture, int width, int height, const Matrix4f& transformMatrix)
+TextureBuffer::Create(std::weak_ptr<TextureData> texture, int width, int height, const Matrix4fv& transformMatrix)
 {
     return rtc::make_ref_counted<TextureBuffer>(texture, width, height, transformMatrix);
 }
 
-TextureBuffer::TextureBuffer(std::weak_ptr<TextureData> texture, int width, int height, const Matrix4f& transformMatrix)
+TextureBuffer::TextureBuffer(
+    std::weak_ptr<TextureData> texture, int width, int height, const Matrix4fv& transformMatrix)
     : texture_(texture), width_(width), height_(height), transformMatrix_(transformMatrix)
 {
     RTC_DLOG(LS_VERBOSE) << "TextureBuffer ctor";
@@ -57,7 +58,7 @@ rtc::scoped_refptr<VideoFrameBuffer> TextureBuffer::CropAndScale(
     int offset_x, int offset_y, int crop_width, int crop_height, int scaled_width, int scaled_height)
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
-    
+
     // crop and scale by transformMatrix_
     // for now, just return self without crop and scale.
     return rtc::scoped_refptr<VideoFrameBuffer>(this);

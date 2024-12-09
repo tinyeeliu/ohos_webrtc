@@ -50,4 +50,4 @@ private:
 
 } // namespace webrtc
 
-#endif //WEBRTC_ASYNC_WORKER_ENUMERATE_DEVICES_H
+#endif // WEBRTC_ASYNC_WORKER_ENUMERATE_DEVICES_H

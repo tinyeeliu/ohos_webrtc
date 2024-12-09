@@ -67,7 +67,7 @@ Napi::Value NapiNativeVideoRenderer::GetSurfaceId(const Napi::CallbackInfo& info
     if (surfaceId_) {
         return String::New(info.Env(), *surfaceId_);
     }
-    
+
     return info.Env().Undefined();
 }
 
@@ -120,7 +120,7 @@ Napi::Value NapiNativeVideoRenderer::SetVideoTrack(const Napi::CallbackInfo& inf
     RemoveSink();
     jsTrackRef_ = Weak(jsTrack);
     AddSink();
-    
+
     return info.Env().Undefined();
 }
 

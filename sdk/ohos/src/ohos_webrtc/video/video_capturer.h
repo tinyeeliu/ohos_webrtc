@@ -36,10 +36,9 @@ public:
         virtual void
         OnFrameCaptured(rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation) = 0;
     };
-    
+
     virtual ~VideoCapturer() = default;
-    
-    // virtual void Init(std::unique_ptr<VideoFrameReceiver>, std::weak_ptr<Observer> observer) = 0;
+
     virtual void Init(std::unique_ptr<VideoFrameReceiver>, Observer* observer) = 0;
     virtual void Release() = 0;
     virtual void Start() = 0;
@@ -49,4 +48,4 @@ public:
 
 } // namespace webrtc
 
-#endif //WEBRTC_VIDEO_VIDEO_CAPTURER_H
+#endif // WEBRTC_VIDEO_VIDEO_CAPTURER_H

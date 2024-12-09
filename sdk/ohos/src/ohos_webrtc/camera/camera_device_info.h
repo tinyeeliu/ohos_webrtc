@@ -25,7 +25,13 @@
 
 namespace webrtc {
 
-enum class FacingMode { kNone, kUser, kEnvironment, kLeft, kRight };
+enum class FacingMode {
+    kNone,
+    kUser,
+    kEnvironment,
+    kLeft,
+    kRight
+};
 
 struct CameraDeviceInfo {
     std::string deviceId;

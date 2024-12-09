@@ -21,6 +21,8 @@
 
 namespace webrtc {
 
+#define kMaxLogSize 1024
+
 GlShader::GlShader() = default;
 
 GlShader::~GlShader()
@@ -119,18 +121,18 @@ void GlShader::SetMatrix4(const char* name, const std::array<float, 16>& matrix)
 bool GlShader::CheckCompileErrors(unsigned int shader, const std::string& type)
 {
     int success;
-    char infoLog[1024];
+    char infoLog[kMaxLogSize];
     if (type != "PROGRAM") {
         glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
         if (!success) {
-            glGetShaderInfoLog(shader, 1024, NULL, infoLog);
+            glGetShaderInfoLog(shader, kMaxLogSize, NULL, infoLog);
             RTC_LOG(LS_ERROR) << "ERROR::SHADER_COMPILATION_ERROR of type: " << type << ", " << infoLog;
             return false;
         }
     } else {
         glGetProgramiv(shader, GL_LINK_STATUS, &success);
         if (!success) {
-            glGetProgramInfoLog(shader, 1024, NULL, infoLog);
+            glGetProgramInfoLog(shader, kMaxLogSize, NULL, infoLog);
             RTC_LOG(LS_ERROR) << "ERROR::PROGRAM_LINKING_ERROR of type: " << type << ", " << infoLog;
             return false;
         }

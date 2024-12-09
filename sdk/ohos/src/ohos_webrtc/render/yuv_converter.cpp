@@ -27,6 +27,9 @@ namespace webrtc {
 
 namespace {
 
+constexpr int32_t kBufferAlignment = 64;
+constexpr int32_t kCoefficientsNum = 4;
+
 static constexpr char DEFAULT_VERTEX_SHADER[] = R"(
 attribute vec3 position;
 attribute vec2 texCoord;
@@ -117,27 +120,32 @@ static constexpr float FULL_RECTANGLE_TEXTURE_BUFFER[] = {
 
 class GlConverterDrawer : public GlDrawer {
 public:
-    enum class ShaderType { UNKNOWN = -1, OES, RGB, YUV };
+    enum class ShaderType {
+        UNKNOWN = -1,
+        OES,
+        RGB,
+        YUV
+    };
 
     GlConverterDrawer() = default;
     ~GlConverterDrawer() override = default;
 
     void DrawOes(
-        int oesTextureId, const Matrix4f& texMatrix, int frameWidth, int frameHeight, int viewportX, int viewportY,
+        int oesTextureId, const Matrix4fv& texMatrix, int frameWidth, int frameHeight, int viewportX, int viewportY,
         int viewportWidth, int viewportHeight) override;
     void DrawRgb(
-        int textureId, const Matrix4f& texMatrix, int frameWidth, int frameHeight, int viewportX, int viewportY,
+        int textureId, const Matrix4fv& texMatrix, int frameWidth, int frameHeight, int viewportX, int viewportY,
         int viewportWidth, int viewportHeight) override;
     void DrawYuv(
-        std::vector<uint32_t> yuvTextures, const Matrix4f& texMatrix, int frameWidth, int frameHeight, int viewportX,
+        std::vector<uint32_t> yuvTextures, const Matrix4fv& texMatrix, int frameWidth, int frameHeight, int viewportX,
         int viewportY, int viewportWidth, int viewportHeight) override;
 
     void SetStepSize(float stepSize);
-    void SetCoefficients(std::array<float, 4> coefficients);
+    void SetCoefficients(std::array<float, kCoefficientsNum> coefficients);
 
 protected:
     void PrepareShader(
-        ShaderType shaderType, const Matrix4f& texMatrix, int frameWidth, int frameHeight, int viewportWidth,
+        ShaderType shaderType, const Matrix4fv& texMatrix, int frameWidth, int frameHeight, int viewportWidth,
         int viewportHeight);
     std::unique_ptr<GlShader> CreateShader(ShaderType shaderType);
 
@@ -150,11 +158,11 @@ private:
     int xUnitLocation_;
     int coefficientsLocation_;
     float stepSize_;
-    std::array<float, 4> coefficients_;
+    std::array<float, kCoefficientsNum> coefficients_;
 };
 
 void GlConverterDrawer::DrawOes(
-    int oesTextureId, const Matrix4f& texMatrix, int frameWidth, int frameHeight, int viewportX, int viewportY,
+    int oesTextureId, const Matrix4fv& texMatrix, int frameWidth, int frameHeight, int viewportX, int viewportY,
     int viewportWidth, int viewportHeight)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
@@ -174,7 +182,7 @@ void GlConverterDrawer::DrawOes(
 }
 
 void GlConverterDrawer::DrawRgb(
-    int textureId, const Matrix4f& texMatrix, int frameWidth, int frameHeight, int viewportX, int viewportY,
+    int textureId, const Matrix4fv& texMatrix, int frameWidth, int frameHeight, int viewportX, int viewportY,
     int viewportWidth, int viewportHeight)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
@@ -194,7 +202,7 @@ void GlConverterDrawer::DrawRgb(
 }
 
 void GlConverterDrawer::DrawYuv(
-    std::vector<uint32_t> yuvTextures, const Matrix4f& texMatrix, int frameWidth, int frameHeight, int viewportX,
+    std::vector<uint32_t> yuvTextures, const Matrix4fv& texMatrix, int frameWidth, int frameHeight, int viewportX,
     int viewportY, int viewportWidth, int viewportHeight)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
@@ -225,13 +233,13 @@ void GlConverterDrawer::SetStepSize(float stepSize)
     stepSize_ = stepSize;
 }
 
-void GlConverterDrawer::SetCoefficients(std::array<float, 4> coefficients)
+void GlConverterDrawer::SetCoefficients(std::array<float, kCoefficientsNum> coefficients)
 {
     coefficients_ = coefficients;
 }
 
 void GlConverterDrawer::PrepareShader(
-    ShaderType shaderType, const Matrix4f& texMatrix, int frameWidth, int frameHeight, int viewportWidth,
+    ShaderType shaderType, const Matrix4fv& texMatrix, int frameWidth, int frameHeight, int viewportWidth,
     int viewportHeight)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
@@ -239,7 +247,11 @@ void GlConverterDrawer::PrepareShader(
     (void)frameHeight;
     (void)viewportWidth;
     (void)viewportHeight;
-    
+
+    if (frameWidth == 0) {
+        return;
+    }
+
     if (shaderType != currentShaderType_) {
         currentShader_ = CreateShader(shaderType);
         RTC_DCHECK(currentShader_);
@@ -311,7 +323,7 @@ public:
 
     int width() const override;
     int height() const override;
-    
+
     const uint8_t* DataY() const override;
     const uint8_t* DataU() const override;
     const uint8_t* DataV() const override;
@@ -487,9 +499,8 @@ rtc::scoped_refptr<I420BufferInterface> YuvConverter::Convert(rtc::scoped_refptr
         RTC_LOG(LS_ERROR) << "Failed to call glBindFramebuffer: " << error;
         return nullptr;
     }
-    
-    Matrix4f renderMatrix = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
-                             0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+
+    Matrix4fv renderMatrix = kMatrix4fv_Identity;
 
     // Draw Y
     drawer_->SetStepSize(1.0f);
@@ -511,7 +522,7 @@ rtc::scoped_refptr<I420BufferInterface> YuvConverter::Convert(rtc::scoped_refptr
         viewportWidth / 2, uvHeight);
 
     std::unique_ptr<uint8_t, AlignedFreeDeleter> i420Buffer(
-        static_cast<uint8_t*>(AlignedMalloc(stride * totalHeight, 8)));
+        static_cast<uint8_t*>(AlignedMalloc(stride * totalHeight, kBufferAlignment)));
     glReadPixels(0, 0, frameBufferWidth_, frameBufferHeight_, GL_RGBA, GL_UNSIGNED_BYTE, i420Buffer.get());
     error = glGetError();
     if (error != GL_NO_ERROR) {
@@ -570,7 +581,7 @@ bool YuvConverter::PrepareFrameBuffer(int width, int height)
         RTC_LOG(LS_ERROR) << "Failed to prepare frame buffer: " << error;
         return false;
     }
-    
+
     // Attach the texture to the framebuffer as color attachment
     glBindFramebuffer(GL_FRAMEBUFFER, frameBufferId_);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureId_, 0);

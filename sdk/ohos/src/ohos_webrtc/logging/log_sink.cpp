@@ -36,7 +36,7 @@ LogSink::LogSink(napi_env env, Napi::Object loggable)
 LogSink::~LogSink()
 {
     tsfn_.Release();
-};
+}
 
 void LogSink::OnLogMessage(const string& msg)
 {

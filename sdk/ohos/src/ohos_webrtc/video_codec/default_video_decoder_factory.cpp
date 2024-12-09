@@ -37,7 +37,7 @@ DefaultVideoDecoderFactory::DefaultVideoDecoderFactory(std::unique_ptr<VideoDeco
 std::vector<SdpVideoFormat> DefaultVideoDecoderFactory::GetSupportedFormats() const
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-    
+
     auto hardwareSupportedFormats = hardwareVideoDecoderFactory_->GetSupportedFormats();
     auto softwareSupportedFormats = softwareVideoDecoderFactory_->GetSupportedFormats();
 
@@ -49,14 +49,14 @@ std::vector<SdpVideoFormat> DefaultVideoDecoderFactory::GetSupportedFormats() co
     for (auto& format : supportedFormats) {
         RTC_DLOG(LS_VERBOSE) << "\t format: " << format.ToString();
     }
-    
+
     return supportedFormats;
 }
 
 std::unique_ptr<VideoDecoder> DefaultVideoDecoderFactory::CreateVideoDecoder(const SdpVideoFormat& format)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-    
+
     auto hardwareDecoder = hardwareVideoDecoderFactory_->CreateVideoDecoder(format);
     auto softwareDecoder = softwareVideoDecoderFactory_->CreateVideoDecoder(format);
     if (hardwareDecoder && softwareDecoder) {

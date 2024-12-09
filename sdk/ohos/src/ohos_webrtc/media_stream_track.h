@@ -29,6 +29,8 @@ class MediaStreamTrackWrapper : public ObserverInterface {
 public:
     static std::unique_ptr<MediaStreamTrackWrapper> Create(rtc::scoped_refptr<MediaStreamTrackInterface> track);
 
+    // Do not use this constructor directly, use 'Create' above.
+    explicit MediaStreamTrackWrapper(rtc::scoped_refptr<MediaStreamTrackInterface> track);
     ~MediaStreamTrackWrapper() override;
 
     const MediaStreamTrackInterface* track() const
@@ -44,9 +46,6 @@ public:
     void AddVideoSink(rtc::VideoSinkInterface<VideoFrame>* sink);
     void RemoveVideoSink(rtc::VideoSinkInterface<VideoFrame>* sink);
     void RemoveAllVideoSinks();
-
-protected:
-    explicit MediaStreamTrackWrapper(rtc::scoped_refptr<MediaStreamTrackInterface> track);
 
 protected:
     void OnChanged() override;

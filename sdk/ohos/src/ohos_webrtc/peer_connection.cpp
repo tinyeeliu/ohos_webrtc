@@ -297,7 +297,7 @@ std::unique_ptr<NapiPeerConnectionWrapper> NapiPeerConnectionWrapper::Create(
     }
 
     auto factory = factoryWrapper->GetFactory();
-    auto observer = std::unique_ptr<NapiPeerConnectionWrapper>(new NapiPeerConnectionWrapper);
+    auto observer = std::make_unique<NapiPeerConnectionWrapper>();
 
     PeerConnectionDependencies dependencies(observer.get());
     auto result = factory->CreatePeerConnectionOrError(config, std::move(dependencies));
@@ -448,11 +448,11 @@ void NapiPeerConnectionWrapper::OnIceCandidate(const IceCandidateInterface* cand
 }
 
 void NapiPeerConnectionWrapper::OnIceCandidateError(
-    const std::string& address, int port, const std::string& url, int error_code, const std::string& error_text)
+    const std::string& address, int port, const std::string& url, int errorCode, const std::string& errorText)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    eventThread_->PostTask([this, address, port, url, error_code, error_text] {
+    eventThread_->PostTask([this, address, port, url, errorCode, errorText] {
         ThreadSafeFunction tsfn;
         if (!GetEventHandler(kEventIceCandidateError, tsfn)) {
             return;
@@ -460,13 +460,13 @@ void NapiPeerConnectionWrapper::OnIceCandidateError(
 
         Reference<Napi::Value>* context = tsfn.GetContext();
         napi_status status = tsfn.BlockingCall(
-            [context, address, port, url, error_code, error_text](Napi::Env env, Napi::Function jsCallback) {
+            [context, address, port, url, errorCode, errorText](Napi::Env env, Napi::Function jsCallback) {
                 auto jsEvent = Object::New(env);
                 jsEvent.Set("address", String::New(env, address));
                 jsEvent.Set("port", Number::New(env, port));
                 jsEvent.Set("url", String::New(env, url));
-                jsEvent.Set("errorCode", Number::New(env, error_code));
-                jsEvent.Set("errorText", String::New(env, error_text));
+                jsEvent.Set("errorCode", Number::New(env, errorCode));
+                jsEvent.Set("errorText", String::New(env, errorText));
 
                 jsCallback.Call(context ? context->Value() : env.Undefined(), {jsEvent});
             });

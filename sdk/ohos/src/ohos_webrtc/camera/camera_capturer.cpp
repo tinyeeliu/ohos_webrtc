@@ -25,7 +25,7 @@ using namespace ohos;
 
 std::unique_ptr<CameraCapturer> CameraCapturer::Create(std::string deviceId, video::VideoProfile profile)
 {
-    return std::unique_ptr<CameraCapturer>(new CameraCapturer(deviceId, profile));
+    return std::make_unique<CameraCapturer>(deviceId, profile);
 }
 
 CameraCapturer::CameraCapturer(std::string deviceId, video::VideoProfile profile)
@@ -76,14 +76,14 @@ void CameraCapturer::Init(std::unique_ptr<VideoFrameReceiver> dataReceiver, Vide
 void CameraCapturer::Release()
 {
     RTC_LOG(LS_INFO) << __FUNCTION__;
-    
+
     Stop();
-    
+
     {
         UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
         observer_ = nullptr;
     }
-    
+
     dataReceiver_.reset();
 
     isInitialized_ = false;
@@ -122,7 +122,7 @@ void CameraCapturer::StartInternal()
         RTC_LOG(LS_WARNING) << "Capture session is started";
         return;
     }
-    
+
     int32_t deviceIndex = -1;
     Camera_Device* device = nullptr;
     auto devices = CameraManager::GetInstance().GetSupportedCameras();
@@ -140,7 +140,7 @@ void CameraCapturer::StartInternal()
     }
 
     RTC_LOG(LS_VERBOSE) << "device: " << deviceIndex << ", " << device->cameraId;
-    
+
     auto sceneModes = CameraManager::GetInstance().GetSupportedSceneModes(device);
     for (std::size_t i = 0; i < sceneModes.Size(); i++) {
         RTC_DLOG(LS_VERBOSE) << "supported scene mode: " << sceneModes[i];
@@ -253,7 +253,7 @@ void CameraCapturer::StartInternal()
 void CameraCapturer::StopInternal()
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
-    
+
     if (!isStarted_) {
         RTC_LOG(LS_ERROR) << "Capture session is not started";
         return;
@@ -271,7 +271,7 @@ void CameraCapturer::StopInternal()
         previewOutput_.RemoveObserver(this);
         previewOutput_.Reset();
     }
-     
+
     input_.Close();
     input_.Reset();
     captureSession_.Reset();

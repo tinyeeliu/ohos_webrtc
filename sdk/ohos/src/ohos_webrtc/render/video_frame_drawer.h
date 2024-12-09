@@ -27,13 +27,13 @@ namespace webrtc {
 
 class VideoFrameDrawer {
 public:
-    void DrawFrame(const VideoFrame& frame, GlDrawer& drawer, const Matrix4f& texMatrix);
+    void DrawFrame(const VideoFrame& frame, GlDrawer& drawer, const Matrix4fv& texMatrix);
     void DrawFrame(
-        const VideoFrame& frame, GlDrawer& drawer, const Matrix4f& texMatrix, int viewportX, int viewportY,
+        const VideoFrame& frame, GlDrawer& drawer, const Matrix4fv& texMatrix, int viewportX, int viewportY,
         int viewportWidth, int viewportHeight);
 
     void DrawTexture(
-        rtc::scoped_refptr<TextureBuffer> buffer, GlDrawer& drawer, const Matrix4f& texMatrix, int frameWidth,
+        rtc::scoped_refptr<TextureBuffer> buffer, GlDrawer& drawer, const Matrix4fv& texMatrix, int frameWidth,
         int frameHeight, int viewportX, int viewportY, int viewportWidth, int viewportHeight);
 
 private:

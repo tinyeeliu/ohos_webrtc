@@ -34,8 +34,8 @@
 
 #ifdef NDK_HELPER_CPP_EXCEPTIONS
 
-#define NATIVE_THROW(e, ...) throw (e)
-#define NATIVE_THROW_VOID(e) throw (e)
+#define NATIVE_THROW(e, ...) throw(e)
+#define NATIVE_THROW_VOID(e) throw(e)
 
 #define NATIVE_THROW_IF_FAILED(condition, code, domain, message, ...)                                                  \
     if (!(condition)) {                                                                                                \
@@ -182,6 +182,7 @@ inline void NativeError::PrintToLog() const
 
 inline const char* NativeError::what() const noexcept
 {
+    // caller should not save the return value.
     return message_.c_str();
 }
 

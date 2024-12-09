@@ -36,6 +36,8 @@ public:
         std::shared_ptr<PeerConnectionFactoryWrapper> factoryWrapper,
         const PeerConnectionInterface::RTCConfiguration& config);
 
+    // Do not use this constructor directly, use 'Create' above.
+    NapiPeerConnectionWrapper();
     ~NapiPeerConnectionWrapper() override;
 
     const std::shared_ptr<PeerConnectionFactoryWrapper> GetPeerConnectionFactoryWrapper() const
@@ -55,8 +57,6 @@ public:
 
 protected:
     friend class NapiPeerConnection;
-
-    NapiPeerConnectionWrapper();
 
     void SetPeerConnectionFactoryWrapper(std::shared_ptr<PeerConnectionFactoryWrapper> factoryWrapper)
     {
