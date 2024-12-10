@@ -185,8 +185,8 @@ void NapiDtlsTransport::SetEventHandler(const Napi::CallbackInfo& info, const Na
 
         EventHandler handler;
         handler.ref = Persistent(fn);
-        handler.tsfn = ThreadSafeFunction::New(
-            fn.Env(), fn, type, 0, 1, context, [](Napi::Env env, Reference<Napi::Value>* ctx) {
+        handler.tsfn =
+            ThreadSafeFunction::New(fn.Env(), fn, type, 0, 1, context, [](Napi::Env env, Reference<Napi::Value>* ctx) {
                 ctx->Reset();
                 delete ctx;
             });

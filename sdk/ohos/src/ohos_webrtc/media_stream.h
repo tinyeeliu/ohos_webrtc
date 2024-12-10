@@ -28,7 +28,7 @@ public:
     static void Init(Napi::Env env, Napi::Object exports);
 
     static Napi::Object NewInstance(Napi::Env env, rtc::scoped_refptr<MediaStreamInterface> stream);
-    
+
     ~NapiMediaStream() override;
 
     rtc::scoped_refptr<MediaStreamInterface> Get() const
@@ -43,7 +43,7 @@ protected:
 
     Napi::Value GetId(const Napi::CallbackInfo& info);
     Napi::Value GetActive(const Napi::CallbackInfo& info);
-    
+
     Napi::Value AddTrack(const Napi::CallbackInfo& info);
     Napi::Value RemoveTrack(const Napi::CallbackInfo& info);
     Napi::Value GetTrackById(const Napi::CallbackInfo& info);

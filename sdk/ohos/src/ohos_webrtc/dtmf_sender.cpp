@@ -21,6 +21,13 @@ namespace webrtc {
 
 using namespace Napi;
 
+constexpr int32_t kDefaultDurationMs = 100;
+constexpr int32_t kMinDurationMs = 40;
+constexpr int32_t kMaxDurationMs = 6000;
+constexpr int32_t kDefaultInterToneGapMs = 70;
+constexpr int32_t kMinInterToneGapMs = 30;
+constexpr int32_t kMaxInterToneGapMs = 6000;
+
 const char kClassName[] = "RTCDTMFSender";
 
 const char kAttributeNameCanInsertDTMF[] = "canInsertDTMF";
@@ -142,7 +149,7 @@ void NapiDtmfSender::SetEventHandler(const Napi::CallbackInfo& info, const Napi:
         EventHandler handler;
         handler.ref = Persistent(fn);
         handler.tsfn = ThreadSafeFunction::New(
-            fn.Env(), fn, "SetEventHandler", 0, 1, context, [this](Napi::Env env, Reference<Napi::Value>* ctx) {
+            fn.Env(), fn, "SetEventHandler", 0, 1, context, [](Napi::Env env, Reference<Napi::Value>* ctx) {
                 ctx->Reset();
                 delete ctx;
             });
@@ -173,33 +180,33 @@ Napi::Value NapiDtmfSender::InsertDTMF(const Napi::CallbackInfo& info)
 
     const std::string tones = info[0].As<String>();
 
-    int duration = 100;
-    int inter_tone_gap = 70;
+    int duration = kDefaultDurationMs;
+    int interToneGap = kDefaultInterToneGapMs;
 
     if (info.Length() == 2) {
         duration = info[1].As<Number>();
-        if (duration > 6000) {
+        if (duration > kMaxDurationMs) {
             RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " The value of duration is greater than 6000";
-            duration = 6000;
+            duration = kMaxDurationMs;
         }
-        if (duration < 40) {
+        if (duration < kMinDurationMs) {
             RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " The value of duration is less than 40";
-            duration = 40;
+            duration = kMinDurationMs;
         }
     }
     if (info.Length() == 3) {
-        inter_tone_gap = info[2].As<Number>();
-        if (inter_tone_gap < 30) {
-            RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " The value of inter_tone_gap is less than 30";
-            inter_tone_gap = 30;
+        interToneGap = info[2].As<Number>();
+        if (interToneGap < kMinInterToneGapMs) {
+            RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " The value of interToneGap is less than 30";
+            interToneGap = kMinInterToneGapMs;
         }
-        if (inter_tone_gap > 6000) {
-            RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " The value of inter_tone_gap is greater than 6000";
-            inter_tone_gap = 6000;
+        if (interToneGap > kMaxInterToneGapMs) {
+            RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " The value of interToneGap is greater than 6000";
+            interToneGap = kMaxInterToneGapMs;
         }
     }
 
-    bool result = dtmfSender_->InsertDtmf(tones, duration, inter_tone_gap);
+    bool result = dtmfSender_->InsertDtmf(tones, duration, interToneGap);
     if (result) {
         return Napi::Boolean::New(info.Env(), result);
     } else {

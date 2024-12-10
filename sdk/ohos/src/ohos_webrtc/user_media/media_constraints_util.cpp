@@ -25,8 +25,11 @@
 
 namespace webrtc {
 
-static constexpr int kMaxDimension = std::numeric_limits<int>::max();
-static constexpr int kMaxFrameRate = 1000;
+// Number of default settings to be used as final tie-breaking criteria.
+constexpr int kNumDefaultDistanceEntries = 3;
+
+constexpr int kMaxDimension = std::numeric_limits<int>::max();
+constexpr int kMaxFrameRate = 1000;
 
 class CandidateSettings;
 
@@ -108,9 +111,9 @@ public:
 
         return NumericRangeSet<T>(
             ConstraintHasMin(constraint) && ConstraintMin(constraint) >= lowerBound ? ConstraintMin(constraint)
-                                                                                     : std::optional<T>(),
+                                                                                    : std::optional<T>(),
             ConstraintHasMax(constraint) && ConstraintMax(constraint) <= upperBound ? ConstraintMax(constraint)
-                                                                                     : std::optional<T>());
+                                                                                    : std::optional<T>());
     }
 
     template <typename ConstraintType>
@@ -141,9 +144,10 @@ using IntRangeSet = NumericRangeSet<int32_t>;
 
 double SquareEuclideanDistance(double x1, double y1, double x2, double y2)
 {
+    // return the dot product between (x1, y1) and (x2, y2)
     double x = x1 - x2;
     double y = y1 - y2;
-    return x * 2 + y * y;
+    return x * x + y * y;
 }
 
 std::string FacingModeToString(FacingMode facingMode)
@@ -202,8 +206,8 @@ double StringConstraintFitnessDistance(const std::string& value, const StringCon
         return 0.0;
     }
 
-    for (auto& ideal_value : constraint.Ideal()) {
-        if (value == ideal_value) {
+    for (auto& idealValue : constraint.Ideal()) {
+        if (value == idealValue) {
             return 0.0;
         }
     }
@@ -245,8 +249,7 @@ public:
                NumericRangeFitness(constraintSet.frameRate, targetFrameRate_.min, targetFrameRate_.max);
     }
 
-    bool
-    ApplyConstraintSet(const MediaTrackConstraintSet& constraintSet, std::string* failedConstraintName = nullptr)
+    bool ApplyConstraintSet(const MediaTrackConstraintSet& constraintSet, std::string* failedConstraintName = nullptr)
     {
         // resizeMode is not supported
         auto constrainedWidth = IntRangeSet::FromConstraint(constraintSet.width);
@@ -420,7 +423,7 @@ bool SelectSettingsForVideo(
     static_assert(std::numeric_limits<double>::has_infinity, "Requires infinity");
 
     uint32_t success = 0;
-    std::vector<double> bestDistance(constraints.Advanced().size() + 4);
+    std::vector<double> bestDistance(constraints.Advanced().size() + 1 + kNumDefaultDistanceEntries);
     std::fill(bestDistance.begin(), bestDistance.end(), HUGE_VAL);
 
     for (auto& device : devices) {
@@ -546,12 +549,12 @@ bool GetConstraint(const ConstraintType& constraint, T* value, size_t* mandatory
 }
 
 template <typename T, typename ConstraintType>
-void ConstraintToOptional(const ConstraintType& constraint, absl::optional<T>* value_out)
+void ConstraintToOptional(const ConstraintType& constraint, absl::optional<T>* valueOut)
 {
     T value;
     bool present = GetConstraint(constraint, &value, nullptr);
     if (present) {
-        *value_out = value;
+        *valueOut = value;
     }
 }
 
@@ -576,7 +579,7 @@ void GetScreenCaptureConstraints(const MediaTrackConstraints& constraints, int& 
 
     // ignore advanced constraints
     auto& basicSet = constraints.Basic();
-    
+
     GetConstraint(basicSet.width, &width, nullptr);
     GetConstraint(basicSet.height, &height, nullptr);
 }

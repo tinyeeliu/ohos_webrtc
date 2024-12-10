@@ -30,11 +30,11 @@ class NativeWindowRendererRaster : public NativeWindowRenderer {
 public:
     static std::unique_ptr<NativeWindowRendererRaster> Create(ohos::NativeWindow window);
 
+    // Do not use this constructor directly, use 'Create' above.
+    explicit NativeWindowRendererRaster(ohos::NativeWindow window);
     ~NativeWindowRendererRaster() override;
 
 protected:
-    explicit NativeWindowRendererRaster(ohos::NativeWindow window);
-
     void OnFrame(const VideoFrame& frame) override;
     void OnDiscardedFrame() override;
     void OnConstraintsChanged(const webrtc::VideoTrackSourceConstraints& constraints) override;

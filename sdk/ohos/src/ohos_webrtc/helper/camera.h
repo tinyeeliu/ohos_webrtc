@@ -664,8 +664,7 @@ inline CameraVideoOutput CameraManager::CreateVideoOutput(Camera_VideoProfile* p
 {
     Camera_VideoOutput* output = nullptr;
     Camera_ErrorCode ret = OH_CameraManager_CreateVideoOutput(Raw(), profile, surfaceId.c_str(), &output);
-    NATIVE_THROW_IF_FAILED(
-        ret == CAMERA_OK, ret, "OH_Camera", "Failed to create preview output", CameraVideoOutput());
+    NATIVE_THROW_IF_FAILED(ret == CAMERA_OK, ret, "OH_Camera", "Failed to create preview output", CameraVideoOutput());
     return CameraVideoOutput(output);
 }
 

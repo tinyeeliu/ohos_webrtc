@@ -401,7 +401,8 @@ void HardwareVideoDecoder::DeliverTextureFrame(const ohos::CodecBuffer& buffer)
                          << ", pts=" << attr.pts;
 
     RTC_DLOG(LS_VERBOSE) << "render output buffer, index=" << buffer.index;
-    ret = OH_VideoDecoder_RenderOutputBufferAtTime(decoder_.Raw(), buffer.index, attr.pts * 1000);
+    ret =
+        OH_VideoDecoder_RenderOutputBufferAtTime(decoder_.Raw(), buffer.index, attr.pts * rtc::kNumNanosecsPerMicrosec);
     if (ret != AV_ERR_OK) {
         RTC_LOG(LS_ERROR) << "Failed to render output buffer" << ret;
     }
@@ -476,9 +477,9 @@ void HardwareVideoDecoder::DeliverByteFrame(const ohos::CodecBuffer& buffer)
     switch (colorFormat_) {
         case AV_PIXEL_FORMAT_YUVI420: {
             // copy data
-            memcpy(i420Buffer->MutableDataY(), addr, width * height);
-            memcpy(i420Buffer->MutableDataU(), addr + width * height, width * height / 4);
-            memcpy(i420Buffer->MutableDataV(), addr + width * height * 5 / 4, width * height / 4);
+            memcpy(i420Buffer->MutableDataY(), addr, width * height); // y planar
+            memcpy(i420Buffer->MutableDataU(), addr + width * height, width * height / 4); // u planar
+            memcpy(i420Buffer->MutableDataV(), addr + width * height * 5 / 4, width * height / 4); // v planar
         } break;
         case AV_PIXEL_FORMAT_NV12: {
             int32_t ret = libyuv::NV12ToI420(

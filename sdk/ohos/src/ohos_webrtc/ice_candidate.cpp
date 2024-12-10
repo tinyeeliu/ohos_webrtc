@@ -22,6 +22,11 @@ namespace webrtc {
 
 using namespace Napi;
 
+// https://www.w3.org/TR/webrtc/#dfn-candidate-attribute
+// https://www.rfc-editor.org/rfc/rfc5245#section-15.1
+constexpr int32_t kComponentIdRtp = 1;
+constexpr int32_t kComponentIdRtcp = 2;
+
 const char kEnumIceCandidateTypeHost[] = "host";
 const char kEnumIceCandidateTypeSrflx[] = "srflx";
 const char kEnumIceCandidateTypePrflx[] = "prflx";
@@ -93,13 +98,13 @@ NapiIceCandidate::NapiIceCandidate(const Napi::CallbackInfo& info) : ObjectWrap<
             if (!SdpDeserializeCandidate(sdpMid, sdp, &candidate_, nullptr)) {
                 NAPI_THROW_VOID(Error::New(info.Env(), "SdpDescrializeCandidate failed with sdp"));
             }
-
-            if (from.Has("usernameFragment")) {
-                candidate_.set_username(from.Get("usernameFragment").As<String>().Utf8Value());
-            }
         }
     } else {
         NAPI_THROW_VOID(Error::New(info.Env(), "candidate is null"));
+    }
+
+    if (from.Has("usernameFragment")) {
+        candidate_.set_username(from.Get("usernameFragment").As<String>().Utf8Value());
     }
 }
 
@@ -158,12 +163,10 @@ Napi::Value NapiIceCandidate::GetComponent(const Napi::CallbackInfo& info)
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    // https://www.w3.org/TR/webrtc/#dfn-candidate-attribute
-    // https://www.rfc-editor.org/rfc/rfc5245#section-15.1
-    if (candidate_.component() == 1) {
+    if (candidate_.component() == kComponentIdRtp) {
         return String::New(info.Env(), kEnumIceCandidateRtp);
     }
-    if (candidate_.component() == 2) {
+    if (candidate_.component() == kComponentIdRtcp) {
         return String::New(info.Env(), kEnumIceCandidateRtcp);
     }
 
@@ -297,12 +300,10 @@ Napi::Object NativeToJsCandidate(
     obj.Set("sdpMid", String::New(env, sdpMid));
     obj.Set("candidate", String::New(env, sdp));
     obj.Set("foundation", String::New(env, candidate.foundation()));
-    // https://www.w3.org/TR/webrtc/#dfn-candidate-attribute
-    // https://www.rfc-editor.org/rfc/rfc5245#section-15.1
-    if (candidate.component() == 1) {
+    if (candidate.component() == kComponentIdRtp) {
         obj.Set("component", String::New(env, kEnumIceCandidateRtp));
     }
-    if (candidate.component() == 2) {
+    if (candidate.component() == kComponentIdRtcp) {
         obj.Set("component", String::New(env, kEnumIceCandidateRtcp));
     }
     obj.Set("priority", Number::New(env, candidate.priority()));
@@ -356,12 +357,10 @@ Napi::Object NativeToJsCandidate(Napi::Env env, const cricket::Candidate& candid
     auto obj = Object::New(env);
 
     obj.Set("foundation", String::New(env, candidate.foundation()));
-    // https://www.w3.org/TR/webrtc/#dfn-candidate-attribute
-    // https://www.rfc-editor.org/rfc/rfc5245#section-15.1
-    if (candidate.component() == 1) {
+    if (candidate.component() == kComponentIdRtp) {
         obj.Set("component", String::New(env, kEnumIceCandidateRtp));
     }
-    if (candidate.component() == 2) {
+    if (candidate.component() == kComponentIdRtcp) {
         obj.Set("component", String::New(env, kEnumIceCandidateRtcp));
     }
     obj.Set("priority", Number::New(env, candidate.priority()));

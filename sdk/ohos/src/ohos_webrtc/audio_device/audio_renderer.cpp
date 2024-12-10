@@ -22,9 +22,10 @@
 
 namespace webrtc {
 
-std::unique_ptr<AudioRenderer> AudioRenderer::Create(int32_t usage, int32_t sampleRate, bool useStereoOutput, bool useLowLatency)
+std::unique_ptr<AudioRenderer>
+AudioRenderer::Create(int32_t usage, int32_t sampleRate, bool useStereoOutput, bool useLowLatency)
 {
-    return std::unique_ptr<AudioRenderer>(new AudioRenderer(usage, sampleRate, useStereoOutput, useLowLatency));
+    return std::make_unique<AudioRenderer>(usage, sampleRate, useStereoOutput, useLowLatency);
 }
 
 int32_t AudioRenderer::OnWriteData1(OH_AudioRenderer* renderer, void* userData, void* buffer, int32_t length)
@@ -53,7 +54,10 @@ int32_t AudioRenderer::OnError1(OH_AudioRenderer* renderer, void* userData, OH_A
 }
 
 AudioRenderer::AudioRenderer(int32_t usage, int32_t sampleRate, bool useStereoOutput, bool useLowLatency)
-    : rendererUsage_(usage), sampleRate_(sampleRate), channelCount_(useStereoOutput ? 2 : 1), useLowLatency_(useLowLatency)
+    : rendererUsage_(usage),
+      sampleRate_(sampleRate),
+      channelCount_(useStereoOutput ? kAudioChannelCount_Stereo : kAudioChannelCount_Mono),
+      useLowLatency_(useLowLatency)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 

@@ -93,9 +93,7 @@ NapiSctpTransport::NapiSctpTransport(const Napi::CallbackInfo& info) : Napi::Obj
     }
 
     auto factoryWrapper = pcWrapper_->GetPeerConnectionFactoryWrapper();
-    factoryWrapper->GetNetworkThread()->BlockingCall([this] {
-        sctpTransport_->RegisterObserver(this);
-    });
+    factoryWrapper->GetNetworkThread()->BlockingCall([this] { sctpTransport_->RegisterObserver(this); });
 }
 
 NapiSctpTransport::~NapiSctpTransport()
@@ -103,9 +101,7 @@ NapiSctpTransport::~NapiSctpTransport()
     RTC_DLOG(LS_INFO) << __FUNCTION__;
 
     auto factoryWrapper = pcWrapper_->GetPeerConnectionFactoryWrapper();
-    factoryWrapper->GetNetworkThread()->BlockingCall([this] {
-        sctpTransport_->UnregisterObserver();
-    });
+    factoryWrapper->GetNetworkThread()->BlockingCall([this] { sctpTransport_->UnregisterObserver(); });
 
     std::lock_guard<std::mutex> lock(mutex_);
     if (eventHandler_.tsfn) {

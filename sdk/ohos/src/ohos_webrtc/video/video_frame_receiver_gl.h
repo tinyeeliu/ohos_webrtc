@@ -35,14 +35,14 @@ public:
     static std::unique_ptr<VideoFrameReceiverGl>
     Create(const std::string& threadName, std::shared_ptr<EglContext> sharedContext);
 
+    // Do not use this constructor directly, use 'Create' above.
+    VideoFrameReceiverGl(const std::string& threadName, std::shared_ptr<EglContext> sharedContext);
     ~VideoFrameReceiverGl() override;
 
     uint64_t GetSurfaceId() const override;
     void SetVideoFrameSize(int32_t width, int32_t height) override;
 
 protected:
-    VideoFrameReceiverGl(const std::string& threadName, std::shared_ptr<EglContext> sharedContext);
-
     bool CreateNativeImage();
     void ReleaseNativeImage();
     void SetTextureSize(int textureWidth, int textureHeight);

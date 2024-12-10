@@ -66,9 +66,9 @@ let transceiverInit = {
 } as webrtc.RTCRtpTransceiverInit;
 
 let dataChannel: webrtc.RTCDataChannelInit = {
-  ordered: true, // 设置为 true 表示消息是有序的
-  maxPacketLifeTime: 3000, // 可选，设置数据包的最大生存时间（毫秒）
-  protocol: "sctp-protocol", // 可选，设置协议
+  ordered: true,
+  maxPacketLifeTime: 3000,
+  protocol: "sctp-protocol",
 };
 
 async function exchangeOffer(caller: webrtc.RTCPeerConnection, callee: webrtc.RTCPeerConnection) {
@@ -430,54 +430,6 @@ export default function PeerConnectionTest() {
       }
     })
 
-    /*it("orderInSetLocalDescriptionAndAddIceCandidate", DEFAULT, async () => {
-      let candidate: webrtc.RTCIceCandidate | undefined = undefined;
-      caller.onicecandidate = (event) => {
-        console.info(TAG, 'onicecandidate: ', event.candidate);
-        candidate = event.candidate;
-      };
-      caller.addTransceiver('audio');
-      await exchangeOffer(caller, callee);
-      await sleep(1000);
-      let pendingPromises: Promise<void>[] = [];
-      let resolveOrder: string[] = [];
-      pendingPromises.push(callee.setLocalDescription().then(() => {
-        resolveOrder.push('setLocalDescription 1');
-      }));
-      pendingPromises.push(callee.setLocalDescription().then(() => {
-        resolveOrder.push('setLocalDescription 2');
-      }));
-      pendingPromises.push(callee.addIceCandidate(candidate).then(() => {
-        resolveOrder.push('addIceCandidate');
-      }));
-      await Promise.all(pendingPromises);
-      expect(resolveOrder[0]).assertEqual('setLocalDescription 1');
-      // ToDo 这里顺序有些问题
-      expect(resolveOrder).assertEqual(['setLocalDescription 1', 'setLocalDescription 2', 'addIceCandidate']);
-    })*/
-
-    it("orderOfOnicecandidateAndSetLocalDescription", DEFAULT, async () => {
-      caller.addTransceiver('audio');
-      let events: string[] = [];
-      let pendingPromises: Promise<void>[] = [];
-
-      caller.onicecandidate = (event) => {
-        console.info(TAG, 'onicecandidate: ', event.candidate);
-      };
-      let onCandidatePromise = new Promise<webrtc.Event>((resolve) => {
-        caller.onicecandidate = resolve;
-      });
-      await sleep(1000);
-      pendingPromises.push(onCandidatePromise.then(() => {
-        events.push('candidate generated');
-      }));
-      pendingPromises.push(caller.setLocalDescription().then(() => {
-        events.push('setLocalDescription');
-      }));
-      await Promise.all(pendingPromises);
-      expect(events).assertDeepEquals(['setLocalDescription', 'candidate generated']);
-    })
-
     it("directionWillChanged", DEFAULT, async () => {
       let calleePromise = callee.createOffer().then((offer) => {
         return caller.setRemoteDescription(offer);
@@ -507,55 +459,6 @@ export default function PeerConnectionTest() {
       caller.addTrack(caller.getReceivers()[0].track);
       expect(caller.getSenders()[0].track!.id).assertEqual(caller.getReceivers()[0].track.id);
     })
-
-    /*it("orderOfSignalingState", DEFAULT, async () => {
-      let signalingStates: webrtc.RTCSignalingState[] = [];
-
-      caller.onsignalingstatechange = () => {
-        console.info(TAG, "add signalingStates: ", caller.signalingState);
-        signalingStates.push(caller.signalingState);
-      }
-
-      caller.addTransceiver('audio', {
-        direction: 'recvonly'
-      });
-      let offer = await caller.createOffer();
-      let sldPromise = caller.setLocalDescription(offer);
-      // offer state为stable or have-remote-offer
-      // https://www.w3.org/TR/webrtc/#dom-peerconnection-setremotedescription
-      let srdPromise = caller.setRemoteDescription(offer);
-      await Promise.all([sldPromise, srdPromise]);
-
-      console.info(TAG, "signalingStates: ", signalingStates.toString())
-      // expect(signalingStates).assertDeepEquals(['have-local-offer', 'stable', 'have-remote-offer']);
-    })*/
-
-    /*it("stateChanged", DEFAULT, async () => {
-      let eventCount = 0;
-      const states = [
-        'stable', 'have-local-offer', 'stable', 'have-remote-offer',
-      ];
-
-      caller.onsignalingstatechange = () => {
-        expect(caller.signalingState).assertEqual(states[++eventCount]);
-      }
-      let offer = await generateAudioReceiveOnlyOffer(caller);
-      console.info(TAG, "signalingStates: ", caller.signalingState)
-      // expect(caller.signalingState).assertEqual('stable');
-      await caller.setLocalDescription(offer);
-      console.info(TAG, "signalingStates: ", caller.signalingState)
-      // expect(caller.signalingState).assertEqual('have-local-offer');
-
-      // offer state为stable or have-remote-offer
-      // https://www.w3.org/TR/webrtc/#dom-peerconnection-setremotedescription
-      await caller.setRemoteDescription(offer);
-      await exchangeAnswer(caller, callee);
-      console.info(TAG, "signalingStates: ", caller.signalingState)
-      // expect(caller.signalingState).assertEqual('stable');
-      await exchangeOffer(caller, callee);
-      console.info(TAG, "signalingStates: ", caller.signalingState)
-      // expect(caller.signalingState).assertEqual('have-remote-offer');
-    })*/
 
     it("inValidSdp", DEFAULT, async () => {
       try {
@@ -641,8 +544,6 @@ export default function PeerConnectionTest() {
       await callee.setRemoteDescription(offer);
       await promise;
       expect(callee.signalingState).assertEqual('have-remote-offer');
-      // expect(callee.remoteDescription).assertDeepEquals(offer);
-      // expect(callee.pendingRemoteDescription).assertDeepEquals(offer);
       expect(callee.currentRemoteDescription).assertUndefined();
       expect(states).assertDeepEquals(['have-remote-offer']);
     })
@@ -680,35 +581,36 @@ export default function PeerConnectionTest() {
 
     it("setLocalDescriptionRollbackFromLocalOffer", DEFAULT, async () => {
       let states: webrtc.RTCSignalingState [] = [];
-
-      let promise = new Promise<void>((resolve) => {
+      let promise1 = new Promise<void>((resolve) => {
         caller.onsignalingstatechange = () => {
-          console.info(TAG, "caller.signalingState: ", caller.signalingState);
           states.push(caller.signalingState);
           resolve();
         }
       })
-
       let offer = await caller.createOffer();
       await caller.setLocalDescription(offer);
-      await promise;
       expect(caller.signalingState).assertEqual('have-local-offer');
       expect(caller.localDescription).not().assertNull();
       expect(caller.pendingLocalDescription).assertDeepEquals(caller.localDescription);
       expect(caller.currentLocalDescription).assertUndefined();
-      let sldPromise = new Promise<void>(async (resolve) => {
-        await caller.setLocalDescription({
-          type: 'rollback'
-        });
-        resolve();
+      await promise1;
+      let promise2 = new Promise<void>((resolve) => {
+        caller.onsignalingstatechange = () => {
+          states.push(caller.signalingState);
+          resolve();
+        }
       })
-      await sldPromise;
+      await caller.setLocalDescription({
+        type: 'rollback'
+      });
       expect(caller.signalingState).assertEqual('stable');
       expect(caller.localDescription).assertUndefined();
       expect(caller.pendingLocalDescription).assertUndefined();
       expect(caller.currentLocalDescription).assertUndefined();
+      await promise2;
       expect(states).assertDeepEquals(['have-local-offer', 'stable']);
     })
+
 
     it("setLocalDescriptionRollbackFromState", DEFAULT, async () => {
       try {
@@ -737,20 +639,6 @@ export default function PeerConnectionTest() {
         }
       })
 
-    /*it("setLocalDescriptionRollbackAfterSettingARemoteOfferShouldRejectWithError", DEFAULT, async () => {
-      let offer = await generateAudioReceiveOnlyOffer(caller);
-      await caller.setRemoteDescription(offer);
-      try {
-        // ToDo 测试预期应该抛出，但是没有抛出，标准中也没有详细的规范表示一定会抛出，先暂停
-        await caller.setLocalDescription({
-          type: 'rollback'
-        });
-        expect().assertFail();
-      } catch (e) {
-        console.info(TAG, "e: ", e);
-      }
-    })*/
-
     it("setLocalDescriptionRollbackIgnoreInvalidSdp", DEFAULT, async () => {
       let offer = await caller.createOffer()
       caller.setLocalDescription(offer)
@@ -771,7 +659,6 @@ export default function PeerConnectionTest() {
       await caller.setLocalDescription(await caller.createOffer());
       expect(caller.signalingState).assertEqual("have-local-offer");
       expect(caller.pendingLocalDescription).not().assertNull();
-      // expect(caller.pendingLocalDescription.type).assertEqual("offer");
       expect(caller.pendingLocalDescription).assertDeepEquals(caller.localDescription);
       expect(caller.pendingRemoteDescription).assertUndefined()
       const sldPromise = caller.setLocalDescription({
@@ -824,19 +711,6 @@ export default function PeerConnectionTest() {
       expect(callee.getTransceivers()[0].currentDirection).assertEqual('recvonly');
     })
 
-    /*it("ParameterlessSLDUsesLastCreatedAnswerIfItIsStillValid", DEFAULT, async () => {
-      let offer = await caller.createOffer();
-      await callee.setRemoteDescription(await caller.createOffer());
-      let answer = await callee.createAnswer();
-      await callee.setLocalDescription();
-      console.info(TAG, "offer.sdp: ", JSON.stringify(offer?.sdp));
-      console.info(TAG, "currentRemoteDescription: ", JSON.stringify(callee?.currentRemoteDescription!.sdp));
-      console.info(TAG, "answer.sdp: ", JSON.stringify(answer?.sdp));
-      console.info(TAG, "currentLocalDescription: ", JSON.stringify(callee?.currentLocalDescription!.sdp));
-      // ToDo 会话id会变化导致sdp不一致
-      expect(callee?.currentLocalDescription!.sdp.toString()).assertEqual(answer?.sdp.toString());
-    })*/
-
     it("exchangeOA", DEFAULT, async () => {
       try {
         await caller.setLocalDescription();
@@ -862,7 +736,6 @@ export default function PeerConnectionTest() {
       let offer = await generateAudioReceiveOnlyOffer(caller);
       await caller.setLocalDescription(offer);
       expect(caller.signalingState).assertEqual('have-local-offer');
-      // expect(JSON.stringify(caller.pendingLocalDescription)).assertEqual(JSON.stringify(caller.localDescription));
       expect(caller.currentLocalDescription).assertUndefined();
       await promise;
       expect(states).assertEqual('have-local-offer');
@@ -972,19 +845,19 @@ export default function PeerConnectionTest() {
       expect(caller.getTransceivers()[0].currentDirection).assertEqual('inactive');
     })
 
-    it("inStateOnnegotiationneededNotPremature", DEFAULT, async () => {
+    it("negotiationNeededWhenReturningToStableDoesNotFireTooEarly", DEFAULT, async () => {
       caller.addTransceiver("audio");
-      caller.onnegotiationneeded = () => {
-        console.info(TAG, "signalingState: ", caller.signalingState);
-      }
       await caller.setLocalDescription(await caller.createOffer());
       caller.restartIce();
-      caller.onnegotiationneeded = () => {
-        console.info(TAG, "signalingState: ", caller.signalingState);
-      }
+      let promise = new Promise<void>((resolve) => {
+        caller.onnegotiationneeded = () => {
+          resolve();
+        }
+      })
       await callee.setRemoteDescription(caller.localDescription);
       await callee.setLocalDescription(await callee.createAnswer());
       await caller.setRemoteDescription(callee.localDescription);
+      await promise;
     })
 
     it("addTransceiverWithInactiveDirectionNotCauseOntrack", DEFAULT, async () => {
@@ -1180,7 +1053,6 @@ export default function PeerConnectionTest() {
         dc2.send(message);
         dc2.close();
       };
-
       let dc1 = caller.createDataChannel('fire-me!');
       let res = "";
       let promise = new Promise<void>((resolve) => {
@@ -1276,48 +1148,6 @@ export default function PeerConnectionTest() {
     it("initialIceGatheringStateShouldBeNew", DEFAULT, () => {
       expect(caller.iceGatheringState).assertEqual('new');
     })
-
-    /*it("gatheringStateAndCandidateCallbacksShouldFireInTheCorrectOrder", DEFAULT, async () => {
-      // ToDo addTransceiver后续实现内部
-      let transceiver = caller.addTransceiver('audio', {
-        direction: 'recvonly'
-      });
-      await caller.setLocalDescription();
-      let iceTransport = transceiver.sender.transport!.iceTransport;
-      while (true) {
-        const candidateEvent = await new Promise<webrtc.RTCPeerConnectionIceEvent>((resolve, reject) => {
-          caller.onicecandidate = resolve;
-        });
-        expect(candidateEvent).not().assertNull();
-        const candidate = candidateEvent!.candidate;
-        if (candidate!.candidate == '') {
-          break;
-        }
-      }
-      expect(iceTransport.gatheringState).assertEqual('gathering');
-      expect(caller.iceGatheringState).assertEqual('gathering');
-
-      let events: string[] = [];
-
-      iceTransport.ongatheringstatechange = () => {
-        expect(iceTransport.gatheringState).assertEqual('complete');
-        expect(caller.iceGatheringState).assertEqual('complete');
-        events.push('gatheringstatechange');
-      };
-      caller.onicegatheringstatechange = () => {
-        expect(iceTransport.gatheringState).assertEqual('complete');
-        expect(caller.iceGatheringState).assertEqual('complete');
-        events.push('icegatheringstatechange');
-      }
-      caller.onicecandidate = e => {
-        expect(e.candidate).assertEqual(null);
-        expect(iceTransport.gatheringState).assertEqual('complete');
-        expect(caller.iceGatheringState).assertEqual('complete');
-        events.push('icecandidate');
-      };
-      await sleep(1000);
-      expect(events).assertDeepEquals(['gatheringstatechange', 'icegatheringstatechange', 'icecandidate']);
-    })*/
 
     it("stateInIceConnectionState", DEFAULT, () => {
       expect(caller.iceConnectionState).assertEqual('new');

@@ -91,7 +91,8 @@ void AsyncWorkerGetUserMedia::Execute()
         CameraCaptureSettings selectedSetting;
         std::string failedConstraintName;
         if (SelectSettingsForVideo(
-                cameraDevices, videoConstraints_, 640, 480, 30, selectedSetting, failedConstraintName))
+                cameraDevices, videoConstraints_, kDefaultWidth, kDefaultHeight, kDefaultFrameRate, selectedSetting,
+                failedConstraintName))
         {
             RTC_DLOG(LS_INFO) << "Selected camera device: " << selectedSetting.deviceId
                               << ", resolution = " << selectedSetting.profile.resolution.width << "x"

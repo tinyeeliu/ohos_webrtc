@@ -27,7 +27,7 @@ namespace webrtc {
 std::unique_ptr<VideoFrameReceiverGl>
 VideoFrameReceiverGl::Create(const std::string& threadName, std::shared_ptr<EglContext> sharedContext)
 {
-    return std::unique_ptr<VideoFrameReceiverGl>(new VideoFrameReceiverGl(threadName, sharedContext));
+    return std::make_unique<VideoFrameReceiverGl>(threadName, sharedContext);
 }
 
 VideoFrameReceiverGl::VideoFrameReceiverGl(const std::string& threadName, std::shared_ptr<EglContext> sharedContext)
@@ -165,16 +165,13 @@ void VideoFrameReceiverGl::OnNativeImageFrameAvailable()
     auto timestamp = nativeImage_.GetTimestamp();
     auto matrix = nativeImage_.GetTransformMatrix();
     RTC_DLOG(LS_VERBOSE) << "timestamp: " << timestamp;
-    RTC_DLOG(LS_VERBOSE) << "transform: [ " << matrix[0] << ", " << matrix[1] << ", " << matrix[2] << ", " << matrix[3]
-                         << ", " << matrix[4] << ", " << matrix[5] << ", " << matrix[6] << ", " << matrix[7] << ", "
-                         << matrix[8] << ", " << matrix[9] << ", " << matrix[10] << ", " << matrix[11] << ", "
-                         << matrix[12] << ", " << matrix[13] << ", " << matrix[14] << ", " << matrix[15] << " ]";
 
     // create video frame
     auto buffer = TextureBuffer::Create(textureData_, width_, height_, matrix);
 
     if (callback_) {
-        callback_->OnFrameAvailable(buffer, timestamp > 0 ? (timestamp / 1000) : rtc::TimeMicros(), kVideoRotation_0);
+        callback_->OnFrameAvailable(
+            buffer, timestamp > 0 ? (timestamp / rtc::kNumNanosecsPerMicrosec) : rtc::TimeMicros(), kVideoRotation_0);
     }
 }
 

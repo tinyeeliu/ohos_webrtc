@@ -40,8 +40,10 @@ class CameraCapturer : public VideoCapturer,
 public:
     static std::unique_ptr<CameraCapturer> Create(std::string deviceId, video::VideoProfile profile);
 
+    // Do not use this constructor directly, use 'Create' above.
+    CameraCapturer(std::string deviceId, video::VideoProfile profile);
     ~CameraCapturer() override;
-    
+
     void Init(std::unique_ptr<VideoFrameReceiver>, VideoCapturer::Observer* observer) override;
     void Release() override;
     void Start() override;
@@ -49,8 +51,6 @@ public:
     bool IsScreencast() override;
 
 protected:
-    CameraCapturer(std::string deviceId, video::VideoProfile profile);
-
     void NotifyCapturedStart(bool success);
     void NotifyCapturedStop();
 

@@ -37,11 +37,11 @@ private:
     using PointerWrapper::PointerWrapper;
 };
 
-
 inline AVScreenCapture AVScreenCapture::Create()
 {
     OH_AVScreenCapture* capture = OH_AVScreenCapture_Create();
-    NATIVE_THROW_IF_FAILED(capture != nullptr, -1, "OH_AVScreenCapture", "Failed to create native window", AVScreenCapture());
+    NATIVE_THROW_IF_FAILED(
+        capture != nullptr, -1, "OH_AVScreenCapture", "Failed to create native window", AVScreenCapture());
     return AVScreenCapture(capture, [](OH_AVScreenCapture* capture) { OH_AVScreenCapture_Release(capture); });
 }
 
@@ -57,4 +57,4 @@ inline AVScreenCapture::AVScreenCapture(OH_AVScreenCapture* capture) : PointerWr
 
 } // namespace ohos
 
-#endif //WEBRTC_HELPER_SCREEN_CAPTURE_H
+#endif // WEBRTC_HELPER_SCREEN_CAPTURE_H

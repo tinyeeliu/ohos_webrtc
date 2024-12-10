@@ -91,8 +91,7 @@ export default function RTCIceCandidateTest() {
       expect(res.candidate).assertEqual(candidateString);
       expect(res.sdpMid).assertEqual('video');
       expect(res.sdpMLineIndex).assertEqual(1);
-      // TODO usernameFragment 是获取的 candidate 的 username
-      // expect(res.usernameFragment).assertEqual('test');
+      expect(res.usernameFragment).assertEqual('test');
       expect(res.foundation).assertEqual('1905690388');
       expect(res.component).assertEqual('rtp');
       expect(res.priority).assertEqual(2113937151);
@@ -117,8 +116,7 @@ export default function RTCIceCandidateTest() {
       expect(res.candidate).assertEqual(candidateString2);
       expect(res.sdpMid).assertEqual('video');
       expect(res.sdpMLineIndex).assertEqual(1);
-      // TODO usernameFragment 是获取的 candidate 的 username
-      // expect(res.usernameFragment).assertEqual('user1');
+      expect(res.usernameFragment).assertEqual('user1');
       expect(res.foundation).assertEqual('435653019');
       expect(res.component).assertEqual('rtcp');
       expect(res.priority).assertEqual(1845501695);

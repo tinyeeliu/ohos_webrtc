@@ -41,7 +41,8 @@ public:
     ~NativeWindowRendererGl() override;
 
 protected:
-    NativeWindowRendererGl(ohos::NativeWindow window, std::shared_ptr<EglContext> sharedContext, const std::string& threadName);
+    NativeWindowRendererGl(
+        ohos::NativeWindow window, std::shared_ptr<EglContext> sharedContext, const std::string& threadName);
 
     void OnFrame(const VideoFrame& frame) override;
     void OnDiscardedFrame() override;
@@ -58,7 +59,7 @@ private:
 
     std::unique_ptr<EglEnv> eglEnv_;
 
-    Matrix4f drawMatrix_;
+    Matrix4fv drawMatrix_;
     std::unique_ptr<GlDrawer> textureDrawer_;
     std::unique_ptr<VideoFrameDrawer> videoFrameDrawer_;
 };

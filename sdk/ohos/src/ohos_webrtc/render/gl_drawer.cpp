@@ -24,6 +24,8 @@ namespace webrtc {
 
 namespace {
 
+constexpr int32_t kYuvTexturesNum = 3;
+
 static constexpr char DEFAULT_VERTEX_SHADER[] = R"(
 attribute vec3 position;
 attribute vec2 texCoord;
@@ -102,7 +104,7 @@ GlGenericDrawer::GlGenericDrawer() = default;
 GlGenericDrawer::~GlGenericDrawer() = default;
 
 void GlGenericDrawer::DrawOes(
-    int oesTextureId, const Matrix4f& texMatrix, int frameWidth, int frameHeight, int viewportX, int viewportY,
+    int oesTextureId, const Matrix4fv& texMatrix, int frameWidth, int frameHeight, int viewportX, int viewportY,
     int viewportWidth, int viewportHeight)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
@@ -122,7 +124,7 @@ void GlGenericDrawer::DrawOes(
 }
 
 void GlGenericDrawer::DrawRgb(
-    int textureId, const Matrix4f& texMatrix, int frameWidth, int frameHeight, int viewportX, int viewportY,
+    int textureId, const Matrix4fv& texMatrix, int frameWidth, int frameHeight, int viewportX, int viewportY,
     int viewportWidth, int viewportHeight)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
@@ -142,7 +144,7 @@ void GlGenericDrawer::DrawRgb(
 }
 
 void GlGenericDrawer::DrawYuv(
-    std::vector<uint32_t> yuvTextures, const Matrix4f& texMatrix, int frameWidth, int frameHeight, int viewportX,
+    std::vector<uint32_t> yuvTextures, const Matrix4fv& texMatrix, int frameWidth, int frameHeight, int viewportX,
     int viewportY, int viewportWidth, int viewportHeight)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
@@ -150,7 +152,7 @@ void GlGenericDrawer::DrawYuv(
     PrepareShader(ShaderType::YUV, texMatrix, frameWidth, frameHeight, viewportWidth, viewportHeight);
 
     // Bind the textures.
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < kYuvTexturesNum; ++i) {
         glActiveTexture(GL_TEXTURE0 + i);
         glBindTexture(GL_TEXTURE_2D, yuvTextures[i]);
     }
@@ -162,14 +164,14 @@ void GlGenericDrawer::DrawYuv(
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
     // Unbind the textures as a precaution.
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < kYuvTexturesNum; ++i) {
         glActiveTexture(GL_TEXTURE0 + i);
         glBindTexture(GL_TEXTURE_2D, 0);
     }
 }
 
 void GlGenericDrawer::PrepareShader(
-    ShaderType shaderType, const Matrix4f& texMatrix, int frameWidth, int frameHeight, int viewportWidth,
+    ShaderType shaderType, const Matrix4fv& texMatrix, int frameWidth, int frameHeight, int viewportWidth,
     int viewportHeight)
 {
     if (shaderType != currentShaderType_) {

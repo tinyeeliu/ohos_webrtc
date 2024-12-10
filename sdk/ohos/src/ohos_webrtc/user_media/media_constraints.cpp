@@ -44,6 +44,9 @@ public:
     static std::shared_ptr<MediaTrackConstraintsPrivate>
     Create(const MediaTrackConstraintSet& basic, const std::vector<MediaTrackConstraintSet>& advanced);
 
+    MediaTrackConstraintsPrivate(
+        const MediaTrackConstraintSet& basic, const std::vector<MediaTrackConstraintSet>& advanced);
+
     bool IsConstrained() const;
     const MediaTrackConstraintSet& Basic() const;
     MediaTrackConstraintSet& MutableBasic();
@@ -51,9 +54,6 @@ public:
     const std::string ToString() const;
 
 private:
-    MediaTrackConstraintsPrivate(
-        const MediaTrackConstraintSet& basic, const std::vector<MediaTrackConstraintSet>& advanced);
-
     MediaTrackConstraintSet basic_;
     std::vector<MediaTrackConstraintSet> advanced_;
 };
@@ -357,13 +357,13 @@ std::shared_ptr<MediaTrackConstraintsPrivate> MediaTrackConstraintsPrivate::Crea
 {
     MediaTrackConstraintSet basic;
     std::vector<MediaTrackConstraintSet> advanced;
-    return std::shared_ptr<MediaTrackConstraintsPrivate>(new MediaTrackConstraintsPrivate(basic, advanced));
+    return Create(basic, advanced);
 }
 
 std::shared_ptr<MediaTrackConstraintsPrivate> MediaTrackConstraintsPrivate::Create(
     const MediaTrackConstraintSet& basic, const std::vector<MediaTrackConstraintSet>& advanced)
 {
-    return std::shared_ptr<MediaTrackConstraintsPrivate>(new MediaTrackConstraintsPrivate(basic, advanced));
+    return std::make_shared<MediaTrackConstraintsPrivate>(basic, advanced);
 }
 
 MediaTrackConstraintsPrivate::MediaTrackConstraintsPrivate(

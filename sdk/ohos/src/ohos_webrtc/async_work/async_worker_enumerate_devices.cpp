@@ -35,7 +35,7 @@ AsyncWorkerEnumerateDevices::AsyncWorkerEnumerateDevices(Napi::Env env, const ch
 void AsyncWorkerEnumerateDevices::Execute()
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-    
+
     cameraDevices_ = CameraEnumerator::GetDevices();
     audioDevices_ = AudioDeviceEnumerator::GetDevices();
 }
@@ -45,8 +45,8 @@ void AsyncWorkerEnumerateDevices::OnOK()
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
     auto result = Array::New(Env(), cameraDevices_.size() + audioDevices_.size());
-    
-    for (uint32_t index = 0; index < cameraDevices_.size() ; index++) {
+
+    for (uint32_t index = 0; index < cameraDevices_.size(); index++) {
         auto obj = Object::New(Env());
         obj.Set("deviceId", String::New(Env(), cameraDevices_[index].deviceId));
         obj.Set("groupId", String::New(Env(), cameraDevices_[index].groupId));

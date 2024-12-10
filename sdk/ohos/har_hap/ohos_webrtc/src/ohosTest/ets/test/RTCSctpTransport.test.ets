@@ -111,32 +111,12 @@ export default function RTCSctpTransportTest() {
     })
 
     it("maxChannelsGetsInstantiatedAfterConnecting", DEFAULT, async () => {
-      let audioSource = pcf?.createAudioSource();
-      let audioTrack = pcf?.createAudioTrack("audio", audioSource);
-
-      caller.addTrack(audioTrack);
-
-      caller.createDataChannel("myDataChannel");
+      caller.createDataChannel("");
       exchangeIceCandidates(caller, callee);
       await exchangeOfferAnswer(caller, callee);
-      console.info(TAG, "maxChannelsGetsInstantiatedAfterConnecting state: ", caller.sctp?.state);
-      // wait the SCTP transport goes into the "connected" state
-      // await sleep(1000);
-      //
-      // await new Promise<void>((resolve) => {
-      //   caller.sctp!.onstatechange = () => {
-      //     if (caller.sctp?.state == 'connected') {
-      //       resolve();
-      //     }
-      //   }
-      // });
-      while (true) {
-        if (caller.sctp?.state === 'connected') {
-          break;
-        }
-        await sleep(100);
+      while (caller.sctp?.state != "connected" && callee.sctp?.state != "connected") {
+        await sleep(500);
       }
-      console.info(TAG, "maxChannelsGetsInstantiatedAfterConnecting state: ", caller.sctp?.state);
       expect(caller.sctp?.maxChannels).assertEqual(callee.sctp?.maxChannels);
     })
 

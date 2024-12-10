@@ -40,7 +40,7 @@ public:
 
     void Start();
     void Stop();
-    
+
     void SetCapturerObserver(VideoCapturer::Observer* observer);
 
 protected:

@@ -32,9 +32,7 @@ using BuiltinVideoDecoderFactory = VideoDecoderFactoryTemplate<
 #ifdef WEBRTC_USE_H264
     OpenH264DecoderTemplateAdapter,
 #endif
-    LibvpxVp8DecoderTemplateAdapter, LibvpxVp9DecoderTemplateAdapter,
-    Dav1dDecoderTemplateAdapter
->;
+    LibvpxVp8DecoderTemplateAdapter, LibvpxVp9DecoderTemplateAdapter, Dav1dDecoderTemplateAdapter>;
 
 } // namespace
 

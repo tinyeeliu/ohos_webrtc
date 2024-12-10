@@ -35,11 +35,11 @@ class DesktopCapturer : public VideoCapturer, public VideoFrameReceiver::Callbac
 public:
     static std::unique_ptr<DesktopCapturer> Create(video::VideoProfile profile);
 
+    // Do not use this constructor directly, use 'Create' above.
+    explicit DesktopCapturer(video::VideoProfile profile);
     ~DesktopCapturer() override;
 
 protected:
-    explicit DesktopCapturer(video::VideoProfile profile);
-
     void NotifyCapturedStart(bool success);
     void NotifyCapturedStop();
 

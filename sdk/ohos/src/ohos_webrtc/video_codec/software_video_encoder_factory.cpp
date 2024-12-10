@@ -32,8 +32,7 @@ using BuiltinVideoEncoderFactory = VideoEncoderFactoryTemplate<
 #ifdef WEBRTC_USE_H264
     OpenH264EncoderTemplateAdapter,
 #endif
-    LibvpxVp8EncoderTemplateAdapter, LibaomAv1EncoderTemplateAdapter,
-    LibvpxVp9EncoderTemplateAdapter>;
+    LibvpxVp8EncoderTemplateAdapter, LibaomAv1EncoderTemplateAdapter, LibvpxVp9EncoderTemplateAdapter>;
 
 } // namespace
 

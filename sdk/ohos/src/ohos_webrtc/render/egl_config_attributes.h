@@ -23,6 +23,11 @@
 
 namespace webrtc {
 
+constexpr int32_t kEGLPixelComponentBits = 8;
+constexpr int32_t kOpenGLVersion_1 = 1;
+constexpr int32_t kOpenGLVersion_2 = 2;
+constexpr int32_t kOpenGLVersion_3 = 3;
+
 class EglConfigAttributes {
 public:
     class Builder {
@@ -49,18 +54,18 @@ public:
         {
             std::vector<int32_t> attrs;
             attrs.push_back(EGL_RED_SIZE);
-            attrs.push_back(8);
+            attrs.push_back(kEGLPixelComponentBits);
             attrs.push_back(EGL_GREEN_SIZE);
-            attrs.push_back(8);
+            attrs.push_back(kEGLPixelComponentBits);
             attrs.push_back(EGL_BLUE_SIZE);
-            attrs.push_back(8);
+            attrs.push_back(kEGLPixelComponentBits);
             if (hasAlphaChannel_) {
                 attrs.push_back(EGL_ALPHA_SIZE);
-                attrs.push_back(8);
+                attrs.push_back(kEGLPixelComponentBits);
             }
-            if (version_ == 2 || version_ == 3) {
+            if (version_ == 2 || version_ == kOpenGLVersion_3) {
                 attrs.push_back(EGL_RENDERABLE_TYPE);
-                attrs.push_back(version_ == 3 ? EGL_OPENGL_ES3_BIT : EGL_OPENGL_ES2_BIT);
+                attrs.push_back(version_ == kOpenGLVersion_3 ? EGL_OPENGL_ES3_BIT : EGL_OPENGL_ES2_BIT);
             }
             if (supportsPixelBuffer_) {
                 attrs.push_back(EGL_SURFACE_TYPE);
@@ -72,7 +77,7 @@ public:
         }
 
     private:
-        int version_{3};
+        int version_{kOpenGLVersion_3};
         bool hasAlphaChannel_{false};
         bool supportsPixelBuffer_{false};
     };

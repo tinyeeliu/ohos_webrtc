@@ -15,6 +15,7 @@
 
 #include "desktop_capturer.h"
 #include "../video/video_frame_receiver_native.h"
+#include "../audio_device/audio_common.h"
 #include "../helper/native_window.h"
 #include "../utils/marcos.h"
 
@@ -34,7 +35,7 @@ OH_VideoSourceType PixelFormatToVideoSourceType(video::PixelFormat format)
 
 std::unique_ptr<DesktopCapturer> DesktopCapturer::Create(video::VideoProfile profile)
 {
-    return std::unique_ptr<DesktopCapturer>(new DesktopCapturer(profile));
+    return std::make_unique<DesktopCapturer>(profile);
 }
 
 DesktopCapturer::DesktopCapturer(video::VideoProfile profile)
@@ -77,8 +78,8 @@ void DesktopCapturer::Init(std::unique_ptr<VideoFrameReceiver> dataReceiver, Obs
     dataReceiver_->SetCallback(this);
 
     OH_AudioCaptureInfo micCapInfo{};
-    micCapInfo.audioSampleRate = 16000;
-    micCapInfo.audioChannels = 2;
+    micCapInfo.audioSampleRate = kAudioSampleRate_16000;
+    micCapInfo.audioChannels = kAudioChannelCount_Stereo;
     micCapInfo.audioSource = OH_MIC;
 
     OH_AudioInfo audioInfo{};
