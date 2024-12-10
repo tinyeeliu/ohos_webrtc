@@ -116,8 +116,7 @@ export default function RTCIceTransportTest() {
       let offer = await caller.createOffer();
       await caller.setLocalDescription(offer);
       await callee.setRemoteDescription(offer);
-      let answer = await callee.createAnswer();
-      await caller.setRemoteDescription(answer);
+      await caller.setRemoteDescription(await callee.createAnswer());
       let iceTransport = caller.sctp?.transport.iceTransport;
       expect(iceTransport?.getSelectedCandidatePair()).assertNull();
     })
@@ -129,17 +128,35 @@ export default function RTCIceTransportTest() {
       expect(iceTransport?.state).assertEqual('new');
     })
 
-    it("afterInitializationAllAttributesAreNotNull", DEFAULT, async () => {
+    it("iceTransportShouldTransitionToGatheringThenCompleteAfterSLD", DEFAULT, async () => {
+      const transceiver = caller.addTransceiver('audio');
+      await caller.setLocalDescription();
+      const iceTransport = transceiver.sender.transport?.iceTransport;
+
+      let promise = new Promise<void>((resolve) => {
+        iceTransport!.ongatheringstatechange = () => {
+          console.info(TAG, 'gatheringState: ', iceTransport?.gatheringState);
+          resolve();
+        };
+      });
+
+      await promise;
+      expect(iceTransport?.gatheringState).not().assertEqual("new");
+    })
+
+    it("afterInitializationSelectedCandidatePairNotNull", DEFAULT, async () => {
       let transport = await createIceTransport(caller, callee);
-      while (transport.state != 'connected') {
-        await sleep(100);
+      while (transport.state != "connected") {
+        await sleep(500);
       }
-      console.info(TAG, 'transport.state: ', transport.state);
       expect(transport.getSelectedCandidatePair()).not().assertNull();
     })
 
     it("onstatechange", DEFAULT, async () => {
-      let transport = await createIceTransport(caller, callee);
+      exchangeIceCandidates(caller, callee);
+      const transceiver = caller.addTransceiver('audio');
+      await caller.setLocalDescription();
+      const transport = transceiver.sender.transport!.iceTransport;
       let events: string[] = [];
       let promise = new Promise<void>((resolve) => {
         transport.onstatechange = () => {
@@ -148,12 +165,18 @@ export default function RTCIceTransportTest() {
           resolve();
         };
       });
+      await callee.setRemoteDescription(caller.localDescription);
+      await callee.setLocalDescription();
+      await caller.setRemoteDescription(callee.localDescription);
       await promise;
       expect(events.length).not().assertEqual(0);
     })
 
     it("onSelectedCandidatePairChange", DEFAULT, async () => {
-      let transport = await createIceTransport(caller, callee);
+      exchangeIceCandidates(caller, callee);
+      const transceiver = caller.addTransceiver('audio');
+      await caller.setLocalDescription();
+      const transport = transceiver.sender.transport!.iceTransport;
       let events: string[] = [];
       let promise = new Promise<void>((resolve) => {
         transport.onselectedcandidatepairchange = () => {
@@ -161,6 +184,9 @@ export default function RTCIceTransportTest() {
           resolve();
         };
       });
+      await callee.setRemoteDescription(caller.localDescription);
+      await callee.setLocalDescription();
+      await caller.setRemoteDescription(callee.localDescription);
       await promise;
       expect(events.length).not().assertEqual(0);
     })

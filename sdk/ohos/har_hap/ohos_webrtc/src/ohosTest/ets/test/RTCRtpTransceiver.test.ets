@@ -328,7 +328,6 @@ export default function RTCRtpTransceiverTest() {
         transceiver.setCodecPreferences(codecs);
         expect().assertFail();
       } catch (e) {
-        // should throw InvalidModificationError
         expect(e).assertInstanceOf('Error');
       }
     })
@@ -346,7 +345,6 @@ export default function RTCRtpTransceiverTest() {
         transceiver.setCodecPreferences(codecs);
         expect().assertFail();
       } catch (e) {
-        // should throw InvalidModificationError
         expect(e).assertInstanceOf('Error');
       }
     })
@@ -362,7 +360,6 @@ export default function RTCRtpTransceiverTest() {
         transceiver.setCodecPreferences(codecs);
         expect().assertFail();
       } catch (e) {
-        // should throw InvalidModificationError
         expect(e).assertInstanceOf('Error');
       }
     })

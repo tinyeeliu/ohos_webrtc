@@ -255,7 +255,7 @@ void NapiDataChannel::Observer::OnBufferedAmountChange(uint64_t sent_data_size)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    if (sent_data_size > bufferedAmountLowThreshold_.load()) {
+    if (dataChannel_->buffered_amount() > bufferedAmountLowThreshold_.load()) {
         return;
     }
 

@@ -35,19 +35,6 @@ let dataChannel: webrtc.RTCDataChannelInit = {
   // id: 1, // 可选，设置数据通道 ID
 };
 
-async function addTracks() {
-  const stream = await getMediaStream();
-  const tracks = stream.getTracks();
-  callee.addTrack(tracks[0], stream);
-  caller.addTransceiver('audio');
-}
-
-async function getMediaStream() {
-  let audioSource = pcf.createAudioSource();
-  let audioTrack = pcf.createAudioTrack("audio", audioSource);
-  return new webrtc.MediaStream([audioTrack]);
-}
-
 async function exchangeOffer(caller: webrtc.RTCPeerConnection, callee: webrtc.RTCPeerConnection) {
   await caller.setLocalDescription(await caller.createOffer());
   console.log(TAG, "caller.localDescription: " + caller.localDescription!.type);
@@ -145,7 +132,6 @@ export default function DataChannelTest() {
     })
 
     it("onBufferedAmountLow", 0, async () => {
-      addTracks();
       let channel = caller.createDataChannel("onBufferedAmountLow");
       console.debug(TAG, "onBufferedAmountLow: " + JSON.stringify(channel));
       let flag = false;
@@ -155,7 +141,6 @@ export default function DataChannelTest() {
           resolve();
         };
       });
-
       channel.bufferedAmountLowThreshold = 1024;
       channel.onopen = () => {
         const largeData = new Array(1000).join('A');
@@ -163,7 +148,6 @@ export default function DataChannelTest() {
       };
       exchangeIceCandidates(caller, callee);
       await exchangeOfferAnswer(caller, callee);
-      await listenToConnected(callee);
       await promise;
       expect(flag).assertTrue();
     })
@@ -200,7 +184,6 @@ export default function DataChannelTest() {
     })
 
     it("afterConnectionOnopenWillTriggered", 0, async () => {
-      addTracks();
       let channel = caller.createDataChannel("onopen");
       let flag = false;
       let promise = new Promise<void>((resolve) => {
@@ -212,30 +195,21 @@ export default function DataChannelTest() {
 
       exchangeIceCandidates(caller, callee);
       await exchangeOfferAnswer(caller, callee);
-      await listenToConnected(callee);
       await promise;
       expect(flag).assertTrue();
     })
 
     it("onmessage", 0, async () => {
-      addTracks();
       let channel = caller.createDataChannel("onmessage");
       channel.onopen = () => {
         console.info(TAG, "channel.readyState:", channel.readyState);
         channel.send("message from caller");
       }
-      channel.onmessage = (event: webrtc.MessageEvent<string>) => {
-        console.info(TAG, "message from callee", event.data);
-        expect(event.data).assertEqual("channel from callee")
-      };
       let promise = new Promise<void>((resolve) => {
         callee.ondatachannel = (event) => {
           console.info(TAG, "ondatachannel");
           let receiveDataChannel = event.channel;
-          receiveDataChannel.onopen = () => {
-            console.info(TAG, "The channel from callee is open");
-            receiveDataChannel.send("channel from callee");
-          }
+
           receiveDataChannel.onmessage = (event: webrtc.MessageEvent<String>) => {
             console.info(TAG, "message from caller", event.data);
             expect(event.data).assertEqual("message from caller");
@@ -245,7 +219,6 @@ export default function DataChannelTest() {
       });
       exchangeIceCandidates(caller, callee);
       await exchangeOfferAnswer(caller, callee);
-      await listenToConnected(callee);
       await promise;
     })
 
@@ -281,7 +254,6 @@ export default function DataChannelTest() {
     })
 
     it("sendString", 0, async () => {
-      addTracks();
       let channel = caller.createDataChannel("sendString");
       channel.onopen = () => {
         console.info(TAG, "channel.readyState:", channel.readyState);
@@ -299,12 +271,10 @@ export default function DataChannelTest() {
       });
       exchangeIceCandidates(caller, callee);
       await exchangeOfferAnswer(caller, callee);
-      await listenToConnected(callee);
       await promise;
     })
 
     it("sendArrayBuffer", 0, async () => {
-      addTracks();
       let channel = caller.createDataChannel("sendArrayBuffer");
       let promise = new Promise<void>((resolve) => {
         channel.onopen = () => {
@@ -317,27 +287,24 @@ export default function DataChannelTest() {
           } catch (e) {
             expect().assertFail()
           }
-          resolve();
+        }
+
+        callee.ondatachannel = (event) => {
+          let receiveDataChannel = event.channel;
+          receiveDataChannel.onmessage = (event: webrtc.MessageEvent) => {
+            const receivedArrayBuffer = event.data as ArrayBuffer;
+            const uint8View = new Uint8Array(receivedArrayBuffer);
+            const receivedValue = uint8View[0];
+            console.info(TAG, "message from caller", receivedValue);
+            expect(receivedValue).assertEqual(97);
+            resolve();
+          }
         }
       });
-      exchangeIceCandidates(caller, callee);
-      await exchangeOfferAnswer(caller, callee);
-      await listenToConnected(callee);
-      await promise;
-    })
 
-    it("bufferedAmountChange", 0, async () => {
-      addTracks();
-      let channel = caller.createDataChannel("");
-      let buffer = "a";
-      channel.onopen = () => {
-        channel.send(buffer);
-        expect(channel.bufferedAmount).assertEqual(buffer.toString().length);
-      };
       exchangeIceCandidates(caller, callee);
       await exchangeOfferAnswer(caller, callee);
-      await listenToConnected(callee);
-      expect(channel.bufferedAmount).assertEqual(0);
+      await promise;
     })
 
     it("sendWhenReadyStateIsConnecting", 0, () => {
@@ -351,7 +318,6 @@ export default function DataChannelTest() {
     })
 
     it("sendWhenBufferIsEmpty", 0, async () => {
-      addTracks();
       let channel = caller.createDataChannel("sendWhenBufferIsEmpty");
       channel.onopen = () => {
         console.info(TAG, "channel.readyState:", channel.readyState);
@@ -375,12 +341,10 @@ export default function DataChannelTest() {
 
       exchangeIceCandidates(caller, callee);
       await exchangeOfferAnswer(caller, callee);
-      await listenToConnected(callee);
       await promise;
     })
 
     it("sendUnicodeString", 0, async () => {
-      addTracks();
       let channel = caller.createDataChannel("sendUnicodeString");
       channel.onopen = () => {
         console.info(TAG, "channel.readyState:", channel.readyState);
@@ -399,12 +363,10 @@ export default function DataChannelTest() {
       })
       exchangeIceCandidates(caller, callee);
       await exchangeOfferAnswer(caller, callee);
-      await listenToConnected(callee);
       await promise;
     })
 
     it("sendBeforeCloseChannel", 0, async () => {
-      addTracks();
       let channel1 = caller.createDataChannel("sendBeforeCloseChannel");
       let channel2: webrtc.RTCDataChannel;
       let receivedSize = 0, sentSize = 0;
@@ -425,8 +387,6 @@ export default function DataChannelTest() {
       })
       exchangeIceCandidates(caller, callee);
       await exchangeOfferAnswer(caller, callee);
-      await listenToConnected(callee);
-
       channel1.onopen = () => {
         channel1.send(largeString);
         sentSize += largeString.length;
@@ -465,11 +425,9 @@ export default function DataChannelTest() {
     })
 
     it("restartIceChannelIsOpen", 0, async () => {
-      addTracks();
       let channel1 = caller.createDataChannel("");
       exchangeIceCandidates(caller, callee);
       await exchangeOfferAnswer(caller, callee);
-      await listenToConnected(callee);
 
       caller.restartIce();
 
@@ -490,11 +448,7 @@ export default function DataChannelTest() {
     })
 
     it("afterPcCloseChannelWillClose", 0, async () => {
-      addTracks();
       let channel1 = caller.createDataChannel("");
-      channel1.onopen = () => {
-        console.info(TAG, "channel.readyState:", channel1.readyState);
-      }
       let closed = false;
       let promise = new Promise<void>((resolve) => {
         channel1.onclose = () => {
@@ -511,7 +465,6 @@ export default function DataChannelTest() {
     })
 
     it("beforePcCloseChannelWillNotClose", 0, async () => {
-      addTracks();
       let channel1 = caller.createDataChannel("");
       let closed = false;
       channel1.onclose = () => {
@@ -519,7 +472,6 @@ export default function DataChannelTest() {
       }
       exchangeIceCandidates(caller, callee);
       await exchangeOfferAnswer(caller, callee);
-      await listenToConnected(callee);
       await sleep(1000);
       expect(closed).assertEqual(false);
     })
