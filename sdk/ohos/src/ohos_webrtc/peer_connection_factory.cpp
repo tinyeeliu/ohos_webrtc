@@ -87,7 +87,7 @@ std::shared_ptr<PeerConnectionFactoryWrapper> PeerConnectionFactoryWrapper::Crea
     rtc::scoped_refptr<AudioDeviceModule> adm, std::unique_ptr<VideoEncoderFactory> videoEncoderFactory,
     std::unique_ptr<VideoDecoderFactory> videoDecoderFactory, rtc::scoped_refptr<AudioProcessing> audioProcessing)
 {
-    auto wrapper = std::shared_ptr<PeerConnectionFactoryWrapper>(new PeerConnectionFactoryWrapper());
+    auto wrapper = std::make_shared<PeerConnectionFactoryWrapper>();
     if (!wrapper->Init(adm, std::move(videoEncoderFactory), std::move(videoDecoderFactory), audioProcessing)) {
         return nullptr;
     }
@@ -355,7 +355,8 @@ Napi::Value NapiPeerConnectionFactory::CreateVideoSource(const CallbackInfo& inf
         CameraCaptureSettings selectedSetting;
         std::string failedConstraintName;
         if (SelectSettingsForVideo(
-                CameraEnumerator::GetDevices(), video, 640, 480, 30, selectedSetting, failedConstraintName))
+                CameraEnumerator::GetDevices(), video, kDefaultWidth, kDefaultHeight, kDefaultFrameRate,
+                selectedSetting, failedConstraintName))
         {
             RTC_DLOG(LS_VERBOSE) << "Selected camera device: " << selectedSetting.deviceId
                                  << ", resolution = " << selectedSetting.profile.resolution.width << "x"

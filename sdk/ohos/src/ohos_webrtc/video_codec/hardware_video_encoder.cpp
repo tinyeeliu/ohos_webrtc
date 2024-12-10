@@ -37,6 +37,8 @@
 namespace webrtc {
 namespace adapter {
 
+constexpr int32_t kRequestedResolutionAlignment = 16;
+
 // QP scaling thresholds.
 static const int kH264QpThresholdLow = 24;
 static const int kH264QpThresholdHigh = 37;
@@ -75,7 +77,7 @@ int HardwareVideoEncoder::InitEncode(const VideoCodec* codec_settings, const Set
 
     codecSettings_ = *codec_settings;
 
-    curBitrate_ = codecSettings_.startBitrate * 1000;
+    curBitrate_ = codecSettings_.startBitrate * 1000; // kilobits/sec to bits/sec
     targetBitrate_ = curBitrate_;
     curFramerate_ = codecSettings_.maxFramerate;
     targetFramerate_ = curFramerate_;
@@ -240,7 +242,7 @@ void HardwareVideoEncoder::SetRates(const RateControlParameters& parameters)
     targetBitrate_ = std::clamp(
         parameters.bitrate.get_sum_bps(), static_cast<uint32_t>(supportedBitrateRange_.minVal),
         static_cast<uint32_t>(supportedBitrateRange_.maxVal));
-    
+
     if (parameters.framerate_fps <= 0) {
         targetFramerate_ = codecSettings_.maxFramerate;
     } else {
@@ -258,7 +260,7 @@ void HardwareVideoEncoder::SetRates(const RateControlParameters& parameters)
             RTC_LOG(LS_ERROR) << "Failed to update bitrate" << ret;
         }
     }
-    
+
     if (targetFramerate_ != curFramerate_) {
         RTC_LOG(LS_INFO) << "Update framerate: " << targetFramerate_;
         auto format = ohos::AVFormat::Create();
@@ -467,7 +469,7 @@ void HardwareVideoEncoder::UpdateEncoderInfo()
     encoderInfo_.supports_simulcast = true;
     encoderInfo_.scaling_settings = GetScalingSettings();
 
-    encoderInfo_.requested_resolution_alignment = 16;
+    encoderInfo_.requested_resolution_alignment = kRequestedResolutionAlignment;
     encoderInfo_.apply_alignment_to_all_simulcast_layers = false;
 }
 
@@ -516,10 +518,11 @@ int32_t HardwareVideoEncoder::EncodeTextureBuffer(const VideoFrame& frame)
 
     glClear(GL_COLOR_BUFFER_BIT);
 
-    Matrix4f matrix = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+    Matrix4fv matrix = kMatrix4fv_Identity;
+    matrix[5] = -1.0f; // turn upside down
     videoFrameDrawer_->DrawFrame(frame, *textureDrawer_, matrix);
 
-    if (!eglEnv_->SwapBuffers(frame.timestamp_us() * 1000)) {
+    if (!eglEnv_->SwapBuffers(frame.timestamp_us() * rtc::kNumNanosecsPerMicrosec)) {
         return WEBRTC_VIDEO_CODEC_ERROR;
     }
 
@@ -566,24 +569,24 @@ int32_t HardwareVideoEncoder::EncodeByteBuffer(const VideoFrame& frame)
     switch (pixelFormat_) {
         case AV_PIXEL_FORMAT_YUVI420: {
             // copy
-            memcpy(addr, srcBuffer->DataY(), width * height);
-            memcpy(addr + width * height, srcBuffer->DataU(), width * height / 4);
-            memcpy(addr + width * height * 5 / 4, srcBuffer->DataV(), width * height / 4);
+            memcpy(addr, srcBuffer->DataY(), width * height); // y planar
+            memcpy(addr + width * height, srcBuffer->DataU(), width * height / 4); // u planar
+            memcpy(addr + width * height * 5 / 4, srcBuffer->DataV(), width * height / 4); // v planar
         } break;
         case AV_PIXEL_FORMAT_NV12: {
-            int32_t ret = libyuv::I420ToNV12(
+            ret = libyuv::I420ToNV12(
                 srcBuffer->DataY(), srcBuffer->StrideY(), srcBuffer->DataU(), srcBuffer->StrideU(), srcBuffer->DataV(),
                 srcBuffer->StrideV(), addr, width, addr + width * height, width, width, height);
             RTC_DLOG(LS_VERBOSE) << "I420ToNV12 ret = " << ret;
         } break;
         case AV_PIXEL_FORMAT_NV21: {
-            int32_t ret = libyuv::I420ToNV21(
+            ret = libyuv::I420ToNV21(
                 srcBuffer->DataY(), srcBuffer->StrideY(), srcBuffer->DataU(), srcBuffer->StrideU(), srcBuffer->DataV(),
                 srcBuffer->StrideV(), addr, width, addr + width * height, width, width, height);
             RTC_DLOG(LS_VERBOSE) << "I420ToNV12 ret = " << ret;
         } break;
         case AV_PIXEL_FORMAT_RGBA: {
-            int ret = libyuv::I420ToABGR(
+            ret = libyuv::I420ToABGR(
                 srcBuffer->DataY(), srcBuffer->StrideY(), srcBuffer->DataU(), srcBuffer->StrideU(), srcBuffer->DataV(),
                 srcBuffer->StrideV(), addr, width * 4, width, height);
             RTC_DLOG(LS_VERBOSE) << "I420ToABGR ret = " << ret;

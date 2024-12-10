@@ -35,7 +35,7 @@ class EglEnv {
 public:
     // used for shared context
     static EglEnv& GetDefault();
-    
+
     static std::unique_ptr<EglEnv> Create();
     static std::unique_ptr<EglEnv> Create(std::shared_ptr<EglContext> sharedContext);
     static std::unique_ptr<EglEnv> Create(const std::vector<int32_t>& configAttributes);
@@ -44,6 +44,8 @@ public:
 
     static int32_t GetOpenGLESVersionFromConfig(const std::vector<int32_t>& configAttributes);
 
+    // Do not use this constructor directly, use 'Create' above.
+    explicit EglEnv();
     ~EglEnv();
 
     std::shared_ptr<EglContext> GetContext() const;
@@ -62,8 +64,6 @@ public:
     int GetSurfaceHeight() const;
 
 protected:
-    EglEnv();
-
     bool Init(EGLContext sharedContext, const std::vector<int32_t>& configAttributes);
     void Release();
 

@@ -23,6 +23,11 @@ namespace webrtc {
 
 using namespace Napi;
 
+// https://www.w3.org/TR/webrtc/#dfn-candidate-attribute
+// https://www.rfc-editor.org/rfc/rfc5245#section-15.1
+constexpr int32_t kComponentIdRtp = 1;
+constexpr int32_t kComponentIdRtcp = 2;
+
 const char kEnumRTCIceRoleUnKnown[] = "unknown";
 const char kEnumRTCIceRoleControlling[] = "controlling";
 const char kEnumRTCIceRoleControlled[] = "controlled";
@@ -118,8 +123,6 @@ NapiIceTransport::NapiIceTransport(const Napi::CallbackInfo& info) : Napi::Objec
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    rtc::scoped_refptr<IceTransportInterface> iceTransport;
-
     if (info[0].IsExternal()) {
         auto iceTransport = info[0].As<External<IceTransportInterface>>().Data();
         iceTransport_ = rtc::scoped_refptr<IceTransportInterface>(iceTransport);
@@ -179,12 +182,10 @@ Napi::Value NapiIceTransport::GetComponent(const Napi::CallbackInfo& info)
     factoryWrapper->GetNetworkThread()->BlockingCall(
         [&component, this] { component = iceTransport_->internal()->component(); });
 
-    // https://www.w3.org/TR/webrtc/#dfn-candidate-attribute
-    // https://www.rfc-editor.org/rfc/rfc5245#section-15.1
-    if (component == 1) {
+    if (component == kComponentIdRtp) {
         return String::New(info.Env(), kEnumRTCIceComponentRtp);
     }
-    if (component == 2) {
+    if (component == kComponentIdRtcp) {
         return String::New(info.Env(), kEnumRTCIceComponentRtcp);
     }
 

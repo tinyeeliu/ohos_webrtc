@@ -51,7 +51,7 @@ MediaStreamTrackWrapper::Create(rtc::scoped_refptr<MediaStreamTrackInterface> tr
         return nullptr;
     }
 
-    return std::unique_ptr<MediaStreamTrackWrapper>(new MediaStreamTrackWrapper(track));
+    return std::make_unique<MediaStreamTrackWrapper>(track);
 }
 
 MediaStreamTrackWrapper::MediaStreamTrackWrapper(rtc::scoped_refptr<MediaStreamTrackInterface> track) : track_(track)
@@ -329,19 +329,19 @@ Napi::Value NapiMediaStreamTrack::GetReadyState(const Napi::CallbackInfo& info)
 Napi::Value NapiMediaStreamTrack::Stop(const Napi::CallbackInfo& info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-    
+
     if (!wrapper_) {
         NAPI_THROW(Error::New(info.Env(), "Illegal state"), info.Env().Undefined());
     }
-    
+
     auto state = wrapper_->track()->state();
     if (state == MediaStreamTrackInterface::kEnded) {
         RTC_LOG(LS_VERBOSE) << "The track is already ended";
         return info.Env().Undefined();
     }
-    
+
     wrapper_->RemoveAllVideoSinks();
-    
+
     return info.Env().Undefined();
 }
 

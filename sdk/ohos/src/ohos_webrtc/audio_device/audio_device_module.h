@@ -30,9 +30,17 @@ namespace webrtc {
 
 class AudioDeviceBuffer;
 
-enum class AudioErrorType { INIT, START_EXCEPTION, START_STATE_MISMATCH, GENERAL };
+enum class AudioErrorType {
+    INIT,
+    START_EXCEPTION,
+    START_STATE_MISMATCH,
+    GENERAL
+};
 
-enum class AudioStateType { START, STOP };
+enum class AudioStateType {
+    START,
+    STOP
+};
 
 class AudioInput {
 public:

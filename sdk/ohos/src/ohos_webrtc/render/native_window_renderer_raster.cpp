@@ -28,7 +28,7 @@ std::unique_ptr<NativeWindowRendererRaster> NativeWindowRendererRaster::Create(o
         return nullptr;
     }
 
-    return std::unique_ptr<NativeWindowRendererRaster>(new NativeWindowRendererRaster(std::move(window)));
+    return std::make_unique<NativeWindowRendererRaster>(std::move(window));
 }
 
 NativeWindowRendererRaster::NativeWindowRendererRaster(ohos::NativeWindow window)
@@ -97,9 +97,7 @@ void NativeWindowRendererRaster::OnFrame(const VideoFrame& frame)
         return;
     }
 
-    thread_->PostTask([this, frame] {
-        RenderByteBuffer(frame.video_frame_buffer()->ToI420());
-    });
+    thread_->PostTask([this, frame] { RenderByteBuffer(frame.video_frame_buffer()->ToI420()); });
 }
 
 void NativeWindowRendererRaster::OnDiscardedFrame()

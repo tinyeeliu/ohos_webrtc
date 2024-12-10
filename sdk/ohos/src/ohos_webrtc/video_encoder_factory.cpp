@@ -54,7 +54,7 @@ NapiHardwareVideoEncoderFactory::NapiHardwareVideoEncoderFactory(const Napi::Cal
             enableH264HighProfile_ = info[0].As<Boolean>().Value();
         }
     }
-    
+
     if (info.Length() > 1) {
         if (info[1].IsObject()) {
             sharedContext_ = NapiEglContext::Unwrap(info[1].As<Object>())->Get();

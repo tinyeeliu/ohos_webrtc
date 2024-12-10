@@ -33,6 +33,8 @@ public:
         // dataChannel should not be nullptr
         static std::unique_ptr<Observer> Create(DataChannelInterface* dataChannel);
 
+        // Do not use this constructor directly, use 'Create' above.
+        explicit Observer(DataChannelInterface* dataChannel);
         ~Observer();
 
         bool GetEventHandler(const std::string& type, Napi::Function& fn);
@@ -46,8 +48,6 @@ public:
         void SetBinaryType(std::string binaryType);
 
     protected:
-        explicit Observer(DataChannelInterface* dataChannel);
-
         std::vector<DataBuffer> GetAndClearPendingMessages();
 
     protected:

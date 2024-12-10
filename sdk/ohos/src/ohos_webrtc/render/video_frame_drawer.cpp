@@ -20,15 +20,19 @@
 
 #include <GLES3/gl3.h>
 
+namespace {
+constexpr int32_t kYuvTextureArrayLength = 3;
+}
+
 namespace webrtc {
 
-void VideoFrameDrawer::DrawFrame(const VideoFrame& frame, GlDrawer& drawer, const Matrix4f& texMatrix)
+void VideoFrameDrawer::DrawFrame(const VideoFrame& frame, GlDrawer& drawer, const Matrix4fv& texMatrix)
 {
     DrawFrame(frame, drawer, texMatrix, 0, 0, frame.width(), frame.height());
 }
 
 void VideoFrameDrawer::DrawFrame(
-    const VideoFrame& frame, GlDrawer& drawer, const Matrix4f& texMatrix, int viewportX, int viewportY,
+    const VideoFrame& frame, GlDrawer& drawer, const Matrix4fv& texMatrix, int viewportX, int viewportY,
     int viewportWidth, int viewportHeight)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
@@ -40,9 +44,9 @@ void VideoFrameDrawer::DrawFrame(
             viewportY, viewportWidth, viewportHeight);
     } else {
         if (yuvTextures_.size() == 0) {
-            yuvTextures_.resize(3);
+            yuvTextures_.resize(kYuvTextureArrayLength);
 
-            glGenTextures(3, yuvTextures_.data());
+            glGenTextures(yuvTextures_.size(), yuvTextures_.data());
             for (uint32_t i = 0; i < yuvTextures_.size(); i++) {
                 glBindTexture(GL_TEXTURE_2D, yuvTextures_[i]);
                 glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -58,7 +62,7 @@ void VideoFrameDrawer::DrawFrame(
         int planeWidths[] = {buffer->width(), buffer->width() / 2, buffer->width() / 2};
         int planeHeights[] = {buffer->height(), buffer->height() / 2, buffer->height() / 2};
 
-        for (uint32_t i = 0; i < 3; i++) {
+        for (uint32_t i = 0; i < yuvTextures_.size(); i++) {
             glActiveTexture(GL_TEXTURE0 + i);
             glBindTexture(GL_TEXTURE_2D, yuvTextures_[i]);
 
@@ -75,11 +79,11 @@ void VideoFrameDrawer::DrawFrame(
 }
 
 void VideoFrameDrawer::DrawTexture(
-    rtc::scoped_refptr<TextureBuffer> buffer, GlDrawer& drawer, const Matrix4f& texMatrix, int frameWidth,
+    rtc::scoped_refptr<TextureBuffer> buffer, GlDrawer& drawer, const Matrix4fv& texMatrix, int frameWidth,
     int frameHeight, int viewportX, int viewportY, int viewportWidth, int viewportHeight)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-    
+
     if (!buffer) {
         RTC_LOG(LS_ERROR) << "Buffer is null";
         return;
@@ -90,7 +94,7 @@ void VideoFrameDrawer::DrawTexture(
         RTC_LOG(LS_ERROR) << "Buffer is released";
         return;
     }
-    
+
     textureData->Lock();
 
     switch (textureData->GetType()) {

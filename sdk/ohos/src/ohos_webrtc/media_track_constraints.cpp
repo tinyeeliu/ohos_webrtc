@@ -29,7 +29,10 @@ using namespace Napi;
 // A naked value is treated as an "ideal" value in the basic constraints,
 // but as an exact value in "advanced" constraints.
 // https://www.w3.org/TR/mediacapture-streams/#constrainable-interface
-enum class NakedValueDisposition { kTreatAsIdeal, kTreatAsExact };
+enum class NakedValueDisposition {
+    kTreatAsIdeal,
+    kTreatAsExact
+};
 
 const size_t kMaxConstraintStringLength = 500;
 const size_t kMaxConstraintStringSeqLength = 100;
@@ -65,10 +68,19 @@ const std::map<std::string, bool> SUPPORTED_CONSTRAINTS_MAP = {
     {NapiMediaConstraints::kAttributeNameGoogAudioMirroring, false},
 };
 
-void CopyLongConstraint(const Napi::Value& jsValue, NakedValueDisposition naked_treatment, LongConstraint& nativeValue)
+bool IsConstraintSupported(const std::string& name)
+{
+    auto it = SUPPORTED_CONSTRAINTS_MAP.find(name);
+    if (it != SUPPORTED_CONSTRAINTS_MAP.end()) {
+        return it->second;
+    }
+    return true;
+}
+
+void CopyLongConstraint(const Napi::Value& jsValue, NakedValueDisposition nakedTreatment, LongConstraint& nativeValue)
 {
     if (jsValue.IsNumber()) {
-        switch (naked_treatment) {
+        switch (nakedTreatment) {
             case NakedValueDisposition::kTreatAsIdeal:
                 nativeValue.SetIdeal(jsValue.As<Number>().Int32Value());
                 break;
@@ -94,10 +106,10 @@ void CopyLongConstraint(const Napi::Value& jsValue, NakedValueDisposition naked_
 }
 
 void CopyDoubleConstraint(
-    const Napi::Value& jsValue, NakedValueDisposition naked_treatment, DoubleConstraint& nativeValue)
+    const Napi::Value& jsValue, NakedValueDisposition nakedTreatment, DoubleConstraint& nativeValue)
 {
     if (jsValue.IsNumber()) {
-        switch (naked_treatment) {
+        switch (nakedTreatment) {
             case NakedValueDisposition::kTreatAsIdeal:
                 nativeValue.SetIdeal(jsValue.As<Number>().DoubleValue());
                 break;
@@ -122,24 +134,24 @@ void CopyDoubleConstraint(
     }
 }
 
-bool ValidateString(const std::string& str, std::string& error_message)
+bool ValidateString(const std::string& str, std::string& errorMessage)
 {
     if (str.length() > kMaxConstraintStringLength) {
-        error_message = "Constraint string too long.";
+        errorMessage = "Constraint string too long.";
         return false;
     }
     return true;
 }
 
-bool ValidateStringSeq(const std::vector<std::string>& strs, std::string& error_message)
+bool ValidateStringSeq(const std::vector<std::string>& strs, std::string& errorMessage)
 {
     if (strs.size() > kMaxConstraintStringSeqLength) {
-        error_message = "Constraint string sequence too long.";
+        errorMessage = "Constraint string sequence too long.";
         return false;
     }
 
     for (const std::string& str : strs) {
-        if (!ValidateString(str, error_message)) {
+        if (!ValidateString(str, errorMessage)) {
             return false;
         }
     }
@@ -147,19 +159,19 @@ bool ValidateStringSeq(const std::vector<std::string>& strs, std::string& error_
     return true;
 }
 
-bool ValidateStringConstraint(const Value& jsValue, std::string& error_message)
+bool ValidateStringConstraint(const Value& jsValue, std::string& errorMessage)
 {
     if (jsValue.IsString()) {
-        return ValidateString(jsValue.As<String>().Utf8Value(), error_message);
+        return ValidateString(jsValue.As<String>().Utf8Value(), errorMessage);
     } else if (jsValue.IsArray()) {
         auto jsArray = jsValue.As<Array>();
         if (jsArray.Length() > kMaxConstraintStringSeqLength) {
-            error_message = "Constraint string sequence too long.";
+            errorMessage = "Constraint string sequence too long.";
             return false;
         }
 
         for (uint32_t index = 0; index < jsArray.Length(); index++) {
-            if (!ValidateString(jsValue.As<String>().Utf8Value(), error_message)) {
+            if (!ValidateString(jsValue.As<String>().Utf8Value(), errorMessage)) {
                 return false;
             }
         }
@@ -167,12 +179,12 @@ bool ValidateStringConstraint(const Value& jsValue, std::string& error_message)
     } else if (jsValue.IsObject()) {
         auto jsObject = jsValue.As<Object>();
         if (jsObject.Has(kConstraintsIdeal) &&
-            !ValidateStringConstraint(jsObject.Get(kConstraintsIdeal).As<String>(), error_message))
+            !ValidateStringConstraint(jsObject.Get(kConstraintsIdeal).As<String>(), errorMessage))
         {
             return false;
         }
         if (jsObject.Has(kConstraintsExact) &&
-            !ValidateStringConstraint(jsObject.Get(kConstraintsExact).As<String>(), error_message))
+            !ValidateStringConstraint(jsObject.Get(kConstraintsExact).As<String>(), errorMessage))
         {
             return false;
         }
@@ -183,15 +195,15 @@ bool ValidateStringConstraint(const Value& jsValue, std::string& error_message)
 }
 
 bool ValidateAndCopyStringConstraint(
-    const Value& jsValue, NakedValueDisposition naked_treatment, StringConstraint& nativeValue,
-    std::string& error_message)
+    const Value& jsValue, NakedValueDisposition nakedTreatment, StringConstraint& nativeValue,
+    std::string& errorMessage)
 {
-    if (!ValidateStringConstraint(jsValue, error_message)) {
+    if (!ValidateStringConstraint(jsValue, errorMessage)) {
         return false;
     }
 
     if (jsValue.IsString()) {
-        switch (naked_treatment) {
+        switch (nakedTreatment) {
             case NakedValueDisposition::kTreatAsIdeal:
                 nativeValue.SetIdeal(std::vector<std::string>(1, jsValue.As<String>().Utf8Value()));
                 break;
@@ -206,7 +218,7 @@ bool ValidateAndCopyStringConstraint(
             nativeArray.push_back(((Napi::Value)jsArray[index]).As<String>().Utf8Value());
         }
 
-        switch (naked_treatment) {
+        switch (nakedTreatment) {
             case NakedValueDisposition::kTreatAsIdeal:
                 nativeValue.SetIdeal(nativeArray);
                 break;
@@ -247,10 +259,10 @@ bool ValidateAndCopyStringConstraint(
 }
 
 void CopyBooleanConstraint(
-    const Napi::Value& jsValue, NakedValueDisposition naked_treatment, BooleanConstraint& nativeValue)
+    const Napi::Value& jsValue, NakedValueDisposition nakedTreatment, BooleanConstraint& nativeValue)
 {
     if (jsValue.IsBoolean()) {
-        switch (naked_treatment) {
+        switch (nakedTreatment) {
             case NakedValueDisposition::kTreatAsIdeal:
                 nativeValue.SetIdeal(jsValue.As<Boolean>());
                 break;
@@ -269,164 +281,90 @@ void CopyBooleanConstraint(
     }
 }
 
-bool ValidateAndCopyConstraintSet(
-    const Object jsTrackConstraints, NakedValueDisposition naked_treatment, MediaTrackConstraintSet& trackConstraints,
-    std::string& error_message)
+void ValidateAndCopyConstraint(
+    const Object& jsTrackConstraints, NakedValueDisposition nakedTreatment, BooleanConstraint& constraint)
 {
-    if (jsTrackConstraints.Has(NapiMediaConstraints::kAttributeNameWidth)) {
-        CopyLongConstraint(
-            jsTrackConstraints.Get(NapiMediaConstraints::kAttributeNameWidth), naked_treatment, trackConstraints.width);
+    if (jsTrackConstraints.Has(constraint.GetName()) && IsConstraintSupported(constraint.GetName())) {
+        CopyBooleanConstraint(jsTrackConstraints.Get(constraint.GetName()), nakedTreatment, constraint);
     }
+}
 
-    if (jsTrackConstraints.Has(NapiMediaConstraints::kAttributeNameHeight)) {
-        CopyLongConstraint(
-            jsTrackConstraints.Get(NapiMediaConstraints::kAttributeNameHeight), naked_treatment,
-            trackConstraints.height);
+void ValidateAndCopyConstraint(
+    const Object& jsTrackConstraints, NakedValueDisposition nakedTreatment, LongConstraint& constraint)
+{
+    if (jsTrackConstraints.Has(constraint.GetName()) && IsConstraintSupported(constraint.GetName())) {
+        CopyLongConstraint(jsTrackConstraints.Get(constraint.GetName()), nakedTreatment, constraint);
     }
+}
 
-    if (jsTrackConstraints.Has(NapiMediaConstraints::kAttributeNameAspectRatio)) {
-        CopyDoubleConstraint(
-            jsTrackConstraints.Get(NapiMediaConstraints::kAttributeNameAspectRatio), naked_treatment,
-            trackConstraints.aspectRatio);
+void ValidateAndCopyConstraint(
+    const Object& jsTrackConstraints, NakedValueDisposition nakedTreatment, DoubleConstraint& constraint)
+{
+    if (jsTrackConstraints.Has(constraint.GetName()) && IsConstraintSupported(constraint.GetName())) {
+        CopyDoubleConstraint(jsTrackConstraints.Get(constraint.GetName()), nakedTreatment, constraint);
     }
+}
 
-    if (jsTrackConstraints.Has(NapiMediaConstraints::kAttributeNameFrameRate)) {
-        CopyDoubleConstraint(
-            jsTrackConstraints.Get(NapiMediaConstraints::kAttributeNameFrameRate), naked_treatment,
-            trackConstraints.frameRate);
-    }
-
-    if (jsTrackConstraints.Has(NapiMediaConstraints::kAttributeNameFacingMode)) {
+bool ValidateAndCopyConstraint(
+    const Object& jsTrackConstraints, NakedValueDisposition nakedTreatment, StringConstraint& constraint,
+    std::string& errorMessage)
+{
+    if (jsTrackConstraints.Has(constraint.GetName()) && IsConstraintSupported(constraint.GetName())) {
         if (!ValidateAndCopyStringConstraint(
-                jsTrackConstraints.Get(NapiMediaConstraints::kAttributeNameFacingMode), naked_treatment,
-                trackConstraints.facingMode, error_message))
+                jsTrackConstraints.Get(constraint.GetName()), nakedTreatment, constraint, errorMessage))
         {
             return false;
         }
-    }
-
-    if (jsTrackConstraints.Has(NapiMediaConstraints::kAttributeNameResizeMode)) {
-        if (!ValidateAndCopyStringConstraint(
-                jsTrackConstraints.Get(NapiMediaConstraints::kAttributeNameResizeMode), naked_treatment,
-                trackConstraints.resizeMode, error_message))
-        {
-            return false;
-        }
-    }
-
-    if (jsTrackConstraints.Has(NapiMediaConstraints::kAttributeNameSampleRate)) {
-        CopyLongConstraint(
-            jsTrackConstraints.Get(NapiMediaConstraints::kAttributeNameSampleRate), naked_treatment,
-            trackConstraints.sampleRate);
-    }
-
-    if (jsTrackConstraints.Has(NapiMediaConstraints::kAttributeNameSampleSize)) {
-        CopyLongConstraint(
-            jsTrackConstraints.Get(NapiMediaConstraints::kAttributeNameSampleSize), naked_treatment,
-            trackConstraints.sampleSize);
-    }
-
-    if (jsTrackConstraints.Has(NapiMediaConstraints::kAttributeNameEchoCancellation)) {
-        CopyBooleanConstraint(
-            jsTrackConstraints.Get(NapiMediaConstraints::kAttributeNameEchoCancellation), naked_treatment,
-            trackConstraints.echoCancellation);
-    }
-
-    if (jsTrackConstraints.Has(NapiMediaConstraints::kAttributeNameAutoGainControl)) {
-        CopyBooleanConstraint(
-            jsTrackConstraints.Get(NapiMediaConstraints::kAttributeNameAutoGainControl), naked_treatment,
-            trackConstraints.autoGainControl);
-    }
-
-    if (jsTrackConstraints.Has(NapiMediaConstraints::kAttributeNameNoiseSuppression)) {
-        CopyBooleanConstraint(
-            jsTrackConstraints.Get(NapiMediaConstraints::kAttributeNameNoiseSuppression), naked_treatment,
-            trackConstraints.noiseSuppression);
-    }
-
-    if (jsTrackConstraints.Has(NapiMediaConstraints::kAttributeNameLatency)) {
-        CopyDoubleConstraint(
-            jsTrackConstraints.Get(NapiMediaConstraints::kAttributeNameLatency), naked_treatment,
-            trackConstraints.latency);
-    }
-
-    if (jsTrackConstraints.Has(NapiMediaConstraints::kAttributeNameChannelCount)) {
-        CopyLongConstraint(
-            jsTrackConstraints.Get(NapiMediaConstraints::kAttributeNameChannelCount), naked_treatment,
-            trackConstraints.channelCount);
-    }
-
-    if (jsTrackConstraints.Has(NapiMediaConstraints::kAttributeNameDeviceId)) {
-        if (!ValidateAndCopyStringConstraint(
-                jsTrackConstraints.Get(NapiMediaConstraints::kAttributeNameDeviceId), naked_treatment,
-                trackConstraints.deviceId, error_message))
-        {
-            return false;
-        }
-    }
-
-    if (jsTrackConstraints.Has(NapiMediaConstraints::kAttributeNameGroupId)) {
-        if (!ValidateAndCopyStringConstraint(
-                jsTrackConstraints.Get(NapiMediaConstraints::kAttributeNameGroupId), naked_treatment,
-                trackConstraints.groupId, error_message))
-        {
-            return false;
-        }
-    }
-
-    if (jsTrackConstraints.Has(NapiMediaConstraints::kAttributeNameBackgroundBlur)) {
-        CopyBooleanConstraint(
-            jsTrackConstraints.Get(NapiMediaConstraints::kAttributeNameBackgroundBlur), naked_treatment,
-            trackConstraints.backgroundBlur);
-    }
-
-    if (jsTrackConstraints.Has(NapiMediaConstraints::kAttributeNameDisplaySurface)) {
-        if (!ValidateAndCopyStringConstraint(
-                jsTrackConstraints.Get(NapiMediaConstraints::kAttributeNameDisplaySurface), naked_treatment,
-                trackConstraints.displaySurface, error_message))
-        {
-            return false;
-        }
-    }
-
-    if (jsTrackConstraints.Has(NapiMediaConstraints::kAttributeNameGoogEchoCancellation)) {
-        CopyBooleanConstraint(
-            jsTrackConstraints.Get(NapiMediaConstraints::kAttributeNameGoogEchoCancellation), naked_treatment,
-            trackConstraints.googEchoCancellation);
-    }
-
-    if (jsTrackConstraints.Has(NapiMediaConstraints::kAttributeNameGoogAutoGainControl)) {
-        CopyBooleanConstraint(
-            jsTrackConstraints.Get(NapiMediaConstraints::kAttributeNameGoogAutoGainControl), naked_treatment,
-            trackConstraints.googAutoGainControl);
-    }
-
-    if (jsTrackConstraints.Has(NapiMediaConstraints::kAttributeNameGoogNoiseSuppression)) {
-        CopyBooleanConstraint(
-            jsTrackConstraints.Get(NapiMediaConstraints::kAttributeNameGoogNoiseSuppression), naked_treatment,
-            trackConstraints.googNoiseSuppression);
-    }
-
-    if (jsTrackConstraints.Has(NapiMediaConstraints::kAttributeNameGoogHighpassFilter)) {
-        CopyBooleanConstraint(
-            jsTrackConstraints.Get(NapiMediaConstraints::kAttributeNameGoogHighpassFilter), naked_treatment,
-            trackConstraints.googHighpassFilter);
-    }
-
-    if (jsTrackConstraints.Has(NapiMediaConstraints::kAttributeNameGoogAudioMirroring)) {
-        CopyBooleanConstraint(
-            jsTrackConstraints.Get(NapiMediaConstraints::kAttributeNameGoogAudioMirroring), naked_treatment,
-            trackConstraints.googAudioMirroring);
     }
 
     return true;
 }
 
-MediaTrackConstraints ParseTrackConstraints(const Napi::Object& jsTrackConstraints, std::string& error_message)
+bool ValidateAndCopyConstraintSet(
+    const Object& jsTrackConstraints, NakedValueDisposition nakedTreatment, MediaTrackConstraintSet& trackConstraints,
+    std::string& errorMessage)
+{
+    ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.width);
+    ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.height);
+    ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.aspectRatio);
+    ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.frameRate);
+    ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.sampleRate);
+    ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.sampleSize);
+    ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.echoCancellation);
+    ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.autoGainControl);
+    ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.noiseSuppression);
+    ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.latency);
+    ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.channelCount);
+    ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.backgroundBlur);
+
+    if (!ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.facingMode, errorMessage)) {
+        return false;
+    }
+
+    if (!ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.resizeMode, errorMessage)) {
+        return false;
+    }
+
+    if (!ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.deviceId, errorMessage)) {
+        return false;
+    }
+
+    if (!ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.groupId, errorMessage)) {
+        return false;
+    }
+
+    if (!ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.displaySurface, errorMessage)) {
+        return false;
+    }
+
+    return true;
+}
+
+MediaTrackConstraints ParseTrackConstraints(const Napi::Object& jsTrackConstraints, std::string& errorMessage)
 {
     MediaTrackConstraintSet basic;
-    if (!ValidateAndCopyConstraintSet(jsTrackConstraints, NakedValueDisposition::kTreatAsIdeal, basic, error_message)) {
-        RTC_LOG(LS_ERROR) << "Failed to parse track constraints: " << error_message;
+    if (!ValidateAndCopyConstraintSet(jsTrackConstraints, NakedValueDisposition::kTreatAsIdeal, basic, errorMessage)) {
+        RTC_LOG(LS_ERROR) << "Failed to parse track constraints: " << errorMessage;
         return MediaTrackConstraints();
     }
 
@@ -437,9 +375,9 @@ MediaTrackConstraints ParseTrackConstraints(const Napi::Object& jsTrackConstrain
         for (uint32_t index = 0; index < jsArray.Length(); index++) {
             auto jsElement = (Napi::Value)jsArray[index];
             if (!ValidateAndCopyConstraintSet(
-                    jsElement.As<Object>(), NakedValueDisposition::kTreatAsExact, advancedElement, error_message))
+                    jsElement.As<Object>(), NakedValueDisposition::kTreatAsExact, advancedElement, errorMessage))
             {
-                RTC_LOG(LS_ERROR) << "Failed to parse track constraints: " << error_message;
+                RTC_LOG(LS_ERROR) << "Failed to parse track constraints: " << errorMessage;
                 return MediaTrackConstraints();
             }
             advanced.push_back(advancedElement);
@@ -465,11 +403,7 @@ std::vector<std::string> NapiMediaConstraints::GetSupportedConstraints()
 
 bool NapiMediaConstraints::IsConstraintSupported(const std::string& name)
 {
-    auto it = SUPPORTED_CONSTRAINTS_MAP.find(name);
-    if (it != SUPPORTED_CONSTRAINTS_MAP.end()) {
-        return it->second;
-    }
-    return true;
+    return ::webrtc::IsConstraintSupported(name);
 }
 
 void NapiMediaConstraints::JsToNative(
@@ -485,10 +419,10 @@ void NapiMediaConstraints::JsToNative(
         }
         return;
     } else if (jsTrackConstraints.IsObject()) {
-        std::string error_message;
-        auto constraints = ParseTrackConstraints(jsTrackConstraints.As<Object>(), error_message);
+        std::string errorMessage;
+        auto constraints = ParseTrackConstraints(jsTrackConstraints.As<Object>(), errorMessage);
         if (constraints.IsNull()) {
-            NAPI_THROW_VOID(TypeError::New(jsTrackConstraints.Env(), error_message));
+            NAPI_THROW_VOID(TypeError::New(jsTrackConstraints.Env(), errorMessage));
         }
         nativeTrackConstraints = constraints;
         return;

@@ -31,7 +31,7 @@ namespace webrtc {
 class PeerConnectionFactoryWrapper : public std::enable_shared_from_this<PeerConnectionFactoryWrapper> {
 public:
     static std::shared_ptr<PeerConnectionFactoryWrapper> GetDefault();
-    
+
     static void SetDefault(std::shared_ptr<PeerConnectionFactoryWrapper> wrapper);
 
     static std::shared_ptr<PeerConnectionFactoryWrapper> Create(
@@ -39,6 +39,9 @@ public:
         std::unique_ptr<VideoEncoderFactory> videoEncoderFactory = nullptr,
         std::unique_ptr<VideoDecoderFactory> videoDecoderFactory = nullptr,
         rtc::scoped_refptr<AudioProcessing> audioProcessing = nullptr);
+
+    // Do not use this constructor directly, use 'Create' above.
+    PeerConnectionFactoryWrapper() = default;
 
     PeerConnectionFactoryInterface* GetFactory()
     {
@@ -66,8 +69,6 @@ public:
     }
 
 protected:
-    PeerConnectionFactoryWrapper() = default;
-
     bool Init(
         rtc::scoped_refptr<AudioDeviceModule> adm, std::unique_ptr<VideoEncoderFactory> videoEncoderFactory,
         std::unique_ptr<VideoDecoderFactory> videoDecoderFactory, rtc::scoped_refptr<AudioProcessing> audioProcessing);
@@ -96,7 +97,7 @@ public:
 
 protected:
     static Napi::Value SetDefault(const Napi::CallbackInfo& info);
-    
+
     Napi::Value CreatePeerConnection(const Napi::CallbackInfo& info);
     Napi::Value CreateAudioSource(const Napi::CallbackInfo& info);
     Napi::Value CreateAudioTrack(const Napi::CallbackInfo& info);

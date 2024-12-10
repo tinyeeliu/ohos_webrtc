@@ -24,7 +24,7 @@
 
 namespace webrtc {
 
-template<typename T>
+template <typename T>
 class NapiMediaSource : public Napi::ObjectWrap<T> {
 public:
     NAPI_ATTRIBUTE_NAME_DECLARE(State, state);
@@ -34,7 +34,7 @@ public:
     NAPI_ENUM_NAME_DECLARE(SourceStateLive, live);
     NAPI_ENUM_NAME_DECLARE(SourceStateEnded, ended);
     NAPI_ENUM_NAME_DECLARE(SourceStateMuted, muted);
-    
+
     explicit NapiMediaSource(const Napi::CallbackInfo& info) : Napi::ObjectWrap<T>(info) {}
 };
 
@@ -42,13 +42,13 @@ class NapiAudioSource : public NapiMediaSource<NapiAudioSource> {
 public:
     NAPI_CLASS_NAME_DECLARE(AudioSource);
     NAPI_METHOD_NAME_DECLARE(SetVolume, setVolume);
-    
+
     static void Init(Napi::Env env, Napi::Object exports);
 
     static Napi::Object NewInstance(Napi::Env env, rtc::scoped_refptr<AudioSourceInterface> source);
 
     ~NapiAudioSource() override;
-    
+
     AudioSourceInterface* Get() const
     {
         return source_.get();
@@ -79,13 +79,13 @@ public:
     NAPI_EVENT_NAME_DECLARE(CapturerStopped, capturerstopped);
     NAPI_METHOD_NAME_DECLARE(StartCapture, startCapture);
     NAPI_METHOD_NAME_DECLARE(StopCapture, stopCapture);
-    
+
     static void Init(Napi::Env env, Napi::Object exports);
 
     static Napi::Object NewInstance(Napi::Env env, rtc::scoped_refptr<OhosVideoTrackSource> source);
 
     ~NapiVideoSource() override;
-    
+
     VideoTrackSourceInterface* Get() const
     {
         return source_.get();
@@ -103,27 +103,29 @@ protected:
     Napi::Value StartCapture(const Napi::CallbackInfo& info);
     Napi::Value StopCapture(const Napi::CallbackInfo& info);
     Napi::Value ToJson(const Napi::CallbackInfo& info);
-    
+
 protected:
     // VideoCapturer::Observer
     void OnCapturerStarted(bool success) override;
     void OnCapturerStopped() override;
     void
-    OnFrameCaptured(rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation) override {}
-    
+    OnFrameCaptured(rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation) override
+    {
+    }
+
 private:
     bool GetEventHandler(const std::string& type, Napi::Function& fn);
     bool GetEventHandler(const std::string& type, Napi::ThreadSafeFunction& tsfn);
     bool SetEventHandler(const std::string& type, Napi::Function fn, Napi::Value receiver);
     bool RemoveEventHandler(const std::string& type);
     void RemoveAllEventHandlers();
-    
+
 private:
     static Napi::FunctionReference constructor_;
 
     rtc::scoped_refptr<OhosVideoTrackSource> source_;
     rtc::Thread* signalThread_{};
-    
+
     struct EventHandler {
         Napi::FunctionReference ref;
         Napi::ThreadSafeFunction tsfn;

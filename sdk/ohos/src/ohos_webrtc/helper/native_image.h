@@ -26,6 +26,10 @@
 
 namespace ohos {
 
+constexpr int32_t kMatrixElementCount = 16;
+
+using TransformMatrix = std::array<float, kMatrixElementCount>;
+
 class NativeImage : public PointerWrapper<OH_NativeImage> {
 public:
     static NativeImage Create(uint32_t textureId, uint32_t textureTarget);
@@ -39,11 +43,11 @@ public:
     void DetachContext();
     void UpdateSurfaceImage();
     int64_t GetTimestamp();
-    std::array<float, 16> GetTransformMatrix();
+    TransformMatrix GetTransformMatrix();
     uint64_t GetSurfaceId() const;
     void SetOnFrameAvailableListener(OH_OnFrameAvailableListener listener);
     void UnsetOnFrameAvailableListener();
-    std::array<float, 16> GetTransformMatrixV2();
+    TransformMatrix GetTransformMatrixV2();
     OHNativeWindowBuffer* AcquireNativeWindowBuffer(int* fenceFd);
     void ReleaseNativeWindowBuffer(OHNativeWindowBuffer* nativeWindowBuffer, int fenceFd);
 
@@ -98,9 +102,9 @@ inline int64_t NativeImage::GetTimestamp()
     return OH_NativeImage_GetTimestamp(Raw());
 }
 
-inline std::array<float, 16> NativeImage::GetTransformMatrix()
+inline TransformMatrix NativeImage::GetTransformMatrix()
 {
-    std::array<float, 16> matrix;
+    TransformMatrix matrix;
     int32_t ret = OH_NativeImage_GetTransformMatrix(Raw(), matrix.data());
     NATIVE_THROW_IF_FAILED(ret == 0, ret, "OH_NativeImage", "Failed to get transform matrix", matrix);
     return matrix;
@@ -126,9 +130,9 @@ inline void NativeImage::UnsetOnFrameAvailableListener()
     NATIVE_THROW_IF_FAILED_VOID(ret == 0, ret, "OH_NativeImage", "Failed to unset on frame available listener");
 }
 
-inline std::array<float, 16> NativeImage::GetTransformMatrixV2()
+inline TransformMatrix NativeImage::GetTransformMatrixV2()
 {
-    std::array<float, 16> matrix;
+    TransformMatrix matrix;
     int32_t ret = OH_NativeImage_GetTransformMatrixV2(Raw(), matrix.data());
     NATIVE_THROW_IF_FAILED(ret == 0, ret, "OH_NativeImage", "Failed to get transform matrix (V2)", matrix);
     return matrix;

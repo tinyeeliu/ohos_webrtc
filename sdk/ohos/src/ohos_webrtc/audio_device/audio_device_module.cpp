@@ -105,14 +105,24 @@ const char* AudioStateToString(AudioStateType state)
 
 class OhosAudioDeviceModule : public AudioDeviceModule {
 public:
-    enum class InitStatus { OK = 0, PLAYOUT_ERROR = 1, RECORDING_ERROR = 2, OTHER_ERROR = 3, NUM_STATUSES = 4 };
+    enum class InitStatus {
+        OK = 0,
+        PLAYOUT_ERROR = 1,
+        RECORDING_ERROR = 2,
+        OTHER_ERROR = 3,
+        NUM_STATUSES = 4
+    };
 
     OhosAudioDeviceModule(
         AudioDeviceModule::AudioLayer audioLayer, bool isStereoPlayoutSupported, bool isStereoRecordSupported,
         std::unique_ptr<AudioInput> audioInput, std::unique_ptr<AudioOutput> audioOutput)
-        : audioLayer_(audioLayer), isStereoPlayoutSupported_(isStereoPlayoutSupported),
-          isStereoRecordSupported_(isStereoRecordSupported), taskQueueFactory_(CreateDefaultTaskQueueFactory()),
-          input_(std::move(audioInput)), output_(std::move(audioOutput)), initialized_(false)
+        : audioLayer_(audioLayer),
+          isStereoPlayoutSupported_(isStereoPlayoutSupported),
+          isStereoRecordSupported_(isStereoRecordSupported),
+          taskQueueFactory_(CreateDefaultTaskQueueFactory()),
+          input_(std::move(audioInput)),
+          output_(std::move(audioOutput)),
+          initialized_(false)
     {
         RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
@@ -758,8 +768,8 @@ NapiAudioDeviceModule::NapiAudioDeviceModule(const Napi::CallbackInfo& info) : O
 
     int32_t audioSource = AUDIOSTREAM_SOURCE_TYPE_VOICE_COMMUNICATION;
     int32_t audioFormat = AUDIOSTREAM_SAMPLE_S16LE;
-    int32_t inputSampleRate = 48000;
-    int32_t outputSampleRate = 48000;
+    int32_t inputSampleRate = kAudioSampleRate_Default;
+    int32_t outputSampleRate = kAudioSampleRate_Default;
     int32_t rendererUsage = AUDIOSTREAM_USAGE_VOICE_COMMUNICATION;
     bool useStereoInput = false;
     bool useStereoOutput = false;
@@ -869,8 +879,8 @@ void NapiAudioDeviceModule::SetEventHandler(const Napi::CallbackInfo& info, cons
 
     EventHandler handler;
     handler.ref = Persistent(cb);
-    handler.tsfn = ThreadSafeFunction::New(
-        info.Env(), cb, type, 0, 1, context, [](Napi::Env env, Reference<Napi::Value>* ctx) {
+    handler.tsfn =
+        ThreadSafeFunction::New(info.Env(), cb, type, 0, 1, context, [](Napi::Env env, Reference<Napi::Value>* ctx) {
             (void)env;
             ctx->Reset();
             delete ctx;

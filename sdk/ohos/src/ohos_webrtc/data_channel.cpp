@@ -63,7 +63,7 @@ const char kEventNameError[] = "error";
 
 std::unique_ptr<NapiDataChannel::Observer> NapiDataChannel::Observer::Create(DataChannelInterface* dataChannel)
 {
-    auto observer = std::unique_ptr<Observer>(new Observer(dataChannel));
+    auto observer = std::make_unique<Observer>(dataChannel);
     return observer;
 }
 
@@ -101,8 +101,8 @@ bool NapiDataChannel::Observer::SetEventHandler(const std::string& type, Napi::F
 
     EventHandler handler;
     handler.ref = Persistent(fn);
-    handler.tsfn = ThreadSafeFunction::New(
-        fn.Env(), fn, type, 0, 1, context, [](Napi::Env /*env*/, Reference<Napi::Value>* ctx) {
+    handler.tsfn =
+        ThreadSafeFunction::New(fn.Env(), fn, type, 0, 1, context, [](Napi::Env /*env*/, Reference<Napi::Value>* ctx) {
             ctx->Reset();
             delete ctx;
         });
@@ -255,7 +255,7 @@ void NapiDataChannel::Observer::OnBufferedAmountChange(uint64_t sent_data_size)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    if (sent_data_size > bufferedAmountLowThreshold_.load()) {
+    if (dataChannel_->buffered_amount() > bufferedAmountLowThreshold_.load()) {
         return;
     }
 
@@ -607,7 +607,7 @@ Napi::Value NapiDataChannel::ToJson(const Napi::CallbackInfo& info)
     json.Set("__native_class__", "NapiDataChannel");
 #endif
 
-return json;
+    return json;
 }
 
 void JsToNativeDataChannelInit(const Napi::Object& jsDataChannelInit, DataChannelInit& init)

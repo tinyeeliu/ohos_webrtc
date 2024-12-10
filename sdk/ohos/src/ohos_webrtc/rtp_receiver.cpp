@@ -209,8 +209,7 @@ Napi::Value NapiRtpReceiver::GetContributingSources(const Napi::CallbackInfo& in
 
         auto audioLevel = source.audio_level();
         if (audioLevel) {
-            constexpr auto max = std::numeric_limits<std::decay_t<decltype(audioLevel.value())>>::max();
-            jsSource.Set(kAttributeNameAudioLevel, Number::New(info.Env(), audioLevel.value() / max));
+            jsSource.Set(kAttributeNameAudioLevel, Number::New(info.Env(), audioLevel.value() / UINT8_MAX));
         }
 
         jsCsrcs.Set(i, jsSource);
@@ -243,8 +242,7 @@ Napi::Value NapiRtpReceiver::GetSynchronizationSources(const Napi::CallbackInfo&
 
         auto audioLevel = source.audio_level();
         if (audioLevel) {
-            constexpr auto max = std::numeric_limits<std::decay_t<decltype(audioLevel.value())>>::max();
-            jsSource.Set(kAttributeNameAudioLevel, Number::New(info.Env(), audioLevel.value() / max));
+            jsSource.Set(kAttributeNameAudioLevel, Number::New(info.Env(), audioLevel.value() / UINT8_MAX));
         }
 
         jsSsrcs.Set(i, jsSource);

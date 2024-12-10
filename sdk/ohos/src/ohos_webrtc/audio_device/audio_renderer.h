@@ -34,8 +34,11 @@ namespace webrtc {
 
 class AudioRenderer : public AudioOutput {
 public:
-    static std::unique_ptr<AudioRenderer> Create(int32_t usage, int32_t sampleRate, bool useStereoOutput, bool useLowLatency);
+    static std::unique_ptr<AudioRenderer>
+    Create(int32_t usage, int32_t sampleRate, bool useStereoOutput, bool useLowLatency);
 
+    // Do not use this constructor directly, use 'Create' above.
+    AudioRenderer(int32_t usage, int32_t sampleRate, bool useStereoOutput, bool useLowLatency);
     ~AudioRenderer() override;
 
     int32_t Init() override;
@@ -61,8 +64,6 @@ public:
     void UnregisterObserver(Observer* obs) override;
 
 protected:
-    AudioRenderer(int32_t usage, int32_t sampleRate, bool useStereoOutput, bool useLowLatency);
-
     static int32_t OnWriteData1(OH_AudioRenderer* renderer, void* userData, void* buffer, int32_t length);
     static int32_t OnStreamEvent1(OH_AudioRenderer* renderer, void* userData, OH_AudioStream_Event event);
     static int32_t OnInterruptEvent1(

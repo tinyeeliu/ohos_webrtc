@@ -24,7 +24,12 @@
 
 namespace webrtc {
 
-const int kDefaultSampleRate = 44100;
+constexpr int kAudioChannelCount_Mono = 1;
+constexpr int kAudioChannelCount_Stereo = 2;
+
+constexpr int kAudioSampleRate_16000 = 16000;
+constexpr int kAudioSampleRate_48000 = 48000;
+constexpr int kAudioSampleRate_Default = kAudioSampleRate_48000;
 
 const int kLowLatencyModeDelayEstimateInMilliseconds = 25;
 const int kHighLatencyModeDelayEstimateInMilliseconds = 75;

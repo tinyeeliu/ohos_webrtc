@@ -44,17 +44,17 @@ public:
     {
         return id_;
     }
-    
+
     Type GetType() const
     {
         return type_;
     }
-    
+
     void Lock() const
     {
         mutex_.lock();
     }
-    
+
     void Unlock() const
     {
         mutex_.unlock();
@@ -81,7 +81,7 @@ private:
 class TextureBuffer : public VideoFrameBuffer {
 public:
     static rtc::scoped_refptr<TextureBuffer>
-    Create(std::weak_ptr<TextureData> texture, int width, int height, const Matrix4f& transformMatrix);
+    Create(std::weak_ptr<TextureData> texture, int width, int height, const Matrix4fv& transformMatrix);
 
     ~TextureBuffer() override;
 
@@ -105,7 +105,7 @@ public:
     rtc::scoped_refptr<VideoFrameBuffer> CropAndScale(
         int offset_x, int offset_y, int crop_width, int crop_height, int scaled_width, int scaled_height) override;
 
-    Matrix4f GetTransformMatrix() const
+    Matrix4fv GetTransformMatrix() const
     {
         return transformMatrix_;
     }
@@ -116,13 +116,13 @@ public:
     }
 
 protected:
-    TextureBuffer(std::weak_ptr<TextureData> texture, int width, int height, const Matrix4f& transformMatrix);
+    TextureBuffer(std::weak_ptr<TextureData> texture, int width, int height, const Matrix4fv& transformMatrix);
 
 private:
+    std::weak_ptr<TextureData> texture_;
     const int width_;
     const int height_;
-    const Matrix4f transformMatrix_;
-    std::weak_ptr<TextureData> texture_;
+    const Matrix4fv transformMatrix_;
 };
 
 } // namespace webrtc

@@ -36,4 +36,4 @@ struct AudioDeviceInfo {
 
 } // namespace webrtc
 
-#endif //WEBRTC_AUDIO_DEVICE_INFO_H
+#endif // WEBRTC_AUDIO_DEVICE_INFO_H

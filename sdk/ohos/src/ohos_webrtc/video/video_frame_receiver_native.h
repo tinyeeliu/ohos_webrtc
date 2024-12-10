@@ -32,14 +32,14 @@ class VideoFrameReceiverNative : public VideoFrameReceiver {
 public:
     static std::unique_ptr<VideoFrameReceiverNative> Create(const std::string& threadName);
 
+    // Do not use this constructor directly, use 'Create' above.
+    explicit VideoFrameReceiverNative(const std::string& threadName);
     ~VideoFrameReceiverNative() override;
 
     uint64_t GetSurfaceId() const override;
     void SetVideoFrameSize(int32_t width, int32_t height) override;
 
 protected:
-    explicit VideoFrameReceiverNative(const std::string& threadName);
-    
     void CreateImageReceiver();
     void ReleaseImageReceiver();
 

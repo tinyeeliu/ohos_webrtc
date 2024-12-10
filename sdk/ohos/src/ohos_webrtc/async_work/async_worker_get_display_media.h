@@ -16,7 +16,6 @@
 #ifndef WEBRTC_ASYNC_WORKER_GET_DISPLAY_MEDIA_H
 #define WEBRTC_ASYNC_WORKER_GET_DISPLAY_MEDIA_H
 
-
 #include "../user_media/media_constraints.h"
 
 #include "napi.h"
@@ -33,12 +32,12 @@ public:
     {
         return deferred_.Promise();
     }
-    
+
     Napi::Promise::Deferred GetDeferred()
     {
         return deferred_;
     }
-    
+
     void Start(MediaTrackConstraints audio, MediaTrackConstraints video);
 
 protected:
@@ -58,4 +57,4 @@ private:
 
 } // namespace webrtc
 
-#endif //WEBRTC_ASYNC_WORKER_GET_DISPLAY_MEDIA_H
+#endif // WEBRTC_ASYNC_WORKER_GET_DISPLAY_MEDIA_H

@@ -28,7 +28,7 @@ using namespace Napi;
 std::unique_ptr<AudioCapturer>
 AudioCapturer::Create(int source, int format, int sampleRate, bool useStereoInput, bool useLowLatency)
 {
-    return std::unique_ptr<AudioCapturer>(new AudioCapturer(source, format, sampleRate, useStereoInput, useLowLatency));
+    return std::make_unique<AudioCapturer>(source, format, sampleRate, useStereoInput, useLowLatency);
 }
 
 int32_t AudioCapturer::OnReadData1(OH_AudioCapturer* stream, void* userData, void* buffer, int32_t length)
@@ -57,7 +57,10 @@ int32_t AudioCapturer::OnError1(OH_AudioCapturer* stream, void* userData, OH_Aud
 }
 
 AudioCapturer::AudioCapturer(int source, int format, int sampleRate, bool useStereoInput, bool useLowLatency)
-    : audioSource_(source), audioFormat_(format), sampleRate_(sampleRate), channelCount_(useStereoInput ? 2 : 1),
+    : audioSource_(source),
+      audioFormat_(format),
+      sampleRate_(sampleRate),
+      channelCount_(useStereoInput ? kAudioChannelCount_Stereo : kAudioChannelCount_Mono),
       useLowLatency_(useLowLatency)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;

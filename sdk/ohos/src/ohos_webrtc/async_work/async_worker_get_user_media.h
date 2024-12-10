@@ -32,12 +32,12 @@ public:
     {
         return deferred_.Promise();
     }
-    
+
     Napi::Promise::Deferred GetDeferred()
     {
         return deferred_;
     }
-    
+
     void Start(MediaTrackConstraints audio, MediaTrackConstraints video);
 
 protected:
