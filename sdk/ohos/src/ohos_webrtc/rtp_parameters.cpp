@@ -122,6 +122,7 @@ bool ParseMimeType(const std::string& mimeType, std::string& kind, std::string& 
 {
     auto results = rtc::split(mimeType, '/');
     if (results.size() != 2) {
+        // split failed, no '/' in mimeType
         return false;
     }
 
