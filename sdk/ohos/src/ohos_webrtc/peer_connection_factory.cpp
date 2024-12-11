@@ -68,7 +68,7 @@ std::shared_ptr<PeerConnectionFactoryWrapper> PeerConnectionFactoryWrapper::GetD
 {
     UNUSED std::lock_guard<std::mutex> lock(mutex_);
     if (!defaultFactory_) {
-        defaultFactory_ = std::shared_ptr<PeerConnectionFactoryWrapper>(new PeerConnectionFactoryWrapper());
+        defaultFactory_ = std::make_shared<PeerConnectionFactoryWrapper>();
         if (!defaultFactory_->Init(nullptr, nullptr, nullptr, nullptr)) {
             defaultFactory_.reset();
         }

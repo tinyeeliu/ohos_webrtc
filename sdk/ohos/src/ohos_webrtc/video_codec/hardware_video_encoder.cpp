@@ -569,8 +569,8 @@ int32_t HardwareVideoEncoder::EncodeByteBuffer(const VideoFrame& frame)
     switch (pixelFormat_) {
         case AV_PIXEL_FORMAT_YUVI420: {
             // copy
-            memcpy(addr, srcBuffer->DataY(), width * height); // y planar
-            memcpy(addr + width * height, srcBuffer->DataU(), width * height / 4); // u planar
+            memcpy(addr, srcBuffer->DataY(), width * height);                              // y planar
+            memcpy(addr + width * height, srcBuffer->DataU(), width * height / 4);         // u planar
             memcpy(addr + width * height * 5 / 4, srcBuffer->DataV(), width * height / 4); // v planar
         } break;
         case AV_PIXEL_FORMAT_NV12: {

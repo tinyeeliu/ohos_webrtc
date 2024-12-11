@@ -26,6 +26,7 @@ namespace webrtc {
 
 class GlConverterDrawer;
 
+// see //sdk/android/api/org/webrtc/YuvConverter.java
 class YuvConverter {
 public:
     YuvConverter();

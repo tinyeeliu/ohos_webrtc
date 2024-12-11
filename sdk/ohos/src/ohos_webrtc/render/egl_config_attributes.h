@@ -63,7 +63,7 @@ public:
                 attrs.push_back(EGL_ALPHA_SIZE);
                 attrs.push_back(kEGLPixelComponentBits);
             }
-            if (version_ == 2 || version_ == kOpenGLVersion_3) {
+            if (version_ == kOpenGLVersion_2 || version_ == kOpenGLVersion_3) {
                 attrs.push_back(EGL_RENDERABLE_TYPE);
                 attrs.push_back(version_ == kOpenGLVersion_3 ? EGL_OPENGL_ES3_BIT : EGL_OPENGL_ES2_BIT);
             }

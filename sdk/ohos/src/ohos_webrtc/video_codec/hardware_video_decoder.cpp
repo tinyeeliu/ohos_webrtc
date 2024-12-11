@@ -477,8 +477,8 @@ void HardwareVideoDecoder::DeliverByteFrame(const ohos::CodecBuffer& buffer)
     switch (colorFormat_) {
         case AV_PIXEL_FORMAT_YUVI420: {
             // copy data
-            memcpy(i420Buffer->MutableDataY(), addr, width * height); // y planar
-            memcpy(i420Buffer->MutableDataU(), addr + width * height, width * height / 4); // u planar
+            memcpy(i420Buffer->MutableDataY(), addr, width * height);                              // y planar
+            memcpy(i420Buffer->MutableDataU(), addr + width * height, width * height / 4);         // u planar
             memcpy(i420Buffer->MutableDataV(), addr + width * height * 5 / 4, width * height / 4); // v planar
         } break;
         case AV_PIXEL_FORMAT_NV12: {

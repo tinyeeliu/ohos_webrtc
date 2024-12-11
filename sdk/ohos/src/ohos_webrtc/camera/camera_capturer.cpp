@@ -145,8 +145,7 @@ void CameraCapturer::StartInternal()
     for (std::size_t i = 0; i < sceneModes.Size(); i++) {
         RTC_DLOG(LS_VERBOSE) << "supported scene mode: " << sceneModes[i];
         if (sceneModes[i] == NORMAL_VIDEO) {
-            // something is wrong in video mode in OpenHarmony
-            // useVideoSceneMode_ = true;
+            // video scene mode is supported
         }
     }
 
