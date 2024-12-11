@@ -25,7 +25,7 @@ constexpr int32_t kMatrixElementCount = 16;
 using Matrix4fv = std::array<float, kMatrixElementCount>;
 
 constexpr Matrix4fv kMatrix4fv_Identity = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
-                              0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+                                           0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
 
 } // namespace webrtc
 

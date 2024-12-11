@@ -1144,6 +1144,7 @@ Napi::Value NapiPeerConnection::AddTrack(const Napi::CallbackInfo& info)
 
     std::vector<std::string> streamIds;
     if (info.Length() >= 2) {
+        // optional parameters from 2
         for (uint32_t i = 1; i < info.Length(); i++) {
             if (!info[i].IsObject()) {
                 NAPI_THROW(Error::New(info.Env(), "The argument is not object"), info.Env().Undefined());
@@ -1335,6 +1336,7 @@ Napi::Value NapiPeerConnection::CreateDataChannel(const Napi::CallbackInfo& info
     auto label = info[0].As<String>().Utf8Value();
 
     if (info.Length() < 2) {
+        // second parameter is optional
         auto result = pc_->CreateDataChannelOrError(label, nullptr);
         if (!result.ok()) {
             auto& error = result.error();

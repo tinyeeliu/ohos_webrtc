@@ -31,7 +31,6 @@ struct AudioDeviceInfo {
     std::string groupId;
     std::string label;
     AudioDeviceRole role;
-    // OH_AudioDevice_Type type;
 };
 
 } // namespace webrtc

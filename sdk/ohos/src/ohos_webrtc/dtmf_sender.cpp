@@ -184,6 +184,7 @@ Napi::Value NapiDtmfSender::InsertDTMF(const Napi::CallbackInfo& info)
     int interToneGap = kDefaultInterToneGapMs;
 
     if (info.Length() == 2) {
+        // second parameter is optional
         duration = info[1].As<Number>();
         if (duration > kMaxDurationMs) {
             RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " The value of duration is greater than 6000";
@@ -194,7 +195,9 @@ Napi::Value NapiDtmfSender::InsertDTMF(const Napi::CallbackInfo& info)
             duration = kMinDurationMs;
         }
     }
+
     if (info.Length() == 3) {
+        // third parameter is optional
         interToneGap = info[2].As<Number>();
         if (interToneGap < kMinInterToneGapMs) {
             RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " The value of interToneGap is less than 30";

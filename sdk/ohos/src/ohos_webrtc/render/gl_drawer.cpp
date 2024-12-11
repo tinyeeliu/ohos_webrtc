@@ -24,8 +24,6 @@ namespace webrtc {
 
 namespace {
 
-constexpr int32_t kYuvTexturesNum = 3;
-
 static constexpr char DEFAULT_VERTEX_SHADER[] = R"(
 attribute vec3 position;
 attribute vec2 texCoord;
@@ -97,6 +95,19 @@ static constexpr float FULL_RECTANGLE_TEXTURE_BUFFER[] = {
     1.0f, 1.0f, // Top right.
 };
 
+constexpr int32_t kVerticePositionComponents = 2;
+constexpr int32_t kTexturePositionComponents = 2;
+
+constexpr int32_t kVerticesNum =
+    sizeof(FULL_RECTANGLE_BUFFER) / sizeof(FULL_RECTANGLE_BUFFER[0]) / kVerticePositionComponents;
+
+constexpr int32_t kTextureUnit_Default = 0;
+constexpr int32_t kTextureUnit_Y = 0;
+constexpr int32_t kTextureUnit_U = 1;
+constexpr int32_t kTextureUnit_V = 2;
+
+constexpr int32_t kYuvTexturesNum = 3;
+
 } // namespace
 
 GlGenericDrawer::GlGenericDrawer() = default;
@@ -117,7 +128,7 @@ void GlGenericDrawer::DrawOes(
 
     // Draw the texture.
     glViewport(viewportX, viewportY, viewportWidth, viewportHeight);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, kVerticesNum);
 
     // Unbind the texture as a precaution.
     glBindTexture(GL_TEXTURE_EXTERNAL_OES, 0);
@@ -137,7 +148,7 @@ void GlGenericDrawer::DrawRgb(
 
     // Draw the texture.
     glViewport(viewportX, viewportY, viewportWidth, viewportHeight);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, kVerticesNum);
 
     // Unbind the texture as a precaution.
     glBindTexture(GL_TEXTURE_2D, 0);
@@ -161,7 +172,7 @@ void GlGenericDrawer::DrawYuv(
     RTC_DLOG(LS_VERBOSE) << "view port: " << viewportX << ", " << viewportY << ", " << viewportWidth << ", "
                          << viewportHeight;
     glViewport(viewportX, viewportY, viewportWidth, viewportHeight);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, kVerticesNum);
 
     // Unbind the textures as a precaution.
     for (int i = 0; i < kYuvTexturesNum; ++i) {
@@ -184,11 +195,11 @@ void GlGenericDrawer::PrepareShader(
 
         // Set input texture units.
         if (shaderType == ShaderType::YUV) {
-            currentShader_->SetInt("tex_y", 0);
-            currentShader_->SetInt("tex_u", 1);
-            currentShader_->SetInt("tex_v", 2);
+            currentShader_->SetInt("tex_y", kTextureUnit_Y);
+            currentShader_->SetInt("tex_u", kTextureUnit_U);
+            currentShader_->SetInt("tex_v", kTextureUnit_V);
         } else {
-            currentShader_->SetInt("tex", 0);
+            currentShader_->SetInt("tex", kTextureUnit_Default);
         }
 
         positionLocation_ = currentShader_->GetAttribLocation("position");
@@ -201,11 +212,12 @@ void GlGenericDrawer::PrepareShader(
 
     // Upload the vertex coordinates.
     glEnableVertexAttribArray(positionLocation_);
-    glVertexAttribPointer(positionLocation_, 2, GL_FLOAT, false, 0, FULL_RECTANGLE_BUFFER);
+    glVertexAttribPointer(positionLocation_, kVerticePositionComponents, GL_FLOAT, false, 0, FULL_RECTANGLE_BUFFER);
 
     // Upload the texture coordinates.
     glEnableVertexAttribArray(textureLocation_);
-    glVertexAttribPointer(textureLocation_, 2, GL_FLOAT, false, 0, FULL_RECTANGLE_TEXTURE_BUFFER);
+    glVertexAttribPointer(
+        textureLocation_, kTexturePositionComponents, GL_FLOAT, false, 0, FULL_RECTANGLE_TEXTURE_BUFFER);
 
     // Upload the texture transformation matrix.
     glUniformMatrix4fv(texTransformLocation_, 1, false, texMatrix.data());
