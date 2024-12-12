@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
- 
+
 import { describe, beforeAll, beforeEach, afterEach, afterAll, it, expect } from '@ohos/hypium'
 import webrtc from 'libohos_webrtc.so';
 import { Logging, LoggingSeverity } from '../../../main/ets/log/Logging';
@@ -140,7 +140,9 @@ export default function RTCIceTransportTest() {
         };
       });
 
-      await promise;
+      if (iceTransport?.gatheringState != "complete") {
+        await promise;
+      }
       expect(iceTransport?.gatheringState).not().assertEqual("new");
     })
 
