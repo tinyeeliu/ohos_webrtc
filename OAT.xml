@@ -52,6 +52,9 @@
                 <filteritem type="filename" name="hvigor-config.json5" desc="OpenHarmony工程编译配置文件，无需添加版权头"/>
                 <filteritem type="filename" name="module.json5" desc="OpenHarmony工程编译配置文件，无需添加版权头"/>
                 <filteritem type="filename" name="build-profile.json5" desc="OpenHarmony工程编译配置文件，无需添加版权头"/>
+                <filteritem type="filepath" name="sdk/ohos/src/node-addon-api/LICENSE.md" desc="三方库文件，不作修改"/>
+                <filteritem type="filepath" name="sdk/ohos/src/node-addon-api/napi.h" desc="三方库文件，不作修改"/>
+                <filteritem type="filepath" name="sdk/ohos/src/node-addon-api/napi-inl.h" desc="三方库文件，不作修改"/>
             </filefilter>
             <filefilter
                 desc="Filters for compatibility，license header policies"
@@ -74,6 +77,9 @@
                 <filteritem type="filename" name="hvigor-config.json5" desc="OpenHarmony工程编译配置文件，无需添加版权头"/>
                 <filteritem type="filename" name="module.json5" desc="OpenHarmony工程编译配置文件，无需添加版权头"/>
                 <filteritem type="filename" name="build-profile.json5" desc="OpenHarmony工程编译配置文件，无需添加版权头"/>
+                <filteritem type="filepath" name="sdk/ohos/src/node-addon-api/LICENSE.md" desc="三方库文件，不作修改"/>
+                <filteritem type="filepath" name="sdk/ohos/src/node-addon-api/napi.h" desc="三方库文件，不作修改"/>
+                <filteritem type="filepath" name="sdk/ohos/src/node-addon-api/napi-inl.h" desc="三方库文件，不作修改"/>
             </filefilter>
         </filefilterlist>
     </oatconfig>

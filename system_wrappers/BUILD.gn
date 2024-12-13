@@ -60,7 +60,7 @@ rtc_library("system_wrappers") {
     libs += [ "log" ]
   }
 
-  if (is_linux || is_chromeos) {
+  if (is_linux || is_chromeos || is_ohos) {
     if (!build_with_chromium) {
       sources += [ "source/cpu_features_linux.cc" ]
     }
