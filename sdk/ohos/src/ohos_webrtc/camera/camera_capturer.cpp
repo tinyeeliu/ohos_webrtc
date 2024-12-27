@@ -145,40 +145,22 @@ void CameraCapturer::StartInternal()
     for (std::size_t i = 0; i < sceneModes.Size(); i++) {
         RTC_DLOG(LS_VERBOSE) << "supported scene mode: " << sceneModes[i];
         if (sceneModes[i] == NORMAL_VIDEO) {
-            // video scene mode is supported
+            useVideoSceneMode_ = true;
         }
     }
 
     Camera_Profile* previewProfile = nullptr;
     Camera_VideoProfile* videoProfile = nullptr;
     auto capability = CameraManager::GetInstance().GetSupportedCameraOutputCapability(device);
-    if (useVideoSceneMode_) {
-        for (uint32_t i = 0; i < capability.VideoProfileSize(); i++) {
-            Camera_VideoProfile* p = capability.GetVideoProfile(i);
-            RTC_DLOG(LS_VERBOSE) << "video format: " << p->format;
-            RTC_DLOG(LS_VERBOSE) << "video size: " << p->size.width << "x" << p->size.height;
-            RTC_DLOG(LS_VERBOSE) << "video fps: " << p->range.min << "-" << p->range.max;
+    for (uint32_t i = 0; i < capability.PreviewProfileSize(); i++) {
+        Camera_Profile* p = capability.GetPreviewProfile(i);
+        RTC_DLOG(LS_VERBOSE) << "preview format: " << p->format;
+        RTC_DLOG(LS_VERBOSE) << "preview size: " << p->size.width << "x" << p->size.height;
 
-            if (profile_.format == NativeCameraFormatToPixelFormat(p->format) &&
-                profile_.resolution.width == p->size.width && profile_.resolution.height == p->size.height &&
-                profile_.frameRateRange.min >= p->range.min && profile_.frameRateRange.max <= p->range.max)
-            {
-                videoProfile = p;
-                break;
-            }
-        }
-    } else {
-        for (uint32_t i = 0; i < capability.PreviewProfileSize(); i++) {
-            Camera_Profile* p = capability.GetPreviewProfile(i);
-            RTC_DLOG(LS_VERBOSE) << "video format: " << p->format;
-            RTC_DLOG(LS_VERBOSE) << "video size: " << p->size.width << "x" << p->size.height;
-
-            if (profile_.format == NativeCameraFormatToPixelFormat(p->format) &&
-                profile_.resolution.width == p->size.width && profile_.resolution.height == p->size.height)
-            {
-                previewProfile = p;
-                break;
-            }
+        if (profile_.format == NativeCameraFormatToPixelFormat(p->format) &&
+            profile_.resolution.width == p->size.width && profile_.resolution.height == p->size.height) {
+            previewProfile = p;
+            break;
         }
     }
 
@@ -200,26 +182,18 @@ void CameraCapturer::StartInternal()
 
     auto surfaceId = std::to_string(dataReceiver_->GetSurfaceId());
 
-    if (useVideoSceneMode_) {
-        videoOutput_ = CameraManager::GetInstance().CreateVideoOutput(videoProfile, surfaceId);
-        if (videoOutput_.IsEmpty()) {
-            RTC_LOG(LS_ERROR) << "Failed to create camera video output";
-            return;
-        }
-
-        videoOutput_.AddObserver(this);
-    } else {
-        previewOutput_ = CameraManager::GetInstance().CreatePreviewOutput(previewProfile, surfaceId);
-        if (previewOutput_.IsEmpty()) {
-            RTC_LOG(LS_ERROR) << "Failed to create camera preview output";
-            return;
-        }
-        previewOutput_.AddObserver(this);
+    previewOutput_ = CameraManager::GetInstance().CreatePreviewOutput(previewProfile, surfaceId);
+    if (previewOutput_.IsEmpty()) {
+        RTC_LOG(LS_ERROR) << "Failed to create camera preview output";
+        return;
     }
+    previewOutput_.AddObserver(this);
 
     captureSession_ = CameraManager::GetInstance().CreateCaptureSession();
-    if (OH_CaptureSession_SetSessionMode(captureSession_.Raw(), NORMAL_VIDEO) != CAMERA_OK) {
-        RTC_LOG(LS_ERROR) << "Failed to set scene mode";
+    if (useVideoSceneMode_) {
+        if (OH_CaptureSession_SetSessionMode(captureSession_.Raw(), NORMAL_VIDEO) != CAMERA_OK) {
+            RTC_LOG(LS_ERROR) << "Failed to set scene mode";
+        }
     }
 
     if (!captureSession_.BeginConfig()) {
@@ -229,11 +203,7 @@ void CameraCapturer::StartInternal()
 
     captureSession_.AddInput(input_);
 
-    if (useVideoSceneMode_) {
-        captureSession_.AddVideoOutput(videoOutput_);
-    } else {
-        captureSession_.AddPreviewOutput(previewOutput_);
-    }
+    captureSession_.AddPreviewOutput(previewOutput_);
 
     if (!captureSession_.CommitConfig()) {
         RTC_LOG(LS_ERROR) << "Failed to commit capture session config";
@@ -263,13 +233,8 @@ void CameraCapturer::StopInternal()
         return;
     }
 
-    if (useVideoSceneMode_) {
-        videoOutput_.RemoveObserver(this);
-        videoOutput_.Reset();
-    } else {
-        previewOutput_.RemoveObserver(this);
-        previewOutput_.Reset();
-    }
+    previewOutput_.RemoveObserver(this);
+    previewOutput_.Reset();
 
     input_.Close();
     input_.Reset();
