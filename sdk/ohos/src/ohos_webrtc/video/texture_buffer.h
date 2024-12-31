@@ -81,7 +81,7 @@ private:
 class TextureBuffer : public VideoFrameBuffer {
 public:
     static rtc::scoped_refptr<TextureBuffer>
-    Create(std::weak_ptr<TextureData> texture, int width, int height, const Matrix4fv& transformMatrix);
+    Create(std::weak_ptr<TextureData> texture, int width, int height, const Matrix& transformMatrix);
 
     ~TextureBuffer() override;
 
@@ -105,7 +105,7 @@ public:
     rtc::scoped_refptr<VideoFrameBuffer> CropAndScale(
         int offset_x, int offset_y, int crop_width, int crop_height, int scaled_width, int scaled_height) override;
 
-    Matrix4fv GetTransformMatrix() const
+    const Matrix& GetTransformMatrix() const
     {
         return transformMatrix_;
     }
@@ -116,13 +116,13 @@ public:
     }
 
 protected:
-    TextureBuffer(std::weak_ptr<TextureData> texture, int width, int height, const Matrix4fv& transformMatrix);
+    TextureBuffer(std::weak_ptr<TextureData> texture, int width, int height, const Matrix& transformMatrix);
 
 private:
     std::weak_ptr<TextureData> texture_;
     const int width_;
     const int height_;
-    const Matrix4fv transformMatrix_;
+    const Matrix transformMatrix_;
 };
 
 } // namespace webrtc

@@ -113,7 +113,7 @@ int32_t HardwareVideoDecoder::Decode(const EncodedImage& input_image, bool /*mis
     }
 
     RTC_DLOG(LS_VERBOSE) << "input image, size=" << input_image.size()
-                         << " capture time=" << input_image.capture_time_ms_
+                         << " capture time=" << input_image.capture_time_ms_ << " rotation=" << input_image.rotation()
                          << " rtp timestamp=" << input_image.RtpTimestamp();
 
     ohos::CodecBuffer codecBuffer;
@@ -195,6 +195,7 @@ void HardwareVideoDecoder::OnFrameAvailable(
     rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+    RTC_DLOG(LS_VERBOSE) << "rotation = " << rotation;
 
     FrameExtraInfo extraInfo;
     {

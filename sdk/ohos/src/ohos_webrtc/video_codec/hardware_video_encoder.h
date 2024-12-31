@@ -88,6 +88,7 @@ private:
     struct FrameExtraInfo {
         int64_t timestampUs; // Used as an identifier of the frame.
         uint32_t timestampRtp;
+        VideoRotation rotation;
     };
 
     const std::string codecName_;

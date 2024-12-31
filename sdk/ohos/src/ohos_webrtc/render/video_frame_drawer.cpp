@@ -26,21 +26,25 @@ constexpr int32_t kYuvTextureArrayLength = 3;
 
 namespace webrtc {
 
-void VideoFrameDrawer::DrawFrame(const VideoFrame& frame, GlDrawer& drawer, const Matrix4fv& texMatrix)
+void VideoFrameDrawer::DrawFrame(const VideoFrame& frame, GlDrawer& drawer, const Matrix& additionalRenderMatrix)
 {
-    DrawFrame(frame, drawer, texMatrix, 0, 0, frame.width(), frame.height());
+    DrawFrame(frame, drawer, additionalRenderMatrix, 0, 0, frame.width(), frame.height());
 }
 
 void VideoFrameDrawer::DrawFrame(
-    const VideoFrame& frame, GlDrawer& drawer, const Matrix4fv& texMatrix, int viewportX, int viewportY,
+    const VideoFrame& frame, GlDrawer& drawer, const Matrix& additionalRenderMatrix, int viewportX, int viewportY,
     int viewportWidth, int viewportHeight)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
+    renderMatrix_.Reset();
+    renderMatrix_.PreRotate(frame.rotation(), 0.5f, 0.5f);
+    renderMatrix_.PreConcat(additionalRenderMatrix);
+
     if (frame.is_texture()) {
         auto buffer = static_cast<TextureBuffer*>(frame.video_frame_buffer().get());
         DrawTexture(
-            rtc::scoped_refptr<TextureBuffer>(buffer), drawer, texMatrix, frame.width(), frame.width(), viewportX,
+            rtc::scoped_refptr<TextureBuffer>(buffer), drawer, renderMatrix_, frame.width(), frame.width(), viewportX,
             viewportY, viewportWidth, viewportHeight);
     } else {
         if (yuvTextures_.size() == 0) {
@@ -71,15 +75,16 @@ void VideoFrameDrawer::DrawFrame(
                 planes[i]);
         }
 
+        auto glFinalMatrix = RenderCommon::ConvertMatrixToGLMatrixData(renderMatrix_);
         drawer.DrawYuv(
-            yuvTextures_, texMatrix, frame.width(), frame.height(), viewportX, viewportY, viewportWidth,
+            yuvTextures_, glFinalMatrix, frame.width(), frame.height(), viewportX, viewportY, viewportWidth,
             viewportHeight);
     }
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 }
 
 void VideoFrameDrawer::DrawTexture(
-    rtc::scoped_refptr<TextureBuffer> buffer, GlDrawer& drawer, const Matrix4fv& texMatrix, int frameWidth,
+    rtc::scoped_refptr<TextureBuffer> buffer, GlDrawer& drawer, const Matrix& renderMatrix, int frameWidth,
     int frameHeight, int viewportX, int viewportY, int viewportWidth, int viewportHeight)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
@@ -97,15 +102,19 @@ void VideoFrameDrawer::DrawTexture(
 
     textureData->Lock();
 
+    Matrix finalMatrix = buffer->GetTransformMatrix();
+    finalMatrix.PreConcat(renderMatrix);
+    auto glFinalMatrix = RenderCommon::ConvertMatrixToGLMatrixData(finalMatrix);
+
     switch (textureData->GetType()) {
         case TextureData::Type::OES:
             drawer.DrawOes(
-                textureData->GetId(), texMatrix, frameWidth, frameHeight, viewportX, viewportY, viewportWidth,
+                textureData->GetId(), glFinalMatrix, frameWidth, frameHeight, viewportX, viewportY, viewportWidth,
                 viewportHeight);
             break;
         case TextureData::Type::RGB:
             drawer.DrawRgb(
-                textureData->GetId(), texMatrix, frameWidth, frameHeight, viewportX, viewportY, viewportWidth,
+                textureData->GetId(), glFinalMatrix, frameWidth, frameHeight, viewportX, viewportY, viewportWidth,
                 viewportHeight);
             break;
         default:

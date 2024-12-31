@@ -27,17 +27,18 @@ namespace webrtc {
 
 class VideoFrameDrawer {
 public:
-    void DrawFrame(const VideoFrame& frame, GlDrawer& drawer, const Matrix4fv& texMatrix);
+    void DrawFrame(const VideoFrame& frame, GlDrawer& drawer, const Matrix& additionalRenderMatrix);
     void DrawFrame(
-        const VideoFrame& frame, GlDrawer& drawer, const Matrix4fv& texMatrix, int viewportX, int viewportY,
+        const VideoFrame& frame, GlDrawer& drawer, const Matrix& additionalRenderMatrix, int viewportX, int viewportY,
         int viewportWidth, int viewportHeight);
 
     void DrawTexture(
-        rtc::scoped_refptr<TextureBuffer> buffer, GlDrawer& drawer, const Matrix4fv& texMatrix, int frameWidth,
+        rtc::scoped_refptr<TextureBuffer> buffer, GlDrawer& drawer, const Matrix& renderMatrix, int frameWidth,
         int frameHeight, int viewportX, int viewportY, int viewportWidth, int viewportHeight);
 
 private:
     std::vector<uint32_t> yuvTextures_;
+    Matrix renderMatrix_;
 };
 
 } // namespace webrtc

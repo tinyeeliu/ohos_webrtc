@@ -17,6 +17,8 @@
 #include "../video/video_frame_receiver_gl.h"
 #include "../utils/marcos.h"
 
+#include <ohcamera/camera_device.h>
+
 #include "rtc_base/logging.h"
 
 namespace webrtc {
@@ -140,6 +142,16 @@ void CameraCapturer::StartInternal()
     }
 
     RTC_LOG(LS_VERBOSE) << "device: " << deviceIndex << ", " << device->cameraId;
+    isCameraFrontFacing_ = device->cameraPosition == CAMERA_POSITION_FRONT;
+
+    uint32_t orientation = 0;
+    Camera_ErrorCode ret = OH_CameraDevice_GetCameraOrientation(device, &orientation);
+    if (ret == CAMERA_OK) {
+        RTC_DLOG(LS_VERBOSE) << "camera orientation: " << orientation;
+        cameraOrientation_ = orientation;
+    } else {
+        RTC_LOG(LS_ERROR) << "Failed to get camera orientation";
+    }
 
     auto sceneModes = CameraManager::GetInstance().GetSupportedSceneModes(device);
     for (std::size_t i = 0; i < sceneModes.Size(); i++) {
@@ -158,7 +170,8 @@ void CameraCapturer::StartInternal()
         RTC_DLOG(LS_VERBOSE) << "preview size: " << p->size.width << "x" << p->size.height;
 
         if (profile_.format == NativeCameraFormatToPixelFormat(p->format) &&
-            profile_.resolution.width == p->size.width && profile_.resolution.height == p->size.height) {
+            profile_.resolution.width == p->size.width && profile_.resolution.height == p->size.height)
+        {
             previewProfile = p;
             break;
         }
@@ -291,9 +304,34 @@ void CameraCapturer::OnFrameAvailable(
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
+    (void)rotation;
+    int32_t cameraOrientation = cameraOrientation_;
+    if (cameraOrientation % VideoRotation::kVideoRotation_90 != 0) {
+        RTC_LOG(LS_WARNING) << "rotation must be a multiple of 90: " << cameraOrientation;
+        cameraOrientation = 0;
+    }
+
+    // Undo the mirror that the OS "helps" us with.
+    // Also, undo camera orientation, we report it as rotation instead.
+    if (buffer->type() == VideoFrameBuffer::Type::kNative) {
+        auto textureBuffer = static_cast<TextureBuffer*>(buffer.get());
+
+        Matrix transformMatrix;
+        // Perform mirror and rotation around (0.5, 0.5) since that is the center of the texture.
+        if (isCameraFrontFacing_) {
+            transformMatrix.PreScale(-1.0f, 1.0f, 0.5f, 0.5f);
+        }
+        transformMatrix.PreRotate(-cameraOrientation, 0.5f, 0.5f);
+
+        Matrix newMatrix = textureBuffer->GetTransformMatrix();
+        newMatrix.PreConcat(transformMatrix);
+        buffer = TextureBuffer::Create(
+            textureBuffer->GetTexture(), textureBuffer->width(), textureBuffer->height(), newMatrix);
+    }
+
     UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
     if (observer_) {
-        observer_->OnFrameCaptured(buffer, timestampUs, rotation);
+        observer_->OnFrameCaptured(buffer, timestampUs, static_cast<VideoRotation>(cameraOrientation));
     }
 }
 
