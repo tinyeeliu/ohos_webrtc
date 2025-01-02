@@ -166,12 +166,14 @@ void VideoFrameReceiverGl::OnNativeImageFrameAvailable()
     auto matrix = nativeImage_.GetTransformMatrix();
     RTC_DLOG(LS_VERBOSE) << "timestamp: " << timestamp;
 
+    auto timestampUs = timestampConverter_.Convert(timestamp);
+    RTC_DLOG(LS_VERBOSE) << "timestampUs=" << timestampUs;
+
     // create video frame
     auto buffer = TextureBuffer::Create(textureData_, width_, height_, matrix);
 
     if (callback_) {
-        callback_->OnFrameAvailable(
-            buffer, timestamp > 0 ? (timestamp / rtc::kNumNanosecsPerMicrosec) : rtc::TimeMicros(), kVideoRotation_0);
+        callback_->OnFrameAvailable(buffer, timestampUs > 0 ? timestampUs : rtc::TimeMicros(), kVideoRotation_0);
     }
 }
 

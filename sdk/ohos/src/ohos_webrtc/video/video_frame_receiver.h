@@ -24,6 +24,46 @@
 
 namespace webrtc {
 
+template <typename From, typename To, typename Rep = int64_t>
+constexpr Rep TimestampCast(Rep timestamp)
+{
+    using CF = std::ratio_divide<From, To>;
+
+    constexpr bool numIsOne = CF::num == 1;
+    constexpr bool denIsOne = CF::den == 1;
+
+    if constexpr (denIsOne) {
+        if constexpr (numIsOne) {
+            return timestamp;
+        } else {
+            return timestamp * CF::num;
+        }
+    } else {
+        if constexpr (numIsOne) {
+            return timestamp / CF::den;
+        } else {
+            return timestamp * CF::num / CF::den;
+        }
+    }
+}
+
+class TimestampConverter {
+public:
+    TimestampConverter() {}
+    explicit TimestampConverter(std::function<int64_t(int64_t)> converter) : converter_(std::move(converter)) {}
+
+    int64_t Convert(int64_t timestamp)
+    {
+        if (converter_) {
+            return converter_(timestamp);
+        }
+        return timestamp;
+    }
+
+private:
+    std::function<int64_t(int64_t)> converter_;
+};
+
 class VideoFrameReceiver {
 public:
     class Callback {
@@ -42,8 +82,16 @@ public:
         callback_ = observer;
     }
 
+    void SetTimestampConverter(TimestampConverter timestampConverter)
+    {
+        timestampConverter_ = std::move(timestampConverter);
+    }
+
 protected:
     Callback* callback_{};
+    // Adapt with different timestamp units from different sources, such as camera and video decoder,
+    // do nothing by Default.
+    TimestampConverter timestampConverter_;
 };
 
 } // namespace webrtc
