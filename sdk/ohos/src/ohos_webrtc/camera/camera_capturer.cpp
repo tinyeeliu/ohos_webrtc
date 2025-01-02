@@ -69,6 +69,8 @@ void CameraCapturer::Init(std::unique_ptr<VideoFrameReceiver> dataReceiver, Vide
     dataReceiver_ = std::move(dataReceiver);
     dataReceiver_->SetVideoFrameSize(profile_.resolution.width, profile_.resolution.height);
     dataReceiver_->SetCallback(this);
+    dataReceiver_->SetTimestampConverter(
+        TimestampConverter([](int64_t timestamp) { return TimestampCast<std::nano, std::micro>(timestamp); }));
 
     isInitialized_ = true;
 }
