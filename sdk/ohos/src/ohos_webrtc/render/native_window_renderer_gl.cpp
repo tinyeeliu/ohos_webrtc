@@ -109,7 +109,7 @@ void NativeWindowRendererGl::OnFrame(const VideoFrame& frame)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " this=" << this;
     RTC_DLOG(LS_VERBOSE) << "render frame, id=" << frame.id() << " size=" << frame.width() << "x" << frame.height()
-                         << ", timestamp=" << frame.timestamp_us();
+                         << ", timestamp=" << frame.timestamp_us() << ", rotation=" << frame.rotation();
 
     if (!frame.video_frame_buffer()) {
         RTC_LOG(LS_ERROR) << "Buffer is null";
@@ -120,8 +120,7 @@ void NativeWindowRendererGl::OnFrame(const VideoFrame& frame)
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        drawMatrix_ = kMatrix4fv_Identity;
-        drawMatrix_[5] = -1.0f; // turn upside down
+        drawMatrix_.Reset();
         videoFrameDrawer_->DrawFrame(
             frame, *textureDrawer_, drawMatrix_, 0, 0, eglEnv_->GetSurfaceWidth(), eglEnv_->GetSurfaceHeight());
         eglEnv_->SwapBuffers();

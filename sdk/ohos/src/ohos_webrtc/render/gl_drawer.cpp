@@ -25,8 +25,8 @@ namespace webrtc {
 namespace {
 
 static constexpr char DEFAULT_VERTEX_SHADER[] = R"(
-attribute vec3 position;
-attribute vec2 texCoord;
+attribute vec4 position;
+attribute vec4 texCoord;
 
 varying vec2 vTexCoord;
 
@@ -34,8 +34,8 @@ uniform mat4 transform;
 
 void main()
 {
-    gl_Position = transform * vec4(position, 1.0);
-    vTexCoord = texCoord;
+    gl_Position = position;
+    vTexCoord = (transform * texCoord).xy;
 }
 )";
 
@@ -115,7 +115,7 @@ GlGenericDrawer::GlGenericDrawer() = default;
 GlGenericDrawer::~GlGenericDrawer() = default;
 
 void GlGenericDrawer::DrawOes(
-    int oesTextureId, const Matrix4fv& texMatrix, int frameWidth, int frameHeight, int viewportX, int viewportY,
+    int oesTextureId, const GLMatrixData& texMatrix, int frameWidth, int frameHeight, int viewportX, int viewportY,
     int viewportWidth, int viewportHeight)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
@@ -135,7 +135,7 @@ void GlGenericDrawer::DrawOes(
 }
 
 void GlGenericDrawer::DrawRgb(
-    int textureId, const Matrix4fv& texMatrix, int frameWidth, int frameHeight, int viewportX, int viewportY,
+    int textureId, const GLMatrixData& texMatrix, int frameWidth, int frameHeight, int viewportX, int viewportY,
     int viewportWidth, int viewportHeight)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
@@ -155,7 +155,7 @@ void GlGenericDrawer::DrawRgb(
 }
 
 void GlGenericDrawer::DrawYuv(
-    std::vector<uint32_t> yuvTextures, const Matrix4fv& texMatrix, int frameWidth, int frameHeight, int viewportX,
+    std::vector<uint32_t> yuvTextures, const GLMatrixData& texMatrix, int frameWidth, int frameHeight, int viewportX,
     int viewportY, int viewportWidth, int viewportHeight)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
@@ -182,7 +182,7 @@ void GlGenericDrawer::DrawYuv(
 }
 
 void GlGenericDrawer::PrepareShader(
-    ShaderType shaderType, const Matrix4fv& texMatrix, int frameWidth, int frameHeight, int viewportWidth,
+    ShaderType shaderType, const GLMatrixData& texMatrix, int frameWidth, int frameHeight, int viewportWidth,
     int viewportHeight)
 {
     if (shaderType != currentShaderType_) {

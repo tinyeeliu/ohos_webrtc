@@ -12,6 +12,7 @@ ReferenceAlignment: Left
 CompactNamespaces: false
 AllowShortFunctionsOnASingleLine: Empty
 AllowShortIfStatementsOnASingleLine: false
+AllowShortEnumsOnASingleLine: false
 AlignAfterOpenBracket: AlwaysBreak
 BreakConstructorInitializers: BeforeColon
 AlwaysBreakTemplateDeclarations: true

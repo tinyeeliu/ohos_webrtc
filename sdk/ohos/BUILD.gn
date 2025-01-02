@@ -70,6 +70,7 @@ if (is_ohos) {
         "$ohos_webrtc_src_path/render/egl_env.cpp",
         "$ohos_webrtc_src_path/render/gl_drawer.cpp",
         "$ohos_webrtc_src_path/render/gl_shader.cpp",
+        "$ohos_webrtc_src_path/render/matrix.cpp",
         "$ohos_webrtc_src_path/render/native_video_renderer.cpp",
         "$ohos_webrtc_src_path/render/native_window_renderer.cpp",
         "$ohos_webrtc_src_path/render/native_window_renderer_gl.cpp",
@@ -105,29 +106,24 @@ if (is_ohos) {
         "NODE_ADDON_API_ENABLE_TYPE_CHECK_ON_AS",
     ]
 
-    cflags = [
-        "-g",
-        "-O0",
-    ]
-
-    ldflags = [
-        "-lace_napi.z",
-        "-lhilog_ndk.z",
-        "-lohaudio",
-        "-lohcamera",
-        "-lohimage",
-        "-limage_receiver",
-        "-lnative_buffer",
-        "-lnative_window",
-        "-lnative_image",
-        "-lEGL",
-        "-lGLESv3",
-        "-lnative_media_codecbase",
-        "-lnative_media_core",
-        "-lnative_media_venc",
-        "-lnative_media_vdec",
-        "-lnative_avscreen_capture",
-        # "-static-libstdc++",
+    libs = [
+      "ace_napi.z",
+      "hilog_ndk.z",
+      "ohaudio",
+      "ohcamera",
+      "ohimage",
+      "image_receiver",
+      "native_buffer",
+      "native_window",
+      "native_image",
+      "EGL",
+      "GLESv3",
+      "native_media_codecbase",
+      "native_media_core",
+      "native_media_venc",
+      "native_media_vdec",
+      "native_avscreen_capture",
+      "native_drawing",
     ]
 
     deps = [

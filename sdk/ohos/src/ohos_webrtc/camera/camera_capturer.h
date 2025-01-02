@@ -77,6 +77,8 @@ private:
     bool isStarted_{false};
 
     bool useVideoSceneMode_{false};
+    bool isCameraFrontFacing_{false};
+    uint32_t cameraOrientation_{0};
 
     ohos::CameraInput input_;
     ohos::CameraPreviewOutput previewOutput_;
