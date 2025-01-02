@@ -25,6 +25,7 @@
 #include "media/base/video_broadcaster.h"
 #include "rtc_base/synchronization/mutex.h"
 #include "rtc_base/thread.h"
+#include "rtc_base/timestamp_aligner.h"
 
 #include <optional>
 
@@ -99,6 +100,7 @@ private:
     std::optional<Stats> stats_ RTC_GUARDED_BY(statsMutex_);
     std::mutex obsMutex_;
     VideoCapturer::Observer* capturerObserver_{};
+    rtc::TimestampAligner timestampAligner_;
 };
 
 } // namespace webrtc

@@ -253,6 +253,8 @@ void OhosVideoTrackSource::OnFrameCaptured(
     rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " timestampUs=" << timestampUs << ", rotation=" << rotation;
+    auto alignedTimestampUs = timestampAligner_.TranslateTimestamp(timestampUs, rtc::TimeMicros());
+    RTC_DLOG(LS_VERBOSE) << "alignedTimestampUs=" << alignedTimestampUs;
 
     int adapted_width = 0;
     int adapted_height = 0;
@@ -292,7 +294,7 @@ void OhosVideoTrackSource::OnFrameCaptured(
     auto frame = VideoFrame::Builder()
                      .set_video_frame_buffer(buffer)
                      .set_rotation(rotation)
-                     .set_timestamp_us(timestampUs)
+                     .set_timestamp_us(alignedTimestampUs)
                      .build();
 
     if (ApplyRotation() && frame.rotation() != kVideoRotation_0 && buffer->type() == VideoFrameBuffer::Type::kI420) {

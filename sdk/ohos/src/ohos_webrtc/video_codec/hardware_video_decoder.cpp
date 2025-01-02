@@ -401,8 +401,7 @@ void HardwareVideoDecoder::DeliverTextureFrame(const ohos::CodecBuffer& buffer)
                          << ", pts=" << attr.pts;
 
     RTC_DLOG(LS_VERBOSE) << "render output buffer, index=" << buffer.index;
-    ret =
-        OH_VideoDecoder_RenderOutputBufferAtTime(decoder_.Raw(), buffer.index, attr.pts * rtc::kNumNanosecsPerMicrosec);
+    ret = OH_VideoDecoder_RenderOutputBuffer(decoder_.Raw(), buffer.index);
     if (ret != AV_ERR_OK) {
         RTC_LOG(LS_ERROR) << "Failed to render output buffer" << ret;
     }
