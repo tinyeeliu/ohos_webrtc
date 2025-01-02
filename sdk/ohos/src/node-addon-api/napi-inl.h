@@ -4835,6 +4835,13 @@ inline napi_value ObjectWrap<T>::ConstructorCallbackWrapper(
       instance->_construction_failed = false;
     }
 #endif  // NAPI_CPP_EXCEPTIONS
+
+#if defined(__OHOS__)
+    // napi_wrap return a strong reference in OpenHarmony, so we unref it here to stay consistent with the standards.
+    // see https://docs.openharmony.cn/pages/v5.0/zh-cn/application-dev/reference/native-lib/napi.md#napiwrap
+    instance->Unref();
+#endif
+
     return callbackInfo.This();
   });
 
