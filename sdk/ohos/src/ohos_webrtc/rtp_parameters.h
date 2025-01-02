@@ -43,6 +43,8 @@ struct NapiRtpCodecCapability {
 };
 
 struct NapiRtpEncodingParameters {
+    constexpr static char kAttributeNameSsrc[] = "ssrc";
+
     static void JsToNative(const Napi::Object& js, RtpEncodingParameters& native);
     static void NativeToJs(const RtpEncodingParameters& native, Napi::Object& js);
 };
