@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-import webrtc, { Logging, LoggingSeverity, VideoRenderController } from 'ohos_webrtc';
+import webrtc, { Logging, LoggingSeverity, VideoRenderController, ScalingMode } from 'ohos_webrtc';
 import abilityAccessCtrl, { PermissionRequestResult } from '@ohos.abilityAccessCtrl';
 import webSocket from '@ohos.net.webSocket';
 import promptAction from '@ohos.promptAction';
@@ -100,8 +100,8 @@ struct Index {
 
       Row() {
         TextInput({ placeholder: '请输入对端ID' })
-          .width('300px')
-          .height('54px')
+          .width(200)
+          .height(54)
           .fontSize(28)
           .fontWeight(FontWeight.Normal)
           .type(InputType.Number)
@@ -111,9 +111,9 @@ struct Index {
           })
 
         Button(this.buttonTitle)
-          .width('240px')
-          .height('54px')
-          .fontSize(28)
+          .width(150)
+          .height(54)
+          .fontSize(20)
           .fontWeight(FontWeight.Bold)
           .margin({ top: 20 })
           .onClick(() => {
@@ -131,7 +131,7 @@ struct Index {
             this.sendMessage('SESSION ' + this.peerId);
             this.buttonTitle = 'Disconnect';
           })
-          .margin({ left: 24, right: 24 })
+          .margin({ left: 10, right: 20 })
 
         Row() {
           Checkbox({ name: 'remote_offerer', group: 'checkboxGroup' })
@@ -159,7 +159,6 @@ struct Index {
         })
           .width('640px')
           .height('480px')
-          .padding({right: 10})
           .onLoad((context?) => {
             console.log(TAG, "context: " + context);
             console.log(TAG, "surfaceId: " + this.mXComponentController1.getXComponentSurfaceId());
@@ -376,6 +375,9 @@ struct Index {
       if (this.localVideoTrack) {
         this.mXComponentController1.setVideoTrack(this.localVideoTrack);
       }
+
+      this.mXComponentController1.setMirror(true);
+      this.mXComponentController1.setScalingMode(ScalingMode.AspectFit);
     }
   }
 

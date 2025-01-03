@@ -39,6 +39,9 @@ void NapiNativeVideoRenderer::Init(Napi::Env env, Napi::Object exports)
             InstanceAccessor<&NapiNativeVideoRenderer::GetSharedContext>(kAttributeNameSharedContext),
             InstanceAccessor<&NapiNativeVideoRenderer::GetVideoTrack>(kAttributeNameVideoTrack),
             InstanceMethod<&NapiNativeVideoRenderer::SetVideoTrack>(kMethodNameSetVideoTrack),
+            InstanceMethod<&NapiNativeVideoRenderer::SetMirror>(kMethodNameSetMirror),
+            InstanceMethod<&NapiNativeVideoRenderer::SetMirrorVertically>(kMethodNameSetMirrorVertically),
+            InstanceMethod<&NapiNativeVideoRenderer::SetScalingMode>(kMethodNameSetScalingMode),
             InstanceMethod<&NapiNativeVideoRenderer::Init>(kMethodNameInit),
             InstanceMethod<&NapiNativeVideoRenderer::Release>(kMethodNameRelease),
             InstanceMethod<&NapiNativeVideoRenderer::ToJson>(kMethodNameToJson),
@@ -167,6 +170,64 @@ Napi::Value NapiNativeVideoRenderer::Release(const Napi::CallbackInfo& info)
     surfaceId_.reset();
     renderer_.reset();
     jsTrackRef_.Reset();
+
+    return info.Env().Undefined();
+}
+
+Napi::Value NapiNativeVideoRenderer::SetMirror(const Napi::CallbackInfo& info)
+{
+    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
+
+    if (info.Length() < 1) {
+        NAPI_THROW(Error::New(info.Env(), "Wrong number of arguments"), info.Env().Undefined());
+    }
+
+    if (!info[0].IsBoolean()) {
+        NAPI_THROW(Error::New(info.Env(), "The first argument is not boolean"), info.Env().Undefined());
+    }
+
+    if (renderer_) {
+        renderer_->SetMirrorHorizontally(info[0].As<Boolean>().Value());
+    }
+
+    return info.Env().Undefined();
+}
+
+Napi::Value NapiNativeVideoRenderer::SetMirrorVertically(const Napi::CallbackInfo& info)
+{
+    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
+
+    if (info.Length() < 1) {
+        NAPI_THROW(Error::New(info.Env(), "Wrong number of arguments"), info.Env().Undefined());
+    }
+
+    if (!info[0].IsBoolean()) {
+        NAPI_THROW(Error::New(info.Env(), "The first argument is not boolean"), info.Env().Undefined());
+    }
+
+    if (renderer_) {
+        renderer_->SetMirrorVertically(info[0].As<Boolean>().Value());
+    }
+
+    return info.Env().Undefined();
+}
+
+Napi::Value NapiNativeVideoRenderer::SetScalingMode(const Napi::CallbackInfo& info)
+{
+    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
+
+    if (info.Length() < 1) {
+        NAPI_THROW(Error::New(info.Env(), "Wrong number of arguments"), info.Env().Undefined());
+    }
+
+    if (!info[0].IsNumber()) {
+        NAPI_THROW(Error::New(info.Env(), "The first argument is not number"), info.Env().Undefined());
+    }
+
+    auto mode = info[0].As<Number>().Int32Value();
+    if (renderer_) {
+        renderer_->SetScalingMode(static_cast<NativeWindowRenderer::ScalingMode>(mode));
+    }
 
     return info.Env().Undefined();
 }

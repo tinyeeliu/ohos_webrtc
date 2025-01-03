@@ -841,6 +841,9 @@ export interface NativeVideoRenderer {
 
   init(surfaceId: string): void;
   setVideoTrack(videoTrack: MediaStreamTrack | null): void;
+  setMirror(mirrorHorizontally: boolean): void;
+  setMirrorVertically(mirrorVertically: boolean): void;
+  setScalingMode(mode: number): void;
   release(): void;
 }
 
