@@ -47,20 +47,20 @@ std::vector<CameraDeviceInfo> CameraEnumerator::GetDevices()
                 device.facingMode = FacingMode::kEnvironment;
                 break;
             default:
+                device.facingMode = FacingMode::kNone;
                 break;
         }
 
         auto capability = ohos::CameraManager::GetInstance().GetSupportedCameraOutputCapability(camera);
-        for (uint32_t j = 0; j < capability.VideoProfileSize(); j++) {
-            Camera_VideoProfile* profile = capability.GetVideoProfile(j);
-            RTC_DLOG(LS_VERBOSE) << "video format: " << profile->format;
-            RTC_DLOG(LS_VERBOSE) << "video size: " << profile->size.width << "x" << profile->size.height;
-            RTC_DLOG(LS_VERBOSE) << "video fps: " << profile->range.min << "-" << profile->range.max;
+        for (uint32_t j = 0; j < capability.PreviewProfileSize(); j++) {
+            Camera_Profile* profile = capability.GetPreviewProfile(j);
+            RTC_DLOG(LS_VERBOSE) << "preview format: " << profile->format;
+            RTC_DLOG(LS_VERBOSE) << "preview size: " << profile->size.width << "x" << profile->size.height;
 
             video::VideoProfile p;
             p.format = NativeCameraFormatToPixelFormat(profile->format);
             p.resolution = video::Resolution{profile->size.width, profile->size.height};
-            p.frameRateRange = video::FrameRateRange{profile->range.min, profile->range.max};
+            p.frameRateRange = video::FrameRateRange{0, UINT_MAX}; // equivalently to ignore 'frameRate' constraints
             device.profiles.push_back(p);
         }
 

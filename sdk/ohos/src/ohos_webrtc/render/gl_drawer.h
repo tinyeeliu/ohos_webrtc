@@ -26,14 +26,14 @@ public:
     virtual ~GlDrawer() = default;
 
     virtual void DrawOes(
-        int oesTextureId, const Matrix4fv& texMatrix, int frameWidth, int frameHeight, int viewportX, int viewportY,
+        int oesTextureId, const GLMatrixData& texMatrix, int frameWidth, int frameHeight, int viewportX, int viewportY,
         int viewportWidth, int viewportHeight) = 0;
     virtual void DrawRgb(
-        int textureId, const Matrix4fv& texMatrix, int frameWidth, int frameHeight, int viewportX, int viewportY,
+        int textureId, const GLMatrixData& texMatrix, int frameWidth, int frameHeight, int viewportX, int viewportY,
         int viewportWidth, int viewportHeight) = 0;
     virtual void DrawYuv(
-        std::vector<uint32_t> yuvTextures, const Matrix4fv& texMatrix, int frameWidth, int frameHeight, int viewportX,
-        int viewportY, int viewportWidth, int viewportHeight) = 0;
+        std::vector<uint32_t> yuvTextures, const GLMatrixData& texMatrix, int frameWidth, int frameHeight,
+        int viewportX, int viewportY, int viewportWidth, int viewportHeight) = 0;
 };
 
 class GlGenericDrawer : public GlDrawer {
@@ -49,18 +49,18 @@ public:
     ~GlGenericDrawer() override;
 
     void DrawOes(
-        int oesTextureId, const Matrix4fv& texMatrix, int frameWidth, int frameHeight, int viewportX, int viewportY,
+        int oesTextureId, const GLMatrixData& texMatrix, int frameWidth, int frameHeight, int viewportX, int viewportY,
         int viewportWidth, int viewportHeight) override;
     void DrawRgb(
-        int textureId, const Matrix4fv& texMatrix, int frameWidth, int frameHeight, int viewportX, int viewportY,
+        int textureId, const GLMatrixData& texMatrix, int frameWidth, int frameHeight, int viewportX, int viewportY,
         int viewportWidth, int viewportHeight) override;
     void DrawYuv(
-        std::vector<uint32_t> yuvTextures, const Matrix4fv& texMatrix, int frameWidth, int frameHeight, int viewportX,
-        int viewportY, int viewportWidth, int viewportHeight) override;
+        std::vector<uint32_t> yuvTextures, const GLMatrixData& texMatrix, int frameWidth, int frameHeight,
+        int viewportX, int viewportY, int viewportWidth, int viewportHeight) override;
 
 protected:
     void PrepareShader(
-        ShaderType shaderType, const Matrix4fv& texMatrix, int frameWidth, int frameHeight, int viewportWidth,
+        ShaderType shaderType, const GLMatrixData& texMatrix, int frameWidth, int frameHeight, int viewportWidth,
         int viewportHeight);
     std::unique_ptr<GlShader> CreateShader(ShaderType shaderType);
 

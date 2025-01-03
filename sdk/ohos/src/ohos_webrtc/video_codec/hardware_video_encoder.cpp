@@ -191,7 +191,7 @@ int32_t HardwareVideoEncoder::RegisterEncodeCompleteCallback(EncodedImageCallbac
 int32_t HardwareVideoEncoder::Encode(const VideoFrame& frame, const std::vector<VideoFrameType>* frame_types)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " frame size=" << frame.width() << "x" << frame.height()
-                         << ", pts=" << frame.timestamp_us();
+                         << ", pts=" << frame.timestamp_us() << ", rotation=" << frame.rotation();
 
     if (!initialized_) {
         RTC_LOG(LS_ERROR) << "Not initialized";
@@ -220,6 +220,7 @@ int32_t HardwareVideoEncoder::Encode(const VideoFrame& frame, const std::vector<
     FrameExtraInfo info;
     info.timestampUs = frame.timestamp_us();
     info.timestampRtp = frame.timestamp();
+    info.rotation = frame.rotation();
     {
         UNUSED std::lock_guard<std::mutex> lock(extraInfosMutex_);
         extraInfos_.push_back(info);
@@ -451,6 +452,7 @@ void HardwareVideoEncoder::OnNewOutputBuffer(OH_AVCodec* codec, uint32_t index, 
     encodedImage._encodedWidth = codecSettings_.width;
     encodedImage._encodedHeight = codecSettings_.height;
     encodedImage.capture_time_ms_ = timestampUs / rtc::kNumMicrosecsPerMillisec;
+    encodedImage.rotation_ = extraInfo.rotation;
     encodedImage.SetRtpTimestamp(extraInfo.timestampRtp);
     encodedImage.SetEncodedData(encodedData);
     encodedImage.set_size(encodedData->size());
@@ -518,9 +520,12 @@ int32_t HardwareVideoEncoder::EncodeTextureBuffer(const VideoFrame& frame)
 
     glClear(GL_COLOR_BUFFER_BIT);
 
-    Matrix4fv matrix = kMatrix4fv_Identity;
-    matrix[5] = -1.0f; // turn upside down
-    videoFrameDrawer_->DrawFrame(frame, *textureDrawer_, matrix);
+    VideoFrame derotatedFrame = VideoFrame::Builder()
+                                    .set_video_frame_buffer(frame.video_frame_buffer())
+                                    .set_rotation(kVideoRotation_0)
+                                    .set_timestamp_us(frame.timestamp_us())
+                                    .build();
+    videoFrameDrawer_->DrawFrame(derotatedFrame, *textureDrawer_, Matrix());
 
     if (!eglEnv_->SwapBuffers(frame.timestamp_us() * rtc::kNumNanosecsPerMicrosec)) {
         return WEBRTC_VIDEO_CODEC_ERROR;

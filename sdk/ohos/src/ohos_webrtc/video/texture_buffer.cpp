@@ -22,13 +22,12 @@
 namespace webrtc {
 
 rtc::scoped_refptr<TextureBuffer>
-TextureBuffer::Create(std::weak_ptr<TextureData> texture, int width, int height, const Matrix4fv& transformMatrix)
+TextureBuffer::Create(std::weak_ptr<TextureData> texture, int width, int height, const Matrix& transformMatrix)
 {
     return rtc::make_ref_counted<TextureBuffer>(texture, width, height, transformMatrix);
 }
 
-TextureBuffer::TextureBuffer(
-    std::weak_ptr<TextureData> texture, int width, int height, const Matrix4fv& transformMatrix)
+TextureBuffer::TextureBuffer(std::weak_ptr<TextureData> texture, int width, int height, const Matrix& transformMatrix)
     : texture_(texture), width_(width), height_(height), transformMatrix_(transformMatrix)
 {
     RTC_DLOG(LS_VERBOSE) << "TextureBuffer ctor";

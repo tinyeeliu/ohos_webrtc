@@ -163,14 +163,16 @@ void VideoFrameReceiverGl::OnNativeImageFrameAvailable()
 
     // 获取最近调用OH_NativeImage_UpdateSurfaceImage的纹理图像的时间戳和变化矩阵。
     auto timestamp = nativeImage_.GetTimestamp();
-    auto matrix = nativeImage_.GetTransformMatrix();
+    auto matrix = nativeImage_.GetTransformMatrixV2();
     RTC_DLOG(LS_VERBOSE) << "timestamp: " << timestamp;
+    RTC_DLOG(LS_VERBOSE) << "matrix: " << RenderCommon::DumpGLMatrixDataToString(matrix);
 
     auto timestampUs = timestampConverter_.Convert(timestamp);
     RTC_DLOG(LS_VERBOSE) << "timestampUs=" << timestampUs;
 
     // create video frame
-    auto buffer = TextureBuffer::Create(textureData_, width_, height_, matrix);
+    auto buffer =
+        TextureBuffer::Create(textureData_, width_, height_, RenderCommon::ConvertGLMatrixDataToMatrix(matrix));
 
     if (callback_) {
         callback_->OnFrameAvailable(buffer, timestampUs > 0 ? timestampUs : rtc::TimeMicros(), kVideoRotation_0);

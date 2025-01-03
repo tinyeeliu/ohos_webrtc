@@ -59,7 +59,7 @@ private:
 
     std::unique_ptr<EglEnv> eglEnv_;
 
-    Matrix4fv drawMatrix_;
+    Matrix drawMatrix_;
     std::unique_ptr<GlDrawer> textureDrawer_;
     std::unique_ptr<VideoFrameDrawer> videoFrameDrawer_;
 };

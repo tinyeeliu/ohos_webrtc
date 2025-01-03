@@ -28,15 +28,15 @@ namespace webrtc {
 namespace {
 
 static constexpr char DEFAULT_VERTEX_SHADER[] = R"(
-attribute vec3 position;
-attribute vec2 texCoord;
+attribute vec4 position;
+attribute vec4 texCoord;
 varying vec2 vTexCoord;
 uniform mat4 transform;
 
 void main()
 {
-    gl_Position = transform * vec4(position, 1.0);
-    vTexCoord = texCoord;
+    gl_Position = position;
+    vTexCoord = (transform * texCoord).xy;
 }
 )";
 
@@ -142,21 +142,21 @@ public:
     ~GlConverterDrawer() override = default;
 
     void DrawOes(
-        int oesTextureId, const Matrix4fv& texMatrix, int frameWidth, int frameHeight, int viewportX, int viewportY,
+        int oesTextureId, const GLMatrixData& texMatrix, int frameWidth, int frameHeight, int viewportX, int viewportY,
         int viewportWidth, int viewportHeight) override;
     void DrawRgb(
-        int textureId, const Matrix4fv& texMatrix, int frameWidth, int frameHeight, int viewportX, int viewportY,
+        int textureId, const GLMatrixData& texMatrix, int frameWidth, int frameHeight, int viewportX, int viewportY,
         int viewportWidth, int viewportHeight) override;
     void DrawYuv(
-        std::vector<uint32_t> yuvTextures, const Matrix4fv& texMatrix, int frameWidth, int frameHeight, int viewportX,
-        int viewportY, int viewportWidth, int viewportHeight) override;
+        std::vector<uint32_t> yuvTextures, const GLMatrixData& texMatrix, int frameWidth, int frameHeight,
+        int viewportX, int viewportY, int viewportWidth, int viewportHeight) override;
 
     void SetStepSize(float stepSize);
     void SetCoefficients(std::array<float, kCoefficientsNum> coefficients);
 
 protected:
     void PrepareShader(
-        ShaderType shaderType, const Matrix4fv& texMatrix, int frameWidth, int frameHeight, int viewportWidth,
+        ShaderType shaderType, const GLMatrixData& texMatrix, int frameWidth, int frameHeight, int viewportWidth,
         int viewportHeight);
     std::unique_ptr<GlShader> CreateShader(ShaderType shaderType);
 
@@ -173,7 +173,7 @@ private:
 };
 
 void GlConverterDrawer::DrawOes(
-    int oesTextureId, const Matrix4fv& texMatrix, int frameWidth, int frameHeight, int viewportX, int viewportY,
+    int oesTextureId, const GLMatrixData& texMatrix, int frameWidth, int frameHeight, int viewportX, int viewportY,
     int viewportWidth, int viewportHeight)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
@@ -193,7 +193,7 @@ void GlConverterDrawer::DrawOes(
 }
 
 void GlConverterDrawer::DrawRgb(
-    int textureId, const Matrix4fv& texMatrix, int frameWidth, int frameHeight, int viewportX, int viewportY,
+    int textureId, const GLMatrixData& texMatrix, int frameWidth, int frameHeight, int viewportX, int viewportY,
     int viewportWidth, int viewportHeight)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
@@ -213,7 +213,7 @@ void GlConverterDrawer::DrawRgb(
 }
 
 void GlConverterDrawer::DrawYuv(
-    std::vector<uint32_t> yuvTextures, const Matrix4fv& texMatrix, int frameWidth, int frameHeight, int viewportX,
+    std::vector<uint32_t> yuvTextures, const GLMatrixData& texMatrix, int frameWidth, int frameHeight, int viewportX,
     int viewportY, int viewportWidth, int viewportHeight)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
@@ -250,7 +250,7 @@ void GlConverterDrawer::SetCoefficients(std::array<float, kCoefficientsNum> coef
 }
 
 void GlConverterDrawer::PrepareShader(
-    ShaderType shaderType, const Matrix4fv& texMatrix, int frameWidth, int frameHeight, int viewportWidth,
+    ShaderType shaderType, const GLMatrixData& texMatrix, int frameWidth, int frameHeight, int viewportWidth,
     int viewportHeight)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
@@ -512,7 +512,8 @@ rtc::scoped_refptr<I420BufferInterface> YuvConverter::Convert(rtc::scoped_refptr
         return nullptr;
     }
 
-    Matrix4fv renderMatrix = kMatrix4fv_Identity;
+    Matrix renderMatrix;
+    renderMatrix.PreScale(1.0f, -1.0f, 0.0f, 0.0f);
 
     // Draw Y
     drawer_->SetStepSize(1.0f);

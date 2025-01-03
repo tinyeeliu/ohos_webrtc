@@ -17,6 +17,8 @@
 #include "../video/video_frame_receiver_gl.h"
 #include "../utils/marcos.h"
 
+#include <ohcamera/camera_device.h>
+
 #include "rtc_base/logging.h"
 
 namespace webrtc {
@@ -142,45 +144,38 @@ void CameraCapturer::StartInternal()
     }
 
     RTC_LOG(LS_VERBOSE) << "device: " << deviceIndex << ", " << device->cameraId;
+    isCameraFrontFacing_ = device->cameraPosition == CAMERA_POSITION_FRONT;
+
+    uint32_t orientation = 0;
+    Camera_ErrorCode ret = OH_CameraDevice_GetCameraOrientation(device, &orientation);
+    if (ret == CAMERA_OK) {
+        RTC_DLOG(LS_VERBOSE) << "camera orientation: " << orientation;
+        cameraOrientation_ = orientation;
+    } else {
+        RTC_LOG(LS_ERROR) << "Failed to get camera orientation";
+    }
 
     auto sceneModes = CameraManager::GetInstance().GetSupportedSceneModes(device);
     for (std::size_t i = 0; i < sceneModes.Size(); i++) {
         RTC_DLOG(LS_VERBOSE) << "supported scene mode: " << sceneModes[i];
         if (sceneModes[i] == NORMAL_VIDEO) {
-            // video scene mode is supported
+            useVideoSceneMode_ = true;
         }
     }
 
     Camera_Profile* previewProfile = nullptr;
     Camera_VideoProfile* videoProfile = nullptr;
     auto capability = CameraManager::GetInstance().GetSupportedCameraOutputCapability(device);
-    if (useVideoSceneMode_) {
-        for (uint32_t i = 0; i < capability.VideoProfileSize(); i++) {
-            Camera_VideoProfile* p = capability.GetVideoProfile(i);
-            RTC_DLOG(LS_VERBOSE) << "video format: " << p->format;
-            RTC_DLOG(LS_VERBOSE) << "video size: " << p->size.width << "x" << p->size.height;
-            RTC_DLOG(LS_VERBOSE) << "video fps: " << p->range.min << "-" << p->range.max;
+    for (uint32_t i = 0; i < capability.PreviewProfileSize(); i++) {
+        Camera_Profile* p = capability.GetPreviewProfile(i);
+        RTC_DLOG(LS_VERBOSE) << "preview format: " << p->format;
+        RTC_DLOG(LS_VERBOSE) << "preview size: " << p->size.width << "x" << p->size.height;
 
-            if (profile_.format == NativeCameraFormatToPixelFormat(p->format) &&
-                profile_.resolution.width == p->size.width && profile_.resolution.height == p->size.height &&
-                profile_.frameRateRange.min >= p->range.min && profile_.frameRateRange.max <= p->range.max)
-            {
-                videoProfile = p;
-                break;
-            }
-        }
-    } else {
-        for (uint32_t i = 0; i < capability.PreviewProfileSize(); i++) {
-            Camera_Profile* p = capability.GetPreviewProfile(i);
-            RTC_DLOG(LS_VERBOSE) << "video format: " << p->format;
-            RTC_DLOG(LS_VERBOSE) << "video size: " << p->size.width << "x" << p->size.height;
-
-            if (profile_.format == NativeCameraFormatToPixelFormat(p->format) &&
-                profile_.resolution.width == p->size.width && profile_.resolution.height == p->size.height)
-            {
-                previewProfile = p;
-                break;
-            }
+        if (profile_.format == NativeCameraFormatToPixelFormat(p->format) &&
+            profile_.resolution.width == p->size.width && profile_.resolution.height == p->size.height)
+        {
+            previewProfile = p;
+            break;
         }
     }
 
@@ -202,26 +197,18 @@ void CameraCapturer::StartInternal()
 
     auto surfaceId = std::to_string(dataReceiver_->GetSurfaceId());
 
-    if (useVideoSceneMode_) {
-        videoOutput_ = CameraManager::GetInstance().CreateVideoOutput(videoProfile, surfaceId);
-        if (videoOutput_.IsEmpty()) {
-            RTC_LOG(LS_ERROR) << "Failed to create camera video output";
-            return;
-        }
-
-        videoOutput_.AddObserver(this);
-    } else {
-        previewOutput_ = CameraManager::GetInstance().CreatePreviewOutput(previewProfile, surfaceId);
-        if (previewOutput_.IsEmpty()) {
-            RTC_LOG(LS_ERROR) << "Failed to create camera preview output";
-            return;
-        }
-        previewOutput_.AddObserver(this);
+    previewOutput_ = CameraManager::GetInstance().CreatePreviewOutput(previewProfile, surfaceId);
+    if (previewOutput_.IsEmpty()) {
+        RTC_LOG(LS_ERROR) << "Failed to create camera preview output";
+        return;
     }
+    previewOutput_.AddObserver(this);
 
     captureSession_ = CameraManager::GetInstance().CreateCaptureSession();
-    if (OH_CaptureSession_SetSessionMode(captureSession_.Raw(), NORMAL_VIDEO) != CAMERA_OK) {
-        RTC_LOG(LS_ERROR) << "Failed to set scene mode";
+    if (useVideoSceneMode_) {
+        if (OH_CaptureSession_SetSessionMode(captureSession_.Raw(), NORMAL_VIDEO) != CAMERA_OK) {
+            RTC_LOG(LS_ERROR) << "Failed to set scene mode";
+        }
     }
 
     if (!captureSession_.BeginConfig()) {
@@ -231,11 +218,7 @@ void CameraCapturer::StartInternal()
 
     captureSession_.AddInput(input_);
 
-    if (useVideoSceneMode_) {
-        captureSession_.AddVideoOutput(videoOutput_);
-    } else {
-        captureSession_.AddPreviewOutput(previewOutput_);
-    }
+    captureSession_.AddPreviewOutput(previewOutput_);
 
     if (!captureSession_.CommitConfig()) {
         RTC_LOG(LS_ERROR) << "Failed to commit capture session config";
@@ -265,13 +248,8 @@ void CameraCapturer::StopInternal()
         return;
     }
 
-    if (useVideoSceneMode_) {
-        videoOutput_.RemoveObserver(this);
-        videoOutput_.Reset();
-    } else {
-        previewOutput_.RemoveObserver(this);
-        previewOutput_.Reset();
-    }
+    previewOutput_.RemoveObserver(this);
+    previewOutput_.Reset();
 
     input_.Close();
     input_.Reset();
@@ -328,9 +306,34 @@ void CameraCapturer::OnFrameAvailable(
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
+    (void)rotation;
+    int32_t cameraOrientation = cameraOrientation_;
+    if (cameraOrientation % VideoRotation::kVideoRotation_90 != 0) {
+        RTC_LOG(LS_WARNING) << "rotation must be a multiple of 90: " << cameraOrientation;
+        cameraOrientation = 0;
+    }
+
+    // Undo the mirror that the OS "helps" us with.
+    // Also, undo camera orientation, we report it as rotation instead.
+    if (buffer->type() == VideoFrameBuffer::Type::kNative) {
+        auto textureBuffer = static_cast<TextureBuffer*>(buffer.get());
+
+        Matrix transformMatrix;
+        // Perform mirror and rotation around (0.5, 0.5) since that is the center of the texture.
+        if (isCameraFrontFacing_) {
+            transformMatrix.PreScale(-1.0f, 1.0f, 0.5f, 0.5f);
+        }
+        transformMatrix.PreRotate(-cameraOrientation, 0.5f, 0.5f);
+
+        Matrix newMatrix = textureBuffer->GetTransformMatrix();
+        newMatrix.PreConcat(transformMatrix);
+        buffer = TextureBuffer::Create(
+            textureBuffer->GetTexture(), textureBuffer->width(), textureBuffer->height(), newMatrix);
+    }
+
     UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
     if (observer_) {
-        observer_->OnFrameCaptured(buffer, timestampUs, rotation);
+        observer_->OnFrameCaptured(buffer, timestampUs, static_cast<VideoRotation>(cameraOrientation));
     }
 }
 
