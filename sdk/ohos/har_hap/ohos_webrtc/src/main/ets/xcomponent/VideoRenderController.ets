@@ -18,11 +18,25 @@ import { Logging } from '../log/Logging'
 
 const TAG: string = '[XComponentController1]';
 
+export enum ScalingMode { Fill, AspectFill, AspectFit }
+
 export class VideoRenderController extends XComponentController {
   private renderer: NativeVideoRenderer = new NativeVideoRenderer();
 
   setVideoTrack(track: MediaStreamTrack | null): void {
     this.renderer.setVideoTrack(track);
+  }
+
+  setMirror(mirror: boolean) : void {
+    this.renderer.setMirror(mirror);
+  }
+  
+  setMirrorVertically(mirrorVertically: boolean): void {
+    this.renderer.setMirrorVertically(mirrorVertically);
+  }
+
+  setScalingMode(mode: ScalingMode) : void {
+    this.renderer.setScalingMode(mode);
   }
 
   onSurfaceCreated(surfaceId: string): void {

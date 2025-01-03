@@ -824,8 +824,6 @@ export interface DeviceChangeEvent extends Event {
 
 // https://www.w3.org/TR/mediacapture-streams/#mediadevices
 export interface MediaDevices extends EventTarget {
-  ondevicechange: (this: MediaDevices, event: DeviceChangeEvent) => void | null;
-
   enumerateDevices(): Promise<MediaDeviceInfo[]>;
   getSupportedConstraints(): MediaTrackSupportedConstraints;
   getUserMedia(constraints?: MediaStreamConstraints): Promise<MediaStream>;
@@ -843,6 +841,9 @@ export interface NativeVideoRenderer {
 
   init(surfaceId: string): void;
   setVideoTrack(videoTrack: MediaStreamTrack | null): void;
+  setMirror(mirrorHorizontally: boolean): void;
+  setMirrorVertically(mirrorVertically: boolean): void;
+  setScalingMode(mode: number): void;
   release(): void;
 }
 
