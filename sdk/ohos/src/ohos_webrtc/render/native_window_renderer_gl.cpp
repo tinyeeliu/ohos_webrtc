@@ -26,6 +26,26 @@
 namespace webrtc {
 namespace adapter {
 
+namespace {
+
+int32_t GetRotatedWidth(const VideoFrame& frame)
+{
+    if (frame.rotation() % kVideoRotation_180 == 0) {
+        return frame.width();
+    }
+    return frame.height();
+}
+
+int32_t GetRotatedHeight(const VideoFrame& frame)
+{
+    if (frame.rotation() % kVideoRotation_180 == 0) {
+        return frame.height();
+    }
+    return frame.width();
+}
+
+} // namespace
+
 std::unique_ptr<NativeWindowRendererGl>
 NativeWindowRendererGl::Create(ohos::NativeWindow window, std::shared_ptr<EglContext> sharedContext)
 {
@@ -105,6 +125,27 @@ NativeWindowRendererGl::~NativeWindowRendererGl()
     thread_->Stop();
 }
 
+void NativeWindowRendererGl::SetMirrorHorizontally(bool mirror)
+{
+    RTC_LOG(LS_VERBOSE) << __FUNCTION__ << " mirror: " << mirror;
+
+    thread_->PostTask([this, mirror] { mirrorHorizontally_ = mirror; });
+}
+
+void NativeWindowRendererGl::SetMirrorVertically(bool mirror)
+{
+    RTC_LOG(LS_VERBOSE) << __FUNCTION__ << " mirror: " << mirror;
+
+    thread_->PostTask([this, mirror] { mirrorVertically_ = mirror; });
+}
+
+void NativeWindowRendererGl::SetScalingMode(ScalingMode scaleMode)
+{
+    RTC_LOG(LS_VERBOSE) << __FUNCTION__ << " scaleMode: " << scaleMode;
+
+    thread_->PostTask([this, scaleMode] { scaleMode_ = scaleMode; });
+}
+
 void NativeWindowRendererGl::OnFrame(const VideoFrame& frame)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " this=" << this;
@@ -116,15 +157,7 @@ void NativeWindowRendererGl::OnFrame(const VideoFrame& frame)
         return;
     }
 
-    thread_->PostTask([this, frame = frame] {
-        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
-
-        drawMatrix_.Reset();
-        videoFrameDrawer_->DrawFrame(
-            frame, *textureDrawer_, drawMatrix_, 0, 0, eglEnv_->GetSurfaceWidth(), eglEnv_->GetSurfaceHeight());
-        eglEnv_->SwapBuffers();
-    });
+    thread_->PostTask([this, frame = frame] { RenderFrame(frame); });
 }
 
 void NativeWindowRendererGl::OnDiscardedFrame()
@@ -135,6 +168,56 @@ void NativeWindowRendererGl::OnDiscardedFrame()
 void NativeWindowRendererGl::OnConstraintsChanged(const webrtc::VideoTrackSourceConstraints& constraints)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+}
+
+void NativeWindowRendererGl::RenderFrame(const VideoFrame& frame)
+{
+    int viewportX = 0;
+    int viewportY = 0;
+    int viewportWidth = eglEnv_->GetSurfaceWidth();
+    int viewportHeight = eglEnv_->GetSurfaceHeight();
+    if (viewportWidth <= 0 || viewportHeight <= 0) {
+        RTC_LOG(LS_WARNING) << "Invalid surface size";
+        return;
+    }
+
+    float drawnAspectRatio = 1.0f * viewportWidth / viewportHeight;
+    float frameAspectRatio = 1.0f * GetRotatedWidth(frame) / GetRotatedHeight(frame);
+    switch (scaleMode_) {
+        case ScalingMode::ASPECT_FILL: {
+            if (frameAspectRatio > drawnAspectRatio) {
+                viewportX = (viewportWidth - viewportHeight * frameAspectRatio) / 2.0f;
+                viewportWidth = viewportHeight * frameAspectRatio;
+            } else {
+                viewportY = (viewportHeight - viewportWidth / frameAspectRatio) / 2.0f;
+                viewportHeight = viewportWidth / frameAspectRatio;
+            }
+            break;
+        }
+        case ScalingMode::ASPECT_FIT: {
+            if (frameAspectRatio > drawnAspectRatio) {
+                viewportY = (viewportHeight - viewportWidth / frameAspectRatio) / 2.0f;
+                viewportHeight = viewportWidth / frameAspectRatio;
+            } else {
+                viewportX = (viewportWidth - viewportHeight * frameAspectRatio) / 2.0f;
+                viewportWidth = viewportHeight * frameAspectRatio;
+            }
+            break;
+        }
+        default:
+            break;
+    }
+
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    drawMatrix_.Reset();
+    drawMatrix_.PreScale(mirrorHorizontally_ ? -1.0f : 1.0f, mirrorVertically_ ? -1.0f : 1.0f, 0.5f, 0.5f);
+    RTC_DLOG(LS_VERBOSE) << "Draw matrix: " << drawMatrix_;
+
+    videoFrameDrawer_->DrawFrame(
+        frame, *textureDrawer_, drawMatrix_, viewportX, viewportY, viewportWidth, viewportHeight);
+    eglEnv_->SwapBuffers();
 }
 
 } // namespace adapter

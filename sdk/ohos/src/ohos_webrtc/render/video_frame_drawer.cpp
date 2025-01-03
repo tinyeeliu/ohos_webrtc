@@ -40,6 +40,7 @@ void VideoFrameDrawer::DrawFrame(
     renderMatrix_.Reset();
     renderMatrix_.PreRotate(frame.rotation(), 0.5f, 0.5f);
     renderMatrix_.PreConcat(additionalRenderMatrix);
+    RTC_DLOG(LS_VERBOSE) << "Render matrix: " << renderMatrix_;
 
     if (frame.is_texture()) {
         auto buffer = static_cast<TextureBuffer*>(frame.video_frame_buffer().get());
@@ -104,7 +105,9 @@ void VideoFrameDrawer::DrawTexture(
 
     Matrix finalMatrix = buffer->GetTransformMatrix();
     finalMatrix.PreConcat(renderMatrix);
+    RTC_DLOG(LS_VERBOSE) << "Final matrix: " << finalMatrix;
     auto glFinalMatrix = RenderCommon::ConvertMatrixToGLMatrixData(finalMatrix);
+    RTC_DLOG(LS_VERBOSE) << "Gl final matrix: " << RenderCommon::DumpGLMatrixDataToString(glFinalMatrix);
 
     switch (textureData->GetType()) {
         case TextureData::Type::OES:

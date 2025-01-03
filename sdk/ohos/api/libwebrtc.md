@@ -2576,8 +2576,8 @@ logMessage(message: string, severity: number, tag: string): void;
 | 名称           | 类型          | 可读  | 可写  | 说明                                              |
 |--------------|-------------|-----|-----|-------------------------------------------------|
 | audioFormat  | number      | 是   | 否   | 采样格式，参见 ohos.multimedia.audio.AudioSampleFormat |
-| channelCount | number      | 是   | 否   | 通道数，参加 ohos.multimedia.audio.AudioChannel       |
-| sampleRate   | number      | 是   | 否   | 采样率，参加 ohos.multimedia.audio.AudioSamplingRate  |
+| channelCount | number      | 是   | 否   | 通道数，参见 ohos.multimedia.audio.AudioChannel       |
+| sampleRate   | number      | 是   | 否   | 采样率，参见 ohos.multimedia.audio.AudioSamplingRate  |
 | data         | ArrayBuffer | 否   | 是   | 采样数据                                            |
 
 ## AudioDeviceModuleOptions
@@ -2904,6 +2904,75 @@ let nativeVideoRenderer = new webrtc.NativeVideoRenderer();
 nativeVideoRenderer.setVideoTrack(this.localVideoTrack);
 ```
 
+### setMirror
+
+setMirror(mirrorHorizontally: boolean): void
+
+设置视频流是否水平镜像显示，默认为false。
+
+#### 参数
+
+| 参数名       | 类型     | 必填 | 说明                                                                                           |
+|-----------|--------|----|----------------------------------------------------------------------------------------------|
+| mirrorHorizontally | boolean | 是  | 如果为true，在水平方向镜像显示视频流。 |
+
+#### 返回值
+
+无
+
+#### 示例
+
+```typescript
+let nativeVideoRenderer = new webrtc.NativeVideoRenderer();
+nativeVideoRenderer.setMirror(true);
+```
+
+### setMirrorVertically
+
+setMirrorVertically(mirrorVertically: boolean): void
+
+设置视频流是否垂直镜像显示，默认为false。
+
+#### 参数
+
+| 参数名       | 类型     | 必填 | 说明                                                                                           |
+|-----------|--------|----|----------------------------------------------------------------------------------------------|
+| mirrorVertically | boolean | 是  | 如果为true，在垂直方向镜像显示视频流。 |
+
+#### 返回值
+
+无
+
+#### 示例
+
+```typescript
+let nativeVideoRenderer = new webrtc.NativeVideoRenderer();
+nativeVideoRenderer.setMirrorVertically(true);
+```
+
+### setScalingMode
+
+setScalingMode(mode: number): void
+
+设置视频流显示的缩放模式，默认为0，即缩放内容以适应窗口的大小。
+
+#### 参数
+
+| 参数名       | 类型     | 必填 | 说明                                                                                           |
+|-----------|--------|----|----------------------------------------------------------------------------------------------|
+| mode | number | 是  | 缩放模式，参见 [ScalingMode](#scalingmode) 。 |
+
+#### 返回值
+
+无
+
+#### 示例
+
+```typescript
+let nativeVideoRenderer = new webrtc.NativeVideoRenderer();
+nativeVideoRenderer.setScalingMode(1);
+```
+
 ### release
 
 release(): void
@@ -2964,3 +3033,124 @@ build()
 
 this.mXComponentController.setVideoTrack(this.localVideoTrack);
 ```
+
+### setMirror
+
+setMirror(mirrorHorizontally: boolean): void
+
+设置视频流是否应该水平镜像显示，默认为false。
+
+#### 参数
+
+| 参数名       | 类型     | 必填 | 说明                                                                                           |
+|-----------|--------|----|----------------------------------------------------------------------------------------------|
+| mirrorHorizontally | boolean | 是  | 如果为true，在水平方向镜像显示视频流。 |
+
+#### 返回值
+
+无
+
+#### 示例
+
+```typescript
+// 初始化 XComponent 控制器
+mXComponentController: VideoRenderController = new VideoRenderController();
+
+build()
+{
+  // ......
+  // 声明 XComponent 组件，并指定 XComponent 控制器
+  XComponent({
+    id: "local-video",
+    type: XComponentType.SURFACE,
+    controller: this.mXComponentController
+  })
+  // ......
+}
+
+this.mXComponentController.setMirror(true);
+```
+
+### setMirrorVertically
+
+setMirrorVertically(mirrorVertically: boolean): void
+
+设置视频流是否应该垂直镜像显示，默认为false。
+
+#### 参数
+
+| 参数名       | 类型     | 必填 | 说明                                                                                           |
+|-----------|--------|----|----------------------------------------------------------------------------------------------|
+| mirrorVertically | boolean | 是  | 如果为true，在垂直方向镜像显示视频流。 |
+
+#### 返回值
+
+无
+
+#### 示例
+
+```typescript
+// 初始化 XComponent 控制器
+mXComponentController: VideoRenderController = new VideoRenderController();
+
+build()
+{
+  // ......
+  // 声明 XComponent 组件，并指定 XComponent 控制器
+  XComponent({
+    id: "local-video",
+    type: XComponentType.SURFACE,
+    controller: this.mXComponentController
+  })
+  // ......
+}
+
+this.mXComponentController.setMirrorVertically(true);
+```
+
+### setScalingMode
+
+setScalingMode(mode: ScalingMode): void
+
+设置视频流显示的缩放模式，默认为 ScalingMode.Fill，即缩放内容以适应窗口的大小。
+
+#### 参数
+
+| 参数名       | 类型     | 必填 | 说明                                                                                           |
+|-----------|--------|----|----------------------------------------------------------------------------------------------|
+| mode | [ScalingMode](#scalingmode) | 是  | 缩放模式，参见 ScalingMode 。 |
+
+#### 返回值
+
+无
+
+#### 示例
+
+```typescript
+// 初始化 XComponent 控制器
+mXComponentController: VideoRenderController = new VideoRenderController();
+
+build()
+{
+  // ......
+  // 声明 XComponent 组件，并指定 XComponent 控制器
+  XComponent({
+    id: "local-video",
+    type: XComponentType.SURFACE,
+    controller: this.mXComponentController
+  })
+  // ......
+}
+
+this.mXComponentController.setScalingMode(ScalingMode.Fill);
+```
+
+## ScalingMode
+
+缩放模式枚举。
+
+| 名称      | 值   | 说明                                   |
+|---------|-----|--------------------------------------|
+| Fill | 0   | 缩放内容以适应窗口的大小，如果需要可以改变内容的宽高比。 |
+| AspectFill    | 1   | 缩放内容以填充窗口的大小。保持宽高比不变，部分内容可能会被裁剪。  |
+| AspectFit | 2   | 缩放内容以适应窗口的大小。保持宽高比不变，窗口左右或上下可能会有黑边。  |

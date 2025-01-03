@@ -26,9 +26,24 @@ namespace adapter {
 
 class NativeWindowRenderer : public rtc::VideoSinkInterface<VideoFrame> {
 public:
+    enum class ScalingMode {
+        // Scale the content to fit the size of the window by changing the aspect ratio of the content if necessary.
+        FILL = 0,
+        // Scale the content to fill the size of the window. Some portion of the content may be clipped to fill the
+        // window’s bounds.
+        ASPECT_FILL,
+        // Scale the content to fit the size of the window by maintaining the aspect ratio. Any remaining area of the
+        // window bounds is blank.
+        ASPECT_FIT
+    };
+
     virtual ~NativeWindowRenderer();
 
     uint64_t GetSurfaceId() const;
+
+    virtual void SetMirrorHorizontally(bool mirror) {}
+    virtual void SetMirrorVertically(bool mirror) {}
+    virtual void SetScalingMode(ScalingMode scaleMode) {}
 
 protected:
     explicit NativeWindowRenderer(ohos::NativeWindow window);
