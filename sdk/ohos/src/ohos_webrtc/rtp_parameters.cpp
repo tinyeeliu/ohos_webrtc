@@ -669,6 +669,12 @@ void NapiRtpEncodingParameters::JsToNative(const Napi::Object& js, RtpEncodingPa
             native.scale_resolution_down_by = jsScaleResolutionDownBy.As<Number>().DoubleValue();
         }
     }
+    if (js.Has(kAttributeNameSsrc)) {
+        auto jsSsrc = js.Get(kAttributeNameSsrc);
+        if (jsSsrc.IsNumber()) {
+            native.ssrc = jsSsrc.As<Number>().Uint32Value();
+        }
+    }
 
     NapiRtpCodingParameters::JsToNative(js, native);
 }
@@ -684,6 +690,9 @@ void NapiRtpEncodingParameters::NativeToJs(const RtpEncodingParameters& native, 
     }
     if (native.scale_resolution_down_by) {
         js.Set(kAttributeNameScaleResolutionDownBy, Number::New(js.Env(), native.scale_resolution_down_by.value()));
+    }
+    if (native.ssrc) {
+        js.Set(kAttributeNameSsrc, Number::New(js.Env(), native.ssrc.value()));
     }
 
     NapiRtpCodingParameters::NativeToJs(native, js);
