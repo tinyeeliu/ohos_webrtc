@@ -36,6 +36,9 @@ public:
     NAPI_ATTRIBUTE_NAME_DECLARE(SharedContext, sharedContext);
     NAPI_METHOD_NAME_DECLARE(Init, init);
     NAPI_METHOD_NAME_DECLARE(SetVideoTrack, setVideoTrack);
+    NAPI_METHOD_NAME_DECLARE(SetMirror, setMirror);
+    NAPI_METHOD_NAME_DECLARE(SetMirrorVertically, setMirrorVertically);
+    NAPI_METHOD_NAME_DECLARE(SetScalingMode, setScalingMode);
     NAPI_METHOD_NAME_DECLARE(Release, release);
     NAPI_METHOD_NAME_DECLARE(ToJson, toJSON);
 
@@ -52,6 +55,9 @@ protected:
     Napi::Value SetVideoTrack(const Napi::CallbackInfo& info);
     Napi::Value Init(const Napi::CallbackInfo& info);
     Napi::Value Release(const Napi::CallbackInfo& info);
+    Napi::Value SetMirror(const Napi::CallbackInfo& info);
+    Napi::Value SetMirrorVertically(const Napi::CallbackInfo& info);
+    Napi::Value SetScalingMode(const Napi::CallbackInfo& info);
     Napi::Value ToJson(const Napi::CallbackInfo& info);
 
     void AddSink();

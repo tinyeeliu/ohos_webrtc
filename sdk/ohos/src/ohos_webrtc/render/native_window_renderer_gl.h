@@ -40,6 +40,10 @@ public:
 
     ~NativeWindowRendererGl() override;
 
+    void SetMirrorHorizontally(bool mirror) override;
+    void SetMirrorVertically(bool mirror) override;
+    void SetScalingMode(ScalingMode scaleMode) override;
+
 protected:
     NativeWindowRendererGl(
         ohos::NativeWindow window, std::shared_ptr<EglContext> sharedContext, const std::string& threadName);
@@ -47,6 +51,8 @@ protected:
     void OnFrame(const VideoFrame& frame) override;
     void OnDiscardedFrame() override;
     void OnConstraintsChanged(const webrtc::VideoTrackSourceConstraints& constraints) override;
+
+    void RenderFrame(const VideoFrame& frame);
 
 private:
     int32_t width_{};
@@ -62,6 +68,10 @@ private:
     Matrix drawMatrix_;
     std::unique_ptr<GlDrawer> textureDrawer_;
     std::unique_ptr<VideoFrameDrawer> videoFrameDrawer_;
+
+    bool mirrorHorizontally_{false};
+    bool mirrorVertically_{false};
+    ScalingMode scaleMode_{ScalingMode::FILL};
 };
 
 } // namespace adapter
