@@ -41,7 +41,7 @@ void Matrix::SetValues(float values[kMatrixSize])
     // clang-format off
     OH_Drawing_MatrixSetMatrix(impl_.Raw(),
         values[kScaleX], values[kSkewX], values[kTransX],
-        values[kSkewX], values[kScaleY], values[kTransY],
+        values[kSkewY], values[kScaleY], values[kTransY],
         values[kPersp0], values[kPersp1], values[kPersp2]);
     // clang-format on
 }
