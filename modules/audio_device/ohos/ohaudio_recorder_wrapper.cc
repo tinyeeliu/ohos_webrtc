@@ -322,6 +322,9 @@ void OHAudioRecorderWrapper::SetStreamConfiguration(OH_AudioStreamBuilder* build
     RTC_LOG(LS_INFO) << "SetStreamConfiguration";
     RTC_DCHECK(builder);
     RTC_DCHECK(thread_checker_.IsCurrent());
+    // Use default capturer info (which is AUDIOSTREAM_SOURCE_TYPE_MIC) seems not work well after input device changed,
+    // such as from mic to bluetooth earphone, so use AUDIOSTREAM_SOURCE_TYPE_VOICE_COMMUNICATION instead.
+    OH_AudioStreamBuilder_SetCapturerInfo(builder, AUDIOSTREAM_SOURCE_TYPE_VOICE_COMMUNICATION);
     OH_AudioStreamBuilder_SetSamplingRate(builder, audio_parameters().sample_rate());
     OH_AudioStreamBuilder_SetChannelCount(builder, audio_parameters().channels());
     OH_AudioStreamBuilder_SetSampleFormat(builder, AUDIOSTREAM_SAMPLE_S16LE);
