@@ -891,7 +891,7 @@ export interface AudioDeviceModuleOptions {
   rendererUsage?: number;
 
   // enable low latency capturing and rendering, default is false
-  useLowLatency?: number;
+  useLowLatency?: boolean;
 
   // Control if the built-in HW acoustic echo canceler should be used or not, default is false.
   // It is possible to query support by calling AudioDeviceModule.isBuiltInAcousticEchoCancelerSupported()
