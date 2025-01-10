@@ -27,6 +27,7 @@
 #include "modules/audio_device/audio_device_buffer.h"
 #include "modules/audio_device/include/audio_device_defines.h"
 #include "rtc_base/thread_annotations.h"
+#include "rtc_base/race_checker.h"
 #include "modules/audio_device/ohos/ohaudio_player_wrapper.h"
 #include "modules/audio_device/ohos/audio_device_module.h"
 
@@ -66,7 +67,7 @@ private:
     int GetPlayoutUnderrunCount() override { return 0; }
     void HandleStreamDisconnected();
     SequenceChecker main_thread_checker_;
-    SequenceChecker thread_checker_ohaudio_;
+    rtc::RaceChecker race_checker_ohaudio_;
     TaskQueueBase* main_thread_;
     OHAudioPlayerWrapper ohaudio_;
     std::unique_ptr<FineAudioBuffer> fine_audio_buffer_;
@@ -77,7 +78,7 @@ private:
     bool initialized_ RTC_GUARDED_BY(main_thread_checker_) = false;
     bool playing_ RTC_GUARDED_BY(main_thread_checker_) = false;
 
-    double latency_millis_ RTC_GUARDED_BY(thread_checker_ohaudio_) = 0;
+    double latency_millis_ RTC_GUARDED_BY(race_checker_ohaudio_) = 0;
     static const int default_channels = 2;
 };
 }  // namespace webrtc
