@@ -61,220 +61,45 @@ const char kEventNameOpen[] = "open";
 const char kEventNameMessage[] = "message";
 const char kEventNameError[] = "error";
 
-std::unique_ptr<NapiDataChannel::Observer> NapiDataChannel::Observer::Create(DataChannelInterface* dataChannel)
+DataChannelObserverTemp::DataChannelObserverTemp(rtc::scoped_refptr<DataChannelInterface> dataChannel)
+    : dataChannel_(std::move(dataChannel))
 {
-    auto observer = std::make_unique<Observer>(dataChannel);
-    return observer;
+    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
+
+    dataChannel_->RegisterObserver(this);
 }
 
-NapiDataChannel::Observer::Observer(DataChannelInterface* dataChannel)
-    : dataChannel_(dataChannel), binaryType_(kEnumBinaryTypeBlob)
+DataChannelObserverTemp::~DataChannelObserverTemp()
 {
+    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
+
+    dataChannel_->UnregisterObserver();
 }
 
-NapiDataChannel::Observer::~Observer()
+void DataChannelObserverTemp::OnStateChange()
 {
-    RTC_DLOG(LS_INFO) << __FUNCTION__;
-    for (auto& handler : eventHandlers_) {
-        handler.second.tsfn.Release();
-    }
-}
-
-bool NapiDataChannel::Observer::GetEventHandler(const std::string& type, Napi::Function& fn)
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-
-    auto it = eventHandlers_.find(type);
-    if (it == eventHandlers_.end()) {
-        return false;
-    }
-
-    fn = it->second.ref.Value();
-
-    return true;
-}
-
-bool NapiDataChannel::Observer::SetEventHandler(const std::string& type, Napi::Function fn, Napi::Value receiver)
-{
-    Reference<Napi::Value>* context = new Reference<Napi::Value>;
-    *context = Persistent(receiver);
-
-    EventHandler handler;
-    handler.ref = Persistent(fn);
-    handler.tsfn =
-        ThreadSafeFunction::New(fn.Env(), fn, type, 0, 1, context, [](Napi::Env /*env*/, Reference<Napi::Value>* ctx) {
-            ctx->Reset();
-            delete ctx;
-        });
-
-    {
-        UNUSED std::lock_guard<std::mutex> lock(mutex_);
-        eventHandlers_[type] = std::move(handler);
-    }
-
-    if (type == kEventNameMessage) {
-        auto messages = GetAndClearPendingMessages();
-        for (auto& message : messages) {
-            auto jsEvent = Object::New(fn.Env());
-            if (message.binary) {
-                auto externalData = new rtc::CopyOnWriteBuffer(message.data);
-                auto arrayBuffer = ArrayBuffer::New(
-                    fn.Env(), static_cast<void*>(externalData->MutableData()), externalData->size(),
-                    [](Napi::Env /*env*/, void* /*data*/, rtc::CopyOnWriteBuffer* hint) {
-                        RTC_DLOG(LS_VERBOSE) << "release rtc::CopyOnWriteBuffer";
-                        delete hint;
-                    },
-                    externalData);
-                jsEvent.Set("data", arrayBuffer);
-            } else {
-                jsEvent.Set("data", String::New(fn.Env(), std::string(message.data.data<char>(), message.size())));
-            }
-            RTC_DLOG(LS_VERBOSE) << "trigger event: " << type;
-            fn.Call(receiver, {jsEvent});
-        }
-    }
-
-    return true;
-}
-
-bool NapiDataChannel::Observer::RemoveEventHandler(const std::string& type)
-{
-    UNUSED std::lock_guard<std::mutex> lock(mutex_);
-    auto it = eventHandlers_.find(type);
-    if (it == eventHandlers_.end()) {
-        return false;
-    }
-
-    it->second.tsfn.Release();
-    eventHandlers_.erase(it);
-
-    return true;
-}
-
-uint64_t NapiDataChannel::Observer::GetBufferedAmountLowThreshold() const
-{
-    return bufferedAmountLowThreshold_.load();
-}
-
-void NapiDataChannel::Observer::SetBufferedAmountLowThreshold(uint64_t bufferedAmountLowThreshold)
-{
-    bufferedAmountLowThreshold_.store(bufferedAmountLowThreshold);
-}
-
-std::string NapiDataChannel::Observer::GetBinaryType() const
-{
-    UNUSED std::lock_guard<std::mutex> lock(mutex_);
-    return binaryType_;
-}
-
-void NapiDataChannel::Observer::SetBinaryType(std::string binaryType)
-{
-    UNUSED std::lock_guard<std::mutex> lock(mutex_);
-    binaryType_ = std::move(binaryType);
-}
-
-std::vector<DataBuffer> NapiDataChannel::Observer::GetAndClearPendingMessages()
-{
-    UNUSED std::lock_guard<std::mutex> lock(mutex_);
-    auto result = pendingMessages_;
-    pendingMessages_.clear();
-    return result;
-}
-
-void NapiDataChannel::Observer::OnStateChange()
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-
-    static std::map<DataChannelInterface::DataState, std::string> STATE_EVENT_MAP = {
-        {DataChannelInterface::kOpen, kEventNameOpen},
-        {DataChannelInterface::kClosing, kEventNameClosing},
-        {DataChannelInterface::kClosed, kEventNameClose},
-    };
+    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
     auto state = dataChannel_->state();
-    auto eventType = STATE_EVENT_MAP[state];
-
-    UNUSED std::lock_guard<std::mutex> lock(mutex_);
-    auto it = eventHandlers_.find(eventType);
-    if (it == eventHandlers_.end()) {
-        return;
-    }
-
-    auto& tsfn = it->second.tsfn;
-    Reference<Napi::Value>* context = tsfn.GetContext();
-    napi_status status = tsfn.NonBlockingCall([context](Napi::Env env, Napi::Function jsCallback) {
-        auto jsEvent = Object::New(env);
-        jsCallback.Call(context ? context->Value() : env.Undefined(), {jsEvent});
-    });
-    if (status != napi_ok) {
-        RTC_LOG(LS_ERROR) << " tsfn call error: " << status;
-    }
+    Enqueue(CallbackEvent<NapiDataChannel>::Create([state](NapiDataChannel &target) {
+        target.HandleStateChange(state);
+    }));
 }
 
-void NapiDataChannel::Observer::OnMessage(const DataBuffer& buffer)
+void DataChannelObserverTemp::OnMessage(const DataBuffer& buffer)
 {
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-    auto state = dataChannel_->state();
-    if (state != DataChannelInterface::kOpen) {
-        RTC_LOG(LS_WARNING) << "Invalid state";
-        return;
-    }
+    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    UNUSED std::lock_guard<std::mutex> lock(mutex_);
-    auto it = eventHandlers_.find(kEventNameMessage);
-    if (it == eventHandlers_.end()) {
-        pendingMessages_.push_back(buffer);
-        return;
-    }
-
-    auto& tsfn = it->second.tsfn;
-    Reference<Napi::Value>* context = tsfn.GetContext();
-    napi_status status = tsfn.NonBlockingCall([context, buffer](Napi::Env env, Napi::Function jsCallback) {
-        auto jsEvent = Object::New(env);
-        if (buffer.binary) {
-            auto externalData = new rtc::CopyOnWriteBuffer(buffer.data);
-            auto arrayBuffer = ArrayBuffer::New(
-                env, static_cast<void*>(externalData->MutableData()), externalData->size(),
-                [](Napi::Env /*env*/, void* /*data*/, rtc::CopyOnWriteBuffer* hint) {
-                    RTC_DLOG(LS_VERBOSE) << "release rtc::CopyOnWriteBuffer";
-                    delete hint;
-                },
-                externalData);
-            jsEvent.Set("data", arrayBuffer);
-        } else {
-            jsEvent.Set("data", String::New(env, std::string(buffer.data.data<char>(), buffer.size())));
-        }
-        jsCallback.Call(context ? context->Value() : env.Undefined(), {jsEvent});
-    });
-    if (status != napi_ok) {
-        RTC_LOG(LS_ERROR) << " tsfn call error: " << status;
-    }
+    Enqueue(CallbackEvent<NapiDataChannel>::Create([buffer](NapiDataChannel &channel) {
+        channel.HandleMessage(buffer);
+    }));
 }
 
-void NapiDataChannel::Observer::OnBufferedAmountChange(uint64_t sent_data_size)
+void DataChannelObserverTemp::OnBufferedAmountChange(uint64_t sent_data_size)
 {
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-
-    if (dataChannel_->buffered_amount() > bufferedAmountLowThreshold_.load()) {
-        return;
-    }
-
-    UNUSED std::lock_guard<std::mutex> lock(mutex_);
-
-    auto it = eventHandlers_.find(kEventNameBufferedAmountLow);
-    if (it == eventHandlers_.end()) {
-        return;
-    }
-
-    auto& tsfn = it->second.tsfn;
-    Reference<Napi::Value>* context = tsfn.GetContext();
-    napi_status status = tsfn.NonBlockingCall([context](Napi::Env env, Napi::Function jsCallback) {
-        auto jsEvent = Object::New(env);
-        jsCallback.Call(context ? context->Value() : env.Undefined(), {jsEvent});
-    });
-    if (status != napi_ok) {
-        RTC_LOG(LS_ERROR) << " tsfn call error: " << status;
-    }
+    // should not reached
+    (void)sent_data_size;
+    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 }
 
 FunctionReference NapiDataChannel::constructor_;
@@ -321,70 +146,46 @@ void NapiDataChannel::Init(Napi::Env env, Napi::Object exports)
     constructor_ = Persistent(func);
 }
 
-Napi::Object NapiDataChannel::NewInstance(Napi::Env env, rtc::scoped_refptr<DataChannelInterface> dataChannel)
+Napi::Object NapiDataChannel::NewInstance(Napi::Env env, std::unique_ptr<DataChannelObserverTemp> observer)
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    auto externalDataChannel = External<DataChannelInterface>::New(
-        env, dataChannel.release(), [](Napi::Env /*env*/, DataChannelInterface* dc) {
-            auto status = dc->Release();
-            RTC_DLOG(LS_VERBOSE) << "DataChannelInterface release status=" << status;
-        });
-
-    return constructor_.New({externalDataChannel});
+    auto externalObserver = External<DataChannelObserverTemp>::New(env, observer.release());
+    return constructor_.New({externalObserver});
 }
 
-Napi::Object
-NapiDataChannel::NewInstance(Napi::Env env, rtc::scoped_refptr<DataChannelInterface> dataChannel, Observer* observer)
+NapiDataChannel::NapiDataChannel(const CallbackInfo& info)
+    : NapiEventTarget<NapiDataChannel>(info), binaryType_(kEnumBinaryTypeBlob)
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    auto externalDataChannel = External<DataChannelInterface>::New(
-        env, dataChannel.release(), [](Napi::Env /*env*/, DataChannelInterface* dc) {
-            auto status = dc->Release();
-            RTC_DLOG(LS_VERBOSE) << "DataChannelInterface release status=" << status;
-        });
-
-    auto externalObserver = External<Observer>::New(env, observer);
-
-    return constructor_.New({externalDataChannel, externalObserver});
-}
-
-NapiDataChannel::NapiDataChannel(const CallbackInfo& info) : ObjectWrap<NapiDataChannel>(info)
-{
-    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
-
-    rtc::scoped_refptr<DataChannelInterface> dc;
-
-    if (info.Length() > 0 && info[0].IsExternal()) {
-        dc = info[0].As<External<DataChannelInterface>>().Data();
-    } else {
-        // nothing to do now
+    if (!info.IsConstructCall()) {
+        NAPI_THROW_VOID(TypeError::New(info.Env(), "Use the new operator to construct the RTCDataChannel"));
     }
 
-    if (!dc) {
-        NAPI_THROW_VOID(Error::New(info.Env(), "Invalid argument"));
+    if (info.Length() < 1 || !info[0].IsExternal()) {
+        NAPI_THROW_VOID(TypeError::New(info.Env(), "Invalid argument"));
     }
 
-    std::unique_ptr<Observer> obs;
-    if (info.Length() > 1 && info[1].IsExternal()) {
-        obs = std::unique_ptr<Observer>(info[1].As<External<Observer>>().Data());
-    } else {
-        obs = Observer::Create(dc.get());
-        dc->RegisterObserver(obs.get());
-    }
+    auto observer = std::unique_ptr<DataChannelObserverTemp>(info[0].As<External<DataChannelObserverTemp>>().Data());
+    dataChannel_ = observer->Get();
+    dataChannel_->RegisterObserver(this);
 
-    if (!obs) {
-        NAPI_THROW_VOID(Error::New(info.Env(), "Invalid argument"));
-    }
+    RTC_DLOG(LS_VERBOSE) << "State: " << dataChannel_->state();
 
-    dataChannel_ = dc;
-    observer_ = std::move(obs);
+    // redispatch queued events
+    while (auto event = observer->Dequeue()) {
+        Dispatch(std::move(event));
+    }
+    
+    // Hold the observer to avoid:
+    // 1. Early 'UnregisterObserver'
+    // 2. The gap of 'UnregisterObserver' and 'RegisterObserver'
+    observerTemp_ = std::move(observer);
 }
 
 NapiDataChannel::~NapiDataChannel()
 {
-    dataChannel_->UnregisterObserver();
 }
 
 rtc::scoped_refptr<DataChannelInterface> NapiDataChannel::Get() const
@@ -482,7 +283,7 @@ Napi::Value NapiDataChannel::GetBufferedAmount(const Napi::CallbackInfo& info)
 Napi::Value NapiDataChannel::GetBufferedAmountLowThreshold(const Napi::CallbackInfo& info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-    return Number::New(info.Env(), observer_->GetBufferedAmountLowThreshold());
+    return Number::New(info.Env(), bufferedAmountLowThreshold_.load());
 }
 
 void NapiDataChannel::SetBufferedAmountLowThreshold(const Napi::CallbackInfo& info, const Napi::Value& value)
@@ -498,14 +299,15 @@ void NapiDataChannel::SetBufferedAmountLowThreshold(const Napi::CallbackInfo& in
         NAPI_THROW_VOID(Error::New(info.Env(), "Invalid argument"));
     }
 
-    observer_->SetBufferedAmountLowThreshold(bufferedAmountLowThreshold);
+    bufferedAmountLowThreshold_.store(bufferedAmountLowThreshold);
 }
 
 // binaryType : BinaryType;
 Napi::Value NapiDataChannel::GetBinaryType(const Napi::CallbackInfo& info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-    return String::New(info.Env(), observer_->GetBinaryType());
+
+    return String::New(info.Env(), binaryType_);
 }
 
 void NapiDataChannel::SetBinaryType(const Napi::CallbackInfo& info, const Napi::Value& value)
@@ -521,19 +323,21 @@ void NapiDataChannel::SetBinaryType(const Napi::CallbackInfo& info, const Napi::
         NAPI_THROW_VOID(Error::New(info.Env(), "Invalid argument"));
     }
 
-    observer_->SetBinaryType(binaryType);
+    binaryType_ = binaryType;
 }
 
 Napi::Value NapiDataChannel::GetEventHandler(const Napi::CallbackInfo& info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    Function fn;
-    if (observer_->GetEventHandler((const char*)info.Data(), fn)) {
-        return fn;
+    const auto type = (const char*)info.Data();
+
+    Function func;
+    if (!NapiEventTarget<NapiDataChannel>::GetEventHandler(type, func)) {
+        return info.Env().Null();
     }
 
-    return info.Env().Null();
+    return func;
 }
 
 void NapiDataChannel::SetEventHandler(const Napi::CallbackInfo& info, const Napi::Value& value)
@@ -542,13 +346,13 @@ void NapiDataChannel::SetEventHandler(const Napi::CallbackInfo& info, const Napi
 
     const auto type = (const char*)info.Data();
 
-    observer_->RemoveEventHandler(type);
-
     if (value.IsFunction()) {
-        Function cb = value.As<Function>();
-        if (!observer_->SetEventHandler(type, std::move(cb), info.This())) {
-            NAPI_THROW_VOID(Napi::Error::New(info.Env(), "Failed to set event handler"));
-        }
+        auto fn = value.As<Function>();
+        NapiEventTarget<NapiDataChannel>::SetEventHandler(type, fn);
+    } else if (value.IsNull()) {
+        RemoveEventHandler(type);
+    } else {
+        NAPI_THROW_VOID(Error::New(info.Env(), "value is error"));
     }
 }
 
@@ -606,8 +410,114 @@ Napi::Value NapiDataChannel::ToJson(const Napi::CallbackInfo& info)
 #ifndef NDEBUG
     json.Set("__native_class__", "NapiDataChannel");
 #endif
+    json.Set(kAttributeNameLabel, GetLabel(info));
+    json.Set(kAttributeNameId, GetId(info));
+    json.Set(kAttributeNameProtocol, GetProtocol(info));
+    json.Set(kAttributeNameOrdered, GetOrdered(info));
 
     return json;
+}
+
+void NapiDataChannel::OnStateChange()
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    auto state = dataChannel_->state();
+    Dispatch(CallbackEvent<NapiDataChannel>::Create([state](NapiDataChannel &channel) {
+        channel.HandleStateChange(state);
+    }));
+}
+
+void NapiDataChannel::OnMessage(const DataBuffer& buffer)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    Dispatch(CallbackEvent<NapiDataChannel>::Create([buffer](NapiDataChannel &channel) { channel.HandleMessage(buffer); }));
+}
+
+void NapiDataChannel::OnBufferedAmountChange(uint64_t sent_data_size)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    (void)sent_data_size;
+
+    auto bufferedAmount = dataChannel_->buffered_amount();
+    auto bufferedAmountLowThreshold = bufferedAmountLowThreshold_.load();
+    if (bufferedAmount > bufferedAmountLowThreshold) {
+        RTC_LOG(LS_VERBOSE) << "Buffered amount is greater than threshold: " << bufferedAmount << " > " << bufferedAmountLowThreshold;
+        return;
+    }
+
+    Dispatch(CallbackEvent<NapiDataChannel>::Create([](NapiDataChannel &channel) {
+        RTC_LOG(LS_VERBOSE) << "Dispatched: " << kEventNameBufferedAmountLow;
+
+        auto env = channel.Env();
+        Napi::HandleScope scope(env);
+        auto jsEvent = Object::New(env);
+        jsEvent.Set("type", String::New(env, kEventNameBufferedAmountLow));
+        channel.MakeCallback(kEventNameBufferedAmountLow, {jsEvent});
+    }));
+}
+
+void NapiDataChannel::HandleStateChange(DataChannelInterface::DataState state)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    static std::map<DataChannelInterface::DataState, std::string_view> STATE_EVENT_MAP = {
+        {DataChannelInterface::kOpen, kEventNameOpen},
+        {DataChannelInterface::kClosing, kEventNameClosing},
+        {DataChannelInterface::kClosed, kEventNameClose},
+    };
+
+    if (state == DataChannelInterface::kOpen) {
+        auto curState = dataChannel_->state();
+        if (curState == DataChannelInterface::kClosing || curState == DataChannelInterface::kClosed) {
+            // abort, see https://www.w3.org/TR/webrtc/#announcing-a-data-channel-as-open.
+            return;
+        }
+    }
+
+    auto eventType = STATE_EVENT_MAP[state];
+
+    HandleScope scope(Env());
+    
+    auto object = Object::New(Env());
+    object.Set("type", String::New(Env(), eventType.data()));
+    MakeCallback(eventType.data(), {object});
+
+    if (state == webrtc::DataChannelInterface::kClosed) {
+        Stop();
+    }
+}
+
+void NapiDataChannel::HandleMessage(const DataBuffer& buffer)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    HandleScope scope(Env());
+    
+    Napi::Value value;
+    if (buffer.binary) {
+        auto externalData = new rtc::CopyOnWriteBuffer(buffer.data);
+        auto arrayBuffer = ArrayBuffer::New(
+            Env(), static_cast<void*>(externalData->MutableData()), externalData->size(),
+            [](Napi::Env /*env*/, void* /*data*/, rtc::CopyOnWriteBuffer* hint) {
+                RTC_DLOG(LS_VERBOSE) << "release rtc::CopyOnWriteBuffer";
+                delete hint;
+            },
+            externalData);
+        value = arrayBuffer;
+    } else {
+        // Should be a UTF-8 string
+        auto str = String::New(Env(), reinterpret_cast<const char *>(buffer.data.data()), buffer.size());
+        value = str;
+    }
+    
+    auto jsEvent = Object::New(Env());
+    jsEvent.Set("type", kEventNameMessage);
+    jsEvent.Set("data", value);
+    
+    MakeCallback(kEventNameMessage, {jsEvent});
 }
 
 void JsToNativeDataChannelInit(const Napi::Object& jsDataChannelInit, DataChannelInit& init)

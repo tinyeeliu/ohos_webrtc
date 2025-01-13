@@ -600,20 +600,18 @@ void NapiPeerConnectionWrapper::OnDataChannel(rtc::scoped_refptr<DataChannelInte
         return;
     }
 
-    eventThread_->PostTask([this, channel] {
+    auto observer = std::make_unique<DataChannelObserverTemp>(channel);
+    eventThread_->PostTask([this, observer = std::move(observer)] () mutable {
         ThreadSafeFunction tsfn;
         if (!GetEventHandler(kEventDataChannel, tsfn)) {
             return;
         }
 
-        auto observer = NapiDataChannel::Observer::Create(channel.get());
-        channel->RegisterObserver(observer.get());
-
         Reference<Napi::Value>* context = tsfn.GetContext();
         napi_status status =
-            tsfn.BlockingCall([context, channel, obs = observer.release()](Napi::Env env, Napi::Function jsCallback) {
+            tsfn.BlockingCall([context, obs = observer.release()](Napi::Env env, Napi::Function jsCallback) {
                 auto jsEvent = Object::New(env);
-                jsEvent.Set("channel", NapiDataChannel::NewInstance(env, channel, obs));
+                jsEvent.Set("channel", NapiDataChannel::NewInstance(env, std::unique_ptr<DataChannelObserverTemp>(obs)));
                 jsCallback.Call(context ? context->Value() : env.Undefined(), {jsEvent});
             });
         if (status != napi_ok) {
@@ -1345,7 +1343,8 @@ Napi::Value NapiPeerConnection::CreateDataChannel(const Napi::CallbackInfo& info
                 Error::New(info.Env(), error.message() ? error.message() : "unknown error"), info.Env().Undefined());
         }
 
-        return NapiDataChannel::NewInstance(info.Env(), result.value());
+        auto observer = std::make_unique<DataChannelObserverTemp>(result.value());
+        return NapiDataChannel::NewInstance(info.Env(), std::move(observer));
     }
 
     if (!info[1].IsObject()) {
@@ -1362,7 +1361,8 @@ Napi::Value NapiPeerConnection::CreateDataChannel(const Napi::CallbackInfo& info
         NAPI_THROW(Error::New(info.Env(), error.message() ? error.message() : "unknown error"), info.Env().Undefined());
     }
 
-    return NapiDataChannel::NewInstance(info.Env(), result.value());
+    auto observer = std::make_unique<DataChannelObserverTemp>(result.value());
+    return NapiDataChannel::NewInstance(info.Env(), std::move(observer));
 }
 
 Napi::Value NapiPeerConnection::AddIceCandidate(const Napi::CallbackInfo& info)
