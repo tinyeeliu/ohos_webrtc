@@ -112,7 +112,12 @@ static int32_t ErrorCallback(OH_AudioRenderer *stream, void* user_data, OH_Audio
 static int32_t DataCallback(OH_AudioRenderer *stream, void* user_data, void* audio_data, int32_t bufferLen)
 {
     RTC_DCHECK(user_data);
-    RTC_DCHECK(audio_data);
+    // Some tests shows that this callback can sometimes be called with nullptr
+    // 'audio_data' and zero 'bufferLen' (after output device changed for example).
+    if (!audio_data || bufferLen == 0) {
+        RTC_LOG(LS_WARNING) << "Invalid data buffer";
+        return 0;
+    }
     RTC_LOG(LS_INFO) << "bufferLen=" << bufferLen;
     OHAudioPlayerWrapper* ohaudio_wrapper = reinterpret_cast<OHAudioPlayerWrapper*>(user_data);
     RTC_DCHECK(ohaudio_wrapper->observer());
@@ -336,6 +341,10 @@ void OHAudioPlayerWrapper::SetStreamConfiguration(OH_AudioStreamBuilder* builder
     RTC_LOG(LS_INFO) << "SetStreamConfiguration";
     RTC_DCHECK(builder);
     RTC_DCHECK(thread_checker_.IsCurrent());
+    // Set renderer info to AUDIOSTREAM_USAGE_VOICE_COMMUNICATION seems more reasonable, or set to
+    // AUDIOSTREAM_USAGE_VIDEO_COMMUNICATION if you prefer to use the speaker as default output device.
+    // See also OH_AudioRenderer_SetDefaultOutputDevice.
+    OH_AudioStreamBuilder_SetRendererInfo(builder, AUDIOSTREAM_USAGE_VOICE_COMMUNICATION);
     OH_AudioStreamBuilder_SetSamplingRate(builder, audio_parameters().sample_rate());
     OH_AudioStreamBuilder_SetChannelCount(builder, audio_parameters().channels());
     OH_AudioStreamBuilder_SetSampleFormat(builder, AUDIOSTREAM_SAMPLE_S16LE);

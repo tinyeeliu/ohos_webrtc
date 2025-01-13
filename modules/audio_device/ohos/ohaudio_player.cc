@@ -30,7 +30,6 @@ OHAudioPlayer::OHAudioPlayer(const AudioParameters& audio_parameters)
     ohaudio_(audio_parameters, AUDIOSTREAM_TYPE_RENDERER, this)
 {
     RTC_LOG(LS_INFO) << "ctor";
-    thread_checker_ohaudio_.Detach();
 }
 
 OHAudioPlayer::~OHAudioPlayer()
@@ -111,7 +110,6 @@ int OHAudioPlayer::StopPlayout()
         RTC_LOG(LS_ERROR) << "StopPlayout failed";
         return -1;
     }
-    thread_checker_ohaudio_.Detach();
     initialized_ = false;
     playing_ = false;
     return 0;
@@ -149,7 +147,10 @@ int32_t OHAudioPlayer::OnErrorCallback(OH_AudioStream_Result error)
 int32_t OHAudioPlayer::OnDataCallback(void* audio_data, int32_t num_frames)
 {
     static const float half_sec = 0.5;
-    RTC_DCHECK_RUN_ON(&thread_checker_ohaudio_);
+    // Some tests shows that this callback can sometimes be called on different
+    // threads (after output device changed for example), so a thread checker
+    // here may cause problem, and use race checker instead.
+    RTC_DCHECK_RUNS_SERIALIZED(&race_checker_ohaudio_);
     if (first_data_callback_) {
         RTC_LOG(LS_INFO) << "--- First output data callback: device id="
                          << ohaudio_.device_id();
