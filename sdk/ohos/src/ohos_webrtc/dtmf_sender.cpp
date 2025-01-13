@@ -63,11 +63,6 @@ void NapiDtmfSender::Init(Napi::Env env, Napi::Object exports)
 NapiDtmfSender::~NapiDtmfSender()
 {
     RTC_DLOG(LS_INFO) << __FUNCTION__;
-
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (eventHandler_.tsfn) {
-        eventHandler_.tsfn.Release();
-    }
 }
 
 Napi::Object NapiDtmfSender::NewInstance(Napi::Env env, rtc::scoped_refptr<DtmfSenderInterface> dtmfSender)
@@ -84,7 +79,7 @@ Napi::Object NapiDtmfSender::NewInstance(Napi::Env env, rtc::scoped_refptr<DtmfS
     return constructor_.New({external});
 }
 
-NapiDtmfSender::NapiDtmfSender(const Napi::CallbackInfo& info) : Napi::ObjectWrap<NapiDtmfSender>(info)
+NapiDtmfSender::NapiDtmfSender(const Napi::CallbackInfo& info) : NapiEventTarget<NapiDtmfSender>(info)
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
@@ -122,41 +117,28 @@ Napi::Value NapiDtmfSender::GetEventHandler(const Napi::CallbackInfo& info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (eventHandler_.ref.IsEmpty()) {
+    const auto type = (const char*)info.Data();
+
+    Function func;
+    if (!NapiEventTarget<NapiDtmfSender>::GetEventHandler(type, func)) {
         return info.Env().Null();
     }
-    return eventHandler_.ref.Value();
+
+    return func;
 }
 
 void NapiDtmfSender::SetEventHandler(const Napi::CallbackInfo& info, const Napi::Value& value)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        if (eventHandler_.tsfn) {
-            eventHandler_.tsfn.Release();
-        }
-    }
+    const auto type = (const char*)info.Data();
 
     if (value.IsFunction()) {
-        auto fn = value.As<Napi::Function>();
-
-        Reference<Napi::Value>* context = new Reference<Napi::Value>;
-        *context = Persistent(info.This());
-
-        EventHandler handler;
-        handler.ref = Persistent(fn);
-        handler.tsfn = ThreadSafeFunction::New(
-            fn.Env(), fn, "SetEventHandler", 0, 1, context, [](Napi::Env env, Reference<Napi::Value>* ctx) {
-                ctx->Reset();
-                delete ctx;
-            });
-        std::lock_guard<std::mutex> lock(mutex_);
-        eventHandler_ = std::move(handler);
+        auto fn = value.As<Function>();
+        NapiEventTarget<NapiDtmfSender>::SetEventHandler(type, fn);
     } else if (value.IsNull()) {
         RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " value is null";
+        RemoveEventHandler(type);
     } else {
         NAPI_THROW_VOID(Error::New(info.Env(), "value is error"));
     }
@@ -183,7 +165,7 @@ Napi::Value NapiDtmfSender::InsertDTMF(const Napi::CallbackInfo& info)
     int duration = kDefaultDurationMs;
     int interToneGap = kDefaultInterToneGapMs;
 
-    if (info.Length() == 2) {
+    if (info.Length() >= 2) {
         // second parameter is optional
         duration = info[1].As<Number>();
         if (duration > kMaxDurationMs) {
@@ -233,24 +215,15 @@ void NapiDtmfSender::OnToneChange(const std::string& tone, const std::string& to
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    std::lock_guard<std::mutex> lock(mutex_);
-    auto& tsfn = eventHandler_.tsfn;
+    Dispatch(CallbackEvent<NapiDtmfSender>::Create([this, tone](NapiDtmfSender& target) {
+        RTC_DCHECK_EQ(this, &target);
 
-    if (!tsfn) {
-        RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " ThreadSafeFunction is not initialized.";
-        return;
-    }
-
-    Reference<Napi::Value>* context = tsfn.GetContext();
-    napi_status status = tsfn.NonBlockingCall([tone, context](Napi::Env env, Napi::Function jsCallback) {
+        auto env = target.Env();
+        Napi::HandleScope scope(env);
         auto jsEvent = Object::New(env);
         jsEvent.Set("tone", String::New(env, tone));
-        jsCallback.Call(context ? context->Value() : env.Undefined(), {jsEvent});
-    });
-
-    if (status != napi_ok) {
-        RTC_LOG(LS_ERROR) << " tsfn call error: " << status;
-    }
+        target.MakeCallback(kEventNameToneChange, {jsEvent});
+    }));
 }
 
 } // namespace webrtc

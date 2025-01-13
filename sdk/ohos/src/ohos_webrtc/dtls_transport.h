@@ -20,11 +20,13 @@
 #include <map>
 #include "api/dtls_transport_interface.h"
 
+#include "event/event_target.h"
+
 namespace webrtc {
 
 class NapiPeerConnectionWrapper;
 
-class NapiDtlsTransport : public Napi::ObjectWrap<NapiDtlsTransport>, public DtlsTransportObserverInterface {
+class NapiDtlsTransport : public NapiEventTarget<NapiDtlsTransport>, public DtlsTransportObserverInterface {
 public:
     static void Init(Napi::Env env, Napi::Object exports);
 
@@ -54,14 +56,6 @@ protected:
 
 private:
     static Napi::FunctionReference constructor_;
-
-    struct EventHandler {
-        Napi::FunctionReference ref;
-        Napi::ThreadSafeFunction tsfn;
-    };
-
-    mutable std::mutex mutex_;
-    std::map<std::string, EventHandler> eventHandlers_;
 
     rtc::scoped_refptr<DtlsTransportInterface> dtlsTransport_;
     NapiPeerConnectionWrapper* pcWrapper_{};
