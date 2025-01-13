@@ -24,57 +24,34 @@
 
 #include "api/data_channel_interface.h"
 
+#include "event/event_target.h"
+
 namespace webrtc {
 
-class NapiDataChannel : public Napi::ObjectWrap<NapiDataChannel> {
+class NapiDataChannel;
+
+class DataChannelObserverTemp : public EventQueue<NapiDataChannel>, public DataChannelObserver {
 public:
-    class Observer : public DataChannelObserver {
-    public:
-        // dataChannel should not be nullptr
-        static std::unique_ptr<Observer> Create(DataChannelInterface* dataChannel);
+    explicit DataChannelObserverTemp(rtc::scoped_refptr<DataChannelInterface> dataChannel);
+    ~DataChannelObserverTemp() override;
 
-        // Do not use this constructor directly, use 'Create' above.
-        explicit Observer(DataChannelInterface* dataChannel);
-        ~Observer();
+    rtc::scoped_refptr<DataChannelInterface> Get() const {
+        return dataChannel_;
+    }
 
-        bool GetEventHandler(const std::string& type, Napi::Function& fn);
-        bool SetEventHandler(const std::string& type, Napi::Function fn, Napi::Value receiver);
-        bool RemoveEventHandler(const std::string& type);
+protected:
+    void OnStateChange() override;
+    void OnMessage(const DataBuffer& buffer) override;
+    void OnBufferedAmountChange(uint64_t sent_data_size) override;
 
-        uint64_t GetBufferedAmountLowThreshold() const;
-        void SetBufferedAmountLowThreshold(uint64_t bufferedAmountLowThreshold);
+private:
+    rtc::scoped_refptr<DataChannelInterface> dataChannel_{};
+};
 
-        std::string GetBinaryType() const;
-        void SetBinaryType(std::string binaryType);
-
-    protected:
-        std::vector<DataBuffer> GetAndClearPendingMessages();
-
-    protected:
-        void OnStateChange() override;
-        void OnMessage(const DataBuffer& buffer) override;
-        void OnBufferedAmountChange(uint64_t sent_data_size) override;
-
-    private:
-        struct EventHandler {
-            Napi::FunctionReference ref;
-            Napi::ThreadSafeFunction tsfn;
-        };
-
-        DataChannelInterface* dataChannel_{};
-
-        mutable std::mutex mutex_;
-        std::map<std::string, EventHandler> eventHandlers_;
-        std::atomic<uint64_t> bufferedAmountLowThreshold_{0};
-        std::string binaryType_;
-        std::vector<DataBuffer> pendingMessages_;
-    };
-
+class NapiDataChannel : public NapiEventTarget<NapiDataChannel>, public DataChannelObserver {
+public:
     static void Init(Napi::Env env, Napi::Object exports);
-
-    static Napi::Object NewInstance(Napi::Env env, rtc::scoped_refptr<DataChannelInterface> dataChannel);
-    static Napi::Object
-    NewInstance(Napi::Env env, rtc::scoped_refptr<DataChannelInterface> dataChannel, Observer* observer);
+    static Napi::Object NewInstance(Napi::Env env, std::unique_ptr<DataChannelObserverTemp> observer);
 
     explicit NapiDataChannel(const Napi::CallbackInfo& info);
     ~NapiDataChannel() override;
@@ -104,12 +81,24 @@ protected:
     Napi::Value Send(const Napi::CallbackInfo& info);
     Napi::Value ToJson(const Napi::CallbackInfo& info);
 
+protected:
+    friend class DataChannelObserverTemp;
+
+    void OnStateChange() override;
+    void OnMessage(const DataBuffer& buffer) override;
+    void OnBufferedAmountChange(uint64_t sent_data_size) override;
+    
+    void HandleStateChange(DataChannelInterface::DataState state);
+    void HandleMessage(const DataBuffer& buffer);
+  
 private:
     static Napi::FunctionReference constructor_;
 
+    std::unique_ptr<DataChannelObserverTemp> observerTemp_;
     rtc::scoped_refptr<DataChannelInterface> dataChannel_;
 
-    std::unique_ptr<Observer> observer_;
+    std::string binaryType_;
+    std::atomic<uint64_t> bufferedAmountLowThreshold_{0};
 };
 
 void JsToNativeDataChannelInit(const Napi::Object& jsDataChannelInit, DataChannelInit& init);
