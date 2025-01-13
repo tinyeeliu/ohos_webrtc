@@ -75,7 +75,7 @@ Napi::Object NapiSctpTransport::NewInstance(
     return constructor_.New({externalTransport, externalPcWrapper});
 }
 
-NapiSctpTransport::NapiSctpTransport(const Napi::CallbackInfo& info) : Napi::ObjectWrap<NapiSctpTransport>(info)
+NapiSctpTransport::NapiSctpTransport(const Napi::CallbackInfo& info) : NapiEventTarget<NapiSctpTransport>(info)
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
@@ -102,11 +102,6 @@ NapiSctpTransport::~NapiSctpTransport()
 
     auto factoryWrapper = pcWrapper_->GetPeerConnectionFactoryWrapper();
     factoryWrapper->GetNetworkThread()->BlockingCall([this] { sctpTransport_->UnregisterObserver(); });
-
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (eventHandler_.tsfn) {
-        eventHandler_.tsfn.Release();
-    }
 }
 
 rtc::scoped_refptr<SctpTransportInterface> NapiSctpTransport::Get() const
@@ -168,41 +163,28 @@ Napi::Value NapiSctpTransport::GetEventHandler(const Napi::CallbackInfo& info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (eventHandler_.ref.IsEmpty()) {
+    const auto type = (const char*)info.Data();
+
+    Function func;
+    if (!NapiEventTarget<NapiSctpTransport>::GetEventHandler(type, func)) {
         return info.Env().Null();
     }
-    return eventHandler_.ref.Value();
+
+    return func;
 }
 
 void NapiSctpTransport::SetEventHandler(const Napi::CallbackInfo& info, const Napi::Value& value)
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        if (eventHandler_.tsfn) {
-            eventHandler_.tsfn.Release();
-        }
-    }
+    const auto type = (const char*)info.Data();
 
     if (value.IsFunction()) {
-        auto fn = value.As<Napi::Function>();
-
-        Reference<Napi::Value>* context = new Reference<Napi::Value>;
-        *context = Persistent(info.This());
-
-        EventHandler handler;
-        handler.ref = Persistent(fn);
-        handler.tsfn = ThreadSafeFunction::New(
-            fn.Env(), fn, "SetEventHandler", 0, 1, context, [](Napi::Env env, Reference<Napi::Value>* ctx) {
-                ctx->Reset();
-                delete ctx;
-            });
-        std::lock_guard<std::mutex> lock(mutex_);
-        eventHandler_ = std::move(handler);
+        auto fn = value.As<Function>();
+        NapiEventTarget<NapiSctpTransport>::SetEventHandler(type, fn);
     } else if (value.IsNull()) {
         RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " value is null";
+        RemoveEventHandler(type);
     } else {
         NAPI_THROW_VOID(Error::New(info.Env(), "value is error"));
     }
@@ -212,23 +194,21 @@ void NapiSctpTransport::OnStateChange(SctpTransportInformation info)
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    std::lock_guard<std::mutex> lock(mutex_);
-    auto& tsfn = eventHandler_.tsfn;
+    auto sctpTransportState = info.state();
 
-    if (!tsfn) {
-        RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " ThreadSafeFunction is not initialized.";
-        return;
-    }
+    Dispatch(CallbackEvent<NapiSctpTransport>::Create([this, sctpTransportState](NapiSctpTransport& target) {
+        RTC_DCHECK_EQ(this, &target);
 
-    Reference<Napi::Value>* context = tsfn.GetContext();
-    napi_status status = tsfn.NonBlockingCall([context](Napi::Env env, Napi::Function jsCallback) {
+        auto env = target.Env();
+        Napi::HandleScope scope(env);
         auto jsEvent = Object::New(env);
-        jsCallback.Call(context ? context->Value() : env.Undefined(), {jsEvent});
-    });
+        jsEvent.Set("type", String::New(env, kEventStateChange));
+        target.MakeCallback(kEventStateChange, {jsEvent});
 
-    if (status != napi_ok) {
-        RTC_LOG(LS_ERROR) << " tsfn call error: " << status;
-    }
+        if (sctpTransportState == SctpTransportState::kClosed) {
+            target.Stop();
+        }
+    }));
 }
 
 Napi::Value NapiSctpTransport::ToJson(const Napi::CallbackInfo& info)

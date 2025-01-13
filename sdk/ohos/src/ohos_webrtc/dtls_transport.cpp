@@ -69,11 +69,6 @@ void NapiDtlsTransport::Init(Napi::Env env, Napi::Object exports)
 NapiDtlsTransport::~NapiDtlsTransport()
 {
     RTC_DLOG(LS_INFO) << __FUNCTION__;
-
-    std::lock_guard<std::mutex> lock(mutex_);
-    for (auto& handler : eventHandlers_) {
-        handler.second.tsfn.Release();
-    }
 }
 
 Napi::Object NapiDtlsTransport::NewInstance(
@@ -93,7 +88,7 @@ Napi::Object NapiDtlsTransport::NewInstance(
     return constructor_.New({externalTransport, externalPcWrapper});
 }
 
-NapiDtlsTransport::NapiDtlsTransport(const Napi::CallbackInfo& info) : Napi::ObjectWrap<NapiDtlsTransport>(info)
+NapiDtlsTransport::NapiDtlsTransport(const Napi::CallbackInfo& info) : NapiEventTarget<NapiDtlsTransport>(info)
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
@@ -153,13 +148,14 @@ Napi::Value NapiDtlsTransport::GetEventHandler(const Napi::CallbackInfo& info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    std::lock_guard<std::mutex> lock(mutex_);
-    auto it = eventHandlers_.find((const char*)info.Data());
-    if (it == eventHandlers_.end()) {
+    const auto type = (const char*)info.Data();
+
+    Function func;
+    if (!NapiEventTarget<NapiDtlsTransport>::GetEventHandler(type, func)) {
         return info.Env().Null();
     }
 
-    return it->second.ref.Value();
+    return func;
 }
 
 void NapiDtlsTransport::SetEventHandler(const Napi::CallbackInfo& info, const Napi::Value& value)
@@ -168,32 +164,12 @@ void NapiDtlsTransport::SetEventHandler(const Napi::CallbackInfo& info, const Na
 
     const auto type = (const char*)info.Data();
 
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        auto it = eventHandlers_.find(type);
-        if (it != eventHandlers_.end()) {
-            it->second.tsfn.Release();
-            eventHandlers_.erase(it);
-        }
-    }
-
     if (value.IsFunction()) {
         auto fn = value.As<Function>();
-
-        Reference<Napi::Value>* context = new Reference<Napi::Value>;
-        *context = Persistent(info.This());
-
-        EventHandler handler;
-        handler.ref = Persistent(fn);
-        handler.tsfn =
-            ThreadSafeFunction::New(fn.Env(), fn, type, 0, 1, context, [](Napi::Env env, Reference<Napi::Value>* ctx) {
-                ctx->Reset();
-                delete ctx;
-            });
-        std::lock_guard<std::mutex> lock(mutex_);
-        eventHandlers_[type] = std::move(handler);
+        NapiEventTarget<NapiDtlsTransport>::SetEventHandler(type, fn);
     } else if (value.IsNull()) {
         RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " value is null";
+        RemoveEventHandler(type);
     } else {
         NAPI_THROW_VOID(Error::New(info.Env(), "value is error"));
     }
@@ -237,44 +213,36 @@ void NapiDtlsTransport::OnStateChange(DtlsTransportInformation info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    std::lock_guard<std::mutex> lock(mutex_);
+    auto dtlsTransportState = info.state();
 
-    auto it = eventHandlers_.find(kEventNameStateChange);
-    if (it == eventHandlers_.end()) {
-        return;
-    }
+    Dispatch(CallbackEvent<NapiDtlsTransport>::Create([this, dtlsTransportState](NapiDtlsTransport& target) {
+        RTC_DCHECK_EQ(this, &target);
 
-    auto& tsfn = it->second.tsfn;
-    Reference<Napi::Value>* context = tsfn.GetContext();
-    napi_status status = tsfn.NonBlockingCall([context](Napi::Env env, Napi::Function jsCallback) {
+        auto env = target.Env();
+        Napi::HandleScope scope(env);
         auto jsEvent = Object::New(env);
-        jsCallback.Call(context ? context->Value() : env.Undefined(), {jsEvent});
-    });
-    if (status != napi_ok) {
-        RTC_LOG(LS_ERROR) << " tsfn call error: " << status;
-    }
+        jsEvent.Set("type", String::New(env, kEventNameStateChange));
+        target.MakeCallback(kEventNameStateChange, {jsEvent});
+
+        if (dtlsTransportState == DtlsTransportState::kClosed) {
+            target.Stop();
+        }
+    }));
 }
 
 void NapiDtlsTransport::OnError(RTCError error)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    std::lock_guard<std::mutex> lock(mutex_);
+    Dispatch(CallbackEvent<NapiDtlsTransport>::Create([this](NapiDtlsTransport& target) {
+        RTC_DCHECK_EQ(this, &target);
 
-    auto it = eventHandlers_.find(kEventNameError);
-    if (it == eventHandlers_.end()) {
-        return;
-    }
-
-    auto& tsfn = it->second.tsfn;
-    Reference<Napi::Value>* context = tsfn.GetContext();
-    napi_status status = tsfn.NonBlockingCall([context](Napi::Env env, Napi::Function jsCallback) {
+        auto env = target.Env();
+        Napi::HandleScope scope(env);
         auto jsEvent = Object::New(env);
-        jsCallback.Call(context ? context->Value() : env.Undefined(), {jsEvent});
-    });
-    if (status != napi_ok) {
-        RTC_LOG(LS_ERROR) << " tsfn call error: " << status;
-    }
+        jsEvent.Set("type", String::New(env, kEventNameError));
+        target.MakeCallback(kEventNameError, {jsEvent});
+    }));
 }
 
 } // namespace webrtc
