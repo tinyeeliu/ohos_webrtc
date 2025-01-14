@@ -59,49 +59,39 @@ void NapiSctpTransport::Init(Napi::Env env, Napi::Object exports)
 }
 
 Napi::Object NapiSctpTransport::NewInstance(
-    Napi::Env env, rtc::scoped_refptr<SctpTransportInterface> transport, NapiPeerConnectionWrapper* pcWrapper)
+    std::shared_ptr<PeerConnectionFactoryWrapper> factory, rtc::scoped_refptr<SctpTransportInterface> transport)
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    if (!transport || !pcWrapper) {
+    auto env = constructor_.Env();
+    if (!factory || !transport) {
         NAPI_THROW(Error::New(env, "Invalid argument"), Object());
     }
 
-    auto externalTransport = External<SctpTransportInterface>::New(
-        env, transport.release(), [](Napi::Env, SctpTransportInterface* transport) { transport->Release(); });
-
-    auto externalPcWrapper = External<NapiPeerConnectionWrapper>::New(env, pcWrapper);
-
-    return constructor_.New({externalTransport, externalPcWrapper});
+    return constructor_.New(
+        {External<std::shared_ptr<PeerConnectionFactoryWrapper>>::New(env, &factory),
+         External<rtc::scoped_refptr<SctpTransportInterface>>::New(env, &transport)});
 }
 
 NapiSctpTransport::NapiSctpTransport(const Napi::CallbackInfo& info) : NapiEventTarget<NapiSctpTransport>(info)
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    if (info[0].IsExternal()) {
-        auto sctpTransport = info[0].As<External<SctpTransportInterface>>().Data();
-        sctpTransport_ = rtc::scoped_refptr<SctpTransportInterface>(sctpTransport);
+    if (info.Length() != 2 || !info[0].IsExternal() || !info[1].IsExternal()) {
+        NAPI_THROW_VOID(Napi::Error::New(info.Env(), "Invalid Operation"));
     }
 
-    if (info.Length() > 1 && info[1].IsExternal()) {
-        pcWrapper_ = info[1].As<External<NapiPeerConnectionWrapper>>().Data();
-    }
+    factory_ = *info[0].As<External<std::shared_ptr<PeerConnectionFactoryWrapper>>>().Data();
+    sctpTransport_ = *info[1].As<External<rtc::scoped_refptr<SctpTransportInterface>>>().Data();
 
-    if (!pcWrapper_ || !sctpTransport_) {
-        NAPI_THROW_VOID(Error::New(info.Env(), "Invalid argument"));
-    }
-
-    auto factoryWrapper = pcWrapper_->GetPeerConnectionFactoryWrapper();
-    factoryWrapper->GetNetworkThread()->BlockingCall([this] { sctpTransport_->RegisterObserver(this); });
+    factory_->GetNetworkThread()->BlockingCall([this] { sctpTransport_->RegisterObserver(this); });
 }
 
 NapiSctpTransport::~NapiSctpTransport()
 {
     RTC_DLOG(LS_INFO) << __FUNCTION__;
 
-    auto factoryWrapper = pcWrapper_->GetPeerConnectionFactoryWrapper();
-    factoryWrapper->GetNetworkThread()->BlockingCall([this] { sctpTransport_->UnregisterObserver(); });
+    factory_->GetNetworkThread()->BlockingCall([this] { sctpTransport_->UnregisterObserver(); });
 }
 
 rtc::scoped_refptr<SctpTransportInterface> NapiSctpTransport::Get() const
@@ -156,7 +146,7 @@ Napi::Value NapiSctpTransport::GetTransport(const Napi::CallbackInfo& info)
         NAPI_THROW(Error::New(info.Env(), "No transport"), info.Env().Undefined());
     }
 
-    return NapiDtlsTransport::NewInstance(info.Env(), transport, pcWrapper_);
+    return NapiDtlsTransport::NewInstance(info.Env(), factory_, transport);
 }
 
 Napi::Value NapiSctpTransport::GetEventHandler(const Napi::CallbackInfo& info)

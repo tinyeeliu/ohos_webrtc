@@ -240,12 +240,7 @@ Napi::Value NapiPeerConnectionFactory::CreatePeerConnection(const CallbackInfo& 
         NAPI_THROW(TypeError::New(info.Env(), "First argument is not Object"), info.Env().Undefined());
     }
 
-    PeerConnectionInterface::RTCConfiguration config;
-    config.sdp_semantics = SdpSemantics::kUnifiedPlan;
-    JsToNativeConfiguration(info[0].As<Object>(), config);
-
-    auto observer = NapiPeerConnectionWrapper::Create(wrapper_, config);
-    return NapiPeerConnection::NewInstance(info.Env(), std::move(observer));
+    return NapiPeerConnection::NewInstance(info[0], wrapper_);
 }
 
 Napi::Value NapiPeerConnectionFactory::CreateAudioSource(const CallbackInfo& info)

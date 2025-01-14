@@ -26,105 +26,24 @@
 
 #include "api/peer_connection_interface.h"
 
+#include "event/event_target.h"
+
 namespace webrtc {
 
 class PeerConnectionFactoryWrapper;
 
-class NapiPeerConnectionWrapper : public PeerConnectionObserver {
-public:
-    static std::unique_ptr<NapiPeerConnectionWrapper> Create(
-        std::shared_ptr<PeerConnectionFactoryWrapper> factoryWrapper,
-        const PeerConnectionInterface::RTCConfiguration& config);
-
-    // Do not use this constructor directly, use 'Create' above.
-    NapiPeerConnectionWrapper();
-    ~NapiPeerConnectionWrapper() override;
-
-    const std::shared_ptr<PeerConnectionFactoryWrapper> GetPeerConnectionFactoryWrapper() const
-    {
-        return factory_;
-    }
-
-    const rtc::scoped_refptr<PeerConnectionInterface>& GetPeerConnection() const
-    {
-        return pc_;
-    }
-
-    bool GetEventHandler(const std::string& type, Napi::Function& fn);
-    bool SetEventHandler(const std::string& type, Napi::Function fn, Napi::Value receiver);
-    bool RemoveEventHandler(const std::string& type);
-    void RemoveAllEventHandlers();
-
-protected:
-    friend class NapiPeerConnection;
-
-    void SetPeerConnectionFactoryWrapper(std::shared_ptr<PeerConnectionFactoryWrapper> factoryWrapper)
-    {
-        factory_ = std::move(factoryWrapper);
-    }
-
-    void SetPeerConnection(rtc::scoped_refptr<PeerConnectionInterface> pc)
-    {
-        pc_ = pc;
-    }
-
-    bool GetEventHandler(const std::string& type, Napi::ThreadSafeFunction& tsfn);
-
-protected:
-    void OnIceCandidate(const IceCandidateInterface* candidate) override;
-    void OnIceCandidateError(
-        const std::string& address, int port, const std::string& url, int error_code,
-        const std::string& error_text) override;
-
-    void OnIceCandidatesRemoved(const std::vector<cricket::Candidate>& candidates) override;
-    void OnSignalingChange(PeerConnectionInterface::SignalingState new_state) override;
-    void OnIceConnectionChange(PeerConnectionInterface::IceConnectionState new_state) override;
-    void OnStandardizedIceConnectionChange(PeerConnectionInterface::IceConnectionState new_state) override;
-    void OnConnectionChange(PeerConnectionInterface::PeerConnectionState new_state) override;
-    void OnIceConnectionReceivingChange(bool receiving) override;
-    void OnIceGatheringChange(PeerConnectionInterface::IceGatheringState new_state) override;
-    void OnIceSelectedCandidatePairChanged(const cricket::CandidatePairChangeEvent& event) override;
-    void OnAddStream(rtc::scoped_refptr<MediaStreamInterface> stream) override;
-    void OnRemoveStream(rtc::scoped_refptr<MediaStreamInterface> stream) override;
-    void OnDataChannel(rtc::scoped_refptr<DataChannelInterface> channel) override;
-    void OnRenegotiationNeeded() override;
-    void OnNegotiationNeededEvent(uint32_t event_id) override;
-    void OnAddTrack(
-        rtc::scoped_refptr<RtpReceiverInterface> receiver,
-        const std::vector<rtc::scoped_refptr<MediaStreamInterface>>& streams) override;
-    void OnTrack(rtc::scoped_refptr<RtpTransceiverInterface> transceiver) override;
-    void OnRemoveTrack(rtc::scoped_refptr<RtpReceiverInterface> receiver) override;
-
-private:
-    std::shared_ptr<PeerConnectionFactoryWrapper> factory_;
-    rtc::scoped_refptr<PeerConnectionInterface> pc_;
-
-    struct EventHandler {
-        Napi::FunctionReference ref;
-        Napi::ThreadSafeFunction tsfn;
-    };
-
-    // set by 'onxxx' like event handler attribute, eg. onicecandidate.
-    std::map<std::string, EventHandler> eventHandlers_;
-
-    std::mutex eventMutex_;
-
-    // Call event handler in this thread (instead of signaling thread) to avoid potential deadlock.
-    // There is a bug in OpenHarmony (4.1 and before), see
-    // https://gitee.com/openharmony/arkui_napi/commit/485e75b6f623bcacf9ab4cb4c82bf0f077fe1f6e
-    std::unique_ptr<rtc::Thread> eventThread_;
-};
-
-class NapiPeerConnection : public Napi::ObjectWrap<NapiPeerConnection> {
+class NapiPeerConnection : public NapiEventTarget<NapiPeerConnection>, public PeerConnectionObserver {
 public:
     static void Init(Napi::Env env, Napi::Object exports);
 
-    static Napi::Value NewInstance(Napi::Env env, std::unique_ptr<NapiPeerConnectionWrapper> wrapper);
+    static Napi::Value NewInstance(Napi::Value configuration, std::shared_ptr<PeerConnectionFactoryWrapper> factory);
 
-    explicit NapiPeerConnection(const Napi::CallbackInfo& info);
-    ~NapiPeerConnection();
+    ~NapiPeerConnection() override;
 
 protected:
+    friend class ObjectWrap;
+    explicit NapiPeerConnection(const Napi::CallbackInfo& info);
+
     Napi::Value GetCanTrickleIceCandidates(const Napi::CallbackInfo& info);
     Napi::Value GetSignalingState(const Napi::CallbackInfo& info);
     Napi::Value GetIceGatheringState(const Napi::CallbackInfo& info);
@@ -162,10 +81,34 @@ protected:
 
     static Napi::Value GenerateCertificate(const Napi::CallbackInfo& info);
 
+protected:
+    void OnIceCandidate(const IceCandidateInterface* candidate) override;
+    void OnIceCandidateError(
+        const std::string& address, int port, const std::string& url, int errorCode,
+        const std::string& errorText) override;
+    void OnIceCandidatesRemoved(const std::vector<cricket::Candidate>& candidates) override;
+    void OnSignalingChange(PeerConnectionInterface::SignalingState newState) override;
+    void OnIceConnectionChange(PeerConnectionInterface::IceConnectionState newState) override;
+    void OnStandardizedIceConnectionChange(PeerConnectionInterface::IceConnectionState newState) override;
+    void OnConnectionChange(PeerConnectionInterface::PeerConnectionState newState) override;
+    void OnIceConnectionReceivingChange(bool receiving) override;
+    void OnIceGatheringChange(PeerConnectionInterface::IceGatheringState newState) override;
+    void OnIceSelectedCandidatePairChanged(const cricket::CandidatePairChangeEvent& event) override;
+    void OnAddStream(rtc::scoped_refptr<MediaStreamInterface> stream) override;
+    void OnRemoveStream(rtc::scoped_refptr<MediaStreamInterface> stream) override;
+    void OnDataChannel(rtc::scoped_refptr<DataChannelInterface> channel) override;
+    void OnRenegotiationNeeded() override;
+    void OnNegotiationNeededEvent(uint32_t eventId) override;
+    void OnAddTrack(
+        rtc::scoped_refptr<RtpReceiverInterface> receiver,
+        const std::vector<rtc::scoped_refptr<MediaStreamInterface>>& streams) override;
+    void OnTrack(rtc::scoped_refptr<RtpTransceiverInterface> transceiver) override;
+    void OnRemoveTrack(rtc::scoped_refptr<RtpReceiverInterface> receiver) override;
+
 private:
     static Napi::FunctionReference constructor_;
 
-    std::unique_ptr<NapiPeerConnectionWrapper> wrapper_;
+    std::shared_ptr<PeerConnectionFactoryWrapper> factory_;
     rtc::scoped_refptr<PeerConnectionInterface> pc_;
 
     Napi::ObjectReference sctpTransportRef_;

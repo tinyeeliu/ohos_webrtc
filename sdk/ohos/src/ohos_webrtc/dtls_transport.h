@@ -24,14 +24,15 @@
 
 namespace webrtc {
 
-class NapiPeerConnectionWrapper;
+class PeerConnectionFactoryWrapper;
 
 class NapiDtlsTransport : public NapiEventTarget<NapiDtlsTransport>, public DtlsTransportObserverInterface {
 public:
     static void Init(Napi::Env env, Napi::Object exports);
 
     static Napi::Object NewInstance(
-        Napi::Env env, rtc::scoped_refptr<DtlsTransportInterface> dtlsTransport, NapiPeerConnectionWrapper* pcWrapper);
+        Napi::Env env, std::shared_ptr<PeerConnectionFactoryWrapper> factory,
+        rtc::scoped_refptr<DtlsTransportInterface> dtlsTransport);
 
     ~NapiDtlsTransport();
 
@@ -57,8 +58,8 @@ protected:
 private:
     static Napi::FunctionReference constructor_;
 
+    std::shared_ptr<PeerConnectionFactoryWrapper> factory_;
     rtc::scoped_refptr<DtlsTransportInterface> dtlsTransport_;
-    NapiPeerConnectionWrapper* pcWrapper_{};
 };
 
 } // namespace webrtc

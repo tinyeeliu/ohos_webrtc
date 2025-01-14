@@ -72,53 +72,45 @@ NapiDtlsTransport::~NapiDtlsTransport()
 }
 
 Napi::Object NapiDtlsTransport::NewInstance(
-    Napi::Env env, rtc::scoped_refptr<DtlsTransportInterface> dtlsTransport, NapiPeerConnectionWrapper* pcWrapper)
+    Napi::Env env, std::shared_ptr<PeerConnectionFactoryWrapper> factory,
+    rtc::scoped_refptr<DtlsTransportInterface> dtlsTransport)
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    if (!dtlsTransport || !pcWrapper) {
+    if (!dtlsTransport || !factory) {
         NAPI_THROW(Error::New(env, "Invalid argument"), Object::New(env));
     }
 
+    auto externalFactory = External<std::shared_ptr<PeerConnectionFactoryWrapper>>::New(env, &factory);
     auto externalTransport = External<DtlsTransportInterface>::New(
         env, dtlsTransport.release(), [](Napi::Env env, DtlsTransportInterface* transport) { transport->Release(); });
-
-    auto externalPcWrapper = External<NapiPeerConnectionWrapper>::New(env, pcWrapper);
-
-    return constructor_.New({externalTransport, externalPcWrapper});
+    return constructor_.New({externalFactory, externalTransport});
 }
 
 NapiDtlsTransport::NapiDtlsTransport(const Napi::CallbackInfo& info) : NapiEventTarget<NapiDtlsTransport>(info)
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    rtc::scoped_refptr<DtlsTransportInterface> dtlsTransport;
-
-    if (info.Length() > 0 && info[0].IsExternal()) {
-        dtlsTransport = info[0].As<External<DtlsTransportInterface>>().Data();
-    } else {
-        // nothing to do now
+    if (info.Length() != 2 || !info[0].IsExternal() || !info[1].IsExternal()) {
+        // You cannot construct an RTCDtlsTransport
+        NAPI_THROW(Napi::Error::New(info.Env(), "Invalid Operation"));
+        return;
     }
 
-    if (!dtlsTransport) {
-        NAPI_THROW_VOID(Error::New(info.Env(), "Invalid argument"));
-    }
+    factory_ = *info[0].As<External<std::shared_ptr<PeerConnectionFactoryWrapper>>>().Data();
 
-    dtlsTransport_ = dtlsTransport;
+    auto dtlsTransport = info[1].As<External<DtlsTransportInterface>>().Data();
+    ;
+    dtlsTransport_ = rtc::scoped_refptr<DtlsTransportInterface>(dtlsTransport);
 
-    if (info.Length() > 1 && info[1].IsExternal()) {
-        pcWrapper_ = info[1].As<External<NapiPeerConnectionWrapper>>().Data();
-    }
-
-    auto factoryWrapper = pcWrapper_->GetPeerConnectionFactoryWrapper();
-    factoryWrapper->GetNetworkThread()->PostTask([this] { dtlsTransport_->RegisterObserver(this); });
+    factory_->GetNetworkThread()->PostTask([this] { dtlsTransport_->RegisterObserver(this); });
 }
 
 Napi::Value NapiDtlsTransport::GetIceTransport(const Napi::CallbackInfo& info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    return NapiIceTransport::NewInstance(info.Env(), dtlsTransport_->ice_transport(), pcWrapper_);
+    return NapiIceTransport::NewInstance(info.Env(), factory_, dtlsTransport_->ice_transport());
 }
 
 Napi::Value NapiDtlsTransport::GetState(const Napi::CallbackInfo& info)

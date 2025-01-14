@@ -19,23 +19,28 @@
 #include "napi.h"
 
 #include "api/rtp_transceiver_interface.h"
+#include "api/peer_connection_interface.h"
 
 namespace webrtc {
 
-class NapiPeerConnectionWrapper;
+class PeerConnectionFactoryWrapper;
 
 class NapiRtpTransceiver : public Napi::ObjectWrap<NapiRtpTransceiver> {
 public:
     static void Init(Napi::Env env, Napi::Object exports);
 
     static Napi::Object NewInstance(
-        Napi::Env env, rtc::scoped_refptr<RtpTransceiverInterface> transceiver, NapiPeerConnectionWrapper* pcWrapper);
+        std::shared_ptr<PeerConnectionFactoryWrapper> factory, rtc::scoped_refptr<PeerConnectionInterface> pc,
+        rtc::scoped_refptr<RtpTransceiverInterface> transceiver);
 
-    explicit NapiRtpTransceiver(const Napi::CallbackInfo& info);
+    ~NapiRtpTransceiver() override;
 
     rtc::scoped_refptr<RtpTransceiverInterface> Get() const;
 
 protected:
+    friend class ObjectWrap;
+    explicit NapiRtpTransceiver(const Napi::CallbackInfo& info);
+
     Napi::Value GetMid(const Napi::CallbackInfo& info);
     Napi::Value GetSender(const Napi::CallbackInfo& info);
     Napi::Value GetReceiver(const Napi::CallbackInfo& info);
@@ -50,8 +55,9 @@ protected:
 private:
     static Napi::FunctionReference constructor_;
 
+    std::shared_ptr<PeerConnectionFactoryWrapper> factory_;
+    rtc::scoped_refptr<PeerConnectionInterface> pc_;
     rtc::scoped_refptr<RtpTransceiverInterface> rtpTransceiver_;
-    NapiPeerConnectionWrapper* pcWrapper_{};
 };
 
 void PopulateTransceiverInit(const Napi::Object& jsInit, webrtc::RtpTransceiverInit& init);

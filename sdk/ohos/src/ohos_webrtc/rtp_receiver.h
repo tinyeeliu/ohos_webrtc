@@ -24,20 +24,24 @@
 
 namespace webrtc {
 
-class NapiPeerConnectionWrapper;
+class PeerConnectionFactoryWrapper;
 
 class NapiRtpReceiver : public Napi::ObjectWrap<NapiRtpReceiver> {
 public:
     static void Init(Napi::Env env, Napi::Object exports);
 
-    static Napi::Object
-    NewInstance(Napi::Env env, rtc::scoped_refptr<RtpReceiverInterface> receiver, NapiPeerConnectionWrapper* pcWrapper);
+    static Napi::Object NewInstance(
+        std::shared_ptr<PeerConnectionFactoryWrapper> factory, rtc::scoped_refptr<PeerConnectionInterface> pc,
+        rtc::scoped_refptr<RtpReceiverInterface> receiver);
 
-    explicit NapiRtpReceiver(const Napi::CallbackInfo& info);
+    ~NapiRtpReceiver() override;
 
     rtc::scoped_refptr<RtpReceiverInterface> Get() const;
 
 protected:
+    friend class ObjectWrap;
+    explicit NapiRtpReceiver(const Napi::CallbackInfo& info);
+
     static Napi::Value GetCapabilities(const Napi::CallbackInfo& info);
 
     Napi::Value GetTrack(const Napi::CallbackInfo& info);
@@ -52,8 +56,9 @@ protected:
 private:
     static Napi::FunctionReference constructor_;
 
+    std::shared_ptr<PeerConnectionFactoryWrapper> factory_;
+    rtc::scoped_refptr<PeerConnectionInterface> pc_;
     rtc::scoped_refptr<RtpReceiverInterface> rtpReceiver_;
-    NapiPeerConnectionWrapper* pcWrapper_{};
 };
 
 } // namespace webrtc

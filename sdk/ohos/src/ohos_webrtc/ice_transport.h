@@ -28,14 +28,15 @@
 
 namespace webrtc {
 
-class NapiPeerConnectionWrapper;
+class PeerConnectionFactoryWrapper;
 
 class NapiIceTransport : public NapiEventTarget<NapiIceTransport>, public sigslot::has_slots<> {
 public:
     static void Init(Napi::Env env, Napi::Object exports);
 
     static Napi::Object NewInstance(
-        Napi::Env env, rtc::scoped_refptr<IceTransportInterface> iceTransport, NapiPeerConnectionWrapper* pcWrapper);
+        Napi::Env env, std::shared_ptr<PeerConnectionFactoryWrapper> factory,
+        rtc::scoped_refptr<IceTransportInterface> iceTransport);
 
     ~NapiIceTransport() override;
 
@@ -68,8 +69,8 @@ protected:
 private:
     static Napi::FunctionReference constructor_;
 
+    std::shared_ptr<PeerConnectionFactoryWrapper> factory_;
     rtc::scoped_refptr<IceTransportInterface> iceTransport_;
-    NapiPeerConnectionWrapper* pcWrapper_{};
 
     std::atomic<IceTransportState> iceTransportState_{IceTransportState::kNew};
     std::atomic<cricket::IceGatheringState> iceGatheringState_{cricket::kIceGatheringNew};

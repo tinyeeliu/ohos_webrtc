@@ -98,60 +98,63 @@ NapiIceTransport::~NapiIceTransport()
 }
 
 Napi::Object NapiIceTransport::NewInstance(
-    Napi::Env env, rtc::scoped_refptr<IceTransportInterface> iceTransport, NapiPeerConnectionWrapper* pcWrapper)
+    Napi::Env env, std::shared_ptr<PeerConnectionFactoryWrapper> factory,
+    rtc::scoped_refptr<IceTransportInterface> iceTransport)
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    if (!iceTransport || !pcWrapper) {
+    if (!iceTransport || !factory) {
         NAPI_THROW(Error::New(env, "Invalid argument"), Object::New(env));
     }
 
+    auto externalFactory = External<std::shared_ptr<PeerConnectionFactoryWrapper>>::New(env, &factory);
     auto externalTransport = External<IceTransportInterface>::New(
         env, iceTransport.release(), [](Napi::Env env, IceTransportInterface* transport) { transport->Release(); });
-
-    auto externalPcWrapper = External<NapiPeerConnectionWrapper>::New(env, pcWrapper);
-
-    return constructor_.New({externalTransport, externalPcWrapper});
+    return constructor_.New({externalFactory, externalTransport});
 }
 
 NapiIceTransport::NapiIceTransport(const Napi::CallbackInfo& info) : NapiEventTarget<NapiIceTransport>(info)
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    if (info[0].IsExternal()) {
-        auto iceTransport = info[0].As<External<IceTransportInterface>>().Data();
-        iceTransport_ = rtc::scoped_refptr<IceTransportInterface>(iceTransport);
+    if (info.Length() != 2 || !info[0].IsExternal() || !info[1].IsExternal()) {
+        // You cannot construct an RTCIceTransport
+        NAPI_THROW(Napi::Error::New(info.Env(), "Invalid Operation"));
+        return;
     }
 
-    if (info.Length() > 1 && info[1].IsExternal()) {
-        pcWrapper_ = info[1].As<External<NapiPeerConnectionWrapper>>().Data();
+    factory_ = *info[0].As<External<std::shared_ptr<PeerConnectionFactoryWrapper>>>().Data();
 
-        auto factoryWrapper = pcWrapper_->GetPeerConnectionFactoryWrapper();
-        cricket::IceTransportInternal* internal = nullptr;
+    auto iceTransport = info[1].As<External<IceTransportInterface>>().Data();
+    iceTransport_ = rtc::scoped_refptr<IceTransportInterface>(iceTransport);
 
-        factoryWrapper->GetNetworkThread()->BlockingCall([&internal, this] {
-            internal = iceTransport_->internal();
-
+    factory_->GetNetworkThread()->BlockingCall([this] {
+        auto internal = iceTransport_->internal();
+        if (internal) {
             internal->SignalIceTransportStateChanged.connect(this, &NapiIceTransport::OnStateChange);
             internal->SignalGatheringState.connect(this, &NapiIceTransport::OnGatheringStateChange);
             internal->SignalCandidatePairChanged.connect(this, &NapiIceTransport::OnSelectedCandidatePairChange);
 
             iceTransportState_ = internal->GetIceTransportState();
             iceGatheringState_ = internal->gathering_state();
-        });
-    }
+        } else {
+            iceTransportState_ = IceTransportState::kClosed;
+            iceGatheringState_ = cricket::kIceGatheringComplete;
+        }
+
+        if (iceTransportState_ == IceTransportState::kClosed) {
+            Stop();
+        }
+    });
 }
 
 Napi::Value NapiIceTransport::GetRole(const Napi::CallbackInfo& info)
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    auto factoryWrapper = pcWrapper_->GetPeerConnectionFactoryWrapper();
-
     cricket::IceRole iceRole;
 
-    factoryWrapper->GetNetworkThread()->BlockingCall(
-        [&iceRole, this] { iceRole = iceTransport_->internal()->GetIceRole(); });
+    factory_->GetNetworkThread()->BlockingCall([&iceRole, this] { iceRole = iceTransport_->internal()->GetIceRole(); });
 
     switch (iceRole) {
         case cricket::ICEROLE_CONTROLLING:
@@ -171,11 +174,9 @@ Napi::Value NapiIceTransport::GetComponent(const Napi::CallbackInfo& info)
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    auto factoryWrapper = pcWrapper_->GetPeerConnectionFactoryWrapper();
-
     int component = 0;
 
-    factoryWrapper->GetNetworkThread()->BlockingCall(
+    factory_->GetNetworkThread()->BlockingCall(
         [&component, this] { component = iceTransport_->internal()->component(); });
 
     if (component == kComponentIdRtp) {
@@ -269,10 +270,8 @@ Napi::Value NapiIceTransport::GetSelectedCandidatePair(const Napi::CallbackInfo&
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    auto factoryWrapper = pcWrapper_->GetPeerConnectionFactoryWrapper();
-
     absl::optional<cricket::CandidatePair> candidatePair;
-    factoryWrapper->GetNetworkThread()->BlockingCall(
+    factory_->GetNetworkThread()->BlockingCall(
         [&candidatePair, this] { candidatePair = iceTransport_->internal()->GetSelectedCandidatePair(); });
 
     if (!candidatePair) {

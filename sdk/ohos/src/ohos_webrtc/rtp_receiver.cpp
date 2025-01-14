@@ -71,34 +71,38 @@ void NapiRtpReceiver::Init(Napi::Env env, Napi::Object exports)
 }
 
 Napi::Object NapiRtpReceiver::NewInstance(
-    Napi::Env env, rtc::scoped_refptr<RtpReceiverInterface> receiver, NapiPeerConnectionWrapper* pcWrapper)
+    std::shared_ptr<PeerConnectionFactoryWrapper> factory, rtc::scoped_refptr<PeerConnectionInterface> pc,
+    rtc::scoped_refptr<RtpReceiverInterface> receiver)
 {
-    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    if (!receiver || !pcWrapper) {
+    auto env = constructor_.Env();
+    if (!factory || !pc || !receiver) {
         NAPI_THROW(Error::New(env, "Invalid argument"), Object());
     }
 
-    auto externalReceiver = External<RtpReceiverInterface>::New(
-        env, receiver.release(), [](Napi::Env, RtpReceiverInterface* receiver) { receiver->Release(); });
-
-    auto externalPcWrapper = External<NapiPeerConnectionWrapper>::New(env, pcWrapper);
-
-    return constructor_.New({externalReceiver, externalPcWrapper});
+    return constructor_.New(
+        {External<std::shared_ptr<PeerConnectionFactoryWrapper>>::New(env, &factory),
+         External<rtc::scoped_refptr<PeerConnectionInterface>>::New(env, &pc),
+         External<rtc::scoped_refptr<RtpReceiverInterface>>::New(env, &receiver)});
 }
 
 NapiRtpReceiver::NapiRtpReceiver(const Napi::CallbackInfo& info) : Napi::ObjectWrap<NapiRtpReceiver>(info)
 {
-    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    if (info[0].IsExternal()) {
-        auto rtpReceiver = info[0].As<External<RtpReceiverInterface>>().Data();
-        rtpReceiver_ = rtc::scoped_refptr<RtpReceiverInterface>(rtpReceiver);
+    if (info.Length() != 3 || !info[0].IsExternal() || !info[1].IsExternal() || !info[2].IsExternal()) {
+        NAPI_THROW_VOID(Napi::Error::New(info.Env(), "Invalid Operation"));
     }
 
-    if (info.Length() > 1 && info[1].IsExternal()) {
-        pcWrapper_ = info[1].As<External<NapiPeerConnectionWrapper>>().Data();
-    }
+    factory_ = *info[0].As<External<std::shared_ptr<PeerConnectionFactoryWrapper>>>().Data();
+    pc_ = *info[1].As<External<rtc::scoped_refptr<PeerConnectionInterface>>>().Data();
+    rtpReceiver_ = *info[2].As<External<rtc::scoped_refptr<RtpReceiverInterface>>>().Data();
+}
+
+NapiRtpReceiver::~NapiRtpReceiver()
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 }
 
 rtc::scoped_refptr<RtpReceiverInterface> NapiRtpReceiver::Get() const
@@ -161,7 +165,7 @@ Napi::Value NapiRtpReceiver::GetTransport(const Napi::CallbackInfo& info)
         return info.Env().Null();
     }
 
-    return NapiDtlsTransport::NewInstance(info.Env(), transport, pcWrapper_);
+    return NapiDtlsTransport::NewInstance(info.Env(), factory_, transport);
 }
 
 Napi::Value NapiRtpReceiver::GetParameters(const Napi::CallbackInfo& info)
@@ -179,8 +183,7 @@ Napi::Value NapiRtpReceiver::GetStats(const Napi::CallbackInfo& info)
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
     auto asyncWorker = AsyncWorkerGetStats::Create(info.Env(), "GetStats");
-    auto pc = pcWrapper_->GetPeerConnection();
-    pc->GetStats(rtpReceiver_, asyncWorker->GetCallback());
+    pc_->GetStats(rtpReceiver_, asyncWorker->GetCallback());
 
     return asyncWorker->GetPromise();
 }
