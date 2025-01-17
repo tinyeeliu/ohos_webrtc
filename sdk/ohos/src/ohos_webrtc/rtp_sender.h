@@ -54,6 +54,7 @@ protected:
     Napi::Value SetStreams(const Napi::CallbackInfo& info);
     Napi::Value GetStats(const Napi::CallbackInfo& info);
     Napi::Value ToJson(const Napi::CallbackInfo& info);
+    Napi::Value GetId(const Napi::CallbackInfo& info); // 新增：暴露 id 属性的 getter
 
 private:
     static Napi::FunctionReference constructor_;
