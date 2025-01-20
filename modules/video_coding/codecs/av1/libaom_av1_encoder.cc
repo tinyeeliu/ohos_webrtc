@@ -42,7 +42,7 @@
 #include "third_party/libaom/source/libaom/aom/aomcx.h"
 
 #if (defined(WEBRTC_ARCH_ARM) || defined(WEBRTC_ARCH_ARM64)) && \
-    (defined(WEBRTC_ANDROID) || defined(WEBRTC_IOS))
+    (defined(WEBRTC_ANDROID) || defined(WEBRTC_IOS) || defined(WEBRTC_OHOS))
 #define MOBILE_ARM
 #endif
 
