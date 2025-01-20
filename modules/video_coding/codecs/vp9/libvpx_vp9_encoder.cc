@@ -48,7 +48,7 @@
 #include "vpx/vpx_encoder.h"
 
 #if (defined(WEBRTC_ARCH_ARM) || defined(WEBRTC_ARCH_ARM64)) && \
-    (defined(WEBRTC_ANDROID) || defined(WEBRTC_IOS))
+    (defined(WEBRTC_ANDROID) || defined(WEBRTC_IOS) || defined(WEBRTC_OHOS))
 #define MOBILE_ARM
 #endif
 
