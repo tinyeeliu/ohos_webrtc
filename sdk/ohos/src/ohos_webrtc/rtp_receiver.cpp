@@ -32,6 +32,7 @@ const char kClassName[] = "RTCRtpReceiver";
 
 const char kAttributeNameTrack[] = "track";
 const char kAttributeNameTransport[] = "transport";
+const char kAttributeNameId[] = "id";
 
 const char kMethodNameGetParameters[] = "getParameters";
 const char kMethodNameGetStats[] = "getStats";
@@ -56,6 +57,7 @@ void NapiRtpReceiver::Init(Napi::Env env, Napi::Object exports)
     Function func = DefineClass(
         env, kClassName,
         {
+            InstanceAccessor<&NapiRtpReceiver::GetId>(kAttributeNameId),
             InstanceAccessor<&NapiRtpReceiver::GetTrack>(kAttributeNameTrack),
             InstanceAccessor<&NapiRtpReceiver::GetTransport>(kAttributeNameTransport),
             InstanceMethod<&NapiRtpReceiver::GetParameters>(kMethodNameGetParameters),
@@ -139,6 +141,13 @@ Napi::Value NapiRtpReceiver::GetCapabilities(const Napi::CallbackInfo& info)
 
     return jsCapabilities;
 }
+
+Napi::Value NapiRtpReceiver::GetId(const Napi::CallbackInfo& info)
+{
+    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
+    return Napi::String::New(info.Env(), rtpReceiver_->id());
+}
+
 
 Napi::Value NapiRtpReceiver::GetTrack(const Napi::CallbackInfo& info)
 {
