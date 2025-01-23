@@ -28,6 +28,7 @@
 #include "napi.h"
 
 #include "api/sequence_checker.h"
+#include "rtc_base/race_checker.h"
 #include "modules/audio_device/fine_audio_buffer.h"
 
 namespace webrtc {
@@ -69,27 +70,30 @@ protected:
     static int32_t OnInterruptEvent1(
         OH_AudioRenderer* renderer, void* userData, OH_AudioInterrupt_ForceType type, OH_AudioInterrupt_Hint hint);
     static int32_t OnError1(OH_AudioRenderer* renderer, void* userData, OH_AudioStream_Result error);
+    static void
+    OnDeviceChangeCallback1(OH_AudioRenderer* renderer, void* userData, OH_AudioStream_DeviceChangeReason reason);
 
     int32_t OnWriteData(OH_AudioRenderer* renderer, void* buffer, int32_t length);
     int32_t OnStreamEvent(OH_AudioRenderer* renderer, OH_AudioStream_Event event);
     int32_t OnInterruptEvent(OH_AudioRenderer* renderer, OH_AudioInterrupt_ForceType type, OH_AudioInterrupt_Hint hint);
     int32_t OnError(OH_AudioRenderer* renderer, OH_AudioStream_Result error);
+    void OnDeviceChangeCallback(OH_AudioRenderer* renderer, OH_AudioStream_DeviceChangeReason reason);
 
     OH_AudioStream_State GetCurrentState() const;
+    double EstimateLatencyMillis() const;
+    uint32_t GetUnderflowCount() const;
 
     void NotifyError(AudioErrorType error, const std::string& message);
     void NotifyStateChange(AudioStateType state);
 
 private:
     SequenceChecker threadChecker_;
+    rtc::RaceChecker dataRaceChecker_;
 
     const int32_t rendererUsage_;
     const int32_t sampleRate_;
     const int32_t channelCount_;
     const bool useLowLatency_;
-
-    // Delay estimate of the output
-    std::atomic<int> rendererDelayMs_{0};
 
     // Samples to be played are replaced by zeros if `speakerMute_` is set to true.
     // Can be used to ensure that the speaker is fully muted.
@@ -97,6 +101,8 @@ private:
 
     bool initialized_{false};
     bool playing_{false};
+
+    uint32_t underflowCount_{0};
 
     AudioDeviceBuffer* audioDeviceBuffer_{nullptr};
     std::unique_ptr<FineAudioBuffer> fineAudioBuffer_;
