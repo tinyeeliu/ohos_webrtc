@@ -74,6 +74,8 @@ protected:
     int32_t OnError(OH_AudioCapturer* stream, OH_AudioStream_Result error);
 
     OH_AudioStream_State GetCurrentState() const;
+    double EstimateLatencyMillis() const;
+    uint32_t GetOverflowCount() const;
 
     void NotifyError(AudioErrorType error, const std::string& message);
     void NotifyStateChange(AudioStateType state);
@@ -88,15 +90,15 @@ private:
     const int32_t channelCount_;
     const bool useLowLatency_;
 
-    // Delay estimate of the input
-    std::atomic<int> captureDelayMs_{0};
-
     // Sets all recorded samples to zero if `microphoneMute_` is true, i.e., ensures that
     // the microphone is muted.
     std::atomic<bool> microphoneMute_{false};
 
     bool initialized_{false};
     bool recording_{false};
+
+    int32_t framesPerBurst_{0};
+    uint32_t overflowCount_{0};
 
     AudioDeviceBuffer* audioDeviceBuffer_{nullptr};
     std::unique_ptr<FineAudioBuffer> fineAudioBuffer_;

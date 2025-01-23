@@ -30,12 +30,20 @@ AudioRenderer::Create(int32_t usage, int32_t sampleRate, bool useStereoOutput, b
 
 int32_t AudioRenderer::OnWriteData1(OH_AudioRenderer* renderer, void* userData, void* buffer, int32_t length)
 {
+    if (!userData) {
+        return -1;
+    }
+
     auto self = (AudioRenderer*)userData;
     return self->OnWriteData(renderer, buffer, length);
 }
 
 int32_t AudioRenderer::OnStreamEvent1(OH_AudioRenderer* renderer, void* userData, OH_AudioStream_Event event)
 {
+    if (!userData) {
+        return -1;
+    }
+
     auto self = (AudioRenderer*)userData;
     return self->OnStreamEvent(renderer, event);
 }
@@ -43,14 +51,33 @@ int32_t AudioRenderer::OnStreamEvent1(OH_AudioRenderer* renderer, void* userData
 int32_t AudioRenderer::OnInterruptEvent1(
     OH_AudioRenderer* renderer, void* userData, OH_AudioInterrupt_ForceType type, OH_AudioInterrupt_Hint hint)
 {
+    if (!userData) {
+        return -1;
+    }
+
     auto self = (AudioRenderer*)userData;
     return self->OnInterruptEvent(renderer, type, hint);
 }
 
 int32_t AudioRenderer::OnError1(OH_AudioRenderer* renderer, void* userData, OH_AudioStream_Result error)
 {
+    if (!userData) {
+        return -1;
+    }
+
     auto self = (AudioRenderer*)userData;
     return self->OnError(renderer, error);
+}
+
+void AudioRenderer::OnDeviceChangeCallback1(
+    OH_AudioRenderer* renderer, void* userData, OH_AudioStream_DeviceChangeReason reason)
+{
+    if (!userData) {
+        return;
+    }
+
+    auto self = (AudioRenderer*)userData;
+    return self->OnDeviceChangeCallback(renderer, reason);
 }
 
 AudioRenderer::AudioRenderer(int32_t usage, int32_t sampleRate, bool useStereoOutput, bool useLowLatency)
@@ -70,6 +97,8 @@ AudioRenderer::~AudioRenderer()
 
     RTC_DCHECK(threadChecker_.IsCurrent());
     Terminate();
+
+    RTC_LOG(LS_INFO) << "Detected underflows: " << underflowCount_;
 }
 
 int32_t AudioRenderer::Init()
@@ -133,6 +162,10 @@ int32_t AudioRenderer::InitPlayout()
         OH_AudioStreamBuilder_SetRendererCallback(builder, callbacks, this),
         NotifyError(AudioErrorType::INIT, "failed to set renderer callback"), -1);
 
+    OH_RESULT_CHECK(
+        OH_AudioStreamBuilder_SetRendererOutputDeviceChangeCallback(builder, OnDeviceChangeCallback1, this),
+        NotifyError(AudioErrorType::INIT, "failed to set renderer callback"), -1);
+
     OH_AudioRenderer* stream = nullptr;
     OH_RESULT_CHECK(
         OH_AudioStreamBuilder_GenerateRenderer(builder, &stream),
@@ -167,6 +200,19 @@ int32_t AudioRenderer::InitPlayout()
         RTC_LOG(LS_ERROR) << "Stream unable to use requested format";
         NotifyError(AudioErrorType::INIT, "unmatched sample format");
         return -1;
+    }
+
+    int32_t frameSize = 0;
+    auto ret = OH_AudioRenderer_GetFrameSizeInCallback(stream, &frameSize);
+    if (ret != AUDIOSTREAM_SUCCESS) {
+        RTC_LOG(LS_ERROR) << "Failed to get frame size in callback: " << ret;
+    } else {
+        RTC_LOG(LS_ERROR) << "Frame size in callback: " << frameSize;
+    }
+
+    ret = OH_AudioRenderer_SetDefaultOutputDevice(stream, AUDIO_DEVICE_TYPE_SPEAKER);
+    if (ret != AUDIOSTREAM_SUCCESS) {
+        RTC_LOG(LS_ERROR) << "Failed to set default output device to speaker: " << ret;
     }
 
     renderer_ = stream;
@@ -214,6 +260,7 @@ int32_t AudioRenderer::StartPlayout()
         OH_AudioRenderer_Start(renderer_), NotifyError(AudioErrorType::START_EXCEPTION, "System error"), -1);
     RTC_DLOG(LS_VERBOSE) << "Current state: " << StateToString(GetCurrentState());
 
+    underflowCount_ = GetUnderflowCount();
     playing_ = true;
 
     NotifyStateChange(AudioStateType::START);
@@ -287,9 +334,16 @@ int32_t AudioRenderer::SpeakerMute(bool* enabled) const
 
 int32_t AudioRenderer::PlayoutDelay(uint16_t* delayMs) const
 {
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+    if (!delayMs) {
+        return 0;
+    }
 
-    *delayMs = rendererDelayMs_;
+    RTC_LOG(LS_WARNING) << __FUNCTION__ << " delayMs=" << *delayMs;
+
+    // Best guess we can do is to use half of the estimated total delay.
+    *delayMs = kHighLatencyModeDelayEstimateInMilliseconds / 2;
+    RTC_DCHECK_GT(*delayMs, 0);
+
     return 0;
 }
 
@@ -323,17 +377,20 @@ int32_t AudioRenderer::OnWriteData(OH_AudioRenderer* renderer, void* buffer, int
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " length=" << length;
 
     (void)renderer;
+    RTC_DCHECK_RUNS_SERIALIZED(&dataRaceChecker_);
 
-    int64_t position;
-    int64_t timestamp;
-    OH_RESULT_CHECK(OH_AudioRenderer_GetTimestamp(renderer_, CLOCK_MONOTONIC, &position, &timestamp), 0);
+    const uint32_t underflowCount = GetUnderflowCount();
+    if (underflowCount_ < underflowCount) {
+        RTC_LOG(LS_ERROR) << "Underflow detected: " << underflowCount;
+        underflowCount_ = underflowCount;
+    }
 
-    double latencyMillis = static_cast<double>(timestamp - rtc::TimeNanos()) / rtc::kNumNanosecsPerMillisec;
-    RTC_DLOG(LS_VERBOSE) << "latencyMillis=" << latencyMillis;
-    rendererDelayMs_ = static_cast<int>(std::ceil(latencyMillis));
+    auto latencyMillis = EstimateLatencyMillis();
+    RTC_DLOG(LS_VERBOSE) << "Estimate latencyMillis=" << latencyMillis;
 
     fineAudioBuffer_->GetPlayoutData(
-        rtc::MakeArrayView(static_cast<int16_t*>(buffer), length / sizeof(int16_t)), rendererDelayMs_);
+        rtc::MakeArrayView(static_cast<int16_t*>(buffer), length / sizeof(int16_t)),
+        static_cast<int>(latencyMillis + kHalfSec));
 
     if (speakerMute_) {
         std::memset(buffer, 0, length);
@@ -373,6 +430,12 @@ int32_t AudioRenderer::OnError(OH_AudioRenderer* renderer, OH_AudioStream_Result
     return 0;
 }
 
+void AudioRenderer::OnDeviceChangeCallback(OH_AudioRenderer* renderer, OH_AudioStream_DeviceChangeReason reason)
+{
+    (void)renderer;
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " reason=" << reason;
+}
+
 OH_AudioStream_State AudioRenderer::GetCurrentState() const
 {
     OH_AudioStream_State state = AUDIOSTREAM_STATE_INVALID;
@@ -381,6 +444,47 @@ OH_AudioStream_State AudioRenderer::GetCurrentState() const
     }
 
     return state;
+}
+
+double AudioRenderer::EstimateLatencyMillis() const
+{
+    RTC_DCHECK(renderer_);
+
+    double latencyMillis = 0.0;
+
+    int64_t framePosition = 0;
+    int64_t timestamp = 0;
+    OH_AudioStream_Result result =
+        OH_AudioRenderer_GetTimestamp(renderer_, CLOCK_MONOTONIC, &framePosition, &timestamp);
+    if (result != AUDIOSTREAM_SUCCESS) {
+        return latencyMillis;
+    }
+    RTC_DLOG(LS_VERBOSE) << "framePosition=" << framePosition;
+    RTC_DLOG(LS_VERBOSE) << "timestamp=" << timestamp;
+
+    int64_t framesWritten = 0;
+    result = OH_AudioRenderer_GetFramesWritten(renderer_, &framesWritten);
+    if (result != AUDIOSTREAM_SUCCESS) {
+        return latencyMillis;
+    }
+    RTC_DLOG(LS_VERBOSE) << "framesWritten=" << framesWritten;
+
+    int64_t frameIndexDelta = framesWritten - framePosition;
+    latencyMillis = static_cast<double>(frameIndexDelta * rtc::kNumMillisecsPerSec) / sampleRate_;
+
+    return latencyMillis;
+}
+
+uint32_t AudioRenderer::GetUnderflowCount() const
+{
+    uint32_t underflowCount = 0;
+    auto ret = OH_AudioRenderer_GetUnderflowCount(renderer_, &underflowCount);
+    if (ret != AUDIOSTREAM_SUCCESS) {
+        RTC_LOG(LS_ERROR) << "Failed to get underflow count: " << ret;
+        return 0;
+    }
+
+    return underflowCount;
 }
 
 void AudioRenderer::NotifyError(AudioErrorType error, const std::string& message)

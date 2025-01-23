@@ -75,6 +75,8 @@ AudioCapturer::~AudioCapturer()
 
     RTC_DCHECK(threadChecker_.IsCurrent());
     Terminate();
+
+    RTC_LOG(LS_INFO) << "detected owerflows: " << overflowCount_;
 }
 
 int32_t AudioCapturer::Init()
@@ -174,6 +176,12 @@ int32_t AudioCapturer::InitRecording()
         return -1;
     }
 
+    int32_t frameSize = 0;
+    if (OH_AudioCapturer_GetFrameSizeInCallback(stream, &frameSize) == AUDIOSTREAM_SUCCESS) {
+        framesPerBurst_ = frameSize;
+    }
+    RTC_LOG(LS_ERROR) << "Frame size in callback: " << frameSize;
+
     capturer_ = stream;
     initialized_ = true;
 
@@ -217,6 +225,8 @@ int32_t AudioCapturer::StartRecording()
     OH_RESULT_CHECK(
         OH_AudioCapturer_Start(capturer_), NotifyError(AudioErrorType::START_EXCEPTION, "system error"), -1);
     RTC_DLOG(LS_VERBOSE) << "current state: " << StateToString(GetCurrentState());
+
+    overflowCount_ = GetOverflowCount();
     recording_ = true;
 
     NotifyStateChange(AudioStateType::START);
@@ -309,20 +319,22 @@ int32_t AudioCapturer::OnReadData(OH_AudioCapturer* stream, void* buffer, int32_
 
     (void)stream;
 
-    int64_t position;
-    int64_t timestamp;
-    OH_RESULT_CHECK(OH_AudioCapturer_GetTimestamp(capturer_, CLOCK_MONOTONIC, &position, &timestamp), 0);
+    const uint32_t overflowCount = GetOverflowCount();
+    if (overflowCount_ < overflowCount) {
+        RTC_LOG(LS_ERROR) << "Overflow detected: " << overflowCount;
+        overflowCount_ = overflowCount;
+    }
 
-    double latencyMillis = static_cast<double>(rtc::TimeNanos() - timestamp) / rtc::kNumNanosecsPerMillisec;
-    RTC_DLOG(LS_VERBOSE) << "latencyMillis=" << latencyMillis;
-    captureDelayMs_ = static_cast<int>(std::ceil(latencyMillis));
+    auto latencyMillis = EstimateLatencyMillis();
+    RTC_DLOG(LS_VERBOSE) << "Estimate latencyMillis=" << latencyMillis;
 
     if (microphoneMute_) {
         std::memset(buffer, 0, length);
     }
 
     fineAudioBuffer_->DeliverRecordedData(
-        rtc::MakeArrayView(static_cast<const int16_t*>(buffer), length / sizeof(int16_t)), captureDelayMs_);
+        rtc::MakeArrayView(static_cast<const int16_t*>(buffer), length / sizeof(int16_t)),
+        static_cast<int>(latencyMillis + kHalfSec));
 
     auto data = new rtc::CopyOnWriteBuffer((uint8_t*)buffer, length);
     NotifySamplesReady(sampleRate_, audioFormat_, channelCount_, data);
@@ -369,6 +381,25 @@ OH_AudioStream_State AudioCapturer::GetCurrentState() const
     }
 
     return state;
+}
+
+double AudioCapturer::EstimateLatencyMillis() const
+{
+    RTC_DCHECK(capturer_);
+
+    return static_cast<double>(framesPerBurst_) / sampleRate_ * rtc::kNumMillisecsPerSec;
+}
+
+uint32_t AudioCapturer::GetOverflowCount() const
+{
+    uint32_t overflowCount = 0;
+    auto ret = OH_AudioCapturer_GetOverflowCount(capturer_, &overflowCount);
+    if (ret != AUDIOSTREAM_SUCCESS) {
+        RTC_LOG(LS_ERROR) << "Failed to get overflow count: " << ret;
+        return 0;
+    }
+
+    return overflowCount;
 }
 
 void AudioCapturer::NotifyError(AudioErrorType error, const std::string& message)
