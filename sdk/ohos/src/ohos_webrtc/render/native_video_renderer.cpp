@@ -28,6 +28,9 @@ using namespace ohos;
 using namespace adapter;
 using namespace Napi;
 
+const char kAttributeNameOnFrameResolutionChanged[] = "onFrameResolutionChanged";
+const char kEventFrameResolutionChanged[] = "frameResolutionChanged";
+
 FunctionReference NapiNativeVideoRenderer::constructor_;
 
 void NapiNativeVideoRenderer::Init(Napi::Env env, Napi::Object exports)
@@ -45,6 +48,8 @@ void NapiNativeVideoRenderer::Init(Napi::Env env, Napi::Object exports)
             InstanceMethod<&NapiNativeVideoRenderer::Init>(kMethodNameInit),
             InstanceMethod<&NapiNativeVideoRenderer::Release>(kMethodNameRelease),
             InstanceMethod<&NapiNativeVideoRenderer::ToJson>(kMethodNameToJson),
+            InstanceAccessor<&NapiNativeVideoRenderer::GetEventHandler, &NapiNativeVideoRenderer::SetEventHandler>(
+                kAttributeNameOnFrameResolutionChanged, napi_default, (void*)kEventFrameResolutionChanged),
         });
     exports.Set(kClassName, func);
 
@@ -158,7 +163,136 @@ Napi::Value NapiNativeVideoRenderer::Init(const Napi::CallbackInfo& info)
 
     renderer_ = NativeWindowRendererGl::Create(nativeWindow, sharedContext_, "native-window-renderer");
 
+    if (renderer_) {
+        // 设置 FrameSizeChangeCallback 回调
+        renderer_->SetFrameSizeChangeCallback([this](int width, int height, int rotation) {
+            // 在这里打印日志，测试事件是否触发
+            RTC_DLOG(LS_VERBOSE) << "[NapiNativeVideoRenderer] Frame size changed: " << width << "x" << height;
+            ThreadSafeFunction tsfn;
+            if (!GetEventHandler(kEventFrameResolutionChanged, tsfn)) {
+                return;
+            }
+            Reference<Napi::Value>* context = tsfn.GetContext();
+            napi_status status =
+                tsfn.BlockingCall([context, width, height, rotation](Napi::Env env, Napi::Function jsCallback) {
+                    auto jsEvent = Object::New(env);
+                    jsEvent.Set("width", Number::New(env, width));
+                    jsEvent.Set("height", Number::New(env, height));
+                    jsEvent.Set("rotation", Number::New(env, rotation));
+                    jsCallback.Call(context ? context->Value() : env.Undefined(), {jsEvent});
+                });
+
+            if (status != napi_ok) {
+                RTC_LOG(LS_ERROR) << "tsfn call error: " << status;
+            }
+        });
+    }
+
     return info.Env().Undefined();
+}
+
+Napi::Value NapiNativeVideoRenderer::GetEventHandler(const Napi::CallbackInfo& info)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    Function fn;
+    if (!GetEventHandler((const char*)info.Data(), fn)) {
+        return info.Env().Null();
+    }
+
+    return fn;
+}
+
+bool NapiNativeVideoRenderer::GetEventHandler(const std::string& type, Napi::Function& fn)
+{
+    RTC_DLOG(LS_VERBOSE) << "NapiNativeVideoRenderer::GetEventHandler type: " << type;
+
+    UNUSED std::lock_guard<std::mutex> lock(eventMutex_);
+    auto it = eventHandlers_.find(type);
+    if (it == eventHandlers_.end()) {
+        RTC_LOG(LS_VERBOSE) << "No event handler for type: " << type;
+        return false;
+    }
+
+    fn = it->second.ref.Value();
+
+    return true;
+}
+
+bool NapiNativeVideoRenderer::GetEventHandler(const std::string& type, Napi::ThreadSafeFunction& tsfn)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " type=" << type;
+
+    UNUSED std::lock_guard<std::mutex> lock(eventMutex_);
+    auto it = eventHandlers_.find(type);
+    if (it == eventHandlers_.end()) {
+        RTC_LOG(LS_VERBOSE) << "No event handler for type: " << type;
+        return false;
+    }
+
+    tsfn = it->second.tsfn;
+
+    return true;
+}
+
+void NapiNativeVideoRenderer::SetEventHandler(const Napi::CallbackInfo& info, const Napi::Value& value)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    RemoveEventHandler((const char*)info.Data());
+
+    if (value.IsFunction()) {
+        Function cb = value.As<Function>();
+        if (!SetEventHandler((const char*)info.Data(), std::move(cb), info.This())) {
+            NAPI_THROW_VOID(Napi::Error::New(info.Env(), "Failed to set event handler"));
+        }
+    }
+}
+
+bool NapiNativeVideoRenderer::SetEventHandler(const std::string& type, Napi::Function fn, Napi::Value receiver)
+{
+    RTC_DLOG(LS_VERBOSE) << "SetEventHandler type: " << type;
+
+    Reference<Napi::Value>* context = new Reference<Napi::Value>;
+    *context = Persistent(receiver);
+
+    EventHandler handler;
+    handler.ref = Persistent(fn);
+    handler.tsfn =
+        ThreadSafeFunction::New(fn.Env(), fn, type, 0, 1, context, [](Napi::Env, Reference<Napi::Value>* ctx) {
+            ctx->Reset();
+            delete ctx;
+        });
+
+    UNUSED std::lock_guard<std::mutex> lock(eventMutex_);
+    eventHandlers_[type] = std::move(handler);
+
+    return true;
+}
+
+bool NapiNativeVideoRenderer::RemoveEventHandler(const std::string& type)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    UNUSED std::lock_guard<std::mutex> lock(eventMutex_);
+    auto it = eventHandlers_.find(type);
+    if (it != eventHandlers_.end()) {
+        it->second.tsfn.Release();
+        eventHandlers_.erase(it);
+    }
+
+    return true;
+}
+
+void NapiNativeVideoRenderer::RemoveAllEventHandlers()
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    UNUSED std::lock_guard<std::mutex> lock(eventMutex_);
+    for (auto& handler : eventHandlers_) {
+        handler.second.tsfn.Release();
+    }
+    eventHandlers_.clear();
 }
 
 Napi::Value NapiNativeVideoRenderer::Release(const Napi::CallbackInfo& info)
