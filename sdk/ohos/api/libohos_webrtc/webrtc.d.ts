@@ -847,6 +847,8 @@ export interface NativeVideoRenderer {
   setMirrorVertically(mirrorVertically: boolean): void;
   setScalingMode(mode: number): void;
   release(): void;
+
+  onFrameResolutionChanged: ((this: NativeVideoRenderer, ev: Event) => any) | null;
 }
 
 declare var NativeVideoRenderer: {
