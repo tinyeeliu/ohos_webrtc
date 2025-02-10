@@ -45,7 +45,7 @@
 #include "vpx/vp8cx.h"
 
 #if (defined(WEBRTC_ARCH_ARM) || defined(WEBRTC_ARCH_ARM64)) && \
-    (defined(WEBRTC_ANDROID) || defined(WEBRTC_IOS))
+    (defined(WEBRTC_ANDROID) || defined(WEBRTC_IOS) || defined(WEBRTC_OHOS))
 #define MOBILE_ARM
 #endif
 
@@ -782,7 +782,7 @@ int LibvpxVp8Encoder::GetCpuSpeed(int width, int height) {
 }
 
 int LibvpxVp8Encoder::NumberOfThreads(int width, int height, int cpus) {
-#if defined(WEBRTC_ANDROID)
+#if (defined(WEBRTC_ANDROID) || defined(WEBRTC_OHOS))
   if (width * height >= 320 * 180) {
     if (cpus >= 4) {
       // 3 threads for CPUs with 4 and more cores since most of times only 4

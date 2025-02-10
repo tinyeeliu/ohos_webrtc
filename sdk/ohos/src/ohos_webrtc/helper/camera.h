@@ -593,23 +593,11 @@ inline CameraManager::CameraManager()
 {
     Camera_ErrorCode ret = OH_Camera_GetCameraManager(&manager_);
     NATIVE_THROW_IF_FAILED_VOID(ret == CAMERA_OK, ret, "OH_Camera", "Failed to get camera manager");
-
-    CameraManager_Callbacks callbacks;
-    callbacks.onCameraStatus = OnCameraManagerStatusCallback1;
-    ret = OH_CameraManager_RegisterCallback(manager_, &callbacks);
-    NATIVE_THROW_IF_FAILED_VOID(ret == CAMERA_OK, ret, "OH_Camera", "Failed to register camera manager callback");
 }
 
 inline CameraManager::~CameraManager()
 {
-    CameraManager_Callbacks callbacks;
-    callbacks.onCameraStatus = OnCameraManagerStatusCallback1;
-    Camera_ErrorCode ret = OH_CameraManager_UnregisterCallback(manager_, &callbacks);
-    if (ret != CAMERA_OK) {
-        NativeError::Create(ret, "OH_Camera", "Failed to unregister camera manager callback").PrintToLog();
-    }
-
-    ret = OH_Camera_DeleteCameraManager(manager_);
+    Camera_ErrorCode ret = OH_Camera_DeleteCameraManager(manager_);
     if (ret != CAMERA_OK) {
         NativeError::Create(ret, "OH_Camera", "Failed to release camara manager").PrintToLog();
     }
