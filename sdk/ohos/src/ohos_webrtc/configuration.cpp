@@ -52,7 +52,7 @@ bool JsToNativeIceServer(const Object& jsIceServer, PeerConnectionInterface::Ice
         for (uint32_t i = 0; i < jsUrlArray.Length(); i++) {
             Napi::Value jsUrl = jsUrlArray[i];
             if (jsUrl.IsString()) {
-                auto url = jsUrls.As<String>().Utf8Value();
+                auto url = jsUrl.As<String>().Utf8Value();
                 iceServer.urls.push_back(url);
             } else {
                 RTC_LOG(LS_WARNING) << "element of urls is not string";
