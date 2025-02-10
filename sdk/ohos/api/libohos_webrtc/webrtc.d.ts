@@ -432,6 +432,8 @@ export interface RTCRtpSendParameters extends RTCRtpParameters {
 
 // https://www.w3.org/TR/webrtc/#dom-rtcrtpreceiveparameters
 export interface RTCRtpReceiveParameters extends RTCRtpParameters {
+  encodings: RTCRtpEncodingParameters[];
+  transactionId: string;
 }
 
 // https://www.w3.org/TR/webrtc/#dom-rtcrtpcontributingsource
@@ -474,6 +476,7 @@ declare var RTCRtpSender: {
 
 // https://www.w3.org/TR/webrtc/#dom-rtcrtpcodec
 export interface RTCRtpCodec {
+  payloadType?: number;
   mimeType: string;
   clockRate: number;
   channels?: number;
@@ -895,7 +898,7 @@ export interface AudioDeviceModuleOptions {
   rendererUsage?: number;
 
   // enable low latency capturing and rendering, default is false
-  useLowLatency?: boolean;
+  useLowLatency?: number;
 
   // Control if the built-in HW acoustic echo canceler should be used or not, default is false.
   // It is possible to query support by calling AudioDeviceModule.isBuiltInAcousticEchoCancelerSupported()
