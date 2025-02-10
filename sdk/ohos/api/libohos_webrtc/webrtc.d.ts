@@ -433,6 +433,8 @@ export interface RTCRtpSendParameters extends RTCRtpParameters {
 
 // https://www.w3.org/TR/webrtc/#dom-rtcrtpreceiveparameters
 export interface RTCRtpReceiveParameters extends RTCRtpParameters {
+  encodings: RTCRtpEncodingParameters[];
+  transactionId: string;
 }
 
 // https://www.w3.org/TR/webrtc/#dom-rtcrtpcontributingsource
@@ -474,6 +476,7 @@ declare var RTCRtpSender: {
 
 // https://www.w3.org/TR/webrtc/#dom-rtcrtpcodec
 export interface RTCRtpCodec {
+  payloadType?: number;
   mimeType: string;
   clockRate: number;
   channels?: number;
