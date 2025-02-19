@@ -328,11 +328,13 @@ void OHAudioRecorderWrapper::SetStreamConfiguration(OH_AudioStreamBuilder* build
     OH_AudioStreamBuilder_SetSamplingRate(builder, audio_parameters().sample_rate());
     OH_AudioStreamBuilder_SetChannelCount(builder, audio_parameters().channels());
     OH_AudioStreamBuilder_SetSampleFormat(builder, AUDIOSTREAM_SAMPLE_S16LE);
-    OH_AudioStreamBuilder_SetLatencyMode(builder, AUDIOSTREAM_LATENCY_MODE_FAST);
+    OH_AudioStreamBuilder_SetLatencyMode(builder, AUDIOSTREAM_LATENCY_MODE_NORMAL);
 
     OH_AudioCapturer_Callbacks callbacks;
     callbacks.OH_AudioCapturer_OnReadData = DataCallback;
     callbacks.OH_AudioCapturer_OnError = ErrorCallback;
+    callbacks.OH_AudioCapturer_OnInterruptEvent = nullptr;
+    callbacks.OH_AudioCapturer_OnStreamEvent = nullptr;
     OH_AudioStreamBuilder_SetCapturerCallback(builder, callbacks, this);
 }
 
