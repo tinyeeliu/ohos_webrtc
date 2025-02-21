@@ -42,7 +42,7 @@ function downlaod_thirdparty() {
     return 0
 }
 
-OHOS_SDK_NATIVE_PATH=/mnt/sdcard/workspace/sdk-linux-4.1.3.500/sdk/HarmonyOS-NEXT-DP1/base/native   # 用户需配置自己SDK路径
+OHOS_SDK_NATIVE_PATH=/data/ohos/SDK/command-line-tools/sdk/default/openharmony/native   # 用户需配置自己SDK路径
 if [ ! -z $1 ]
 then
     OHOS_SDK_NATIVE_PATH=$1
@@ -53,8 +53,6 @@ then
     echo "use ./build.sh OHOS_SDK_NATIVE_PATH"
     exit 1
 fi
-
-git submodule update --init --recursive            ## git clone submodules
 
 check_depot_tools
 if [ $? -ne 0 ]
@@ -73,7 +71,11 @@ fi
 arguments="target_cpu=\"arm64\" \
     target_os=\"ohos\" \
     ohos_sdk_native_root=\"$OHOS_SDK_NATIVE_PATH\" \
-    is_clang=true"
+    is_clang=true \
+    ffmpeg_branding=\"Chrome\" \
+    rtc_use_h264=true \
+    rtc_use_h265=true \
+    is_component_ffmpeg=true"
 
 gn gen out/webrtc --args="$arguments"
 if [ $? -ne 0 ]
@@ -82,7 +84,7 @@ then
     exit 1
 fi
 
-ninja -C out/webrtc -v -j32 > build.log
+ninja -C out/webrtc -v -j8 > build.log
 if [ $? -ne 0 ]
 then
     echo "[ERROR] webrtc build failed! see the detailes in build.log file"
