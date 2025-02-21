@@ -611,7 +611,7 @@ export interface RTCStats {
 
 // https://www.w3.org/TR/webrtc/#rtcstatsreport-object
 export interface RTCStatsReport {
-  readonly stats: Map<string, RTCStats>;
+  readonly stats: Map<string, ESObject>;
   // readonly timestamp: HighResTimeStamp; // android
   // forEach(callback: (value: RTCStats, key: string, parent: RTCStatsReport) => void): void;
 }
