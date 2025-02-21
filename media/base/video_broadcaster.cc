@@ -67,17 +67,17 @@ void VideoBroadcaster::OnFrame(const webrtc::VideoFrame& frame) {
   webrtc::MutexLock lock(&sinks_and_wants_lock_);
   bool current_frame_was_discarded = false;
   for (auto& sink_pair : sink_pairs()) {
-    if (sink_pair.wants.rotation_applied &&
-        frame.rotation() != webrtc::kVideoRotation_0) {
-      // Calls to OnFrame are not synchronized with changes to the sink wants.
-      // When rotation_applied is set to true, one or a few frames may get here
-      // with rotation still pending. Protect sinks that don't expect any
-      // pending rotation.
-      RTC_LOG(LS_VERBOSE) << "Discarding frame with unexpected rotation.";
-      sink_pair.sink->OnDiscardedFrame();
-      current_frame_was_discarded = true;
-      continue;
-    }
+    // if (sink_pair.wants.rotation_applied &&
+    //     frame.rotation() != webrtc::kVideoRotation_0) {
+    //   // Calls to OnFrame are not synchronized with changes to the sink wants.
+    //   // When rotation_applied is set to true, one or a few frames may get here
+    //   // with rotation still pending. Protect sinks that don't expect any
+    //   // pending rotation.
+    //   RTC_LOG(LS_VERBOSE) << "Discarding frame with unexpected rotation.";
+    //   sink_pair.sink->OnDiscardedFrame();
+    //   current_frame_was_discarded = true;
+    //   continue;
+    // }
     if (sink_pair.wants.black_frames) {
       webrtc::VideoFrame black_frame =
           webrtc::VideoFrame::Builder()
