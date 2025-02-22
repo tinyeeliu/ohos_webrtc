@@ -45,6 +45,11 @@ sdk/ohos/
         |—— ...	# 其它接口实现
 ```
 
+##  下载安装
+```
+ohpm install @ohos/webrtc
+```
+
 ## 其它
 
 接口说明及使用方法请参阅[文档](./api/libwebrtc.md)，实现代码在src/ohos_webrtc目录下，其中NAPI接口的使用借助了开源项目[node-addon-api](https://github.com/nodejs/node-addon-api)。
