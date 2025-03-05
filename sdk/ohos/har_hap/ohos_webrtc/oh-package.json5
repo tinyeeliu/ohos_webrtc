@@ -1,15 +1,25 @@
 {
   "name": "@ohos/webrtc",
-  "version": "1.0.0-rc1",
+  "version": "1.0.0-rc2",
   "description": "ArkTS interfaces of webrtc for OpenHarmony.",
   "keywords": ["webrtc"],
   "main": "Index.ets",
   "author": "ohos_tpc",
-  "homepage": "https://gitee.com/openharmony-sig/ohos_webrtc",
-  "repository": "https://gitee.com/openharmony-sig/ohos_webrtc",
+  "homepage": "https://gitcode.com/openharmony-sig/ohos_webrtc",
+  "repository": "https://gitcode.com/openharmony-sig/ohos_webrtc",
   "license": "Apache-2.0",
   "dependencies": {
     "libohos_webrtc.so": "file:./src/main/libohos_webrtc"
   },
-  "devDependencies": {}
+  "devDependencies": {},
+  "metadata": {
+    "sourceRoots": [
+      "./src/main"
+    ],
+    "debug": true,
+    "nativeDebugSymbol": true
+  },
+  "compatibleSdkVersion": 12,
+  "compatibleSdkType": "OpenHarmony",
+  "obfuscated": false
 }
