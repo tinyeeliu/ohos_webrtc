@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-import webrtc, { Logging, LoggingSeverity, VideoRenderController, ScalingMode } from 'ohos_webrtc';
+import webrtc, { Logging, LoggingSeverity, VideoRenderController, ScalingMode } from '@ohos/webrtc';
 import abilityAccessCtrl, { PermissionRequestResult } from '@ohos.abilityAccessCtrl';
 import webSocket from '@ohos.net.webSocket';
 import promptAction from '@ohos.promptAction';
