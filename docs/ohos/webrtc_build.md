@@ -5,13 +5,14 @@
 WebRTC (Web Real-Time Communications) 是一项实时通讯技术，它允许网络应用或者站点，在不借助中间媒介的情况下，建立浏览器之间点对点（Peer-to-Peer）的连接，实现视频流和（或）音频流等任意数据的传输。<br/>
 本仓库代码是基于webrtc m120版本(commitid: b0cc68e61205fd11a7256a6e85307ec17ad95790)进行开发的。
 
+> [sdk/ohos](/sdk/ohos)目录下提供了OpenHarmony平台的适配和封装接口，以及应用示例工程，相关说明见[README.md](/sdk/ohos/README.md)。
 ## 编译前准备
 
 ### 编译环境
 
 - ubuntu 20.04.1
 - webrtc版本（m120，commitid:b0cc68e6）
-- OpenHarmony SDK版本(4.0.10)
+- OpenHarmony SDK版本(5.0.0.71)
 
 ### 源码准备
 
@@ -44,7 +45,7 @@ WebRTC (Web Real-Time Communications) 是一项实时通讯技术，它允许网
 
 - OpenHarmony SDK获取
 
-  使用者可以从openHarmony SDK [官方发布渠道](https://gitee.com/openharmony-sig/oh-inner-release-management/blob/master/Release-Testing-Version.md)获取对应版本的SDK，也可以从社区发布对应4.0版本获取对应的SDK，如 [OpenHarmony 4.0 Release](https://gitee.com/openharmony/docs/blob/master/zh-cn/release-notes/OpenHarmony-v4.0-release.md#%E4%BB%8E%E9%95%9C%E5%83%8F%E7%AB%99%E7%82%B9%E8%8E%B7%E5%8F%96)。
+  使用者可以从社区发布对应5.0版本获取对应的SDK，如 [OpenHarmony 5.0 Release](https://gitee.com/openharmony/docs/blob/master/zh-cn/release-notes/OpenHarmony-v5.0.0-release.md#%E4%BB%8E%E9%95%9C%E5%83%8F%E7%AB%99%E7%82%B9%E8%8E%B7%E5%8F%96)。
 
 ## 源码编译
 
