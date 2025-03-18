@@ -22,6 +22,10 @@
 #include <android/log.h>  // NOLINT
 #endif
 
+#if defined(WEBRTC_OHOS)
+#include "hilog/log.h"
+#endif
+
 #if defined(WEBRTC_WIN)
 #include <windows.h>
 #endif
@@ -68,6 +72,10 @@ RTC_NORETURN void WriteFatalLog(absl::string_view output) {
   std::string output_str(output);
   __android_log_print(ANDROID_LOG_ERROR, RTC_LOG_TAG_ANDROID, "%s\n",
                       output_str.c_str());
+#endif
+#if defined(WEBRTC_OHOS)
+  std::string output_str(output);
+  OH_LOG_Print(LOG_APP, LOG_FATAL, LOG_DOMAIN, "rtc", "%{public}s\n", output_str.c_str());
 #endif
   fflush(stdout);
   fwrite(output.data(), output.size(), 1, stderr);
