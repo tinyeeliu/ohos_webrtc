@@ -514,6 +514,9 @@ rtc_library("checks") {
   if (is_android) {
     libs += [ "log" ]
   }
+  if (is_ohos) {
+    libs += [ "hilog_ndk.z" ]
+  }
 }
 
 rtc_library("rate_limiter") {
