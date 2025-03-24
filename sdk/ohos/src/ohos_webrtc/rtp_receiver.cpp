@@ -158,7 +158,7 @@ Napi::Value NapiRtpReceiver::GetTrack(const Napi::CallbackInfo& info)
         NAPI_THROW(Error::New(info.Env(), "No track"), info.Env().Undefined());
     }
 
-    return NapiMediaStreamTrack::NewInstance(info.Env(), MediaStreamTrackWrapper::Create(track));
+    return NapiMediaStreamTrack::NewInstance(factory_, track);
 }
 
 Napi::Value NapiRtpReceiver::GetTransport(const Napi::CallbackInfo& info)

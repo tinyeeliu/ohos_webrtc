@@ -338,6 +338,12 @@ public:
     BooleanConstraint googNoiseSuppression;
     BooleanConstraint googHighpassFilter;
     BooleanConstraint googAudioMirroring;
+    StringConstraint ohosScreenCaptureMode;
+    LongConstraint ohosScreenCaptureDisplayId;
+    StringConstraint ohosScreenCaptureMissionId;
+    StringConstraint ohosScreenCaptureWindowFilter;
+    StringConstraint ohosScreenCaptureAudioFilter;
+    StringConstraint ohosScreenCaptureSkipPrivacyMode;
 
     bool HasMin() const;
     bool HasExact() const;

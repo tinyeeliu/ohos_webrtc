@@ -40,7 +40,7 @@
 #include "video_encoder_factory.h"
 #include "video_decoder_factory.h"
 #include "audio_processing_factory.h"
-#include "audio_device/audio_device_module.h"
+#include "audio_device/ohos_audio_device_module.h"
 #include "render/native_video_renderer.h"
 #include "logging/native_logging.h"
 

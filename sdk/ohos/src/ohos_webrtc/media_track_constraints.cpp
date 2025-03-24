@@ -66,6 +66,12 @@ const std::map<std::string, bool> SUPPORTED_CONSTRAINTS_MAP = {
     {NapiMediaConstraints::kAttributeNameGoogNoiseSuppression, false},
     {NapiMediaConstraints::kAttributeNameGoogHighpassFilter, false},
     {NapiMediaConstraints::kAttributeNameGoogAudioMirroring, false},
+    {NapiMediaConstraints::kAttributeNameOhosScreenCaptureMode, true},
+    {NapiMediaConstraints::kAttributeNameOhosScreenCaptureDisplayId, true},
+    {NapiMediaConstraints::kAttributeNameOhosScreenCaptureMissionId, true},
+    {NapiMediaConstraints::kAttributeNameOhosScreenCaptureAudioFilter, true},
+    {NapiMediaConstraints::kAttributeNameOhosScreenCaptureWindowFilter, true},
+    {NapiMediaConstraints::kAttributeNameOhosScreenCaptureSkipPrivacyMode, true},
 };
 
 bool IsConstraintSupported(const std::string& name)
@@ -171,7 +177,7 @@ bool ValidateStringConstraint(const Value& jsValue, std::string& errorMessage)
         }
 
         for (uint32_t index = 0; index < jsArray.Length(); index++) {
-            if (!ValidateString(jsValue.As<String>().Utf8Value(), errorMessage)) {
+            if (!ValidateString(jsArray.Get(index).As<String>().Utf8Value(), errorMessage)) {
                 return false;
             }
         }
@@ -336,6 +342,7 @@ bool ValidateAndCopyConstraintSet(
     ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.latency);
     ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.channelCount);
     ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.backgroundBlur);
+    ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.ohosScreenCaptureDisplayId);
 
     if (!ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.facingMode, errorMessage)) {
         return false;
@@ -354,6 +361,26 @@ bool ValidateAndCopyConstraintSet(
     }
 
     if (!ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.displaySurface, errorMessage)) {
+        return false;
+    }
+
+    if (!ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.ohosScreenCaptureMode, errorMessage)) {
+        return false;
+    }
+
+    if (!ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.ohosScreenCaptureMissionId, errorMessage)) {
+        return false;
+    }
+
+    if (!ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.ohosScreenCaptureWindowFilter, errorMessage)) {
+        return false;
+    }
+
+    if (!ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.ohosScreenCaptureAudioFilter, errorMessage)) {
+        return false;
+    }
+
+    if (!ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.ohosScreenCaptureSkipPrivacyMode, errorMessage)) {
         return false;
     }
 

@@ -23,11 +23,15 @@
 
 namespace webrtc {
 
+class NapiMediaStreamTrack;
+class PeerConnectionFactoryWrapper;
+
 class NapiMediaStream : public Napi::ObjectWrap<NapiMediaStream> {
 public:
     static void Init(Napi::Env env, Napi::Object exports);
 
-    static Napi::Object NewInstance(Napi::Env env, rtc::scoped_refptr<MediaStreamInterface> stream);
+    static Napi::Object
+    NewInstance(std::shared_ptr<PeerConnectionFactoryWrapper> factory, rtc::scoped_refptr<MediaStreamInterface> stream);
 
     ~NapiMediaStream() override;
 
@@ -52,15 +56,20 @@ protected:
     Napi::Value GetVideoTracks(const Napi::CallbackInfo& info);
     Napi::Value ToJson(const Napi::CallbackInfo& info);
 
+    bool CreateMediaStream();
+    bool CreateMediaStream(const NapiMediaStream* stream);
+    bool CreateMediaStream(const std::vector<NapiMediaStreamTrack*>& tracks);
+
 protected:
+    static Napi::FunctionReference& Constructor();
+
     void OnAudioTrackAddedToStream(AudioTrackInterface* track, MediaStreamInterface* stream);
     void OnVideoTrackAddedToStream(VideoTrackInterface* track, MediaStreamInterface* stream);
     void OnAudioTrackRemovedFromStream(AudioTrackInterface* track, MediaStreamInterface* stream);
     void OnVideoTrackRemovedFromStream(VideoTrackInterface* track, MediaStreamInterface* stream);
 
 private:
-    static Napi::FunctionReference constructor_;
-
+    std::shared_ptr<PeerConnectionFactoryWrapper> factory_;
     rtc::scoped_refptr<MediaStreamInterface> stream_;
     std::unique_ptr<MediaStreamObserver> observer_;
 };

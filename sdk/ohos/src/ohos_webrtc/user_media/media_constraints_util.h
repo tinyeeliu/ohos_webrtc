@@ -18,6 +18,7 @@
 
 #include "media_constraints.h"
 #include "../camera/camera_device_info.h"
+#include "../screen_capture/screen_capture_options.h"
 
 #include <string>
 
@@ -42,7 +43,7 @@ bool SelectSettingsForVideo(
 // Copy all relevant constraints into an AudioOptions object.
 void CopyConstraintsIntoAudioOptions(const MediaTrackConstraints& constraints, cricket::AudioOptions& options);
 
-void GetScreenCaptureConstraints(const MediaTrackConstraints& constraints, int& width, int& height);
+void GetScreenCaptureOptionsFromConstraints(const MediaTrackConstraints& constraints, ScreenCaptureOptions& options);
 
 } // namespace webrtc
 

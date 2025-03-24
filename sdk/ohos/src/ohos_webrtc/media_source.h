@@ -19,10 +19,14 @@
 #include "napi.h"
 
 #include "api/media_stream_interface.h"
-#include "utils/marcos.h"
+
 #include "video/video_track_source.h"
+#include "audio_device/ohos_local_audio_source.h"
+#include "utils/marcos.h"
 
 namespace webrtc {
+
+class OhosLocalAudioSource;
 
 template <typename T>
 class NapiMediaSource : public Napi::ObjectWrap<T> {
@@ -45,14 +49,11 @@ public:
 
     static void Init(Napi::Env env, Napi::Object exports);
 
-    static Napi::Object NewInstance(Napi::Env env, rtc::scoped_refptr<AudioSourceInterface> source);
+    static Napi::Object NewInstance(Napi::Env env, rtc::scoped_refptr<OhosLocalAudioSource> source);
 
     ~NapiAudioSource() override;
 
-    AudioSourceInterface* Get() const
-    {
-        return source_.get();
-    }
+    rtc::scoped_refptr<OhosLocalAudioSource> Get() const;
 
 protected:
     friend class ObjectWrap;
@@ -67,7 +68,7 @@ protected:
 private:
     static Napi::FunctionReference constructor_;
 
-    rtc::scoped_refptr<AudioSourceInterface> source_;
+    rtc::scoped_refptr<OhosLocalAudioSource> source_;
 };
 
 class NapiVideoSource : public NapiMediaSource<NapiVideoSource>, public VideoCapturer::Observer {
@@ -86,9 +87,9 @@ public:
 
     ~NapiVideoSource() override;
 
-    VideoTrackSourceInterface* Get() const
+    rtc::scoped_refptr<OhosVideoTrackSource> Get() const
     {
-        return source_.get();
+        return source_;
     }
 
 protected:

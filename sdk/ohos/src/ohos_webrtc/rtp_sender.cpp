@@ -203,7 +203,7 @@ Napi::Value NapiRtpSender::GetTrack(const Napi::CallbackInfo& info)
         return info.Env().Null();
     }
 
-    return NapiMediaStreamTrack::NewInstance(info.Env(), MediaStreamTrackWrapper::Create(track));
+    return NapiMediaStreamTrack::NewInstance(factory_, track);
 }
 
 Napi::Value NapiRtpSender::GetTransport(const Napi::CallbackInfo& info)

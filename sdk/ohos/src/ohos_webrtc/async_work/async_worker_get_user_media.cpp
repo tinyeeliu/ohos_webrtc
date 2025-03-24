@@ -22,20 +22,21 @@
 #include "../video/video_track_source.h"
 #include "../user_media/media_constraints_util.h"
 #include "../render/egl_env.h"
+#include "../audio_device/ohos_local_audio_source.h"
 
 #include "rtc_base/logging.h"
 #include "rtc_base/helpers.h"
 
 namespace webrtc {
 
-AsyncWorkerGetUserMedia* AsyncWorkerGetUserMedia::Create(Napi::Env env, const char* resourceName)
+AsyncWorkerGetUserMedia* AsyncWorkerGetUserMedia::Create(Napi::Env env, std::shared_ptr<PeerConnectionFactoryWrapper> factory)
 {
-    auto asyncWorker = new AsyncWorkerGetUserMedia(env, resourceName);
+    auto asyncWorker = new AsyncWorkerGetUserMedia(env, std::move(factory));
     return asyncWorker;
 }
 
-AsyncWorkerGetUserMedia::AsyncWorkerGetUserMedia(Napi::Env env, const char* resourceName)
-    : AsyncWorker(env, resourceName), deferred_(Napi::Promise::Deferred::New(env))
+AsyncWorkerGetUserMedia::AsyncWorkerGetUserMedia(Napi::Env env, std::shared_ptr<PeerConnectionFactoryWrapper> factory)
+    : AsyncWorker(env, "getUserMedia"), deferred_(Napi::Promise::Deferred::New(env)), factory_(std::move(factory))
 {
 }
 
@@ -50,18 +51,12 @@ void AsyncWorkerGetUserMedia::Execute()
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    auto factoryWrapper = PeerConnectionFactoryWrapper::GetDefault();
-    if (!factoryWrapper) {
-        SetError("Internal error");
-        return;
-    }
-    auto factory = factoryWrapper->GetFactory();
-    if (!factory) {
+    if (!factory_) {
         SetError("Internal error");
         return;
     }
 
-    stream_ = factory->CreateLocalMediaStream(rtc::CreateRandomUuid());
+    stream_ = factory_->GetFactory()->CreateLocalMediaStream(rtc::CreateRandomUuid());
     if (!stream_) {
         SetError("Failed to create media stream");
         return;
@@ -71,12 +66,12 @@ void AsyncWorkerGetUserMedia::Execute()
         cricket::AudioOptions options;
         CopyConstraintsIntoAudioOptions(audioConstraints_, options);
 
-        auto audioSource = factoryWrapper->GetFactory()->CreateAudioSource(options);
+        auto audioSource = factory_->CreateAudioSource(options);
         if (!audioSource) {
             SetError("Failed to create audio source");
             return;
         }
-        auto audioTrack = factoryWrapper->GetFactory()->CreateAudioTrack(rtc::CreateRandomUuid(), audioSource.get());
+        auto audioTrack = factory_->CreateAudioTrack(rtc::CreateRandomUuid(), audioSource);
         if (!audioTrack) {
             SetError("Failed to create audio track");
             return;
@@ -111,14 +106,13 @@ void AsyncWorkerGetUserMedia::Execute()
             return;
         }
 
-        auto videoSource = OhosVideoTrackSource::Create(
-            std::move(capturer), factoryWrapper->GetSignalingThread(), EglEnv::GetDefault().GetContext());
+        auto videoSource = factory_->CreateVideoSource(std::move(capturer));
         if (!videoSource) {
             SetError("Failed to create video source");
             return;
         }
 
-        auto videoTrack = factoryWrapper->GetFactory()->CreateVideoTrack(videoSource, rtc::CreateRandomUuid());
+        auto videoTrack = factory_->CreateVideoTrack(rtc::CreateRandomUuid(), videoSource);
         if (!videoTrack) {
             SetError("Failed to create video track");
             return;
@@ -132,7 +126,7 @@ void AsyncWorkerGetUserMedia::OnOK()
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    auto mediaStream = NapiMediaStream::NewInstance(Env(), stream_);
+    auto mediaStream = NapiMediaStream::NewInstance(factory_, stream_);
     if (Env().IsExceptionPending()) {
         deferred_.Reject(Env().GetAndClearPendingException().Value());
         return;
