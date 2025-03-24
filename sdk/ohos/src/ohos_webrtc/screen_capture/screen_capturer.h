@@ -13,9 +13,10 @@
  * limitations under the License.
  */
 
-#ifndef WEBRTC_DESKTOP_CAPTURER_H
-#define WEBRTC_DESKTOP_CAPTURER_H
+#ifndef WEBRTC_SCREEN_CAPTURER_H
+#define WEBRTC_SCREEN_CAPTURER_H
 
+#include "screen_capture_options.h"
 #include "../video/video_info.h"
 #include "../video/video_capturer.h"
 #include "../video/video_frame_receiver.h"
@@ -31,19 +32,25 @@
 
 namespace webrtc {
 
-class DesktopCapturer : public VideoCapturer, public VideoFrameReceiver::Callback {
+class SystemAudioReceiver;
+
+class ScreenCapturer : public VideoCapturer, public VideoFrameReceiver::Callback {
 public:
-    static std::unique_ptr<DesktopCapturer> Create(video::VideoProfile profile);
+    class AudioObserver {
+    public:
+        virtual ~AudioObserver() = default;
+        virtual void OnStarted(bool success) = 0;
+        virtual void OnStopped() = 0;
+        virtual void OnData(void* buffer, int32_t length, int64_t timestampUs) = 0;
+        virtual void OnError(int32_t errorCode, const std::string& message) = 0;
+    };
+
+    static std::unique_ptr<ScreenCapturer> Create(ScreenCaptureOptions options, std::shared_ptr<SystemAudioReceiver> systemAudioReceiver = nullptr);
 
     // Do not use this constructor directly, use 'Create' above.
-    explicit DesktopCapturer(video::VideoProfile profile);
-    ~DesktopCapturer() override;
+    ScreenCapturer(ScreenCaptureOptions options, std::shared_ptr<SystemAudioReceiver> systemAudioReceiver);
+    ~ScreenCapturer() override;
 
-protected:
-    void NotifyCapturedStart(bool success);
-    void NotifyCapturedStop();
-
-protected:
     void Init(std::unique_ptr<VideoFrameReceiver>, Observer* observer) override;
     void Release() override;
 
@@ -52,6 +59,14 @@ protected:
 
     bool IsScreencast() override;
 
+protected:
+    void SetupConfig(int32_t width, int32_t height, OH_AVScreenCaptureConfig& config);
+    bool SetupContentFilter(ohos::AVScreenCaptureContentFilter& contentFilter);
+
+    void NotifyCaptureStart(bool success);
+    void NotifyCaptureStop();
+    
+protected:
     void
     OnFrameAvailable(rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation) override;
 
@@ -68,7 +83,8 @@ protected:
         OH_AVScreenCapture* capture, OH_AVBuffer* buffer, OH_AVScreenCaptureBufferType bufferType, int64_t timestamp);
 
 private:
-    const video::VideoProfile profile_;
+    const ScreenCaptureOptions options_;
+    const std::shared_ptr<SystemAudioReceiver> systemAudioReceiver_;
 
     bool isInitialized_{false};
     bool isStarted_{false};
@@ -78,9 +94,9 @@ private:
     std::unique_ptr<VideoFrameReceiver> dataReceiver_;
 
     Observer* observer_{};
-    std::mutex obsMutex_;
+    mutable std::mutex obsMutex_;
 };
 
 } // namespace webrtc
 
-#endif // WEBRTC_DESKTOP_CAPTURER_H
+#endif // WEBRTC_SCREEN_CAPTURER_H

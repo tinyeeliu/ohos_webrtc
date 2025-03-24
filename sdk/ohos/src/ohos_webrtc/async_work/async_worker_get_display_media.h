@@ -24,9 +24,11 @@
 
 namespace webrtc {
 
+class PeerConnectionFactoryWrapper;
+
 class AsyncWorkerGetDisplayMedia : public Napi::AsyncWorker {
 public:
-    static AsyncWorkerGetDisplayMedia* Create(Napi::Env env, const char* resourceName);
+    static AsyncWorkerGetDisplayMedia* Create(Napi::Env env, std::shared_ptr<PeerConnectionFactoryWrapper> factory);
 
     Napi::Promise GetPromise()
     {
@@ -38,10 +40,10 @@ public:
         return deferred_;
     }
 
-    void Start(MediaTrackConstraints audio, MediaTrackConstraints video);
+    void Start(MediaTrackConstraints audio, MediaTrackConstraints video, MediaTrackConstraints systemAudio);
 
 protected:
-    AsyncWorkerGetDisplayMedia(Napi::Env env, const char* resourceName);
+    AsyncWorkerGetDisplayMedia(Napi::Env env, std::shared_ptr<PeerConnectionFactoryWrapper> factory);
 
     void Execute() override;
     void OnOK() override;
@@ -50,7 +52,10 @@ protected:
 private:
     Napi::Promise::Deferred deferred_;
 
+    std::shared_ptr<PeerConnectionFactoryWrapper> factory_;
+
     MediaTrackConstraints audioConstraints_;
+    MediaTrackConstraints systemAudioConstraints_;
     MediaTrackConstraints videoConstraints_;
     rtc::scoped_refptr<MediaStreamInterface> stream_;
 };

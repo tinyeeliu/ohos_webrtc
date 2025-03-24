@@ -25,51 +25,20 @@
 
 namespace webrtc {
 
-class MediaStreamTrackWrapper : public ObserverInterface {
-public:
-    static std::unique_ptr<MediaStreamTrackWrapper> Create(rtc::scoped_refptr<MediaStreamTrackInterface> track);
+class PeerConnectionFactoryWrapper;
 
-    // Do not use this constructor directly, use 'Create' above.
-    explicit MediaStreamTrackWrapper(rtc::scoped_refptr<MediaStreamTrackInterface> track);
-    ~MediaStreamTrackWrapper() override;
-
-    const MediaStreamTrackInterface* track() const
-    {
-        return track_.get();
-    }
-
-    MediaStreamTrackInterface* track()
-    {
-        return track_.get();
-    }
-
-    void AddVideoSink(rtc::VideoSinkInterface<VideoFrame>* sink);
-    void RemoveVideoSink(rtc::VideoSinkInterface<VideoFrame>* sink);
-    void RemoveAllVideoSinks();
-
-protected:
-    void OnChanged() override;
-
-private:
-    rtc::scoped_refptr<MediaStreamTrackInterface> track_;
-    std::mutex sinksMutex_;
-    std::set<rtc::VideoSinkInterface<VideoFrame>*> videoSinks_;
-};
-
-class NapiMediaStreamTrack : public Napi::ObjectWrap<NapiMediaStreamTrack> {
+class NapiMediaStreamTrack : public Napi::ObjectWrap<NapiMediaStreamTrack>, public ObserverInterface {
 public:
     static void Init(Napi::Env env, Napi::Object exports);
 
-    static Napi::Object NewInstance(Napi::Env env, std::unique_ptr<MediaStreamTrackWrapper> wrapper);
+    static Napi::Object NewInstance(
+        std::shared_ptr<PeerConnectionFactoryWrapper> factory, rtc::scoped_refptr<MediaStreamTrackInterface> track);
 
     ~NapiMediaStreamTrack() override;
 
     rtc::scoped_refptr<MediaStreamTrackInterface> Get() const
     {
-        if (!wrapper_) {
-            return nullptr;
-        }
-        return rtc::scoped_refptr<MediaStreamTrackInterface>(wrapper_->track());
+        return track_;
     }
 
     bool IsAudioTrack() const;
@@ -80,6 +49,16 @@ public:
 
     void AddSink(rtc::VideoSinkInterface<VideoFrame>* sink);
     void RemoveSink(rtc::VideoSinkInterface<VideoFrame>* sink);
+
+protected:
+    static Napi::FunctionReference& Constructor();
+
+    void AddVideoSink(rtc::VideoSinkInterface<VideoFrame>* sink);
+    void RemoveVideoSink(rtc::VideoSinkInterface<VideoFrame>* sink);
+    void RemoveAllVideoSinks();
+
+    // ObserverInterface implementation
+    void OnChanged() override;
 
 protected:
     friend class ObjectWrap;
@@ -95,9 +74,11 @@ protected:
     Napi::Value ToJson(const Napi::CallbackInfo& info);
 
 private:
-    static Napi::FunctionReference constructor_;
+    std::shared_ptr<PeerConnectionFactoryWrapper> factory_;
+    rtc::scoped_refptr<MediaStreamTrackInterface> track_;
 
-    std::unique_ptr<MediaStreamTrackWrapper> wrapper_;
+    std::mutex sinksMutex_;
+    std::set<rtc::VideoSinkInterface<VideoFrame>*> videoSinks_;
 };
 
 } // namespace webrtc

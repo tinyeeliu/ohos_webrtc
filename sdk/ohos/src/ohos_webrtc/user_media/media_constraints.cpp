@@ -274,7 +274,13 @@ MediaTrackConstraintSet::MediaTrackConstraintSet()
       googAutoGainControl("autoGainControl"),
       googNoiseSuppression("noiseSuppression"),
       googHighpassFilter("googHighpassFilter"),
-      googAudioMirroring("googAudioMirroring")
+      googAudioMirroring("googAudioMirroring"),
+      ohosScreenCaptureMode("ohosScreenCaptureMode"),
+      ohosScreenCaptureDisplayId("ohosScreenCaptureDisplayId"),
+      ohosScreenCaptureMissionId("ohosScreenCaptureMissionId"),
+      ohosScreenCaptureWindowFilter("ohosScreenCaptureWindowFilter"),
+      ohosScreenCaptureAudioFilter("ohosScreenCaptureAudioFilter"),
+      ohosScreenCaptureSkipPrivacyMode("ohosScreenCaptureSkipPrivacyMode")
 {
 }
 
@@ -311,6 +317,12 @@ std::vector<const BaseConstraint*> MediaTrackConstraintSet::AllConstraints() con
         &googNoiseSuppression,
         &googHighpassFilter,
         &googAudioMirroring,
+        &ohosScreenCaptureMode,
+        &ohosScreenCaptureDisplayId,
+        &ohosScreenCaptureMissionId,
+        &ohosScreenCaptureWindowFilter,
+        &ohosScreenCaptureAudioFilter,
+        &ohosScreenCaptureSkipPrivacyMode,
     };
 }
 

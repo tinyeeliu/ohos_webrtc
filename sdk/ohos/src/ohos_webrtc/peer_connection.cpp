@@ -36,6 +36,7 @@
 #include "utils/marcos.h"
 #include "async_work/async_worker_certificate.h"
 #include "async_work/async_worker_get_stats.h"
+#include "audio_device/ohos_local_audio_source.h"
 
 namespace webrtc {
 
@@ -728,7 +729,7 @@ void NapiPeerConnection::SetEventHandler(const Napi::CallbackInfo& info, const N
 
 Napi::Value NapiPeerConnection::AddTrack(const Napi::CallbackInfo& info)
 {
-    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
+    RTC_LOG(LS_INFO) << __FUNCTION__;
 
     if (info.Length() < 1) {
         NAPI_THROW(Error::New(info.Env(), "Wrong number of arguments"), info.Env().Undefined());
@@ -767,11 +768,21 @@ Napi::Value NapiPeerConnection::AddTrack(const Napi::CallbackInfo& info)
         streamIds.push_back("stream_id");
     }
 
-    auto track = NapiMediaStreamTrack::Unwrap(jsTrack);
-    auto result = pc_->AddTrack(track->Get(), streamIds);
+    auto napiTrack = NapiMediaStreamTrack::Unwrap(jsTrack);
+    auto track = napiTrack->Get();
+    auto result = pc_->AddTrack(track, streamIds);
     if (!result.ok()) {
         RTC_LOG(LS_ERROR) << "Failed to add audio track to PeerConnection: " << result.error().message();
         NAPI_THROW(Error::New(info.Env(), result.error().message()), info.Env().Undefined());
+    }
+
+    if (track && track->kind() == MediaStreamTrackInterface::kAudioKind) {
+        // Add audio input to adm
+        auto source = factory_->GetAudioSource(track);
+        auto adm = factory_->GetAudioDeviceModule();
+        if (source && adm) {
+            adm->AddAudioInput(source->GetAudioInput());
+        }
     }
 
     return NapiRtpSender::NewInstance(factory_, pc_, result.value());
@@ -808,6 +819,16 @@ Napi::Value NapiPeerConnection::RemoveTrack(const Napi::CallbackInfo& info)
                 break;
         }
         NAPI_THROW(Error::New(info.Env(), message), info.Env().Undefined());
+    }
+
+    auto track = sender->Get()->track();
+    if (track && track->kind() == MediaStreamTrackInterface::kAudioKind) {
+        // Remove audio input from adm
+        auto source = factory_->GetAudioSource(track);
+        auto adm = factory_->GetAudioDeviceModule();
+        if (adm && source) {
+            adm->RemoveAudioInput(source->GetAudioInput());
+        }
     }
 
     return info.Env().Undefined();
@@ -1528,21 +1549,19 @@ void NapiPeerConnection::OnTrack(rtc::scoped_refptr<RtpTransceiverInterface> tra
             return;
         }
 
-        auto track = MediaStreamTrackWrapper::Create(receiver->track());
-
         auto env = target.Env();
         Napi::HandleScope scope(env);
 
         auto streams = receiver->streams();
         auto jsStreams = Array::New(env, streams.size());
         for (uint32_t i = 0; i < streams.size(); i++) {
-            jsStreams[i] = NapiMediaStream::NewInstance(env, streams[i]);
+            jsStreams[i] = NapiMediaStream::NewInstance(factory_, streams[i]);
         }
 
         auto jsEvent = Object::New(env);
         jsEvent.Set("type", String::New(env, kEventTrack));
         jsEvent.Set("streams", jsStreams);
-        jsEvent.Set("track", NapiMediaStreamTrack::NewInstance(env, std::move(track)));
+        jsEvent.Set("track", NapiMediaStreamTrack::NewInstance(factory_, receiver->track()));
         jsEvent.Set("receiver", NapiRtpReceiver::NewInstance(factory_, pc_, receiver));
         jsEvent.Set("transceiver", NapiRtpTransceiver::NewInstance(factory_, pc_, transceiver));
 

@@ -15,6 +15,7 @@
 
 #include "media_devices.h"
 #include "media_track_constraints.h"
+#include "peer_connection_factory.h"
 #include "async_work/async_worker_enumerate_devices.h"
 #include "async_work/async_worker_get_user_media.h"
 #include "async_work/async_worker_get_display_media.h"
@@ -90,7 +91,12 @@ Napi::Value NapiMediaDevices::GetUserMedia(const Napi::CallbackInfo& info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    auto asyncWorker = AsyncWorkerGetUserMedia::Create(info.Env(), "getUserMedia");
+    auto factory = PeerConnectionFactoryWrapper::GetDefault();
+    if (!factory || !factory->GetFactory()) {
+        NAPI_THROW(Error::New(info.Env(), "No default peer connection factory"), info.Env().Undefined());
+    }
+
+    auto asyncWorker = AsyncWorkerGetUserMedia::Create(info.Env(), factory);
     auto deferred = asyncWorker->GetDeferred();
 
     if (info.Length() == 0 || !info[0].IsObject()) {
@@ -133,7 +139,12 @@ Napi::Value NapiMediaDevices::GetDisplayMedia(const Napi::CallbackInfo& info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    auto asyncWorker = AsyncWorkerGetDisplayMedia::Create(info.Env(), "getDisplayMedia");
+    auto factory = PeerConnectionFactoryWrapper::GetDefault();
+    if (!factory || !factory->GetFactory()) {
+        NAPI_THROW(Error::New(info.Env(), "No default peer connection factory"), info.Env().Undefined());
+    }
+
+    auto asyncWorker = AsyncWorkerGetDisplayMedia::Create(info.Env(), std::move(factory));
     auto deferred = asyncWorker->GetDeferred();
 
     if (info.Length() == 0 || !info[0].IsObject()) {
@@ -142,11 +153,20 @@ Napi::Value NapiMediaDevices::GetDisplayMedia(const Napi::CallbackInfo& info)
     }
 
     MediaTrackConstraints audio;
+    MediaTrackConstraints systemAudio;
     MediaTrackConstraints video;
 
     auto jsConstraints = info[0].As<Object>();
     if (jsConstraints.Has("audio")) {
         NapiMediaConstraints::JsToNative(jsConstraints.Get("audio"), audio);
+        if (info.Env().IsExceptionPending()) {
+            deferred.Reject(info.Env().GetAndClearPendingException().Value());
+            return asyncWorker->GetPromise();
+        }
+    }
+
+    if (jsConstraints.Has("ohosSystemAudio")) {
+        NapiMediaConstraints::JsToNative(jsConstraints.Get("ohosSystemAudio"), systemAudio);
         if (info.Env().IsExceptionPending()) {
             deferred.Reject(info.Env().GetAndClearPendingException().Value());
             return asyncWorker->GetPromise();
@@ -161,6 +181,8 @@ Napi::Value NapiMediaDevices::GetDisplayMedia(const Napi::CallbackInfo& info)
         }
     }
 
+    RTC_DLOG(LS_VERBOSE) << "video constraints: " << video.ToString();
+    RTC_DLOG(LS_VERBOSE) << "systemAudio constraints: " << systemAudio.ToString();
     RTC_DLOG(LS_VERBOSE) << "audio constraints: " << audio.ToString();
 
     if (audio.IsNull() && video.IsNull()) {
@@ -168,7 +190,7 @@ Napi::Value NapiMediaDevices::GetDisplayMedia(const Napi::CallbackInfo& info)
         return asyncWorker->GetPromise();
     }
 
-    asyncWorker->Start(std::move(audio), std::move(video));
+    asyncWorker->Start(std::move(audio), std::move(video), std::move(systemAudio));
     return asyncWorker->GetPromise();
 }
 
