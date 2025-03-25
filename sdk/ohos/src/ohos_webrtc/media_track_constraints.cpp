@@ -326,6 +326,45 @@ bool ValidateAndCopyConstraint(
     return true;
 }
 
+bool ValidateAndCopyConstraintSetExtension(
+    const Object& jsTrackConstraints, NakedValueDisposition nakedTreatment, MediaTrackConstraintSet& trackConstraints,
+    std::string& errorMessage)
+{
+    ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.ohosScreenCaptureDisplayId);
+
+    if (!ValidateAndCopyConstraint(
+            jsTrackConstraints, nakedTreatment, trackConstraints.ohosScreenCaptureMode, errorMessage))
+    {
+        return false;
+    }
+
+    if (!ValidateAndCopyConstraint(
+            jsTrackConstraints, nakedTreatment, trackConstraints.ohosScreenCaptureMissionId, errorMessage))
+    {
+        return false;
+    }
+
+    if (!ValidateAndCopyConstraint(
+            jsTrackConstraints, nakedTreatment, trackConstraints.ohosScreenCaptureWindowFilter, errorMessage))
+    {
+        return false;
+    }
+
+    if (!ValidateAndCopyConstraint(
+            jsTrackConstraints, nakedTreatment, trackConstraints.ohosScreenCaptureAudioFilter, errorMessage))
+    {
+        return false;
+    }
+
+    if (!ValidateAndCopyConstraint(
+            jsTrackConstraints, nakedTreatment, trackConstraints.ohosScreenCaptureSkipPrivacyMode, errorMessage))
+    {
+        return false;
+    }
+
+    return true;
+}
+
 bool ValidateAndCopyConstraintSet(
     const Object& jsTrackConstraints, NakedValueDisposition nakedTreatment, MediaTrackConstraintSet& trackConstraints,
     std::string& errorMessage)
@@ -364,23 +403,7 @@ bool ValidateAndCopyConstraintSet(
         return false;
     }
 
-    if (!ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.ohosScreenCaptureMode, errorMessage)) {
-        return false;
-    }
-
-    if (!ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.ohosScreenCaptureMissionId, errorMessage)) {
-        return false;
-    }
-
-    if (!ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.ohosScreenCaptureWindowFilter, errorMessage)) {
-        return false;
-    }
-
-    if (!ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.ohosScreenCaptureAudioFilter, errorMessage)) {
-        return false;
-    }
-
-    if (!ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.ohosScreenCaptureSkipPrivacyMode, errorMessage)) {
+    if (!ValidateAndCopyConstraintSetExtension(jsTrackConstraints, nakedTreatment, trackConstraints, errorMessage)) {
         return false;
     }
 

@@ -29,7 +29,8 @@
 
 namespace webrtc {
 
-AsyncWorkerGetUserMedia* AsyncWorkerGetUserMedia::Create(Napi::Env env, std::shared_ptr<PeerConnectionFactoryWrapper> factory)
+AsyncWorkerGetUserMedia*
+AsyncWorkerGetUserMedia::Create(Napi::Env env, std::shared_ptr<PeerConnectionFactoryWrapper> factory)
 {
     auto asyncWorker = new AsyncWorkerGetUserMedia(env, std::move(factory));
     return asyncWorker;
@@ -45,6 +46,79 @@ void AsyncWorkerGetUserMedia::Start(MediaTrackConstraints audio, MediaTrackConst
     audioConstraints_ = std::move(audio);
     videoConstraints_ = std::move(video);
     Queue();
+}
+
+rtc::scoped_refptr<AudioTrackInterface> AsyncWorkerGetUserMedia::CreateAudioTrack(std::string* errorMessage)
+{
+    cricket::AudioOptions options;
+    CopyConstraintsIntoAudioOptions(audioConstraints_, options);
+
+    auto audioSource = factory_->CreateAudioSource(options);
+    if (!audioSource) {
+        if (errorMessage) {
+            *errorMessage = "Failed to create audio source";
+        }
+        return nullptr;
+    }
+    auto audioTrack = factory_->CreateAudioTrack(rtc::CreateRandomUuid(), audioSource);
+    if (!audioTrack) {
+        if (errorMessage) {
+            *errorMessage = "Failed to create audio track";
+        }
+        return nullptr;
+    }
+
+    return audioTrack;
+}
+
+rtc::scoped_refptr<VideoTrackInterface> AsyncWorkerGetUserMedia::CreateVideoTrack(std::string* errorMessage)
+{
+    auto cameraDevices = CameraEnumerator::GetDevices();
+
+    CameraCaptureSettings selectedSetting;
+    std::string failedConstraintName;
+    if (SelectSettingsForVideo(
+            cameraDevices, videoConstraints_, kDefaultWidth, kDefaultHeight, kDefaultFrameRate, selectedSetting,
+            failedConstraintName))
+    {
+        RTC_DLOG(LS_INFO) << "Selected camera device: " << selectedSetting.deviceId
+                          << ", resolution = " << selectedSetting.profile.resolution.width << "x"
+                          << selectedSetting.profile.resolution.height
+                          << ", format = " << selectedSetting.profile.format
+                          << ", framerate = " << selectedSetting.profile.frameRateRange.min << "-"
+                          << selectedSetting.profile.frameRateRange.max;
+    } else {
+        RTC_LOG(LS_ERROR) << "Failed to select settings for video: " << failedConstraintName;
+        if (errorMessage) {
+            *errorMessage = std::string("Unsatisfied constraint: ") + failedConstraintName;
+        }
+    }
+
+    auto capturer = CameraCapturer::Create(selectedSetting.deviceId, selectedSetting.profile);
+    if (!capturer) {
+        if (errorMessage) {
+            *errorMessage = "Failed to create camera capturer";
+        }
+        return nullptr;
+    }
+
+    auto videoSource = factory_->CreateVideoSource(std::move(capturer));
+    if (!videoSource) {
+        if (errorMessage) {
+            *errorMessage = "Failed to create video source";
+        }
+        return nullptr;
+    }
+
+    auto videoTrack = factory_->CreateVideoTrack(rtc::CreateRandomUuid(), videoSource);
+    if (!videoTrack) {
+        if (errorMessage) {
+            *errorMessage = "Failed to create video track";
+        }
+        return nullptr;
+    }
+
+    return videoTrack;
 }
 
 void AsyncWorkerGetUserMedia::Execute()
@@ -63,62 +137,25 @@ void AsyncWorkerGetUserMedia::Execute()
     }
 
     if (!audioConstraints_.IsNull()) {
-        cricket::AudioOptions options;
-        CopyConstraintsIntoAudioOptions(audioConstraints_, options);
-
-        auto audioSource = factory_->CreateAudioSource(options);
-        if (!audioSource) {
-            SetError("Failed to create audio source");
+        std::string errorMessage;
+        auto audioTrack = CreateAudioTrack(&errorMessage);
+        if (audioTrack) {
+            stream_->AddTrack(audioTrack);
+        } else {
+            SetError(errorMessage);
             return;
         }
-        auto audioTrack = factory_->CreateAudioTrack(rtc::CreateRandomUuid(), audioSource);
-        if (!audioTrack) {
-            SetError("Failed to create audio track");
-            return;
-        }
-
-        stream_->AddTrack(audioTrack);
     }
 
     if (!videoConstraints_.IsNull()) {
-        auto cameraDevices = CameraEnumerator::GetDevices();
-
-        CameraCaptureSettings selectedSetting;
-        std::string failedConstraintName;
-        if (SelectSettingsForVideo(
-                cameraDevices, videoConstraints_, kDefaultWidth, kDefaultHeight, kDefaultFrameRate, selectedSetting,
-                failedConstraintName))
-        {
-            RTC_DLOG(LS_INFO) << "Selected camera device: " << selectedSetting.deviceId
-                              << ", resolution = " << selectedSetting.profile.resolution.width << "x"
-                              << selectedSetting.profile.resolution.height
-                              << ", format = " << selectedSetting.profile.format
-                              << ", framerate = " << selectedSetting.profile.frameRateRange.min << "-"
-                              << selectedSetting.profile.frameRateRange.max;
+        std::string errorMessage;
+        auto videoTrack = CreateVideoTrack(&errorMessage);
+        if (videoTrack) {
+            stream_->AddTrack(videoTrack);
         } else {
-            RTC_LOG(LS_ERROR) << "Failed to select settings for video: " << failedConstraintName;
-            SetError(std::string("Unsatisfied constraint: ") + failedConstraintName);
-        }
-
-        auto capturer = CameraCapturer::Create(selectedSetting.deviceId, selectedSetting.profile);
-        if (!capturer) {
-            SetError("Failed to create camera capturer");
+            SetError(errorMessage);
             return;
         }
-
-        auto videoSource = factory_->CreateVideoSource(std::move(capturer));
-        if (!videoSource) {
-            SetError("Failed to create video source");
-            return;
-        }
-
-        auto videoTrack = factory_->CreateVideoTrack(rtc::CreateRandomUuid(), videoSource);
-        if (!videoTrack) {
-            SetError("Failed to create video track");
-            return;
-        }
-
-        stream_->AddTrack(videoTrack);
     }
 }
 

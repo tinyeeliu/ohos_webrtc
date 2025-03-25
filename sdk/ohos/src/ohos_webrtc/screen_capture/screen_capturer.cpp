@@ -318,7 +318,8 @@ void ScreenCapturer::OnStateChange(struct OH_AVScreenCapture* capture, OH_AVScre
             if (systemAudioReceiver_) {
                 systemAudioReceiver_->OnStarted(true);
             }
-        } break;
+            break;
+        }
         case OH_SCREEN_CAPTURE_STATE_CANCELED:
         case OH_SCREEN_CAPTURE_STATE_STOPPED_BY_USER: {
             NotifyCaptureStop();
@@ -329,12 +330,13 @@ void ScreenCapturer::OnStateChange(struct OH_AVScreenCapture* capture, OH_AVScre
         }
         case OH_SCREEN_CAPTURE_STATE_INTERRUPTED_BY_OTHER:
         case OH_SCREEN_CAPTURE_STATE_STOPPED_BY_CALL:
-        case OH_SCREEN_CAPTURE_STATE_STOPPED_BY_USER_SWITCHES:
+        case OH_SCREEN_CAPTURE_STATE_STOPPED_BY_USER_SWITCHES: {
             NotifyCaptureStop();
             if (systemAudioReceiver_) {
                 systemAudioReceiver_->OnError(0, "Interrupted");
             }
             break;
+        }
         default:
             break;
     }

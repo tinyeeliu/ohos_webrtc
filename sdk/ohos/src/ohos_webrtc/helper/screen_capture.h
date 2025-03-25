@@ -69,24 +69,31 @@ inline AVScreenCapture::AVScreenCapture() = default;
 
 inline AVScreenCapture::AVScreenCapture(OH_AVScreenCapture* capture) : PointerWrapper(capture, NullDeleter) {}
 
-
 inline AVScreenCaptureContentFilter AVScreenCaptureContentFilter::Create()
 {
     OH_AVScreenCapture_ContentFilter* filter = OH_AVScreenCapture_CreateContentFilter();
     NATIVE_THROW_IF_FAILED(
-        filter != nullptr, -1, "OH_AVScreenCapture", "Failed to create screen capture content filter", AVScreenCaptureContentFilter());
-    return AVScreenCaptureContentFilter(filter, [](OH_AVScreenCapture_ContentFilter* filter) { OH_AVScreenCapture_ReleaseContentFilter(filter); });
+        filter != nullptr, -1, "OH_AVScreenCapture", "Failed to create screen capture content filter",
+        AVScreenCaptureContentFilter());
+    return AVScreenCaptureContentFilter(
+        filter, [](OH_AVScreenCapture_ContentFilter* filter) { OH_AVScreenCapture_ReleaseContentFilter(filter); });
 }
 
-inline AVScreenCaptureContentFilter AVScreenCaptureContentFilter::TakeOwnership(OH_AVScreenCapture_ContentFilter* filter)
+inline AVScreenCaptureContentFilter
+AVScreenCaptureContentFilter::TakeOwnership(OH_AVScreenCapture_ContentFilter* filter)
 {
-    NATIVE_THROW_IF_FAILED(filter != nullptr, -1, "OH_AVScreenCapture", "Null argument", AVScreenCaptureContentFilter());
-    return AVScreenCaptureContentFilter(filter, [](OH_AVScreenCapture_ContentFilter* filter) { OH_AVScreenCapture_ReleaseContentFilter(filter); });
+    NATIVE_THROW_IF_FAILED(
+        filter != nullptr, -1, "OH_AVScreenCapture", "Null argument", AVScreenCaptureContentFilter());
+    return AVScreenCaptureContentFilter(
+        filter, [](OH_AVScreenCapture_ContentFilter* filter) { OH_AVScreenCapture_ReleaseContentFilter(filter); });
 }
 
 inline AVScreenCaptureContentFilter::AVScreenCaptureContentFilter() = default;
 
-inline AVScreenCaptureContentFilter::AVScreenCaptureContentFilter(OH_AVScreenCapture_ContentFilter* filter) : PointerWrapper(filter, NullDeleter) {}
+inline AVScreenCaptureContentFilter::AVScreenCaptureContentFilter(OH_AVScreenCapture_ContentFilter* filter)
+    : PointerWrapper(filter, NullDeleter)
+{
+}
 
 } // namespace ohos
 

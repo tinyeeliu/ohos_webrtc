@@ -79,21 +79,15 @@ NapiSctpTransport::NapiSctpTransport(const Napi::CallbackInfo& info) : NapiEvent
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    if (info[0].IsExternal()) {
-        auto sctpTransport = info[0].As<External<SctpTransportInterface>>().Data();
-        sctpTransport_ = rtc::scoped_refptr<SctpTransportInterface>(sctpTransport);
+    // Create from native with 2 paramters, and SHOULD NOT create from ArkTS
+    if (info.Length() != 2 || !info[0].IsExternal() || !info[1].IsExternal()) {
+        NAPI_THROW_VOID(Napi::Error::New(info.Env(), "Invalid Operation"));
     }
 
-    if (info.Length() > 1 && info[1].IsExternal()) {
-        pcWrapper_ = info[1].As<External<NapiPeerConnectionWrapper>>().Data();
-    }
+    factory_ = *info[0].As<External<std::shared_ptr<PeerConnectionFactoryWrapper>>>().Data();
+    sctpTransport_ = *info[1].As<External<rtc::scoped_refptr<SctpTransportInterface>>>().Data();
 
-    if (!pcWrapper_ || !sctpTransport_) {
-        NAPI_THROW_VOID(Error::New(info.Env(), "Invalid argument"));
-    }
-
-    auto factoryWrapper = pcWrapper_->GetPeerConnectionFactoryWrapper();
-    factoryWrapper->GetNetworkThread()->BlockingCall([this] { sctpTransport_->RegisterObserver(this); });
+    factory_->GetNetworkThread()->BlockingCall([this] { sctpTransport_->RegisterObserver(this); });
 }
 
 NapiSctpTransport::~NapiSctpTransport()

@@ -90,6 +90,7 @@ NapiMediaStreamTrack::NapiMediaStreamTrack(const Napi::CallbackInfo& info)
     RTC_DLOG(LS_INFO) << __FUNCTION__;
 
     auto env = info.Env();
+    // Create from native with 2 paramters, and SHOULD NOT create from ArkTS
     if (info.Length() != 2 || !info[0].IsExternal() || !info[1].IsExternal()) {
         NAPI_THROW_VOID(Napi::Error::New(info.Env(), "Invalid Operation"));
     }

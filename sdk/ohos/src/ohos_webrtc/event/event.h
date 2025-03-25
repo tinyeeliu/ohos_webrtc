@@ -31,12 +31,15 @@ public:
 
 template <typename T>
 class CallbackEvent : public Event<T> {
+    struct PrivateTag {};
+
 public:
     static std::unique_ptr<CallbackEvent<T>> Create(std::function<void(T&)> callback)
     {
-        return std::unique_ptr<CallbackEvent<T>>(new CallbackEvent(std::move(callback)));
+        return std::make_unique<CallbackEvent<T>>(PrivateTag(), std::move(callback));
     }
 
+    CallbackEvent(PrivateTag, const std::function<void(T&)>& callback) : callback_(callback) {}
     ~CallbackEvent() override = default;
 
     void Process(T& target) override
@@ -45,18 +48,20 @@ public:
     }
 
 private:
-    explicit CallbackEvent(const std::function<void(T&)>& callback) : callback_(callback) {}
     const std::function<void(T&)> callback_;
 };
 
 template <typename T>
 class EmptyEvent : public Event<T> {
+    struct PrivateTag {};
+
 public:
     static std::unique_ptr<EmptyEvent> Create()
     {
-        return std::unique_ptr<EmptyEvent>(new EmptyEvent());
+        return std::make_unique<EmptyEvent>(PrivateTag());
     }
 
+    explicit EmptyEvent(PrivateTag) {}
     ~EmptyEvent() override = default;
 
     void Process(T&) override

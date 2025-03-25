@@ -81,24 +81,22 @@ void DataChannelObserverTemp::OnStateChange()
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
     auto state = dataChannel_->state();
-    Enqueue(CallbackEvent<NapiDataChannel>::Create([state](NapiDataChannel &target) {
-        target.HandleStateChange(state);
-    }));
+    Enqueue(
+        CallbackEvent<NapiDataChannel>::Create([state](NapiDataChannel& target) { target.HandleStateChange(state); }));
 }
 
 void DataChannelObserverTemp::OnMessage(const DataBuffer& buffer)
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    Enqueue(CallbackEvent<NapiDataChannel>::Create([buffer](NapiDataChannel &channel) {
-        channel.HandleMessage(buffer);
-    }));
+    Enqueue(
+        CallbackEvent<NapiDataChannel>::Create([buffer](NapiDataChannel& channel) { channel.HandleMessage(buffer); }));
 }
 
-void DataChannelObserverTemp::OnBufferedAmountChange(uint64_t sent_data_size)
+void DataChannelObserverTemp::OnBufferedAmountChange(uint64_t sentDataSize)
 {
     // should not reached
-    (void)sent_data_size;
+    (void)sentDataSize;
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 }
 
@@ -177,16 +175,14 @@ NapiDataChannel::NapiDataChannel(const CallbackInfo& info)
     while (auto event = observer->Dequeue()) {
         Dispatch(std::move(event));
     }
-    
+
     // Hold the observer to avoid:
     // 1. Early 'UnregisterObserver'
     // 2. The gap of 'UnregisterObserver' and 'RegisterObserver'
     observerTemp_ = std::move(observer);
 }
 
-NapiDataChannel::~NapiDataChannel()
-{
-}
+NapiDataChannel::~NapiDataChannel() {}
 
 rtc::scoped_refptr<DataChannelInterface> NapiDataChannel::Get() const
 {
@@ -423,32 +419,33 @@ void NapiDataChannel::OnStateChange()
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
     auto state = dataChannel_->state();
-    Dispatch(CallbackEvent<NapiDataChannel>::Create([state](NapiDataChannel &channel) {
-        channel.HandleStateChange(state);
-    }));
+    Dispatch(CallbackEvent<NapiDataChannel>::Create(
+        [state](NapiDataChannel& channel) { channel.HandleStateChange(state); }));
 }
 
 void NapiDataChannel::OnMessage(const DataBuffer& buffer)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    Dispatch(CallbackEvent<NapiDataChannel>::Create([buffer](NapiDataChannel &channel) { channel.HandleMessage(buffer); }));
+    Dispatch(
+        CallbackEvent<NapiDataChannel>::Create([buffer](NapiDataChannel& channel) { channel.HandleMessage(buffer); }));
 }
 
-void NapiDataChannel::OnBufferedAmountChange(uint64_t sent_data_size)
+void NapiDataChannel::OnBufferedAmountChange(uint64_t sentDataSize)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    (void)sent_data_size;
+    (void)sentDataSize;
 
     auto bufferedAmount = dataChannel_->buffered_amount();
     auto bufferedAmountLowThreshold = bufferedAmountLowThreshold_.load();
     if (bufferedAmount > bufferedAmountLowThreshold) {
-        RTC_LOG(LS_VERBOSE) << "Buffered amount is greater than threshold: " << bufferedAmount << " > " << bufferedAmountLowThreshold;
+        RTC_LOG(LS_VERBOSE) << "Buffered amount is greater than threshold: " << bufferedAmount << " > "
+                            << bufferedAmountLowThreshold;
         return;
     }
 
-    Dispatch(CallbackEvent<NapiDataChannel>::Create([](NapiDataChannel &channel) {
+    Dispatch(CallbackEvent<NapiDataChannel>::Create([](NapiDataChannel& channel) {
         RTC_LOG(LS_VERBOSE) << "Dispatched: " << kEventNameBufferedAmountLow;
 
         auto env = channel.Env();
@@ -480,7 +477,7 @@ void NapiDataChannel::HandleStateChange(DataChannelInterface::DataState state)
     auto eventType = STATE_EVENT_MAP[state];
 
     HandleScope scope(Env());
-    
+
     auto object = Object::New(Env());
     object.Set("type", String::New(Env(), eventType.data()));
     MakeCallback(eventType.data(), {object});
@@ -495,7 +492,7 @@ void NapiDataChannel::HandleMessage(const DataBuffer& buffer)
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
     HandleScope scope(Env());
-    
+
     Napi::Value value;
     if (buffer.binary) {
         auto externalData = new rtc::CopyOnWriteBuffer(buffer.data);
@@ -509,14 +506,14 @@ void NapiDataChannel::HandleMessage(const DataBuffer& buffer)
         value = arrayBuffer;
     } else {
         // Should be a UTF-8 string
-        auto str = String::New(Env(), reinterpret_cast<const char *>(buffer.data.data()), buffer.size());
+        auto str = String::New(Env(), reinterpret_cast<const char*>(buffer.data.data()), buffer.size());
         value = str;
     }
-    
+
     auto jsEvent = Object::New(Env());
     jsEvent.Set("type", kEventNameMessage);
     jsEvent.Set("data", value);
-    
+
     MakeCallback(kEventNameMessage, {jsEvent});
 }
 

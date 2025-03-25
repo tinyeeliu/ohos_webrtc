@@ -93,9 +93,9 @@ NapiRtpReceiver::NapiRtpReceiver(const Napi::CallbackInfo& info) : Napi::ObjectW
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    if (info[0].IsExternal()) {
-        auto rtpReceiver = info[0].As<External<RtpReceiverInterface>>().Data();
-        rtpReceiver_ = rtc::scoped_refptr<RtpReceiverInterface>(rtpReceiver);
+    // Create from native with 3 paramters, and SHOULD NOT create from ArkTS
+    if (info.Length() != 3 || !info[0].IsExternal() || !info[1].IsExternal() || !info[2].IsExternal()) {
+        NAPI_THROW_VOID(Napi::Error::New(info.Env(), "Invalid Operation"));
     }
 
     if (info.Length() > 1 && info[1].IsExternal()) {

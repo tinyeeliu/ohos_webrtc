@@ -177,7 +177,8 @@ void SystemAudioReceiver::OnData(void* buffer, int32_t length, int64_t timestamp
     }
     
     if (mute_) {
-        std::memset(buffer, 0, length);
+        auto it = static_cast<uint8_t*>(buffer);
+        std::fill(it, it + length, 0);
     }
 
     NotifyDataReady(buffer, length, timestampUs, 0);

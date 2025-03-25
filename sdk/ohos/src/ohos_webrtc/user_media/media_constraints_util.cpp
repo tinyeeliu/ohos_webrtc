@@ -412,6 +412,20 @@ bool DeviceSatisfiesConstraintSet(
     return true;
 }
 
+std::string CameraCaptureSettings::ToString() const
+{
+    std::ostringstream ss;
+
+    ss << "CameraCaptureSettings {";
+    ss << "captureMode: " << deviceId << ", ";
+    ss << "resolution: " << profile.resolution.width << "x" << profile.resolution.height << ", ";
+    ss << "format: " << static_cast<int32_t>(profile.format) << ", ";
+    ss << "framerate: " << profile.frameRateRange.min << "-" << profile.frameRateRange.max;
+    ss << "}";
+
+    return ss.str();
+}
+
 bool SelectSettingsForVideo(
     const std::vector<CameraDeviceInfo>& devices, const MediaTrackConstraints& constraints, int defaultWidth,
     int defaultHeight, double defaultFrameRate, CameraCaptureSettings& setting, std::string& failedConstraintName)

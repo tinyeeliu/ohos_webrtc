@@ -103,7 +103,7 @@ rtc::scoped_refptr<OhosAudioDeviceModule> PeerConnectionFactoryWrapper::GetAudio
 rtc::scoped_refptr<OhosLocalAudioSource> PeerConnectionFactoryWrapper::CreateAudioSource(
     const cricket::AudioOptions& options, std::shared_ptr<AudioInput> audioInput)
 {
-    return adm_->CreateAudioSource(std::move(options), std::move(audioInput));
+    return adm_->CreateAudioSource(options, std::move(audioInput));
 }
 
 rtc::scoped_refptr<OhosVideoTrackSource>
@@ -120,8 +120,11 @@ rtc::scoped_refptr<AudioTrackInterface> PeerConnectionFactoryWrapper::CreateAudi
     }
 
     auto track = pcFactory_->CreateAudioTrack(label, source.get());
-    audioSources_[track] = source;
+    if (!track) {
+        return nullptr;
+    }
 
+    audioSources_[track] = source;
     return track;
 }
 
@@ -133,8 +136,11 @@ rtc::scoped_refptr<VideoTrackInterface> PeerConnectionFactoryWrapper::CreateVide
     }
 
     auto track = pcFactory_->CreateVideoTrack(source, label);
-    videoSources_[track] = source;
+    if (!track) {
+        return nullptr;
+    }
 
+    videoSources_[track] = source;
     return track;
 }
 
@@ -407,7 +413,7 @@ Napi::Value NapiPeerConnectionFactory::CreateVideoSource(const CallbackInfo& inf
 
     if (info.Length() > 1) {
         if (!info[1].IsBoolean()) {
-            NAPI_THROW(TypeError::New(info.Env(), "The first argument must be boolean"), info.Env().Undefined());
+            NAPI_THROW(TypeError::New(info.Env(), "The second argument must be boolean"), info.Env().Undefined());
         }
 
         isScreencast = info[1].As<Boolean>().Value();
@@ -426,17 +432,10 @@ Napi::Value NapiPeerConnectionFactory::CreateVideoSource(const CallbackInfo& inf
     } else {
         CameraCaptureSettings selectedSetting;
         std::string failedConstraintName;
-        if (SelectSettingsForVideo(
+        if (!SelectSettingsForVideo(
                 CameraEnumerator::GetDevices(), video, kDefaultWidth, kDefaultHeight, kDefaultFrameRate,
                 selectedSetting, failedConstraintName))
         {
-            RTC_DLOG(LS_VERBOSE) << "Selected camera device: " << selectedSetting.deviceId
-                                 << ", resolution = " << selectedSetting.profile.resolution.width << "x"
-                                 << selectedSetting.profile.resolution.height
-                                 << ", format = " << selectedSetting.profile.format
-                                 << ", framerate = " << selectedSetting.profile.frameRateRange.min << "-"
-                                 << selectedSetting.profile.frameRateRange.max;
-        } else {
             RTC_LOG(LS_ERROR) << "Failed to select settings for video, unsatisfied constraint: "
                               << failedConstraintName;
             NAPI_THROW(
@@ -444,6 +443,7 @@ Napi::Value NapiPeerConnectionFactory::CreateVideoSource(const CallbackInfo& inf
                 info.Env().Undefined());
         }
 
+        RTC_DLOG(LS_VERBOSE) << "Selected camera device: " << selectedSetting.ToString();
         videoCapturer = CameraCapturer::Create(selectedSetting.deviceId, selectedSetting.profile);
         if (!videoCapturer) {
             NAPI_THROW(Error::New(info.Env(), "Failed to create camera capturer"), info.Env().Undefined());

@@ -1845,7 +1845,6 @@ void NapiPeerConnection::OnConnectionChange(PeerConnectionInterface::PeerConnect
 
 void NapiPeerConnection::OnIceConnectionReceivingChange(bool receiving)
 {
-
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 }
 
