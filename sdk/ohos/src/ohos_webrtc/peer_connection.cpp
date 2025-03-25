@@ -1226,14 +1226,11 @@ Napi::Value NapiPeerConnection::Close(const Napi::CallbackInfo& info)
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    // if (pc_) {
     // Close操作可能耗时较长，放到信令线程执行以避免阻塞主线程
     pc_->signaling_thread()->PostTask([pc = pc_] {
         RTC_DLOG(LS_INFO) << "Do Close";
         pc->Close();
     });
-    // }
-    // pc_ = nullptr;
 
     return info.Env().Undefined();
 }
@@ -1452,7 +1449,6 @@ void NapiPeerConnection::OnConnectionChange(PeerConnectionInterface::PeerConnect
 
 void NapiPeerConnection::OnIceConnectionReceivingChange(bool receiving)
 {
-
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 }
 

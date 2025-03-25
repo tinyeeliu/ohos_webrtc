@@ -35,14 +35,15 @@ public:
     explicit DataChannelObserverTemp(rtc::scoped_refptr<DataChannelInterface> dataChannel);
     ~DataChannelObserverTemp() override;
 
-    rtc::scoped_refptr<DataChannelInterface> Get() const {
+    rtc::scoped_refptr<DataChannelInterface> Get() const
+    {
         return dataChannel_;
     }
 
 protected:
     void OnStateChange() override;
     void OnMessage(const DataBuffer& buffer) override;
-    void OnBufferedAmountChange(uint64_t sent_data_size) override;
+    void OnBufferedAmountChange(uint64_t sentDataSize) override;
 
 private:
     rtc::scoped_refptr<DataChannelInterface> dataChannel_{};
@@ -86,11 +87,11 @@ protected:
 
     void OnStateChange() override;
     void OnMessage(const DataBuffer& buffer) override;
-    void OnBufferedAmountChange(uint64_t sent_data_size) override;
-    
+    void OnBufferedAmountChange(uint64_t sentDataSize) override;
+
     void HandleStateChange(DataChannelInterface::DataState state);
     void HandleMessage(const DataBuffer& buffer);
-  
+
 private:
     static Napi::FunctionReference constructor_;
 

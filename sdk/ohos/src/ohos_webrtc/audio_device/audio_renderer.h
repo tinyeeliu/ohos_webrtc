@@ -37,7 +37,7 @@ public:
     static std::unique_ptr<AudioRenderer> Create(AudioOutputOptions options);
 
     // Do not use this constructor directly, use 'Create' above.
-    AudioRenderer(AudioOutputOptions options);
+    explicit AudioRenderer(AudioOutputOptions options);
     ~AudioRenderer() override;
 
     int32_t Init() override;
@@ -82,6 +82,7 @@ protected:
     OH_AudioStream_State GetCurrentState() const;
     double EstimateLatencyMillis() const;
     uint32_t GetUnderflowCount() const;
+    bool CheckConfiguration(OH_AudioRenderer* renderer);
 
     void NotifyError(AudioErrorType error, const std::string& message);
     void NotifyStateChange(AudioStateType state);

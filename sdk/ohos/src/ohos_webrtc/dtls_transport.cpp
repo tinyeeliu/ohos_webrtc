@@ -100,7 +100,6 @@ NapiDtlsTransport::NapiDtlsTransport(const Napi::CallbackInfo& info) : NapiEvent
     factory_ = *info[0].As<External<std::shared_ptr<PeerConnectionFactoryWrapper>>>().Data();
 
     auto dtlsTransport = info[1].As<External<DtlsTransportInterface>>().Data();
-    ;
     dtlsTransport_ = rtc::scoped_refptr<DtlsTransportInterface>(dtlsTransport);
 
     factory_->GetNetworkThread()->PostTask([this] { dtlsTransport_->RegisterObserver(this); });

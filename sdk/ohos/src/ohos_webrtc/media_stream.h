@@ -59,6 +59,7 @@ protected:
     bool CreateMediaStream();
     bool CreateMediaStream(const NapiMediaStream* stream);
     bool CreateMediaStream(const std::vector<NapiMediaStreamTrack*>& tracks);
+    void SetupObserver();
 
 protected:
     static Napi::FunctionReference& Constructor();

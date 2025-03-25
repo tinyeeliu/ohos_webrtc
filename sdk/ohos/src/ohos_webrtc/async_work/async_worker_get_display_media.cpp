@@ -52,6 +52,88 @@ void AsyncWorkerGetDisplayMedia::Start(
     Queue();
 }
 
+rtc::scoped_refptr<AudioTrackInterface> AsyncWorkerGetDisplayMedia::CreateAudioTrack(std::string* errorMessage)
+{
+    cricket::AudioOptions options;
+    CopyConstraintsIntoAudioOptions(audioConstraints_, options);
+
+    auto audioSource = factory_->CreateAudioSource(options);
+    if (!audioSource) {
+        if (errorMessage) {
+            *errorMessage = "Failed to create audio source";
+        }
+        return nullptr;
+    }
+    auto audioTrack = factory_->CreateAudioTrack(rtc::CreateRandomUuid(), audioSource);
+    if (!audioTrack) {
+        if (errorMessage) {
+            *errorMessage = "Failed to create audio track";
+        }
+        return nullptr;
+    }
+
+    return audioTrack;
+}
+
+rtc::scoped_refptr<AudioTrackInterface> AsyncWorkerGetDisplayMedia::CreateSystemAudioTrack(
+    std::shared_ptr<SystemAudioReceiver> systemAudioReceiver, std::string* errorMessage)
+{
+    cricket::AudioOptions options;
+    CopyConstraintsIntoAudioOptions(systemAudioConstraints_, options);
+
+    auto audioSource = factory_->CreateAudioSource(options, std::move(systemAudioReceiver));
+    if (!audioSource) {
+        if (errorMessage) {
+            *errorMessage = "Failed to create system audio source";
+        }
+        return nullptr;
+    }
+
+    auto audioTrack = factory_->CreateAudioTrack(rtc::CreateRandomUuid(), audioSource);
+    if (!audioTrack) {
+        if (errorMessage) {
+            *errorMessage = "Failed to create system audio track";
+        }
+        return nullptr;
+    }
+
+    return audioTrack;
+}
+
+rtc::scoped_refptr<VideoTrackInterface> AsyncWorkerGetDisplayMedia::CreateVideoTrack(
+    std::shared_ptr<SystemAudioReceiver> systemAudioReceiver, std::string* errorMessage)
+{
+    ScreenCaptureOptions options;
+    GetScreenCaptureOptionsFromConstraints(videoConstraints_, options);
+    RTC_DLOG(LS_INFO) << "Screen capture options: " << options.ToString();
+
+    auto screenCapturer = ScreenCapturer::Create(options, std::move(systemAudioReceiver));
+    if (!screenCapturer) {
+        if (errorMessage) {
+            *errorMessage = "Failed to create screen capturer";
+        }
+        return nullptr;
+    }
+
+    auto videoSource = factory_->CreateVideoSource(std::move(screenCapturer));
+    if (!videoSource) {
+        if (errorMessage) {
+            *errorMessage = "Failed to create video source";
+        }
+        return nullptr;
+    }
+
+    auto videoTrack = factory_->CreateVideoTrack(rtc::CreateRandomUuid(), videoSource);
+    if (!videoTrack) {
+        if (errorMessage) {
+            *errorMessage = "Failed to create video track";
+        }
+        return nullptr;
+    }
+
+    return videoTrack;
+}
+
 void AsyncWorkerGetDisplayMedia::Execute()
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
@@ -74,21 +156,14 @@ void AsyncWorkerGetDisplayMedia::Execute()
             return;
         }
 
-        cricket::AudioOptions options;
-        CopyConstraintsIntoAudioOptions(audioConstraints_, options);
-
-        auto audioSource = factory_->CreateAudioSource(options);
-        if (!audioSource) {
-            SetError("Failed to create audio source");
+        std::string errorMessage;
+        auto audioTrack = CreateAudioTrack(&errorMessage);
+        if (audioTrack) {
+            stream_->AddTrack(audioTrack);
+        } else {
+            SetError(errorMessage);
             return;
         }
-        auto audioTrack = factory_->CreateAudioTrack(rtc::CreateRandomUuid(), audioSource);
-        if (!audioTrack) {
-            SetError("Failed to create audio track");
-            return;
-        }
-
-        stream_->AddTrack(audioTrack);
     }
 
     std::shared_ptr<SystemAudioReceiver> systemAudioReceiver;
@@ -98,50 +173,27 @@ void AsyncWorkerGetDisplayMedia::Execute()
             return;
         }
 
-        cricket::AudioOptions options;
-        CopyConstraintsIntoAudioOptions(systemAudioConstraints_, options);
-
         // Use default options
         systemAudioReceiver = SystemAudioReceiver::Create();
-        auto audioSource = factory_->CreateAudioSource(options, systemAudioReceiver);
-        if (!audioSource) {
-            SetError("Failed to create audio source");
+        std::string errorMessage;
+        auto audioTrack = CreateSystemAudioTrack(systemAudioReceiver, &errorMessage);
+        if (audioTrack) {
+            stream_->AddTrack(audioTrack);
+        } else {
+            SetError(errorMessage);
             return;
         }
-        auto audioTrack = factory_->CreateAudioTrack(rtc::CreateRandomUuid(), audioSource);
-        if (!audioTrack) {
-            SetError("Failed to create audio track");
-            return;
-        }
-
-        stream_->AddTrack(audioTrack);
     }
 
     if (!videoConstraints_.IsNull()) {
-        ScreenCaptureOptions options;
-        GetScreenCaptureOptionsFromConstraints(videoConstraints_, options);
-        RTC_DLOG(LS_INFO) << "Screen capture options: " << options.ToString();
-
-        auto screenCapturer = ScreenCapturer::Create(options, systemAudioReceiver);
-        if (!screenCapturer) {
-            SetError("Failed to create camera capturer");
-            return;
+        std::string errorMessage;
+        auto videoTrack = CreateVideoTrack(systemAudioReceiver, &errorMessage);
+        if (videoTrack) {
+            stream_->AddTrack(videoTrack);
+        } else {
+            SetError(errorMessage);
         }
-
-        auto videoSource = factory_->CreateVideoSource(std::move(screenCapturer));
-        if (!videoSource) {
-            SetError("Failed to create video source");
-            return;
-        }
-        auto videoTrack = factory_->CreateVideoTrack(rtc::CreateRandomUuid(), videoSource);
-        if (!videoTrack) {
-            SetError("Failed to create video track");
-            return;
-        }
-
-        stream_->AddTrack(videoTrack);
     }
-    RTC_DLOG(LS_INFO) << "AsyncWorkerGetDisplayMedia::Execute exit";
 }
 
 void AsyncWorkerGetDisplayMedia::OnOK()

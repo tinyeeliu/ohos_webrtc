@@ -45,6 +45,9 @@ public:
 protected:
     AsyncWorkerGetUserMedia(Napi::Env env, std::shared_ptr<PeerConnectionFactoryWrapper> factory);
 
+    rtc::scoped_refptr<AudioTrackInterface> CreateAudioTrack(std::string* errorMessage = nullptr);
+    rtc::scoped_refptr<VideoTrackInterface> CreateVideoTrack(std::string* errorMessage = nullptr);
+
     void Execute() override;
     void OnOK() override;
     void OnError(const Napi::Error& e) override;

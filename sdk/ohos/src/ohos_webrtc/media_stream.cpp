@@ -85,11 +85,11 @@ NapiMediaStream::NapiMediaStream(const CallbackInfo& info) : ObjectWrap<NapiMedi
 
     auto env = info.Env();
     if (info.Length() == 2 && info[0].IsExternal() && info[1].IsExternal()) {
-        // Create from native
+        // Create from native with 2 parameters
         factory_ = *info[0].As<External<std::shared_ptr<PeerConnectionFactoryWrapper>>>().Data();
         stream_ = *info[1].As<External<rtc::scoped_refptr<MediaStreamInterface>>>().Data();
     } else if (info.Length() > 0) {
-        // Create from JS
+        // Create from ArkTS
         if (info[0].IsArray()) {
             std::vector<NapiMediaStreamTrack*> napiTracks;
 
@@ -118,7 +118,7 @@ NapiMediaStream::NapiMediaStream(const CallbackInfo& info) : ObjectWrap<NapiMedi
             NAPI_THROW_VOID(Error::New(env, "Invalid argument"));
         }
     } else {
-        // Create from JS
+        // Create from ArkTS with no parameter
         if (!CreateMediaStream()) {
             NAPI_THROW_VOID(Error::New(env, "Failed to create media stream"));
         }
@@ -126,20 +126,7 @@ NapiMediaStream::NapiMediaStream(const CallbackInfo& info) : ObjectWrap<NapiMedi
 
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " stream_=" << stream_.get();
 
-    observer_.reset(new MediaStreamObserver(
-        stream_.get(),
-        [this](AudioTrackInterface* audio_track, MediaStreamInterface* media_stream) {
-            OnAudioTrackAddedToStream(audio_track, media_stream);
-        },
-        [this](AudioTrackInterface* audio_track, MediaStreamInterface* media_stream) {
-            OnAudioTrackRemovedFromStream(audio_track, media_stream);
-        },
-        [this](VideoTrackInterface* video_track, MediaStreamInterface* media_stream) {
-            OnVideoTrackAddedToStream(video_track, media_stream);
-        },
-        [this](VideoTrackInterface* video_track, MediaStreamInterface* media_stream) {
-            OnVideoTrackRemovedFromStream(video_track, media_stream);
-        }));
+    SetupObserver();
 }
 
 NapiMediaStream::~NapiMediaStream()
@@ -408,6 +395,24 @@ bool NapiMediaStream::CreateMediaStream(const std::vector<NapiMediaStreamTrack*>
     }
 
     return true;
+}
+
+void NapiMediaStream::SetupObserver()
+{
+    observer_.reset(new MediaStreamObserver(
+        stream_.get(),
+        [this](AudioTrackInterface* audio_track, MediaStreamInterface* media_stream) {
+            OnAudioTrackAddedToStream(audio_track, media_stream);
+        },
+        [this](AudioTrackInterface* audio_track, MediaStreamInterface* media_stream) {
+            OnAudioTrackRemovedFromStream(audio_track, media_stream);
+        },
+        [this](VideoTrackInterface* video_track, MediaStreamInterface* media_stream) {
+            OnVideoTrackAddedToStream(video_track, media_stream);
+        },
+        [this](VideoTrackInterface* video_track, MediaStreamInterface* media_stream) {
+            OnVideoTrackRemovedFromStream(video_track, media_stream);
+        }));
 }
 
 void NapiMediaStream::OnAudioTrackAddedToStream(AudioTrackInterface* track, MediaStreamInterface* stream)

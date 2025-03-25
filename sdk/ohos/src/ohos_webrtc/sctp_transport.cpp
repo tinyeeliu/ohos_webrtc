@@ -77,6 +77,7 @@ NapiSctpTransport::NapiSctpTransport(const Napi::CallbackInfo& info) : NapiEvent
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
+    // Create from native with 2 paramters, and SHOULD NOT create from ArkTS
     if (info.Length() != 2 || !info[0].IsExternal() || !info[1].IsExternal()) {
         NAPI_THROW_VOID(Napi::Error::New(info.Env(), "Invalid Operation"));
     }

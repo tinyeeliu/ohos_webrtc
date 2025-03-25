@@ -99,9 +99,9 @@ protected:
     bool MicrophoneIsInitialized() const override;
     int32_t SpeakerVolumeIsAvailable(bool* available) override;
     int32_t SetSpeakerVolume(uint32_t volume) override;
-    int32_t SpeakerVolume(uint32_t* output_volume) const override;
-    int32_t MaxSpeakerVolume(uint32_t* output_max_volume) const override;
-    int32_t MinSpeakerVolume(uint32_t* output_min_volume) const override;
+    int32_t SpeakerVolume(uint32_t* outputVolume) const override;
+    int32_t MaxSpeakerVolume(uint32_t* outputMaxVolume) const override;
+    int32_t MinSpeakerVolume(uint32_t* outputMinVolume) const override;
     int32_t MicrophoneVolumeIsAvailable(bool* available) override;
     int32_t SetMicrophoneVolume(uint32_t volume) override;
     int32_t MicrophoneVolume(uint32_t* volume) const override;
@@ -132,7 +132,8 @@ protected:
     // AudioInput::Observer implementation.
     void OnAudioInputError(AudioInput* input, AudioErrorType type, const std::string& message) override;
     void OnAudioInputStateChange(AudioInput* input, AudioStateType newState) override;
-    void OnAudioInputDataReady(AudioInput* input, void* buffer, int32_t length, int64_t timestampUs, int64_t deleyUs) override;
+    void OnAudioInputDataReady(
+        AudioInput* input, void* buffer, int32_t length, int64_t timestampUs, int64_t deleyUs) override;
 
     // AudioOutput::Observer implementation.
     void OnAudioOutputError(AudioOutput* output, AudioErrorType type, const std::string& message) override;
@@ -161,7 +162,7 @@ private:
     std::shared_ptr<AudioInput> input_;
     mutable std::mutex mut_;
     std::list<std::shared_ptr<AudioInput>> inputs_;
-    
+
     // Sets all recorded samples to zero if `microphoneMute_` is true, i.e., ensures that
     // the microphone is muted.
     std::atomic<bool> microphoneMute_{false};
@@ -200,7 +201,8 @@ protected:
     // Implements AudioInput::Observer
     void OnAudioInputError(AudioInput* input, AudioErrorType type, const std::string& message) override;
     void OnAudioInputStateChange(AudioInput* input, AudioStateType newState) override;
-    void OnAudioInputDataReady(AudioInput* input, void* buffer, int32_t length, int64_t timestampUs, int64_t deleyUs) override;
+    void OnAudioInputDataReady(
+        AudioInput* input, void* buffer, int32_t length, int64_t timestampUs, int64_t deleyUs) override;
 
     // Implements AudioOutput::Observer
     void OnAudioOutputError(AudioOutput* output, AudioErrorType type, const std::string& message) override;

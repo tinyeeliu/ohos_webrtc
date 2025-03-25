@@ -25,6 +25,7 @@
 namespace webrtc {
 
 class PeerConnectionFactoryWrapper;
+class SystemAudioReceiver;
 
 class AsyncWorkerGetDisplayMedia : public Napi::AsyncWorker {
 public:
@@ -44,6 +45,12 @@ public:
 
 protected:
     AsyncWorkerGetDisplayMedia(Napi::Env env, std::shared_ptr<PeerConnectionFactoryWrapper> factory);
+
+    rtc::scoped_refptr<AudioTrackInterface> CreateAudioTrack(std::string* errorMessage = nullptr);
+    rtc::scoped_refptr<AudioTrackInterface> CreateSystemAudioTrack(
+        std::shared_ptr<SystemAudioReceiver> systemAudioReceiver, std::string* errorMessage = nullptr);
+    rtc::scoped_refptr<VideoTrackInterface>
+    CreateVideoTrack(std::shared_ptr<SystemAudioReceiver> systemAudioReceiver, std::string* errorMessage = nullptr);
 
     void Execute() override;
     void OnOK() override;

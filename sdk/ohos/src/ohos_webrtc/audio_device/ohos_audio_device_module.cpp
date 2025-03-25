@@ -598,21 +598,21 @@ int32_t OhosAudioDeviceModule::SetSpeakerVolume(uint32_t volume)
     RTC_CHECK_NOTREACHED();
 }
 
-int32_t OhosAudioDeviceModule::SpeakerVolume(uint32_t* output_volume) const
+int32_t OhosAudioDeviceModule::SpeakerVolume(uint32_t* outputVolume) const
 {
-    (void)output_volume;
+    (void)outputVolume;
     RTC_CHECK_NOTREACHED();
 }
 
-int32_t OhosAudioDeviceModule::MaxSpeakerVolume(uint32_t* output_max_volume) const
+int32_t OhosAudioDeviceModule::MaxSpeakerVolume(uint32_t* outputMaxVolume) const
 {
-    (void)output_max_volume;
+    (void)outputMaxVolume;
     RTC_CHECK_NOTREACHED();
 }
 
-int32_t OhosAudioDeviceModule::MinSpeakerVolume(uint32_t* output_min_volume) const
+int32_t OhosAudioDeviceModule::MinSpeakerVolume(uint32_t* outputMinVolume) const
 {
-    (void)output_min_volume;
+    (void)outputMinVolume;
     RTC_CHECK_NOTREACHED();
 }
 

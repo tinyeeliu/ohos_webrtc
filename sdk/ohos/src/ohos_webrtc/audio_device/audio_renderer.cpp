@@ -169,48 +169,8 @@ int32_t AudioRenderer::InitPlayout()
         OH_AudioStreamBuilder_GenerateRenderer(builder, &stream),
         NotifyError(AudioErrorType::INIT, "failed to generate renderer"), -1);
 
-    // check configuration
-    int32_t rate;
-    OH_RESULT_CHECK(
-        OH_AudioRenderer_GetSamplingRate(stream, &rate),
-        NotifyError(AudioErrorType::INIT, "failed to get sampling rate"), -1);
-    if (rate != GetSampleRate()) {
-        RTC_LOG(LS_ERROR) << "Stream unable to use requested sample rate";
-        NotifyError(AudioErrorType::INIT, "unmatched sampling rate");
+    if (!CheckConfiguration(stream)) {
         return -1;
-    }
-
-    int32_t channelCount;
-    OH_RESULT_CHECK(
-        OH_AudioRenderer_GetChannelCount(stream, &channelCount),
-        NotifyError(AudioErrorType::INIT, "failed to get channel count"), -1);
-    if (channelCount != GetChannelCount()) {
-        RTC_LOG(LS_ERROR) << "Stream unable to use requested channel count";
-        NotifyError(AudioErrorType::INIT, "unmatched channel count");
-        return -1;
-    }
-
-    OH_AudioStream_SampleFormat sampleFormat;
-    OH_RESULT_CHECK(
-        OH_AudioRenderer_GetSampleFormat(stream, &sampleFormat),
-        NotifyError(AudioErrorType::INIT, "failed to get sample format"), -1);
-    if (sampleFormat != AUDIOSTREAM_SAMPLE_S16LE) {
-        RTC_LOG(LS_ERROR) << "Stream unable to use requested format";
-        NotifyError(AudioErrorType::INIT, "unmatched sample format");
-        return -1;
-    }
-
-    int32_t frameSize = 0;
-    auto ret = OH_AudioRenderer_GetFrameSizeInCallback(stream, &frameSize);
-    if (ret != AUDIOSTREAM_SUCCESS) {
-        RTC_LOG(LS_ERROR) << "Failed to get frame size in callback: " << ret;
-    } else {
-        RTC_DLOG(LS_INFO) << "Frame size in callback: " << frameSize;
-    }
-
-    ret = OH_AudioRenderer_SetDefaultOutputDevice(stream, AUDIO_DEVICE_TYPE_SPEAKER);
-    if (ret != AUDIOSTREAM_SUCCESS) {
-        RTC_LOG(LS_ERROR) << "Failed to set default output device to speaker: " << ret;
     }
 
     renderer_ = stream;
@@ -391,7 +351,8 @@ int32_t AudioRenderer::OnWriteData(OH_AudioRenderer* renderer, void* buffer, int
         static_cast<int>(latencyMillis + kHalfSec));
 
     if (mute_) {
-        std::memset(buffer, 0, length);
+        auto it = static_cast<uint8_t*>(buffer);
+        std::fill(it, it + length, 0);
     }
 
     return 0;
@@ -487,6 +448,46 @@ uint32_t AudioRenderer::GetUnderflowCount() const
     }
 
     return underflowCount;
+}
+
+bool AudioRenderer::CheckConfiguration(OH_AudioRenderer* renderer)
+{
+    if (!renderer) {
+        RTC_LOG(LS_ERROR) << "Invalid parameter";
+        return false;
+    }
+    
+    int32_t rate;
+    OH_RESULT_CHECK(
+        OH_AudioRenderer_GetSamplingRate(renderer, &rate),
+        NotifyError(AudioErrorType::INIT, "failed to get sampling rate"), false);
+    if (rate != GetSampleRate()) {
+        RTC_LOG(LS_ERROR) << "Stream unable to use requested sample rate";
+        NotifyError(AudioErrorType::INIT, "unmatched sampling rate");
+        return false;
+    }
+
+    int32_t channelCount;
+    OH_RESULT_CHECK(
+        OH_AudioRenderer_GetChannelCount(renderer, &channelCount),
+        NotifyError(AudioErrorType::INIT, "failed to get channel count"), false);
+    if (channelCount != GetChannelCount()) {
+        RTC_LOG(LS_ERROR) << "Stream unable to use requested channel count";
+        NotifyError(AudioErrorType::INIT, "unmatched channel count");
+        return false;
+    }
+
+    OH_AudioStream_SampleFormat sampleFormat;
+    OH_RESULT_CHECK(
+        OH_AudioRenderer_GetSampleFormat(renderer, &sampleFormat),
+        NotifyError(AudioErrorType::INIT, "failed to get sample format"), false);
+    if (sampleFormat != AUDIOSTREAM_SAMPLE_S16LE) {
+        RTC_LOG(LS_ERROR) << "Stream unable to use requested format";
+        NotifyError(AudioErrorType::INIT, "unmatched sample format");
+        return false;
+    }
+
+    return true;
 }
 
 void AudioRenderer::NotifyError(AudioErrorType error, const std::string& message)

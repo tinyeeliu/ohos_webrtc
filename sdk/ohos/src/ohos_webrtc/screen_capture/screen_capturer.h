@@ -45,7 +45,8 @@ public:
         virtual void OnError(int32_t errorCode, const std::string& message) = 0;
     };
 
-    static std::unique_ptr<ScreenCapturer> Create(ScreenCaptureOptions options, std::shared_ptr<SystemAudioReceiver> systemAudioReceiver = nullptr);
+    static std::unique_ptr<ScreenCapturer>
+    Create(ScreenCaptureOptions options, std::shared_ptr<SystemAudioReceiver> systemAudioReceiver = nullptr);
 
     // Do not use this constructor directly, use 'Create' above.
     ScreenCapturer(ScreenCaptureOptions options, std::shared_ptr<SystemAudioReceiver> systemAudioReceiver);
@@ -65,7 +66,7 @@ protected:
 
     void NotifyCaptureStart(bool success);
     void NotifyCaptureStop();
-    
+
 protected:
     void
     OnFrameAvailable(rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation) override;

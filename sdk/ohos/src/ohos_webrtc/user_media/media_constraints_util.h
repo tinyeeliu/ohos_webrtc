@@ -32,6 +32,8 @@ constexpr int32_t kDefaultHeight = 480;
 constexpr int32_t kDefaultFrameRate = 30;
 
 struct CameraCaptureSettings {
+    std::string ToString() const;
+
     std::string deviceId;
     video::VideoProfile profile;
 };

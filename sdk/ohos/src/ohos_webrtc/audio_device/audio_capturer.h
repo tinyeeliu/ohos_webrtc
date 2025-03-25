@@ -69,6 +69,7 @@ protected:
     OH_AudioStream_State GetCurrentState() const;
     double EstimateLatencyMillis() const;
     uint32_t GetOverflowCount() const;
+    bool CheckConfiguration(OH_AudioCapturer* capturer);
 
 private:
     SequenceChecker threadChecker_;

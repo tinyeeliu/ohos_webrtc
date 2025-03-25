@@ -79,7 +79,7 @@ public:
 
 class AudioInputBase : public AudioInput {
 public:
-    AudioInputBase(AudioInputOptions options) : options_(std::move(options)) {}
+    explicit AudioInputBase(AudioInputOptions options) : options_(std::move(options)) {}
     ~AudioInputBase() override = default;
 
     void RegisterObserver(Observer* obs) override
