@@ -19,6 +19,8 @@ import webSocket from '@ohos.net.webSocket';
 import promptAction from '@ohos.promptAction';
 import buffer from '@ohos.buffer';
 import fs from '@ohos.file.fs';
+import audio from '@ohos.multimedia.audio';
+import { BusinessError } from '@kit.BasicServicesKit';
 
 const TAG: string = '[Index]';
 
@@ -45,8 +47,10 @@ struct Index {
   private mXComponentController2: VideoRenderController = new VideoRenderController();
   private ws: webSocket.WebSocket = webSocket.createWebSocket();
   private localAudioSource?: webrtc.AudioSource;
+  private localAudioSource2?: webrtc.AudioSource;
   private localVideoSource?: webrtc.VideoSource;
   private localAudioTrack?: webrtc.MediaStreamTrack;
+  private localAudioTrack2?: webrtc.MediaStreamTrack;
   private localVideoTrack?: webrtc.MediaStreamTrack;
   private remoteAudioTrack?: webrtc.MediaStreamTrack;
   private remoteVideoTrack?: webrtc.MediaStreamTrack;
@@ -55,7 +59,8 @@ struct Index {
   private pc?: webrtc.RTCPeerConnection;
   private recvChannel?: webrtc.RTCDataChannel;
   private sendChannel?: webrtc.RTCDataChannel;
-
+  private displayMediaStream?: webrtc.MediaStream;
+  private mediaDevices = new webrtc.MediaDevices();
   private onDataChannelMessageReceived = (event: webrtc.MessageEvent<string | ArrayBuffer>) => {
     // this is Index
     console.info(TAG, "dataChannel.OnMessage: ", event);
@@ -157,7 +162,7 @@ struct Index {
           type: XComponentType.SURFACE,
           controller: this.mXComponentController1
         })
-          .width('640px')
+          .width('480px')
           .height('480px')
           .onLoad((context?) => {
             console.log(TAG, "context: " + context);
@@ -172,7 +177,7 @@ struct Index {
           type: XComponentType.SURFACE,
           controller: this.mXComponentController2
         })
-          .width('640px')
+          .width('480px')
           .height('480px')
           .onLoad((context?) => {
             console.log(TAG, "context: " + JSON.stringify(context));
@@ -193,6 +198,19 @@ struct Index {
   }
 
   aboutToAppear(): void {
+    // 设置音频策略，允许和其它音频流并发
+    let strategy: audio.AudioSessionStrategy = {
+      concurrencyMode: audio.AudioConcurrencyMode.CONCURRENCY_MIX_WITH_OTHERS
+    };
+
+    let audioManager = audio.getAudioManager();
+    let audioSessionManager = audioManager.getSessionManager();
+    audioSessionManager.activateAudioSession(strategy).then(() => {
+      console.info(TAG, 'activateAudioSession SUCCESS');
+    }).catch((err: BusinessError) => {
+      console.error(`ERROR: ${err}`);
+    });
+
     Logging.enableLogThreads();
     Logging.enableLogTimeStamps();
     Logging.enableLogToDebugOutput(LoggingSeverity.VERBOSE);
@@ -342,8 +360,15 @@ struct Index {
   }
 
   async createPeerConnectionFactory() {
-    this.pcf = new webrtc.PeerConnectionFactory();
+    this.pcf = new webrtc.PeerConnectionFactory({
+      videoEncoderFactory: new webrtc.HardwareVideoEncoderFactory,
+      videoDecoderFactory: new webrtc.HardwareVideoDecoderFactory,
+      adm: this.adm
+    });
     Logging.d(TAG, 'this.pcf: ' + JSON.stringify(this.pcf));
+
+    // MediaDevices 依赖默认的 PeerConnnectionFactory，且需要与创建 PeerConnection 的是同一个。
+    webrtc.PeerConnectionFactory.setDefault(this.pcf);
 
     let filesDir = getContext().filesDir;
     let file = fs.openSync(filesDir + '/test.txt', fs.OpenMode.READ_WRITE | fs.OpenMode.CREATE);
@@ -381,8 +406,43 @@ struct Index {
     }
   }
 
+  async prepareDisplayMedia() {
+    if (!this.displayMediaStream) {
+      this.displayMediaStream = await this.mediaDevices.getDisplayMedia({
+        video: {
+          width: 720,
+          height: 1280,
+          ohosScreenCaptureAudioFilter: 'current-app', // 过滤当前应用播放的音频
+        },
+        audio: true,
+        ohosSystemAudio: true
+      });
+
+      this.displayMediaStream.getTracks().forEach((track) => console.info(TAG, 'display media Stream track: ' + JSON.stringify(track)));
+
+      this.localVideoTrack = this.displayMediaStream.getVideoTracks()[0];
+      console.info(TAG, 'videoTrack: ' + JSON.stringify(this.localVideoTrack));
+
+      if (this.localVideoTrack) {
+        this.mXComponentController1.setVideoTrack(this.localVideoTrack);
+        this.mXComponentController1.setScalingMode(ScalingMode.AspectFit);
+      }
+
+      let audioTracks = this.displayMediaStream.getAudioTracks();
+      if (audioTracks.length > 0) {
+        this.localAudioTrack = audioTracks[0];
+        console.info(TAG, 'audioTrack: ' + JSON.stringify(this.localAudioTrack));
+      }
+      if (audioTracks.length > 1) {
+        this.localAudioTrack2 = audioTracks[1];
+        console.info(TAG, 'audioTrack2: ' + JSON.stringify(this.localAudioTrack2));
+      }
+    }
+  }
+
   async createPeerConnection() {
-    await this.prepareLocalMedia();
+    // await this.prepareLocalMedia();
+    await this.prepareDisplayMedia();
 
     this.pc = this.pcf?.createPeerConnection({
       iceServers: [{ urls: STUN_SERVER }]
@@ -407,6 +467,10 @@ struct Index {
     }
     this.pc.onconnectionstatechange = (event) => {
       console.info(TAG, 'onconnectionstatechange: ' + this.pc?.connectionState);
+      if (this.pc?.connectionState == 'failed') {
+        this.setError("Peer connection failed");
+        this.ws.close();
+      }
     }
     this.pc.onnegotiationneeded = (event) => {
       // this is Index
@@ -425,7 +489,11 @@ struct Index {
       console.error(TAG, 'onicecandidateerror: event=' + JSON.stringify(event));
     };
     this.pc.oniceconnectionstatechange = (event) => {
-      console.error(TAG, 'oniceconnectionstatechange: ' + this.pc?.iceConnectionState);
+      console.info(TAG, 'oniceconnectionstatechange: ' + this.pc?.iceConnectionState);
+      if (this.pc?.iceConnectionState === 'failed') {
+        this.setError("Ice connection failed");
+        this.ws.close();
+      }
     };
     this.pc.onicegatheringstatechange = (event) => {
       console.info(TAG, 'onicegatheringstatechange: ' + this.pc?.iceGatheringState);
@@ -452,10 +520,20 @@ struct Index {
       this.recvChannel.onclose = this.onDataChannelClose;
     }
 
-    let rtpSender1 = this.pc.addTrack(this.localAudioTrack);
-    console.info(TAG, 'rtpSender1: ' + JSON.stringify(rtpSender1));
-    let rtpSender2 = this.pc.addTrack(this.localVideoTrack);
-    console.info(TAG, 'rtpSender2: ' + JSON.stringify(rtpSender2));
+    if (this.localAudioTrack) {
+      let rtpSender1 = this.pc.addTrack(this.localAudioTrack);
+      console.info(TAG, 'rtpSender1: ' + JSON.stringify(rtpSender1));
+    }
+    if (this.localAudioTrack2) {
+      let rtpSender2 = this.pc.addTrack(this.localAudioTrack2);
+      console.info(TAG, 'rtpSender2: ' + JSON.stringify(rtpSender2));
+    }
+    if (this.localVideoTrack) {
+      let rtpSender3 = this.pc.addTrack(this.localVideoTrack);
+      console.info(TAG, 'rtpSender3: ' + JSON.stringify(rtpSender3));
+    }
+
+    console.info(TAG, 'transceivers: ' + JSON.stringify(this.pc.getTransceivers()));
 
     this.sendChannel = this.pc.createDataChannel("send");
     console.info(TAG, 'sendChannel: ' + JSON.stringify(this.sendChannel));
@@ -539,7 +617,6 @@ struct Index {
   async receiveSdp(sdp: webrtc.RTCSessionDescriptionInit) {
     if (sdp.type === 'offer') {
       console.info(TAG, 'receive offer');
-      this.setStatus('');
       this.pc?.setRemoteDescription(sdp).then(() => {
         this.setStatus("Remote SDP set");
         this.sendAnswer();
