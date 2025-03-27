@@ -22,6 +22,7 @@
 
 namespace webrtc {
 
+static constexpr int halfDen = 2;
 std::unique_ptr<AudioRenderer>
 AudioRenderer::Create(AudioOutputOptions options)
 {
@@ -274,7 +275,7 @@ int32_t AudioRenderer::PlayoutDelay(uint16_t* delayMs) const
     RTC_DLOG(LS_VERBOSE) << "delayMs=" << *delayMs;
 
     // Best guess we can do is to use half of the estimated total delay.
-    *delayMs = kHighLatencyModeDelayEstimateInMilliseconds / 2;
+    *delayMs = kHighLatencyModeDelayEstimateInMilliseconds / halfDen;
     RTC_DCHECK_GT(*delayMs, 0);
 
     return 0;

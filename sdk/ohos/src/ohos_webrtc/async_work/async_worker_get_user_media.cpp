@@ -29,8 +29,8 @@
 
 namespace webrtc {
 
-AsyncWorkerGetUserMedia*
-AsyncWorkerGetUserMedia::Create(Napi::Env env, std::shared_ptr<PeerConnectionFactoryWrapper> factory)
+AsyncWorkerGetUserMedia* AsyncWorkerGetUserMedia::Create(Napi::Env env,
+    std::shared_ptr<PeerConnectionFactoryWrapper> factory)
 {
     auto asyncWorker = new AsyncWorkerGetUserMedia(env, std::move(factory));
     return asyncWorker;
@@ -77,10 +77,8 @@ rtc::scoped_refptr<VideoTrackInterface> AsyncWorkerGetUserMedia::CreateVideoTrac
 
     CameraCaptureSettings selectedSetting;
     std::string failedConstraintName;
-    if (SelectSettingsForVideo(
-            cameraDevices, videoConstraints_, kDefaultWidth, kDefaultHeight, kDefaultFrameRate, selectedSetting,
-            failedConstraintName))
-    {
+    if (SelectSettingsForVideo(cameraDevices, videoConstraints_, kDefaultWidth, kDefaultHeight,
+                               kDefaultFrameRate, selectedSetting, failedConstraintName)) {
         RTC_DLOG(LS_INFO) << "Selected camera device: " << selectedSetting.deviceId
                           << ", resolution = " << selectedSetting.profile.resolution.width << "x"
                           << selectedSetting.profile.resolution.height

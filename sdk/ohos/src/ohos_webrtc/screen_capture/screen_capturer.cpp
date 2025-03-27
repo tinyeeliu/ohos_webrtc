@@ -31,8 +31,8 @@ constexpr int32_t kVideoFrameHeight_Default = 1280;
 
 } // namespace
 
-std::unique_ptr<ScreenCapturer>
-ScreenCapturer::Create(ScreenCaptureOptions options, std::shared_ptr<SystemAudioReceiver> systemAudioReceiver)
+std::unique_ptr<ScreenCapturer> ScreenCapturer::Create(ScreenCaptureOptions options,
+    std::shared_ptr<SystemAudioReceiver> systemAudioReceiver)
 {
     RTC_DLOG(LS_INFO) << __FUNCTION__;
 
@@ -234,8 +234,7 @@ bool ScreenCapturer::SetupContentFilter(ohos::AVScreenCaptureContentFilter& cont
     if (!options_.filteredAudioContents.empty()) {
         for (const auto& audioContent : options_.filteredAudioContents) {
             if (audioContent != OH_SCREEN_CAPTURE_NOTIFICATION_AUDIO &&
-                audioContent != OH_SCREEN_CAPTURE_CURRENT_APP_AUDIO)
-            {
+                audioContent != OH_SCREEN_CAPTURE_CURRENT_APP_AUDIO) {
                 RTC_LOG(LS_WARNING) << "Invalid audio content: " << audioContent;
                 continue;
             }

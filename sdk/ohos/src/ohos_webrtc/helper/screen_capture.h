@@ -79,8 +79,8 @@ inline AVScreenCaptureContentFilter AVScreenCaptureContentFilter::Create()
         filter, [](OH_AVScreenCapture_ContentFilter* filter) { OH_AVScreenCapture_ReleaseContentFilter(filter); });
 }
 
-inline AVScreenCaptureContentFilter
-AVScreenCaptureContentFilter::TakeOwnership(OH_AVScreenCapture_ContentFilter* filter)
+inline AVScreenCaptureContentFilter AVScreenCaptureContentFilter::TakeOwnership(
+    OH_AVScreenCapture_ContentFilter* filter)
 {
     NATIVE_THROW_IF_FAILED(
         filter != nullptr, -1, "OH_AVScreenCapture", "Null argument", AVScreenCaptureContentFilter());

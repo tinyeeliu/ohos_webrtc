@@ -773,7 +773,8 @@ void NapiPeerConnection::Init(class Env env, Object exports)
     exports.Set(kClassName, func);
 }
 
-Napi::Value NapiPeerConnection::NewInstance(Napi::Env env, std::unique_ptr<NapiPeerConnectionWrapper> observer)
+Napi::Value NapiPeerConnection::NewInstance(Napi::Value configuration,
+    std::shared_ptr<PeerConnectionFactoryWrapper> factory)
 {
     RTC_LOG(LS_INFO) << __FUNCTION__;
 

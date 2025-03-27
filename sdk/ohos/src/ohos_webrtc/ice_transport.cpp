@@ -65,6 +65,7 @@ const char kMethodNameGetSelectedCandidatePair[] = "getSelectedCandidatePair";
 const char kMethodNameToJson[] = "toJSON";
 
 FunctionReference NapiIceTransport::constructor_;
+static constexpr int callbackInfoLen = 2;
 
 void NapiIceTransport::Init(Napi::Env env, Napi::Object exports)
 {
@@ -118,13 +119,13 @@ NapiIceTransport::NapiIceTransport(const Napi::CallbackInfo& info) : NapiEventTa
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    if (info[0].IsExternal()) {
-        auto iceTransport = info[0].As<External<IceTransportInterface>>().Data();
-        iceTransport_ = rtc::scoped_refptr<IceTransportInterface>(iceTransport);
+    if (info.Length() != callbackInfoLen || !info[0].IsExternal() || !info[1].IsExternal()) {
+        // You cannot construct an RTCIceTransport
+        NAPI_THROW(Napi::Error::New(info.Env(), "Invalid Operation"));
+        return;
     }
 
-    if (info.Length() > 1 && info[1].IsExternal()) {
-        pcWrapper_ = info[1].As<External<NapiPeerConnectionWrapper>>().Data();
+    factory_ = *info[0].As<External<std::shared_ptr<PeerConnectionFactoryWrapper>>>().Data();
 
         auto factoryWrapper = pcWrapper_->GetPeerConnectionFactoryWrapper();
         cricket::IceTransportInternal* internal = nullptr;

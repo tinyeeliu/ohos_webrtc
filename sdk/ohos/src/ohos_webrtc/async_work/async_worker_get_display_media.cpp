@@ -30,8 +30,8 @@
 
 namespace webrtc {
 
-AsyncWorkerGetDisplayMedia*
-AsyncWorkerGetDisplayMedia::Create(Napi::Env env, std::shared_ptr<PeerConnectionFactoryWrapper> factory)
+AsyncWorkerGetDisplayMedia* AsyncWorkerGetDisplayMedia::Create(Napi::Env env,
+    std::shared_ptr<PeerConnectionFactoryWrapper> factory)
 {
     auto asyncWorker = new AsyncWorkerGetDisplayMedia(env, std::move(factory));
     return asyncWorker;

@@ -44,6 +44,8 @@ const char kMethodNameGetStats[] = "getStats";
 const char kMethodNameToJson[] = "toJSON";
 
 const char kStaticMethodNameGetCapabilities[] = "getCapabilities";
+static constexpr int indexTwo = 2;
+static constexpr int callbackInfoLen = 3;
 
 class AsyncWorkerReplaceTrack : public Napi::AsyncWorker {
 public:
@@ -140,13 +142,18 @@ NapiRtpSender::NapiRtpSender(const Napi::CallbackInfo& info) : Napi::ObjectWrap<
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
     // Create from native with 3 paramters, and SHOULD NOT create from ArkTS
-    if (info.Length() != 3 || !info[0].IsExternal() || !info[1].IsExternal() || !info[2].IsExternal()) {
+    if (info.Length() != callbackInfoLen || !info[0].IsExternal() || !info[1].IsExternal() || !info[indexTwo].IsExternal()) {
         NAPI_THROW_VOID(Napi::Error::New(info.Env(), "Invalid Operation"));
     }
 
-    if (info.Length() > 1 && info[1].IsExternal()) {
-        pcWrapper_ = info[1].As<External<NapiPeerConnectionWrapper>>().Data();
-    }
+    factory_ = *info[0].As<External<std::shared_ptr<PeerConnectionFactoryWrapper>>>().Data();
+    pc_ = *info[1].As<External<rtc::scoped_refptr<PeerConnectionInterface>>>().Data();
+    rtpSender_ = *info[indexTwo].As<External<rtc::scoped_refptr<RtpSenderInterface>>>().Data();
+}
+
+NapiRtpSender::~NapiRtpSender()
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 }
 
 rtc::scoped_refptr<RtpSenderInterface> NapiRtpSender::Get() const

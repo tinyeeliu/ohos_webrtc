@@ -44,6 +44,7 @@ const char kEventNameStateChange[] = "statechange";
 const char kEventNameError[] = "error";
 
 FunctionReference NapiDtlsTransport::constructor_;
+static constexpr int callbackInfoLen = 2;
 
 void NapiDtlsTransport::Init(Napi::Env env, Napi::Object exports)
 {
@@ -92,7 +93,7 @@ NapiDtlsTransport::NapiDtlsTransport(const Napi::CallbackInfo& info) : NapiEvent
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    if (info.Length() != 2 || !info[0].IsExternal() || !info[1].IsExternal()) {
+    if (info.Length() != callbackInfoLen || !info[0].IsExternal() || !info[1].IsExternal()) {
         // You cannot construct an RTCDtlsTransport
         NAPI_THROW(Napi::Error::New(info.Env(), "Invalid Operation"));
         return;

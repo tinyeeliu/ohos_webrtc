@@ -109,7 +109,8 @@ rtc::scoped_refptr<OhosLocalAudioSource> PeerConnectionFactoryWrapper::CreateAud
 rtc::scoped_refptr<OhosVideoTrackSource>
 PeerConnectionFactoryWrapper::CreateVideoSource(std::unique_ptr<VideoCapturer> capturer)
 {
-    return OhosVideoTrackSource::Create(std::move(capturer), signalingThread_.get(), EglEnv::GetDefault().GetContext());
+    return OhosVideoTrackSource::Create(std::move(capturer), signalingThread_.get(),
+                                        EglEnv::GetDefault().GetContext());
 }
 
 rtc::scoped_refptr<AudioTrackInterface> PeerConnectionFactoryWrapper::CreateAudioTrack(
@@ -144,8 +145,8 @@ rtc::scoped_refptr<VideoTrackInterface> PeerConnectionFactoryWrapper::CreateVide
     return track;
 }
 
-rtc::scoped_refptr<OhosLocalAudioSource>
-PeerConnectionFactoryWrapper::GetAudioSource(rtc::scoped_refptr<MediaStreamTrackInterface> track) const
+rtc::scoped_refptr<OhosLocalAudioSource> PeerConnectionFactoryWrapper::GetAudioSource(
+    rtc::scoped_refptr<MediaStreamTrackInterface> track) const
 {
     auto it = audioSources_.find(track);
     if (it == audioSources_.end()) {
@@ -154,8 +155,8 @@ PeerConnectionFactoryWrapper::GetAudioSource(rtc::scoped_refptr<MediaStreamTrack
     return it->second;
 }
 
-rtc::scoped_refptr<OhosVideoTrackSource>
-PeerConnectionFactoryWrapper::GetVideoSource(rtc::scoped_refptr<MediaStreamTrackInterface> track) const
+rtc::scoped_refptr<OhosVideoTrackSource> PeerConnectionFactoryWrapper::GetVideoSource(
+    rtc::scoped_refptr<MediaStreamTrackInterface> track) const
 {
     auto it = videoSources_.find(track);
     if (it == videoSources_.end()) {

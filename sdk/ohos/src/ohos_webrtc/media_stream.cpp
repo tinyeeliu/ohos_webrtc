@@ -38,6 +38,8 @@ const char kMethodNameGetAudioTracks[] = "getAudioTracks";
 const char kMethodNameGetVideoTracks[] = "getVideoTracks";
 const char kMethodNameToJson[] = "toJSON";
 
+static constexpr int callbackInfoLen = 2;
+
 void NapiMediaStream::Init(Napi::Env env, Object exports)
 {
     Function func = DefineClass(
@@ -84,7 +86,7 @@ NapiMediaStream::NapiMediaStream(const CallbackInfo& info) : ObjectWrap<NapiMedi
     RTC_DLOG(LS_INFO) << __FUNCTION__;
 
     auto env = info.Env();
-    if (info.Length() == 2 && info[0].IsExternal() && info[1].IsExternal()) {
+    if (info.Length() == callbackInfoLen && info[0].IsExternal() && info[1].IsExternal()) {
         // Create from native with 2 parameters
         factory_ = *info[0].As<External<std::shared_ptr<PeerConnectionFactoryWrapper>>>().Data();
         stream_ = *info[1].As<External<rtc::scoped_refptr<MediaStreamInterface>>>().Data();

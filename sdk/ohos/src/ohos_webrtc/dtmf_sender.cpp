@@ -40,6 +40,7 @@ const char kMethodNameToJson[] = "toJSON";
 const char kEventNameToneChange[] = "tonechange";
 
 FunctionReference NapiDtmfSender::constructor_;
+static constexpr int callbackInfoLen = 2;
 
 void NapiDtmfSender::Init(Napi::Env env, Napi::Object exports)
 {
@@ -165,7 +166,7 @@ Napi::Value NapiDtmfSender::InsertDTMF(const Napi::CallbackInfo& info)
     int duration = kDefaultDurationMs;
     int interToneGap = kDefaultInterToneGapMs;
 
-    if (info.Length() >= 2) {
+    if (info.Length() >= callbackInfoLen) {
         // second parameter is optional
         duration = info[1].As<Number>();
         if (duration > kMaxDurationMs) {
