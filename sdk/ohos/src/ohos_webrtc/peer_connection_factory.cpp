@@ -106,8 +106,8 @@ rtc::scoped_refptr<OhosLocalAudioSource> PeerConnectionFactoryWrapper::CreateAud
     return adm_->CreateAudioSource(options, std::move(audioInput));
 }
 
-rtc::scoped_refptr<OhosVideoTrackSource>
-PeerConnectionFactoryWrapper::CreateVideoSource(std::unique_ptr<VideoCapturer> capturer)
+rtc::scoped_refptr<OhosVideoTrackSource> PeerConnectionFactoryWrapper::CreateVideoSource(
+    std::unique_ptr<VideoCapturer> capturer)
 {
     return OhosVideoTrackSource::Create(std::move(capturer), signalingThread_.get(),
                                         EglEnv::GetDefault().GetContext());

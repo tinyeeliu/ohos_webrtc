@@ -142,7 +142,8 @@ NapiRtpSender::NapiRtpSender(const Napi::CallbackInfo& info) : Napi::ObjectWrap<
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
     // Create from native with 3 paramters, and SHOULD NOT create from ArkTS
-    if (info.Length() != callbackInfoLen || !info[0].IsExternal() || !info[1].IsExternal() || !info[indexTwo].IsExternal()) {
+    if (info.Length() != callbackInfoLen || !info[0].IsExternal() || !info[1].IsExternal() ||
+        !info[indexTwo].IsExternal()) {
         NAPI_THROW_VOID(Napi::Error::New(info.Env(), "Invalid Operation"));
     }
 
