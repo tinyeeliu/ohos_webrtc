@@ -309,8 +309,7 @@ int16_t OhosAudioDeviceModule::RecordingDevices()
     return 1;
 }
 
-int32_t
-OhosAudioDeviceModule::PlayoutDeviceName(uint16_t index, char name[kAdmMaxDeviceNameSize],
+int32_t OhosAudioDeviceModule::PlayoutDeviceName(uint16_t index, char name[kAdmMaxDeviceNameSize],
     char guid[kAdmMaxGuidSize])
 {
     (void)index;
