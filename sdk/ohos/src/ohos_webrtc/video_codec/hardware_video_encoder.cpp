@@ -390,13 +390,6 @@ void HardwareVideoEncoder::OnNewOutputBuffer(OH_AVCodec* codec, uint32_t index, 
         return;
     }
 
-    OH_AVFormat* format = OH_AVBuffer_GetParameter(buffer);
-    if (!format) {
-        RTC_LOG(LS_ERROR) << "Failed to get buffer parameter: " << ret;
-    } else {
-        RTC_DLOG(LS_VERBOSE) << "buffer parameter: " << OH_AVFormat_DumpInfo(format);
-    }
-
     if ((attr.flags & AVCODEC_BUFFER_FLAGS_CODEC_DATA) != 0) {
         configData_ = EncodedImageBuffer::Create(addr, attr.size);
         OH_VideoEncoder_FreeOutputBuffer(codec, index);
