@@ -332,33 +332,28 @@ bool ValidateAndCopyConstraintSetExtension(
 {
     ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.ohosScreenCaptureDisplayId);
 
-    if (!ValidateAndCopyConstraint(
-            jsTrackConstraints, nakedTreatment, trackConstraints.ohosScreenCaptureMode, errorMessage))
-    {
+    if (!ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment,
+                                   trackConstraints.ohosScreenCaptureMode, errorMessage)) {
         return false;
     }
 
-    if (!ValidateAndCopyConstraint(
-            jsTrackConstraints, nakedTreatment, trackConstraints.ohosScreenCaptureMissionId, errorMessage))
-    {
+    if (!ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment,
+                                   trackConstraints.ohosScreenCaptureMissionId, errorMessage)) {
         return false;
     }
 
-    if (!ValidateAndCopyConstraint(
-            jsTrackConstraints, nakedTreatment, trackConstraints.ohosScreenCaptureWindowFilter, errorMessage))
-    {
+    if (!ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment,
+                                   trackConstraints.ohosScreenCaptureWindowFilter, errorMessage)) {
         return false;
     }
 
-    if (!ValidateAndCopyConstraint(
-            jsTrackConstraints, nakedTreatment, trackConstraints.ohosScreenCaptureAudioFilter, errorMessage))
-    {
+    if (!ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment,
+                                   trackConstraints.ohosScreenCaptureAudioFilter, errorMessage)) {
         return false;
     }
 
-    if (!ValidateAndCopyConstraint(
-            jsTrackConstraints, nakedTreatment, trackConstraints.ohosScreenCaptureSkipPrivacyMode, errorMessage))
-    {
+    if (!ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment,
+                                   trackConstraints.ohosScreenCaptureSkipPrivacyMode, errorMessage)) {
         return false;
     }
 

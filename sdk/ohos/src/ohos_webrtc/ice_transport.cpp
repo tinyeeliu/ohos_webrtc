@@ -65,6 +65,7 @@ const char kMethodNameGetSelectedCandidatePair[] = "getSelectedCandidatePair";
 const char kMethodNameToJson[] = "toJSON";
 
 FunctionReference NapiIceTransport::constructor_;
+static constexpr int callbackInfoLen = 2;
 
 void NapiIceTransport::Init(Napi::Env env, Napi::Object exports)
 {
@@ -117,7 +118,7 @@ NapiIceTransport::NapiIceTransport(const Napi::CallbackInfo& info) : NapiEventTa
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    if (info.Length() != 2 || !info[0].IsExternal() || !info[1].IsExternal()) {
+    if (info.Length() != callbackInfoLen || !info[0].IsExternal() || !info[1].IsExternal()) {
         // You cannot construct an RTCIceTransport
         NAPI_THROW(Napi::Error::New(info.Env(), "Invalid Operation"));
         return;

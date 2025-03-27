@@ -49,6 +49,9 @@ const char kAttributeNameAudioLevel[] = "audioLevel";
 /// NapiRtpReceiver
 FunctionReference NapiRtpReceiver::constructor_;
 
+static constexpr int indexTwo = 2;
+static constexpr int callbackInfoLen = 3;
+
 void NapiRtpReceiver::Init(Napi::Env env, Napi::Object exports)
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
@@ -92,13 +95,13 @@ NapiRtpReceiver::NapiRtpReceiver(const Napi::CallbackInfo& info) : Napi::ObjectW
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
     // Create from native with 3 paramters, and SHOULD NOT create from ArkTS
-    if (info.Length() != 3 || !info[0].IsExternal() || !info[1].IsExternal() || !info[2].IsExternal()) {
+    if (info.Length() != callbackInfoLen || !info[0].IsExternal() || !info[1].IsExternal() || !info[indexTwo].IsExternal()) {
         NAPI_THROW_VOID(Napi::Error::New(info.Env(), "Invalid Operation"));
     }
 
     factory_ = *info[0].As<External<std::shared_ptr<PeerConnectionFactoryWrapper>>>().Data();
     pc_ = *info[1].As<External<rtc::scoped_refptr<PeerConnectionInterface>>>().Data();
-    rtpReceiver_ = *info[2].As<External<rtc::scoped_refptr<RtpReceiverInterface>>>().Data();
+    rtpReceiver_ = *info[indexTwo].As<External<rtc::scoped_refptr<RtpReceiverInterface>>>().Data();
 }
 
 NapiRtpReceiver::~NapiRtpReceiver()
