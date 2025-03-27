@@ -41,8 +41,8 @@ constexpr int32_t kBufferDurationInMs = 200;
 
 class AudioMixerSourceAdapter : public AudioMixer::Source, public AudioInput::Observer {
 public:
-    explicit AudioMixerSourceAdapter(std::shared_ptr<AudioInput> input, int ssrc = 0) :
-        input_(std::move(input)), ssrc_(ssrc)
+    explicit AudioMixerSourceAdapter(std::shared_ptr<AudioInput> input, int ssrc = 0)
+        : input_(std::move(input)), ssrc_(ssrc)
     {
         RTC_DLOG(LS_INFO) << __FUNCTION__;
 
