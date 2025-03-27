@@ -169,8 +169,8 @@ void OhosAudioDeviceModule::RemoveAudioInput(std::shared_ptr<AudioInput> input)
     inputs_.remove(input);
 }
 
-rtc::scoped_refptr<OhosLocalAudioSource>
-OhosAudioDeviceModule::CreateAudioSource(cricket::AudioOptions options, std::shared_ptr<AudioInput> audioInput)
+rtc::scoped_refptr<OhosLocalAudioSource> OhosAudioDeviceModule::CreateAudioSource(
+    cricket::AudioOptions options, std::shared_ptr<AudioInput> audioInput)
 {
     if (!audioInput) {
         // Use default
@@ -309,8 +309,8 @@ int16_t OhosAudioDeviceModule::RecordingDevices()
     return 1;
 }
 
-int32_t
-OhosAudioDeviceModule::PlayoutDeviceName(uint16_t index, char name[kAdmMaxDeviceNameSize], char guid[kAdmMaxGuidSize])
+int32_t OhosAudioDeviceModule::PlayoutDeviceName(uint16_t index, char name[kAdmMaxDeviceNameSize],
+    char guid[kAdmMaxGuidSize])
 {
     (void)index;
     (void)name;
@@ -318,8 +318,8 @@ OhosAudioDeviceModule::PlayoutDeviceName(uint16_t index, char name[kAdmMaxDevice
     RTC_CHECK_NOTREACHED();
 }
 
-int32_t
-OhosAudioDeviceModule::RecordingDeviceName(uint16_t index, char name[kAdmMaxDeviceNameSize], char guid[kAdmMaxGuidSize])
+int32_t OhosAudioDeviceModule::RecordingDeviceName(uint16_t index,
+    char name[kAdmMaxDeviceNameSize], char guid[kAdmMaxGuidSize])
 {
     (void)index;
     (void)name;

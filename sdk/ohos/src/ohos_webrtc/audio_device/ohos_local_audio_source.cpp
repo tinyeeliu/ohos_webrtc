@@ -23,8 +23,8 @@
 
 namespace webrtc {
 
-rtc::scoped_refptr<OhosLocalAudioSource>
-OhosLocalAudioSource::Create(cricket::AudioOptions audioOptions, std::shared_ptr<AudioInput> audioInput)
+rtc::scoped_refptr<OhosLocalAudioSource> OhosLocalAudioSource::Create(cricket::AudioOptions audioOptions,
+    std::shared_ptr<AudioInput> audioInput)
 {
     RTC_DCHECK(audioInput);
     if (!audioInput) {
