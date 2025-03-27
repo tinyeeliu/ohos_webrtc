@@ -19,16 +19,17 @@
 #include "napi.h"
 
 #include "api/dtmf_sender_interface.h"
+#include "event/event_target.h"
 
 namespace webrtc {
 
-class NapiDtmfSender : public Napi::ObjectWrap<NapiDtmfSender>, public DtmfSenderObserverInterface {
+class NapiDtmfSender : public NapiEventTarget<NapiDtmfSender>, public DtmfSenderObserverInterface {
 public:
     static void Init(Napi::Env env, Napi::Object exports);
 
     static Napi::Object NewInstance(Napi::Env env, rtc::scoped_refptr<DtmfSenderInterface> dtmfSender);
 
-    ~NapiDtmfSender();
+    ~NapiDtmfSender() override;
 
 protected:
     friend class ObjectWrap;
@@ -50,14 +51,6 @@ protected:
 
 private:
     static Napi::FunctionReference constructor_;
-
-    struct EventHandler {
-        Napi::FunctionReference ref;
-        Napi::ThreadSafeFunction tsfn;
-    };
-
-    mutable std::mutex mutex_;
-    EventHandler eventHandler_;
 
     rtc::scoped_refptr<DtmfSenderInterface> dtmfSender_;
 };

@@ -43,6 +43,8 @@ const char kMethodNameGetStats[] = "getStats";
 const char kMethodNameToJson[] = "toJSON";
 
 const char kStaticMethodNameGetCapabilities[] = "getCapabilities";
+static constexpr int indexTwo = 2;
+static constexpr int callbackInfoLen = 3;
 
 class AsyncWorkerReplaceTrack : public Napi::AsyncWorker {
 public:
@@ -117,34 +119,41 @@ void NapiRtpSender::Init(Napi::Env env, Napi::Object exports)
 }
 
 Napi::Object NapiRtpSender::NewInstance(
-    Napi::Env env, rtc::scoped_refptr<RtpSenderInterface> sender, NapiPeerConnectionWrapper* pcWrapper)
+    std::shared_ptr<PeerConnectionFactoryWrapper> factory, rtc::scoped_refptr<PeerConnectionInterface> pc,
+    rtc::scoped_refptr<RtpSenderInterface> sender)
 {
-    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    if (!sender || !pcWrapper) {
+    auto env = constructor_.Env();
+    if (!factory || !pc || !sender) {
         NAPI_THROW(Error::New(env, "Invalid argument"), Object());
     }
 
-    auto externalSender = External<RtpSenderInterface>::New(
-        env, sender.release(), [](Napi::Env, RtpSenderInterface* sender) { sender->Release(); });
-
-    auto externalPcWrapper = External<NapiPeerConnectionWrapper>::New(env, pcWrapper);
-
-    return constructor_.New({externalSender, externalPcWrapper});
+    Napi::HandleScope scope(env);
+    return constructor_.New(
+        {External<std::shared_ptr<PeerConnectionFactoryWrapper>>::New(env, &factory),
+         External<rtc::scoped_refptr<PeerConnectionInterface>>::New(env, &pc),
+         External<rtc::scoped_refptr<RtpSenderInterface>>::New(env, &sender)});
 }
 
 NapiRtpSender::NapiRtpSender(const Napi::CallbackInfo& info) : Napi::ObjectWrap<NapiRtpSender>(info)
 {
-    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    if (info.Length() > 0 && info[0].IsExternal()) {
-        auto rtpSender = info[0].As<External<RtpSenderInterface>>().Data();
-        rtpSender_ = rtc::scoped_refptr<RtpSenderInterface>(rtpSender);
+    // Create from native with 3 paramters, and SHOULD NOT create from ArkTS
+    if (info.Length() != callbackInfoLen || !info[0].IsExternal() || !info[1].IsExternal() ||
+        !info[indexTwo].IsExternal()) {
+        NAPI_THROW_VOID(Napi::Error::New(info.Env(), "Invalid Operation"));
     }
 
-    if (info.Length() > 1 && info[1].IsExternal()) {
-        pcWrapper_ = info[1].As<External<NapiPeerConnectionWrapper>>().Data();
-    }
+    factory_ = *info[0].As<External<std::shared_ptr<PeerConnectionFactoryWrapper>>>().Data();
+    pc_ = *info[1].As<External<rtc::scoped_refptr<PeerConnectionInterface>>>().Data();
+    rtpSender_ = *info[indexTwo].As<External<rtc::scoped_refptr<RtpSenderInterface>>>().Data();
+}
+
+NapiRtpSender::~NapiRtpSender()
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 }
 
 rtc::scoped_refptr<RtpSenderInterface> NapiRtpSender::Get() const
@@ -195,7 +204,7 @@ Napi::Value NapiRtpSender::GetTrack(const Napi::CallbackInfo& info)
         return info.Env().Null();
     }
 
-    return NapiMediaStreamTrack::NewInstance(info.Env(), MediaStreamTrackWrapper::Create(track));
+    return NapiMediaStreamTrack::NewInstance(factory_, track);
 }
 
 Napi::Value NapiRtpSender::GetTransport(const Napi::CallbackInfo& info)
@@ -207,7 +216,7 @@ Napi::Value NapiRtpSender::GetTransport(const Napi::CallbackInfo& info)
         return info.Env().Null();
     }
 
-    return NapiDtlsTransport::NewInstance(info.Env(), transport, pcWrapper_);
+    return NapiDtlsTransport::NewInstance(info.Env(), factory_, transport);
 }
 
 Napi::Value NapiRtpSender::GetDtmf(const Napi::CallbackInfo& info)
@@ -325,8 +334,7 @@ Napi::Value NapiRtpSender::GetStats(const Napi::CallbackInfo& info)
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
     auto asyncWorker = AsyncWorkerGetStats::Create(info.Env(), "GetStats");
-    auto pc = pcWrapper_->GetPeerConnection();
-    pc->GetStats(rtpSender_, asyncWorker->GetCallback());
+    pc_->GetStats(rtpSender_, asyncWorker->GetCallback());
 
     return asyncWorker->GetPromise();
 }

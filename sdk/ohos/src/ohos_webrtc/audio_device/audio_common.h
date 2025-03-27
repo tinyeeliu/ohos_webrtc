@@ -29,7 +29,9 @@ constexpr int kAudioChannelCount_Stereo = 2;
 
 constexpr int kAudioSampleRate_16000 = 16000;
 constexpr int kAudioSampleRate_48000 = 48000;
-constexpr int kAudioSampleRate_Default = kAudioSampleRate_48000;
+constexpr int kAudioSampleRate_Default = kAudioSampleRate_16000;
+
+constexpr float kHalfSec = 0.5;
 
 const int kLowLatencyModeDelayEstimateInMilliseconds = 25;
 const int kHighLatencyModeDelayEstimateInMilliseconds = 75;
@@ -62,6 +64,18 @@ inline const char* StateToString(OH_AudioStream_State state)
             return "UNKNOWN";
     }
 }
+
+enum class AudioErrorType {
+    INIT,
+    START_EXCEPTION,
+    START_STATE_MISMATCH,
+    GENERAL
+};
+
+enum class AudioStateType {
+    START,
+    STOP
+};
 
 } // namespace webrtc
 

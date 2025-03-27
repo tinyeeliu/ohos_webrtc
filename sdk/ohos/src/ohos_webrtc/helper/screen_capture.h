@@ -25,6 +25,8 @@
 
 namespace ohos {
 
+class AVScreenCaptureContentFilter;
+
 class AVScreenCapture : public PointerWrapper<OH_AVScreenCapture> {
 public:
     static AVScreenCapture Create();
@@ -37,11 +39,23 @@ private:
     using PointerWrapper::PointerWrapper;
 };
 
+class AVScreenCaptureContentFilter : public PointerWrapper<OH_AVScreenCapture_ContentFilter> {
+public:
+    static AVScreenCaptureContentFilter Create();
+    static AVScreenCaptureContentFilter TakeOwnership(OH_AVScreenCapture_ContentFilter* filter);
+
+    AVScreenCaptureContentFilter();
+    explicit AVScreenCaptureContentFilter(OH_AVScreenCapture_ContentFilter* filter);
+
+private:
+    using PointerWrapper::PointerWrapper;
+};
+
 inline AVScreenCapture AVScreenCapture::Create()
 {
     OH_AVScreenCapture* capture = OH_AVScreenCapture_Create();
     NATIVE_THROW_IF_FAILED(
-        capture != nullptr, -1, "OH_AVScreenCapture", "Failed to create native window", AVScreenCapture());
+        capture != nullptr, -1, "OH_AVScreenCapture", "Failed to create screen capture", AVScreenCapture());
     return AVScreenCapture(capture, [](OH_AVScreenCapture* capture) { OH_AVScreenCapture_Release(capture); });
 }
 
@@ -54,6 +68,32 @@ inline AVScreenCapture AVScreenCapture::TakeOwnership(OH_AVScreenCapture* captur
 inline AVScreenCapture::AVScreenCapture() = default;
 
 inline AVScreenCapture::AVScreenCapture(OH_AVScreenCapture* capture) : PointerWrapper(capture, NullDeleter) {}
+
+inline AVScreenCaptureContentFilter AVScreenCaptureContentFilter::Create()
+{
+    OH_AVScreenCapture_ContentFilter* filter = OH_AVScreenCapture_CreateContentFilter();
+    NATIVE_THROW_IF_FAILED(
+        filter != nullptr, -1, "OH_AVScreenCapture", "Failed to create screen capture content filter",
+        AVScreenCaptureContentFilter());
+    return AVScreenCaptureContentFilter(
+        filter, [](OH_AVScreenCapture_ContentFilter* filter) { OH_AVScreenCapture_ReleaseContentFilter(filter); });
+}
+
+inline AVScreenCaptureContentFilter AVScreenCaptureContentFilter::TakeOwnership(
+    OH_AVScreenCapture_ContentFilter* filter)
+{
+    NATIVE_THROW_IF_FAILED(
+        filter != nullptr, -1, "OH_AVScreenCapture", "Null argument", AVScreenCaptureContentFilter());
+    return AVScreenCaptureContentFilter(
+        filter, [](OH_AVScreenCapture_ContentFilter* filter) { OH_AVScreenCapture_ReleaseContentFilter(filter); });
+}
+
+inline AVScreenCaptureContentFilter::AVScreenCaptureContentFilter() = default;
+
+inline AVScreenCaptureContentFilter::AVScreenCaptureContentFilter(OH_AVScreenCapture_ContentFilter* filter)
+    : PointerWrapper(filter, NullDeleter)
+{
+}
 
 } // namespace ohos
 

@@ -18,17 +18,14 @@
 
 #include "rtc_base/copy_on_write_buffer.h"
 #include "rtc_base/logging.h"
-#include <bits/alltypes.h>
-#include <cmath>
 
 namespace webrtc {
 
 using namespace Napi;
 
-std::unique_ptr<AudioCapturer>
-AudioCapturer::Create(int source, int format, int sampleRate, bool useStereoInput, bool useLowLatency)
+std::unique_ptr<AudioCapturer> AudioCapturer::Create(AudioInputOptions options)
 {
-    return std::make_unique<AudioCapturer>(source, format, sampleRate, useStereoInput, useLowLatency);
+    return std::make_unique<AudioCapturer>(std::move(options));
 }
 
 int32_t AudioCapturer::OnReadData1(OH_AudioCapturer* stream, void* userData, void* buffer, int32_t length)
@@ -56,12 +53,7 @@ int32_t AudioCapturer::OnError1(OH_AudioCapturer* stream, void* userData, OH_Aud
     return self->OnError(stream, error);
 }
 
-AudioCapturer::AudioCapturer(int source, int format, int sampleRate, bool useStereoInput, bool useLowLatency)
-    : audioSource_(source),
-      audioFormat_(format),
-      sampleRate_(sampleRate),
-      channelCount_(useStereoInput ? kAudioChannelCount_Stereo : kAudioChannelCount_Mono),
-      useLowLatency_(useLowLatency)
+AudioCapturer::AudioCapturer(AudioInputOptions options) : AudioInputBase(std::move(options))
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
@@ -75,6 +67,8 @@ AudioCapturer::~AudioCapturer()
 
     RTC_DCHECK(threadChecker_.IsCurrent());
     Terminate();
+
+    RTC_LOG(LS_INFO) << "detected owerflows: " << overflowCount_;
 }
 
 int32_t AudioCapturer::Init()
@@ -113,20 +107,20 @@ int32_t AudioCapturer::InitRecording()
         NotifyError(AudioErrorType::INIT, "system error"), -1);
 
     OH_RESULT_CHECK(
-        OH_AudioStreamBuilder_SetCapturerInfo(builder, static_cast<OH_AudioStream_SourceType>(audioSource_)),
+        OH_AudioStreamBuilder_SetCapturerInfo(builder, static_cast<OH_AudioStream_SourceType>(GetAudioSource())),
         NotifyError(AudioErrorType::INIT, "failed to set capturer info"), -1);
     OH_RESULT_CHECK(
-        OH_AudioStreamBuilder_SetSamplingRate(builder, sampleRate_),
+        OH_AudioStreamBuilder_SetSamplingRate(builder, GetSampleRate()),
         NotifyError(AudioErrorType::INIT, "failed to set sample rate"), -1);
     OH_RESULT_CHECK(
-        OH_AudioStreamBuilder_SetChannelCount(builder, channelCount_),
+        OH_AudioStreamBuilder_SetChannelCount(builder, GetChannelCount()),
         NotifyError(AudioErrorType::INIT, "failed to set channel count"), -1);
     OH_RESULT_CHECK(
-        OH_AudioStreamBuilder_SetSampleFormat(builder, (OH_AudioStream_SampleFormat)audioFormat_),
+        OH_AudioStreamBuilder_SetSampleFormat(builder, static_cast<OH_AudioStream_SampleFormat>(GetSampleFormat())),
         NotifyError(AudioErrorType::INIT, "failed to set sample format"), -1);
     OH_RESULT_CHECK(
         OH_AudioStreamBuilder_SetLatencyMode(
-            builder, useLowLatency_ ? AUDIOSTREAM_LATENCY_MODE_FAST : AUDIOSTREAM_LATENCY_MODE_NORMAL),
+            builder, UseLowLatency() ? AUDIOSTREAM_LATENCY_MODE_FAST : AUDIOSTREAM_LATENCY_MODE_NORMAL),
         NotifyError(AudioErrorType::INIT, "failed to set latency mode"), -1);
 
     OH_AudioCapturer_Callbacks callbacks;
@@ -143,34 +137,7 @@ int32_t AudioCapturer::InitRecording()
         OH_AudioStreamBuilder_GenerateCapturer(builder, &stream), NotifyError(AudioErrorType::INIT, "system error"),
         -1);
 
-    // check configuration
-    int32_t rate;
-    OH_RESULT_CHECK(
-        OH_AudioCapturer_GetSamplingRate(stream, &rate), NotifyError(AudioErrorType::INIT, "failed to get sample rate"),
-        -1);
-    if (rate != sampleRate_) {
-        RTC_LOG(LS_ERROR) << "Stream unable to use requested sample rate";
-        NotifyError(AudioErrorType::INIT, "unmatched sample rate");
-        return -1;
-    }
-
-    int32_t channelCount;
-    OH_RESULT_CHECK(
-        OH_AudioCapturer_GetChannelCount(stream, &channelCount),
-        NotifyError(AudioErrorType::INIT, "failed to get channel count"), -1);
-    if (channelCount != static_cast<int32_t>(channelCount_)) {
-        RTC_LOG(LS_ERROR) << "Stream unable to use requested channel count";
-        NotifyError(AudioErrorType::INIT, "unmatched channel count");
-        return -1;
-    }
-
-    OH_AudioStream_SampleFormat sampleFormat;
-    OH_RESULT_CHECK(
-        OH_AudioCapturer_GetSampleFormat(stream, &sampleFormat),
-        NotifyError(AudioErrorType::INIT, "failed to get sample format"), -1);
-    if (sampleFormat != AUDIOSTREAM_SAMPLE_S16LE) {
-        RTC_LOG(LS_ERROR) << "Stream unable to use requested format";
-        NotifyError(AudioErrorType::INIT, "unmatched sample format");
+    if (!CheckConfiguration(stream)) {
         return -1;
     }
 
@@ -190,7 +157,7 @@ bool AudioCapturer::RecordingIsInitialized() const
 
 int32_t AudioCapturer::StartRecording()
 {
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+    RTC_LOG(LS_INFO) << __FUNCTION__;
 
     RTC_DCHECK(threadChecker_.IsCurrent());
     if (recording_) {
@@ -203,10 +170,6 @@ int32_t AudioCapturer::StartRecording()
         return 0;
     }
 
-    if (fineAudioBuffer_) {
-        fineAudioBuffer_->ResetPlayout();
-    }
-
     OH_AudioStream_State state = GetCurrentState();
     if (state != AUDIOSTREAM_STATE_PREPARED) {
         RTC_LOG(LS_ERROR) << "Invalid state: " << StateToString(state);
@@ -216,7 +179,9 @@ int32_t AudioCapturer::StartRecording()
 
     OH_RESULT_CHECK(
         OH_AudioCapturer_Start(capturer_), NotifyError(AudioErrorType::START_EXCEPTION, "system error"), -1);
-    RTC_DLOG(LS_VERBOSE) << "current state: " << StateToString(GetCurrentState());
+    RTC_DLOG(LS_INFO) << "current state: " << StateToString(GetCurrentState());
+
+    overflowCount_ = GetOverflowCount();
     recording_ = true;
 
     NotifyStateChange(AudioStateType::START);
@@ -246,61 +211,13 @@ int32_t AudioCapturer::StopRecording()
 
 bool AudioCapturer::Recording() const
 {
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " recording_ = " << recording_;
+    RTC_DLOG(LS_INFO) << __FUNCTION__ << " recording_ = " << recording_;
     return recording_;
 }
 
-void AudioCapturer::AttachAudioBuffer(AudioDeviceBuffer* audioBuffer)
+std::string AudioCapturer::GetLabel() const
 {
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " audioBuffer = " << audioBuffer;
-
-    RTC_DCHECK(threadChecker_.IsCurrent());
-    audioDeviceBuffer_ = audioBuffer;
-    audioDeviceBuffer_->SetRecordingSampleRate(sampleRate_);
-    audioDeviceBuffer_->SetRecordingChannels(channelCount_);
-    fineAudioBuffer_ = std::make_unique<FineAudioBuffer>(audioDeviceBuffer_);
-}
-
-int32_t AudioCapturer::MicrophoneMuteIsAvailable(bool* available)
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-
-    *available = true;
-    return 0;
-}
-
-int32_t AudioCapturer::SetMicrophoneMute(bool mute)
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-
-    microphoneMute_ = mute;
-    return 0;
-}
-
-int32_t AudioCapturer::MicrophoneMute(bool* enabled) const
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-
-    *enabled = microphoneMute_;
-    return 0;
-}
-
-void AudioCapturer::RegisterObserver(Observer* obs)
-{
-    if (!obs) {
-        return;
-    }
-
-    observers_.insert(obs);
-}
-
-void AudioCapturer::UnregisterObserver(Observer* obs)
-{
-    if (!obs) {
-        return;
-    }
-
-    observers_.erase(obs);
+    return "Default";
 }
 
 int32_t AudioCapturer::OnReadData(OH_AudioCapturer* stream, void* buffer, int32_t length)
@@ -309,30 +226,28 @@ int32_t AudioCapturer::OnReadData(OH_AudioCapturer* stream, void* buffer, int32_
 
     (void)stream;
 
-    int64_t position;
-    int64_t timestamp;
-    OH_RESULT_CHECK(OH_AudioCapturer_GetTimestamp(capturer_, CLOCK_MONOTONIC, &position, &timestamp), 0);
-
-    double latencyMillis = static_cast<double>(rtc::TimeNanos() - timestamp) / rtc::kNumNanosecsPerMillisec;
-    RTC_DLOG(LS_VERBOSE) << "latencyMillis=" << latencyMillis;
-    captureDelayMs_ = static_cast<int>(std::ceil(latencyMillis));
-
-    if (microphoneMute_) {
-        std::memset(buffer, 0, length);
+    const uint32_t overflowCount = GetOverflowCount();
+    if (overflowCount_ < overflowCount) {
+        RTC_LOG(LS_ERROR) << "Overflow detected: " << overflowCount;
+        overflowCount_ = overflowCount;
     }
 
-    fineAudioBuffer_->DeliverRecordedData(
-        rtc::MakeArrayView(static_cast<const int16_t*>(buffer), length / sizeof(int16_t)), captureDelayMs_);
+    auto latencyMillis = EstimateLatencyMillis();
+    RTC_DLOG(LS_VERBOSE) << "Estimate latencyMillis=" << latencyMillis;
 
-    auto data = new rtc::CopyOnWriteBuffer((uint8_t*)buffer, length);
-    NotifySamplesReady(sampleRate_, audioFormat_, channelCount_, data);
+    if (mute_) {
+        auto it = static_cast<uint8_t*>(buffer);
+        std::fill(it, it + length, 0);
+    }
+
+    NotifyDataReady(buffer, length, rtc::TimeMicros(), latencyMillis);
 
     return -1;
 }
 
 int32_t AudioCapturer::OnStreamEvent(OH_AudioCapturer* stream, OH_AudioStream_Event event)
 {
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " event=" << event;
+    RTC_LOG(LS_INFO) << __FUNCTION__ << " event=" << event;
 
     (void)stream;
 
@@ -342,23 +257,27 @@ int32_t AudioCapturer::OnStreamEvent(OH_AudioCapturer* stream, OH_AudioStream_Ev
 int32_t
 AudioCapturer::OnInterruptEvent(OH_AudioCapturer* stream, OH_AudioInterrupt_ForceType type, OH_AudioInterrupt_Hint hint)
 {
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " type=" << type;
+    RTC_LOG(LS_WARNING) << __FUNCTION__ << " type=" << type << ", hint=" << hint;
 
     (void)stream;
-    (void)hint;
 
     return 0;
 }
 
 int32_t AudioCapturer::OnError(OH_AudioCapturer* stream, OH_AudioStream_Result error)
 {
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " error=" << error;
+    RTC_LOG(LS_ERROR) << __FUNCTION__ << " error=" << error;
 
     (void)stream;
 
     NotifyError(AudioErrorType::GENERAL, "system error");
 
     return 0;
+}
+
+int32_t AudioCapturer::GetAudioSource() const
+{
+    return options_.source.value_or(AUDIOSTREAM_SOURCE_TYPE_VOICE_COMMUNICATION);
 }
 
 OH_AudioStream_State AudioCapturer::GetCurrentState() const
@@ -371,26 +290,63 @@ OH_AudioStream_State AudioCapturer::GetCurrentState() const
     return state;
 }
 
-void AudioCapturer::NotifyError(AudioErrorType error, const std::string& message)
+double AudioCapturer::EstimateLatencyMillis() const
 {
-    for (auto& obs : observers_) {
-        obs->OnAudioInputError(error, message);
-    }
+    RTC_DCHECK(capturer_);
+
+    return static_cast<double>(framesPerBurst_) / GetSampleRate() * rtc::kNumMillisecsPerSec;
 }
 
-void AudioCapturer::NotifyStateChange(AudioStateType state)
+uint32_t AudioCapturer::GetOverflowCount() const
 {
-    for (auto& obs : observers_) {
-        obs->OnAudioInputStateChange(state);
+    uint32_t overflowCount = 0;
+    auto ret = OH_AudioCapturer_GetOverflowCount(capturer_, &overflowCount);
+    if (ret != AUDIOSTREAM_SUCCESS) {
+        RTC_LOG(LS_ERROR) << "Failed to get overflow count: " << ret;
+        return 0;
     }
+
+    return overflowCount;
 }
 
-void AudioCapturer::NotifySamplesReady(
-    int32_t sampleRate, int32_t format, int32_t channelCount, rtc::CopyOnWriteBuffer* data)
+bool AudioCapturer::CheckConfiguration(OH_AudioCapturer* capturer)
 {
-    for (auto& obs : observers_) {
-        obs->OnAudioInputSamplesReady(sampleRate, format, channelCount, data);
+    if (!capturer) {
+        RTC_LOG(LS_ERROR) << "Invalid parameter";
+        return false;
     }
+
+    int32_t rate;
+    OH_RESULT_CHECK(
+        OH_AudioCapturer_GetSamplingRate(capturer, &rate),
+        NotifyError(AudioErrorType::INIT, "failed to get sample rate"), false);
+    if (rate != GetSampleRate()) {
+        RTC_LOG(LS_ERROR) << "Stream unable to use requested sample rate";
+        NotifyError(AudioErrorType::INIT, "unmatched sample rate");
+        return false;
+    }
+
+    int32_t channelCount;
+    OH_RESULT_CHECK(
+        OH_AudioCapturer_GetChannelCount(capturer, &channelCount),
+        NotifyError(AudioErrorType::INIT, "failed to get channel count"), false);
+    if (channelCount != GetChannelCount()) {
+        RTC_LOG(LS_ERROR) << "Stream unable to use requested channel count";
+        NotifyError(AudioErrorType::INIT, "unmatched channel count");
+        return false;
+    }
+
+    OH_AudioStream_SampleFormat sampleFormat;
+    OH_RESULT_CHECK(
+        OH_AudioCapturer_GetSampleFormat(capturer, &sampleFormat),
+        NotifyError(AudioErrorType::INIT, "failed to get sample format"), false);
+    if (sampleFormat != AUDIOSTREAM_SAMPLE_S16LE) {
+        RTC_LOG(LS_ERROR) << "Stream unable to use requested format";
+        NotifyError(AudioErrorType::INIT, "unmatched sample format");
+        return false;
+    }
+
+    return true;
 }
 
 } // namespace webrtc

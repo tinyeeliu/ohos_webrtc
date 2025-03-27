@@ -20,18 +20,20 @@
 
 #include "api/sctp_transport_interface.h"
 
+#include "event/event_target.h"
+
 namespace webrtc {
 
-class NapiPeerConnectionWrapper;
+class PeerConnectionFactoryWrapper;
 
-class NapiSctpTransport : public Napi::ObjectWrap<NapiSctpTransport>, public SctpTransportObserverInterface {
+class NapiSctpTransport : public NapiEventTarget<NapiSctpTransport>, public SctpTransportObserverInterface {
 public:
     static void Init(Napi::Env env, Napi::Object exports);
 
     static Napi::Object NewInstance(
-        Napi::Env env, rtc::scoped_refptr<SctpTransportInterface> transport, NapiPeerConnectionWrapper* pcWrapper);
+        std::shared_ptr<PeerConnectionFactoryWrapper> factory, rtc::scoped_refptr<SctpTransportInterface> transport);
 
-    ~NapiSctpTransport();
+    ~NapiSctpTransport() override;
 
     explicit NapiSctpTransport(const Napi::CallbackInfo& info);
 
@@ -53,16 +55,8 @@ protected:
 private:
     static Napi::FunctionReference constructor_;
 
-    struct EventHandler {
-        Napi::FunctionReference ref;
-        Napi::ThreadSafeFunction tsfn;
-    };
-
-    mutable std::mutex mutex_;
-    EventHandler eventHandler_;
-
+    std::shared_ptr<PeerConnectionFactoryWrapper> factory_;
     rtc::scoped_refptr<SctpTransportInterface> sctpTransport_;
-    NapiPeerConnectionWrapper* pcWrapper_{};
 };
 
 } // namespace webrtc

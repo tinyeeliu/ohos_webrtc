@@ -30,6 +30,11 @@
               "action.system.home"
             ]
           }
+        ],
+        "backgroundModes": [
+          "audioPlayback",
+          "audioRecording",
+          "dataTransfer"
         ]
       }
     ],
@@ -57,6 +62,10 @@
           ],
           "when": "inuse"
         }
+      },
+      {
+        "name": "ohos.permission.KEEP_BACKGROUND_RUNNING",
+        "reason": "$string:background_running_permission_reason"
       }
     ]
   }

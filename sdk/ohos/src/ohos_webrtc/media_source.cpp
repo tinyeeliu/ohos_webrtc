@@ -38,14 +38,14 @@ void NapiAudioSource::Init(Napi::Env env, Napi::Object exports)
     constructor_ = Persistent(func);
 }
 
-Napi::Object NapiAudioSource::NewInstance(Napi::Env env, rtc::scoped_refptr<AudioSourceInterface> source)
+Napi::Object NapiAudioSource::NewInstance(Napi::Env env, rtc::scoped_refptr<OhosLocalAudioSource> source)
 {
     if (!source) {
         NAPI_THROW(Error::New(env, "Invalid argument"), Object::New(env));
     }
 
-    auto external = External<AudioSourceInterface>::New(
-        env, source.release(), [](Napi::Env /*env*/, AudioSourceInterface* source) { source->Release(); });
+    auto external = External<OhosLocalAudioSource>::New(
+        env, source.release(), [](Napi::Env /*env*/, OhosLocalAudioSource* source) { source->Release(); });
 
     return constructor_.New({external});
 }
@@ -53,14 +53,19 @@ Napi::Object NapiAudioSource::NewInstance(Napi::Env env, rtc::scoped_refptr<Audi
 NapiAudioSource::NapiAudioSource(const Napi::CallbackInfo& info) : NapiMediaSource<NapiAudioSource>(info)
 {
     if (info[0].IsExternal()) {
-        auto source = info[0].As<External<AudioSourceInterface>>().Data();
-        source_ = rtc::scoped_refptr<AudioSourceInterface>(source);
+        auto source = info[0].As<External<OhosLocalAudioSource>>().Data();
+        source_ = rtc::scoped_refptr<OhosLocalAudioSource>(source);
     }
 }
 
 NapiAudioSource::~NapiAudioSource()
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+}
+
+rtc::scoped_refptr<OhosLocalAudioSource> NapiAudioSource::Get() const
+{
+    return source_;
 }
 
 Napi::Value NapiAudioSource::GetState(const Napi::CallbackInfo& info)

@@ -999,7 +999,8 @@ export default function PeerConnectionTest() {
       expect(flag).assertTrue();
     })
 
-    it("sendDataInDatachannelEvent", DEFAULT, async () => {
+    it("OnDataChannel1", DEFAULT, async () => {
+      // Should be able to send data in a datachannel event handler.
       let message = 'meow meow!';
 
       callee.ondatachannel = (event) => {
@@ -1022,16 +1023,19 @@ export default function PeerConnectionTest() {
       expect(data).assertEqual(message);
     })
 
-    it("closeChannelNotCauseOnopenInDatachannelEvent", DEFAULT, async () => {
+    it("OnDataChannel2", DEFAULT, async () => {
+      // Open event should not be raised when closing the channel in the datachannel event.
       let flag = false;
       let promise = new Promise<void>((resolve) => {
         callee.ondatachannel = async (event) => {
           const dc = event.channel;
           dc.onopen = () => {
+            console.error(TAG, "onopen");
             flag = true;
-            expect().assertFail();
           };
           dc.close();
+          // Wait a bit to ensure the 'open' event does NOT fire.
+          await sleep(500);
           resolve();
         };
       })
@@ -1041,6 +1045,33 @@ export default function PeerConnectionTest() {
       await exchangeOfferAnswer(caller, callee);
       await promise;
       expect(flag).assertEqual(false);
+    })
+
+    it("OnDataChannel3", DEFAULT, async () => {
+      // Open event should be raised when closing the channel in the datachannel event after enqueuing a task.
+      let flag = false;
+      let promise = new Promise<void>((resolve) => {
+        callee.ondatachannel = async (event) => {
+          const dc = event.channel;
+          dc.onopen = () => {
+            flag = true;
+            console.error(TAG, "onopen");
+            resolve();
+          };
+
+          setTimeout(() => {
+            setTimeout(() => {
+              dc.close();
+            }, 1);
+          }, 1);
+        };
+      })
+      caller.createDataChannel('fire-me!');
+
+      exchangeIceCandidates(caller, callee);
+      await exchangeOfferAnswer(caller, callee);
+      await promise;
+      expect(flag).assertTrue();
     })
 
     it("closeChannelWhenSendNotCauseOnopenInDataChannelEvent", DEFAULT, async () => {

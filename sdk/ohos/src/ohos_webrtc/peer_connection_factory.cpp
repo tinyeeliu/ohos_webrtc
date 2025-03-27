@@ -26,10 +26,11 @@
 #include "media_source.h"
 #include "media_stream_track.h"
 #include "peer_connection.h"
-#include "audio_device/audio_device_module.h"
+#include "audio_device/ohos_audio_device_module.h"
+#include "audio_device/ohos_local_audio_source.h"
 #include "camera/camera_enumerator.h"
 #include "camera/camera_capturer.h"
-#include "desktop_capture/desktop_capturer.h"
+#include "screen_capture/screen_capturer.h"
 #include "video/video_track_source.h"
 #include "user_media/media_constraints_util.h"
 #include "video_encoder_factory.h"
@@ -84,7 +85,7 @@ void PeerConnectionFactoryWrapper::SetDefault(std::shared_ptr<PeerConnectionFact
 }
 
 std::shared_ptr<PeerConnectionFactoryWrapper> PeerConnectionFactoryWrapper::Create(
-    rtc::scoped_refptr<AudioDeviceModule> adm, std::unique_ptr<VideoEncoderFactory> videoEncoderFactory,
+    rtc::scoped_refptr<OhosAudioDeviceModule> adm, std::unique_ptr<VideoEncoderFactory> videoEncoderFactory,
     std::unique_ptr<VideoDecoderFactory> videoDecoderFactory, rtc::scoped_refptr<AudioProcessing> audioProcessing)
 {
     auto wrapper = std::make_shared<PeerConnectionFactoryWrapper>();
@@ -94,8 +95,88 @@ std::shared_ptr<PeerConnectionFactoryWrapper> PeerConnectionFactoryWrapper::Crea
     return wrapper;
 }
 
+rtc::scoped_refptr<OhosAudioDeviceModule> PeerConnectionFactoryWrapper::GetAudioDeviceModule() const
+{
+    return adm_;
+}
+
+rtc::scoped_refptr<OhosLocalAudioSource> PeerConnectionFactoryWrapper::CreateAudioSource(
+    const cricket::AudioOptions& options, std::shared_ptr<AudioInput> audioInput)
+{
+    return adm_->CreateAudioSource(options, std::move(audioInput));
+}
+
+rtc::scoped_refptr<OhosVideoTrackSource> PeerConnectionFactoryWrapper::CreateVideoSource(
+    std::unique_ptr<VideoCapturer> capturer)
+{
+    return OhosVideoTrackSource::Create(std::move(capturer), signalingThread_.get(),
+                                        EglEnv::GetDefault().GetContext());
+}
+
+rtc::scoped_refptr<AudioTrackInterface> PeerConnectionFactoryWrapper::CreateAudioTrack(
+    const std::string& label, rtc::scoped_refptr<OhosLocalAudioSource> source)
+{
+    if (!source) {
+        return nullptr;
+    }
+
+    auto track = pcFactory_->CreateAudioTrack(label, source.get());
+    if (!track) {
+        return nullptr;
+    }
+
+    audioSources_[track] = source;
+    return track;
+}
+
+rtc::scoped_refptr<VideoTrackInterface> PeerConnectionFactoryWrapper::CreateVideoTrack(
+    const std::string& label, rtc::scoped_refptr<OhosVideoTrackSource> source)
+{
+    if (!source) {
+        return nullptr;
+    }
+
+    auto track = pcFactory_->CreateVideoTrack(source, label);
+    if (!track) {
+        return nullptr;
+    }
+
+    videoSources_[track] = source;
+    return track;
+}
+
+rtc::scoped_refptr<OhosLocalAudioSource> PeerConnectionFactoryWrapper::GetAudioSource(
+    rtc::scoped_refptr<MediaStreamTrackInterface> track) const
+{
+    auto it = audioSources_.find(track);
+    if (it == audioSources_.end()) {
+        return nullptr;
+    }
+    return it->second;
+}
+
+rtc::scoped_refptr<OhosVideoTrackSource> PeerConnectionFactoryWrapper::GetVideoSource(
+    rtc::scoped_refptr<MediaStreamTrackInterface> track) const
+{
+    auto it = videoSources_.find(track);
+    if (it == videoSources_.end()) {
+        return nullptr;
+    }
+    return it->second;
+}
+
+void PeerConnectionFactoryWrapper::RemoveAudioSource(rtc::scoped_refptr<MediaStreamTrackInterface> track)
+{
+    audioSources_.erase(track);
+}
+
+void PeerConnectionFactoryWrapper::RemoveVideoSource(rtc::scoped_refptr<MediaStreamTrackInterface> track)
+{
+    videoSources_.erase(track);
+}
+
 bool PeerConnectionFactoryWrapper::Init(
-    rtc::scoped_refptr<AudioDeviceModule> adm, std::unique_ptr<VideoEncoderFactory> videoEncoderFactory,
+    rtc::scoped_refptr<OhosAudioDeviceModule> adm, std::unique_ptr<VideoEncoderFactory> videoEncoderFactory,
     std::unique_ptr<VideoDecoderFactory> videoDecoderFactory, rtc::scoped_refptr<AudioProcessing> audioProcessing)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
@@ -124,6 +205,10 @@ bool PeerConnectionFactoryWrapper::Init(
         return false;
     }
 
+    if (!adm) {
+        adm = CreateDefaultAudioDeviceModule();
+    }
+
     pcFactory_ = CreatePeerConnectionFactory(
         networkThread.get(), workerThread.get(), signalingThread.get(), adm, CreateBuiltinAudioEncoderFactory(),
         CreateBuiltinAudioDecoderFactory(),
@@ -136,6 +221,7 @@ bool PeerConnectionFactoryWrapper::Init(
         return false;
     }
 
+    adm_ = adm;
     socketServer_ = std::move(socketServer);
     networkThread_ = std::move(networkThread);
     workerThread_ = std::move(workerThread);
@@ -151,7 +237,7 @@ NapiPeerConnectionFactory::NapiPeerConnectionFactory(const CallbackInfo& info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    rtc::scoped_refptr<AudioDeviceModule> adm;
+    rtc::scoped_refptr<OhosAudioDeviceModule> adm;
     std::unique_ptr<VideoEncoderFactory> videoEncoderFactory;
     std::unique_ptr<VideoDecoderFactory> videoDecoderFactory;
     rtc::scoped_refptr<AudioProcessing> audioProcessing;
@@ -240,12 +326,7 @@ Napi::Value NapiPeerConnectionFactory::CreatePeerConnection(const CallbackInfo& 
         NAPI_THROW(TypeError::New(info.Env(), "First argument is not Object"), info.Env().Undefined());
     }
 
-    PeerConnectionInterface::RTCConfiguration config;
-    config.sdp_semantics = SdpSemantics::kUnifiedPlan;
-    JsToNativeConfiguration(info[0].As<Object>(), config);
-
-    auto observer = NapiPeerConnectionWrapper::Create(wrapper_, config);
-    return NapiPeerConnection::NewInstance(info.Env(), std::move(observer));
+    return NapiPeerConnection::NewInstance(info[0], wrapper_);
 }
 
 Napi::Value NapiPeerConnectionFactory::CreateAudioSource(const CallbackInfo& info)
@@ -264,12 +345,10 @@ Napi::Value NapiPeerConnectionFactory::CreateAudioSource(const CallbackInfo& inf
             NAPI_THROW(info.Env().GetAndClearPendingException(), info.Env().Undefined());
         }
         CopyConstraintsIntoAudioOptions(audioConstraints, options);
+        RTC_DLOG(LS_VERBOSE) << "Audio options: " << options.ToString();
     }
 
-    if (options.echo_cancellation) {
-        RTC_DLOG(LS_VERBOSE) << "echo_cancellation = " << options.echo_cancellation.value();
-    }
-    auto source = GetFactory()->CreateAudioSource(options);
+    auto source = wrapper_->CreateAudioSource(options);
     if (!source) {
         NAPI_THROW(Error::New(info.Env(), "Failed to create audio source"), info.Env().Undefined());
     }
@@ -301,12 +380,12 @@ Napi::Value NapiPeerConnectionFactory::CreateAudioTrack(const CallbackInfo& info
         NAPI_THROW(TypeError::New(info.Env(), "Second argument is not AudioSource"), info.Env().Undefined());
     }
 
-    auto track = GetFactory()->CreateAudioTrack(id, source->Get());
+    auto track = wrapper_->CreateAudioTrack(id, source->Get());
     if (!track) {
         NAPI_THROW(TypeError::New(info.Env(), "Failed to create audio track"), info.Env().Undefined());
     }
 
-    return NapiMediaStreamTrack::NewInstance(info.Env(), MediaStreamTrackWrapper::Create(track));
+    return NapiMediaStreamTrack::NewInstance(wrapper_, track);
 }
 
 Napi::Value NapiPeerConnectionFactory::CreateVideoSource(const CallbackInfo& info)
@@ -330,7 +409,7 @@ Napi::Value NapiPeerConnectionFactory::CreateVideoSource(const CallbackInfo& inf
 
     if (info.Length() > 1) {
         if (!info[1].IsBoolean()) {
-            NAPI_THROW(TypeError::New(info.Env(), "The first argument must be boolean"), info.Env().Undefined());
+            NAPI_THROW(TypeError::New(info.Env(), "The second argument must be boolean"), info.Env().Undefined());
         }
 
         isScreencast = info[1].As<Boolean>().Value();
@@ -338,33 +417,21 @@ Napi::Value NapiPeerConnectionFactory::CreateVideoSource(const CallbackInfo& inf
 
     std::unique_ptr<VideoCapturer> videoCapturer;
     if (isScreencast) {
-        // default size
-        int width = 720;
-        int height = 1080;
-        GetScreenCaptureConstraints(video, width, height);
+        ScreenCaptureOptions options;
+        GetScreenCaptureOptionsFromConstraints(video, options);
+        RTC_DLOG(LS_INFO) << "Screen capture options: " << options.ToString();
 
-        video::VideoProfile profile;
-        profile.resolution.width = width;
-        profile.resolution.height = height;
-        profile.format = video::PixelFormat::RGBA;
-        videoCapturer = DesktopCapturer::Create(profile);
+        videoCapturer = ScreenCapturer::Create(std::move(options));
         if (!videoCapturer) {
             NAPI_THROW(Error::New(info.Env(), "Failed to create desktop capturer"), info.Env().Undefined());
         }
     } else {
         CameraCaptureSettings selectedSetting;
         std::string failedConstraintName;
-        if (SelectSettingsForVideo(
+        if (!SelectSettingsForVideo(
                 CameraEnumerator::GetDevices(), video, kDefaultWidth, kDefaultHeight, kDefaultFrameRate,
                 selectedSetting, failedConstraintName))
         {
-            RTC_DLOG(LS_VERBOSE) << "Selected camera device: " << selectedSetting.deviceId
-                                 << ", resolution = " << selectedSetting.profile.resolution.width << "x"
-                                 << selectedSetting.profile.resolution.height
-                                 << ", format = " << selectedSetting.profile.format
-                                 << ", framerate = " << selectedSetting.profile.frameRateRange.min << "-"
-                                 << selectedSetting.profile.frameRateRange.max;
-        } else {
             RTC_LOG(LS_ERROR) << "Failed to select settings for video, unsatisfied constraint: "
                               << failedConstraintName;
             NAPI_THROW(
@@ -372,14 +439,14 @@ Napi::Value NapiPeerConnectionFactory::CreateVideoSource(const CallbackInfo& inf
                 info.Env().Undefined());
         }
 
+        RTC_DLOG(LS_VERBOSE) << "Selected camera device: " << selectedSetting.ToString();
         videoCapturer = CameraCapturer::Create(selectedSetting.deviceId, selectedSetting.profile);
         if (!videoCapturer) {
             NAPI_THROW(Error::New(info.Env(), "Failed to create camera capturer"), info.Env().Undefined());
         }
     }
 
-    auto source = OhosVideoTrackSource::Create(
-        std::move(videoCapturer), wrapper_->GetSignalingThread(), EglEnv::GetDefault().GetContext());
+    auto source = wrapper_->CreateVideoSource(std::move(videoCapturer));
     if (!source) {
         NAPI_THROW(Error::New(info.Env(), "Failed to create video source"), info.Env().Undefined());
     }
@@ -411,12 +478,12 @@ Napi::Value NapiPeerConnectionFactory::CreateVideoTrack(const CallbackInfo& info
         NAPI_THROW(TypeError::New(info.Env(), "Second argument is not VideoSource"), info.Env().Undefined());
     }
 
-    auto track = GetFactory()->CreateVideoTrack(rtc::scoped_refptr<VideoTrackSourceInterface>(source->Get()), id);
+    auto track = wrapper_->CreateVideoTrack(id, source->Get());
     if (!track) {
         NAPI_THROW(TypeError::New(info.Env(), "Failed to create video track"), info.Env().Undefined());
     }
 
-    return NapiMediaStreamTrack::NewInstance(info.Env(), MediaStreamTrackWrapper::Create(track));
+    return NapiMediaStreamTrack::NewInstance(wrapper_, track);
 }
 
 Napi::Value NapiPeerConnectionFactory::StartAecDump(const Napi::CallbackInfo& info)

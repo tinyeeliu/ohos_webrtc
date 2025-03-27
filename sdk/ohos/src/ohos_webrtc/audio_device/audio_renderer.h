@@ -16,29 +16,28 @@
 #ifndef WEBRTC_AUDIO_RENDERER_H
 #define WEBRTC_AUDIO_RENDERER_H
 
-#include "audio_device_module.h"
+#include <set>
+#include <memory>
+#include <mutex>
+#include <atomic>
 
 #include <ohaudio/native_audiorenderer.h>
 #include <ohaudio/native_audiostreambuilder.h>
 
-#include <set>
-#include <memory>
-#include <atomic>
-
-#include "napi.h"
-
 #include "api/sequence_checker.h"
+#include "rtc_base/race_checker.h"
 #include "modules/audio_device/fine_audio_buffer.h"
+
+#include "audio_output.h"
 
 namespace webrtc {
 
 class AudioRenderer : public AudioOutput {
 public:
-    static std::unique_ptr<AudioRenderer>
-    Create(int32_t usage, int32_t sampleRate, bool useStereoOutput, bool useLowLatency);
+    static std::unique_ptr<AudioRenderer> Create(AudioOutputOptions options);
 
     // Do not use this constructor directly, use 'Create' above.
-    AudioRenderer(int32_t usage, int32_t sampleRate, bool useStereoOutput, bool useLowLatency);
+    explicit AudioRenderer(AudioOutputOptions options);
     ~AudioRenderer() override;
 
     int32_t Init() override;
@@ -53,15 +52,16 @@ public:
 
     void AttachAudioBuffer(AudioDeviceBuffer* audioBuffer) override;
 
-    int32_t SpeakerMuteIsAvailable(bool* available) override;
-    int32_t setSpeakerMute(bool mute) override;
-    int32_t SpeakerMute(bool* enabled) const override;
-
+    int32_t SetMute(bool mute) override;
     int32_t PlayoutDelay(uint16_t* delayMs) const override;
     int GetPlayoutUnderrunCount() override;
 
     void RegisterObserver(Observer* obs) override;
     void UnregisterObserver(Observer* obs) override;
+
+    int32_t GetSampleRate() const override;
+    int32_t GetChannelCount() const override;
+    bool UseLowLatency() const override;
 
 protected:
     static int32_t OnWriteData1(OH_AudioRenderer* renderer, void* userData, void* buffer, int32_t length);
@@ -69,40 +69,44 @@ protected:
     static int32_t OnInterruptEvent1(
         OH_AudioRenderer* renderer, void* userData, OH_AudioInterrupt_ForceType type, OH_AudioInterrupt_Hint hint);
     static int32_t OnError1(OH_AudioRenderer* renderer, void* userData, OH_AudioStream_Result error);
+    static void
+    OnDeviceChangeCallback1(OH_AudioRenderer* renderer, void* userData, OH_AudioStream_DeviceChangeReason reason);
 
     int32_t OnWriteData(OH_AudioRenderer* renderer, void* buffer, int32_t length);
     int32_t OnStreamEvent(OH_AudioRenderer* renderer, OH_AudioStream_Event event);
     int32_t OnInterruptEvent(OH_AudioRenderer* renderer, OH_AudioInterrupt_ForceType type, OH_AudioInterrupt_Hint hint);
     int32_t OnError(OH_AudioRenderer* renderer, OH_AudioStream_Result error);
+    void OnDeviceChangeCallback(OH_AudioRenderer* renderer, OH_AudioStream_DeviceChangeReason reason);
 
+    int32_t GetUsage() const;
     OH_AudioStream_State GetCurrentState() const;
+    double EstimateLatencyMillis() const;
+    uint32_t GetUnderflowCount() const;
+    bool CheckConfiguration(OH_AudioRenderer* renderer);
 
     void NotifyError(AudioErrorType error, const std::string& message);
     void NotifyStateChange(AudioStateType state);
 
 private:
     SequenceChecker threadChecker_;
+    rtc::RaceChecker dataRaceChecker_;
 
-    const int32_t rendererUsage_;
-    const int32_t sampleRate_;
-    const int32_t channelCount_;
-    const bool useLowLatency_;
+    const AudioOutputOptions options_;
 
-    // Delay estimate of the output
-    std::atomic<int> rendererDelayMs_{0};
-
-    // Samples to be played are replaced by zeros if `speakerMute_` is set to true.
+    // Samples to be played are replaced by zeros if `mute_` is set to true.
     // Can be used to ensure that the speaker is fully muted.
-    std::atomic<bool> speakerMute_{false};
+    std::atomic<bool> mute_{false};
 
     bool initialized_{false};
     bool playing_{false};
 
-    AudioDeviceBuffer* audioDeviceBuffer_{nullptr};
+    uint32_t underflowCount_{0};
+
     std::unique_ptr<FineAudioBuffer> fineAudioBuffer_;
 
     OH_AudioRenderer* renderer_{nullptr};
 
+    std::mutex obsMutex_;
     std::set<Observer*> observers_;
 };
 

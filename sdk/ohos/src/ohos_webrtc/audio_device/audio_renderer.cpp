@@ -22,20 +22,29 @@
 
 namespace webrtc {
 
+static constexpr int halfDen = 2;
 std::unique_ptr<AudioRenderer>
-AudioRenderer::Create(int32_t usage, int32_t sampleRate, bool useStereoOutput, bool useLowLatency)
+AudioRenderer::Create(AudioOutputOptions options)
 {
-    return std::make_unique<AudioRenderer>(usage, sampleRate, useStereoOutput, useLowLatency);
+    return std::make_unique<AudioRenderer>(std::move(options));
 }
 
 int32_t AudioRenderer::OnWriteData1(OH_AudioRenderer* renderer, void* userData, void* buffer, int32_t length)
 {
+    if (!userData) {
+        return -1;
+    }
+
     auto self = (AudioRenderer*)userData;
     return self->OnWriteData(renderer, buffer, length);
 }
 
 int32_t AudioRenderer::OnStreamEvent1(OH_AudioRenderer* renderer, void* userData, OH_AudioStream_Event event)
 {
+    if (!userData) {
+        return -1;
+    }
+
     auto self = (AudioRenderer*)userData;
     return self->OnStreamEvent(renderer, event);
 }
@@ -43,38 +52,56 @@ int32_t AudioRenderer::OnStreamEvent1(OH_AudioRenderer* renderer, void* userData
 int32_t AudioRenderer::OnInterruptEvent1(
     OH_AudioRenderer* renderer, void* userData, OH_AudioInterrupt_ForceType type, OH_AudioInterrupt_Hint hint)
 {
+    if (!userData) {
+        return -1;
+    }
+
     auto self = (AudioRenderer*)userData;
     return self->OnInterruptEvent(renderer, type, hint);
 }
 
 int32_t AudioRenderer::OnError1(OH_AudioRenderer* renderer, void* userData, OH_AudioStream_Result error)
 {
+    if (!userData) {
+        return -1;
+    }
+
     auto self = (AudioRenderer*)userData;
     return self->OnError(renderer, error);
 }
 
-AudioRenderer::AudioRenderer(int32_t usage, int32_t sampleRate, bool useStereoOutput, bool useLowLatency)
-    : rendererUsage_(usage),
-      sampleRate_(sampleRate),
-      channelCount_(useStereoOutput ? kAudioChannelCount_Stereo : kAudioChannelCount_Mono),
-      useLowLatency_(useLowLatency)
+void AudioRenderer::OnDeviceChangeCallback1(
+    OH_AudioRenderer* renderer, void* userData, OH_AudioStream_DeviceChangeReason reason)
 {
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+    if (!userData) {
+        return;
+    }
+
+    auto self = (AudioRenderer*)userData;
+    return self->OnDeviceChangeCallback(renderer, reason);
+}
+
+AudioRenderer::AudioRenderer(AudioOutputOptions options)
+    : options_(std::move(options))
+{
+    RTC_DLOG(LS_INFO) << __FUNCTION__;
 
     threadChecker_.Detach();
 }
 
 AudioRenderer::~AudioRenderer()
 {
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+    RTC_DLOG(LS_INFO) << __FUNCTION__;
 
     RTC_DCHECK(threadChecker_.IsCurrent());
     Terminate();
+
+    RTC_LOG(LS_INFO) << "Detected underflows: " << underflowCount_;
 }
 
 int32_t AudioRenderer::Init()
 {
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+    RTC_DLOG(LS_INFO) << __FUNCTION__;
 
     RTC_DCHECK(threadChecker_.IsCurrent());
     return 0;
@@ -82,7 +109,7 @@ int32_t AudioRenderer::Init()
 
 int32_t AudioRenderer::Terminate()
 {
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+    RTC_DLOG(LS_INFO) << __FUNCTION__;
 
     RTC_DCHECK(threadChecker_.IsCurrent());
     StopPlayout();
@@ -93,7 +120,7 @@ int32_t AudioRenderer::Terminate()
 
 int32_t AudioRenderer::InitPlayout()
 {
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+    RTC_LOG(LS_INFO) << __FUNCTION__;
 
     RTC_DCHECK(threadChecker_.IsCurrent());
     if (initialized_) {
@@ -108,20 +135,21 @@ int32_t AudioRenderer::InitPlayout()
         NotifyError(AudioErrorType::INIT, "System error"), -1);
 
     OH_RESULT_CHECK(
-        OH_AudioStreamBuilder_SetRendererInfo(builder, static_cast<OH_AudioStream_Usage>(rendererUsage_)),
+        OH_AudioStreamBuilder_SetRendererInfo(builder, static_cast<OH_AudioStream_Usage>(GetUsage())),
         NotifyError(AudioErrorType::INIT, "failed to set renderer info"), -1);
     OH_RESULT_CHECK(
-        OH_AudioStreamBuilder_SetSamplingRate(builder, sampleRate_),
+        OH_AudioStreamBuilder_SetSamplingRate(builder, GetSampleRate()),
         NotifyError(AudioErrorType::INIT, "failed to set sample rate"), -1);
     OH_RESULT_CHECK(
-        OH_AudioStreamBuilder_SetChannelCount(builder, channelCount_),
+        OH_AudioStreamBuilder_SetChannelCount(builder, GetChannelCount()),
         NotifyError(AudioErrorType::INIT, "failed to set channel count"), -1);
+    // Use s16le in webrtc
     OH_RESULT_CHECK(
         OH_AudioStreamBuilder_SetSampleFormat(builder, AUDIOSTREAM_SAMPLE_S16LE),
         NotifyError(AudioErrorType::INIT, "failed to set sample format"), -1);
     OH_RESULT_CHECK(
         OH_AudioStreamBuilder_SetLatencyMode(
-            builder, useLowLatency_ ? AUDIOSTREAM_LATENCY_MODE_FAST : AUDIOSTREAM_LATENCY_MODE_NORMAL),
+            builder, UseLowLatency() ? AUDIOSTREAM_LATENCY_MODE_FAST : AUDIOSTREAM_LATENCY_MODE_NORMAL),
         NotifyError(AudioErrorType::INIT, "failed to set latency mode"), -1);
 
     OH_AudioRenderer_Callbacks callbacks;
@@ -133,39 +161,16 @@ int32_t AudioRenderer::InitPlayout()
         OH_AudioStreamBuilder_SetRendererCallback(builder, callbacks, this),
         NotifyError(AudioErrorType::INIT, "failed to set renderer callback"), -1);
 
+    OH_RESULT_CHECK(
+        OH_AudioStreamBuilder_SetRendererOutputDeviceChangeCallback(builder, OnDeviceChangeCallback1, this),
+        NotifyError(AudioErrorType::INIT, "failed to set renderer callback"), -1);
+
     OH_AudioRenderer* stream = nullptr;
     OH_RESULT_CHECK(
         OH_AudioStreamBuilder_GenerateRenderer(builder, &stream),
         NotifyError(AudioErrorType::INIT, "failed to generate renderer"), -1);
 
-    // check configuration
-    int32_t rate;
-    OH_RESULT_CHECK(
-        OH_AudioRenderer_GetSamplingRate(stream, &rate),
-        NotifyError(AudioErrorType::INIT, "failed to get sampling rate"), -1);
-    if (rate != sampleRate_) {
-        RTC_LOG(LS_ERROR) << "Stream unable to use requested sample rate";
-        NotifyError(AudioErrorType::INIT, "unmatched sampling rate");
-        return -1;
-    }
-
-    int32_t channelCount;
-    OH_RESULT_CHECK(
-        OH_AudioRenderer_GetChannelCount(stream, &channelCount),
-        NotifyError(AudioErrorType::INIT, "failed to get channel count"), -1);
-    if (channelCount != static_cast<int32_t>(channelCount_)) {
-        RTC_LOG(LS_ERROR) << "Stream unable to use requested channel count";
-        NotifyError(AudioErrorType::INIT, "unmatched channel count");
-        return -1;
-    }
-
-    OH_AudioStream_SampleFormat sampleFormat;
-    OH_RESULT_CHECK(
-        OH_AudioRenderer_GetSampleFormat(stream, &sampleFormat),
-        NotifyError(AudioErrorType::INIT, "failed to get sample format"), -1);
-    if (sampleFormat != AUDIOSTREAM_SAMPLE_S16LE) {
-        RTC_LOG(LS_ERROR) << "Stream unable to use requested format";
-        NotifyError(AudioErrorType::INIT, "unmatched sample format");
+    if (!CheckConfiguration(stream)) {
         return -1;
     }
 
@@ -186,7 +191,7 @@ bool AudioRenderer::PlayoutIsInitialized() const
 
 int32_t AudioRenderer::StartPlayout()
 {
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+    RTC_LOG(LS_INFO) << __FUNCTION__;
 
     RTC_DCHECK(threadChecker_.IsCurrent());
     if (playing_) {
@@ -214,6 +219,7 @@ int32_t AudioRenderer::StartPlayout()
         OH_AudioRenderer_Start(renderer_), NotifyError(AudioErrorType::START_EXCEPTION, "System error"), -1);
     RTC_DLOG(LS_VERBOSE) << "Current state: " << StateToString(GetCurrentState());
 
+    underflowCount_ = GetUnderflowCount();
     playing_ = true;
 
     NotifyStateChange(AudioStateType::START);
@@ -223,7 +229,7 @@ int32_t AudioRenderer::StartPlayout()
 
 int32_t AudioRenderer::StopPlayout()
 {
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+    RTC_LOG(LS_INFO) << __FUNCTION__;
 
     RTC_DCHECK(threadChecker_.IsCurrent());
     if (!initialized_ || !playing_) {
@@ -250,46 +256,28 @@ bool AudioRenderer::Playing() const
 
 void AudioRenderer::AttachAudioBuffer(AudioDeviceBuffer* audioBuffer)
 {
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+    RTC_DLOG(LS_INFO) << __FUNCTION__;
 
     RTC_DCHECK(threadChecker_.IsCurrent());
-    audioDeviceBuffer_ = audioBuffer;
-    RTC_CHECK(audioDeviceBuffer_);
-    audioDeviceBuffer_->SetPlayoutSampleRate(sampleRate_);
-    audioDeviceBuffer_->SetPlayoutChannels(channelCount_);
+    RTC_CHECK(audioBuffer);
+    audioBuffer->SetPlayoutSampleRate(GetSampleRate());
+    audioBuffer->SetPlayoutChannels(GetChannelCount());
 
-    fineAudioBuffer_ = std::make_unique<FineAudioBuffer>(audioDeviceBuffer_);
-}
-
-int32_t AudioRenderer::SpeakerMuteIsAvailable(bool* available)
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-
-    *available = true;
-    return 0;
-}
-
-int32_t AudioRenderer::setSpeakerMute(bool mute)
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-
-    speakerMute_ = mute;
-    return 0;
-}
-
-int32_t AudioRenderer::SpeakerMute(bool* enabled) const
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-
-    *enabled = speakerMute_;
-    return 0;
+    fineAudioBuffer_ = std::make_unique<FineAudioBuffer>(audioBuffer);
 }
 
 int32_t AudioRenderer::PlayoutDelay(uint16_t* delayMs) const
 {
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+    if (!delayMs) {
+        return 0;
+    }
 
-    *delayMs = rendererDelayMs_;
+    RTC_DLOG(LS_VERBOSE) << "delayMs=" << *delayMs;
+
+    // Best guess we can do is to use half of the estimated total delay.
+    *delayMs = kHighLatencyModeDelayEstimateInMilliseconds / halfDen;
+    RTC_DCHECK_GT(*delayMs, 0);
+
     return 0;
 }
 
@@ -306,6 +294,7 @@ void AudioRenderer::RegisterObserver(Observer* obs)
         return;
     }
 
+    std::lock_guard<std::mutex> lock(obsMutex_);
     observers_.insert(obs);
 }
 
@@ -315,7 +304,31 @@ void AudioRenderer::UnregisterObserver(Observer* obs)
         return;
     }
 
+    std::lock_guard<std::mutex> lock(obsMutex_);
     observers_.erase(obs);
+}
+
+int32_t AudioRenderer::GetSampleRate() const
+{
+    return options_.sampleRate.value_or(kAudioSampleRate_Default);
+}
+
+int32_t AudioRenderer::GetChannelCount() const
+{
+    return options_.channelCount.value_or(kAudioChannelCount_Mono);
+}
+
+bool AudioRenderer::UseLowLatency() const
+{
+    return options_.useLowLatency.value_or(false);
+}
+
+int32_t AudioRenderer::SetMute(bool mute)
+{
+    RTC_LOG(LS_INFO) << __FUNCTION__;
+
+    mute_ = mute;
+    return 0;
 }
 
 int32_t AudioRenderer::OnWriteData(OH_AudioRenderer* renderer, void* buffer, int32_t length)
@@ -323,20 +336,24 @@ int32_t AudioRenderer::OnWriteData(OH_AudioRenderer* renderer, void* buffer, int
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " length=" << length;
 
     (void)renderer;
+    RTC_DCHECK_RUNS_SERIALIZED(&dataRaceChecker_);
 
-    int64_t position;
-    int64_t timestamp;
-    OH_RESULT_CHECK(OH_AudioRenderer_GetTimestamp(renderer_, CLOCK_MONOTONIC, &position, &timestamp), 0);
+    const uint32_t underflowCount = GetUnderflowCount();
+    if (underflowCount_ < underflowCount) {
+        RTC_LOG(LS_ERROR) << "Underflow detected: " << underflowCount;
+        underflowCount_ = underflowCount;
+    }
 
-    double latencyMillis = static_cast<double>(timestamp - rtc::TimeNanos()) / rtc::kNumNanosecsPerMillisec;
-    RTC_DLOG(LS_VERBOSE) << "latencyMillis=" << latencyMillis;
-    rendererDelayMs_ = static_cast<int>(std::ceil(latencyMillis));
+    auto latencyMillis = EstimateLatencyMillis();
+    RTC_DLOG(LS_VERBOSE) << "Estimate latencyMillis=" << latencyMillis;
 
     fineAudioBuffer_->GetPlayoutData(
-        rtc::MakeArrayView(static_cast<int16_t*>(buffer), length / sizeof(int16_t)), rendererDelayMs_);
+        rtc::MakeArrayView(static_cast<int16_t*>(buffer), length / sizeof(int16_t)),
+        static_cast<int>(latencyMillis + kHalfSec));
 
-    if (speakerMute_) {
-        std::memset(buffer, 0, length);
+    if (mute_) {
+        auto it = static_cast<uint8_t*>(buffer);
+        std::fill(it, it + length, 0);
     }
 
     return 0;
@@ -344,7 +361,7 @@ int32_t AudioRenderer::OnWriteData(OH_AudioRenderer* renderer, void* buffer, int
 
 int32_t AudioRenderer::OnStreamEvent(OH_AudioRenderer* renderer, OH_AudioStream_Event event)
 {
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " event=" << event;
+    RTC_LOG(LS_INFO) << __FUNCTION__ << " event=" << event;
 
     (void)renderer;
 
@@ -354,23 +371,33 @@ int32_t AudioRenderer::OnStreamEvent(OH_AudioRenderer* renderer, OH_AudioStream_
 int32_t AudioRenderer::OnInterruptEvent(
     OH_AudioRenderer* renderer, OH_AudioInterrupt_ForceType type, OH_AudioInterrupt_Hint hint)
 {
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " type=" << type;
+    RTC_LOG(LS_WARNING) << __FUNCTION__ << " type=" << type << ", hint=" << hint;
 
     (void)renderer;
-    (void)hint;
 
     return 0;
 }
 
 int32_t AudioRenderer::OnError(OH_AudioRenderer* renderer, OH_AudioStream_Result error)
 {
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " error=" << error;
+    RTC_LOG(LS_ERROR) << __FUNCTION__ << " error=" << error;
 
     (void)renderer;
 
     NotifyError(AudioErrorType::GENERAL, "System error");
 
     return 0;
+}
+
+void AudioRenderer::OnDeviceChangeCallback(OH_AudioRenderer* renderer, OH_AudioStream_DeviceChangeReason reason)
+{
+    (void)renderer;
+    RTC_LOG(LS_INFO) << __FUNCTION__ << " reason=" << reason;
+}
+
+int32_t AudioRenderer::GetUsage() const
+{
+    return options_.usage.value_or(AUDIOSTREAM_USAGE_VOICE_COMMUNICATION);
 }
 
 OH_AudioStream_State AudioRenderer::GetCurrentState() const
@@ -383,17 +410,100 @@ OH_AudioStream_State AudioRenderer::GetCurrentState() const
     return state;
 }
 
+double AudioRenderer::EstimateLatencyMillis() const
+{
+    RTC_DCHECK(renderer_);
+
+    double latencyMillis = 0.0;
+
+    int64_t framePosition = 0;
+    int64_t timestamp = 0;
+    OH_AudioStream_Result result =
+        OH_AudioRenderer_GetTimestamp(renderer_, CLOCK_MONOTONIC, &framePosition, &timestamp);
+    if (result != AUDIOSTREAM_SUCCESS) {
+        return latencyMillis;
+    }
+    RTC_DLOG(LS_VERBOSE) << "framePosition=" << framePosition;
+    RTC_DLOG(LS_VERBOSE) << "timestamp=" << timestamp;
+
+    int64_t framesWritten = 0;
+    result = OH_AudioRenderer_GetFramesWritten(renderer_, &framesWritten);
+    if (result != AUDIOSTREAM_SUCCESS) {
+        return latencyMillis;
+    }
+    RTC_DLOG(LS_VERBOSE) << "framesWritten=" << framesWritten;
+
+    int64_t frameIndexDelta = framesWritten - framePosition;
+    latencyMillis = static_cast<double>(frameIndexDelta * rtc::kNumMillisecsPerSec) / GetSampleRate();
+
+    return latencyMillis;
+}
+
+uint32_t AudioRenderer::GetUnderflowCount() const
+{
+    uint32_t underflowCount = 0;
+    auto ret = OH_AudioRenderer_GetUnderflowCount(renderer_, &underflowCount);
+    if (ret != AUDIOSTREAM_SUCCESS) {
+        RTC_LOG(LS_ERROR) << "Failed to get underflow count: " << ret;
+        return 0;
+    }
+
+    return underflowCount;
+}
+
+bool AudioRenderer::CheckConfiguration(OH_AudioRenderer* renderer)
+{
+    if (!renderer) {
+        RTC_LOG(LS_ERROR) << "Invalid parameter";
+        return false;
+    }
+    
+    int32_t rate;
+    OH_RESULT_CHECK(
+        OH_AudioRenderer_GetSamplingRate(renderer, &rate),
+        NotifyError(AudioErrorType::INIT, "failed to get sampling rate"), false);
+    if (rate != GetSampleRate()) {
+        RTC_LOG(LS_ERROR) << "Stream unable to use requested sample rate";
+        NotifyError(AudioErrorType::INIT, "unmatched sampling rate");
+        return false;
+    }
+
+    int32_t channelCount;
+    OH_RESULT_CHECK(
+        OH_AudioRenderer_GetChannelCount(renderer, &channelCount),
+        NotifyError(AudioErrorType::INIT, "failed to get channel count"), false);
+    if (channelCount != GetChannelCount()) {
+        RTC_LOG(LS_ERROR) << "Stream unable to use requested channel count";
+        NotifyError(AudioErrorType::INIT, "unmatched channel count");
+        return false;
+    }
+
+    OH_AudioStream_SampleFormat sampleFormat;
+    OH_RESULT_CHECK(
+        OH_AudioRenderer_GetSampleFormat(renderer, &sampleFormat),
+        NotifyError(AudioErrorType::INIT, "failed to get sample format"), false);
+    if (sampleFormat != AUDIOSTREAM_SAMPLE_S16LE) {
+        RTC_LOG(LS_ERROR) << "Stream unable to use requested format";
+        NotifyError(AudioErrorType::INIT, "unmatched sample format");
+        return false;
+    }
+
+    return true;
+}
+
 void AudioRenderer::NotifyError(AudioErrorType error, const std::string& message)
 {
+    std::lock_guard<std::mutex> lock(obsMutex_);
     for (auto& obs : observers_) {
-        obs->OnAudioOutputError(error, message);
+        obs->OnAudioOutputError(this, error, message);
     }
 }
 
 void AudioRenderer::NotifyStateChange(AudioStateType state)
 {
+    std::lock_guard<std::mutex> lock(obsMutex_);
     for (auto& obs : observers_) {
-        obs->OnAudioOutputStateChange(state);
+        obs->OnAudioOutputStateChange(this, state);
     }
 }
 

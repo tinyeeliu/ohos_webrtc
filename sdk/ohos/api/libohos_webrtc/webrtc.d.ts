@@ -37,7 +37,7 @@ export type DegradationPreference = "balanced" | "maintain-framerate" | "maintai
 export type RTCRtpTransceiverDirection = "inactive" | "recvonly" | "sendonly" | "sendrecv" | "stopped";
 export type RTCSctpTransportState = "connecting" | "connected" | "closed";
 export type RTCStatsType = "candidate-pair" | "certificate" | "codec" | "data-channel" | "inbound-rtp" | "local-candidate" | "media-playout" | "media-source" | "outbound-rtp" | "peer-connection" | "remote-candidate" | "remote-inbound-rtp" | "remote-outbound-rtp" | "transport";
-export type RTCStatsIceCandidatePairState = "failed" | "frozen" | "in-progress" | "inprogress" | "succeeded" | "waiting";
+export type RTCStatsIceCandidatePairState = "failed" | "frozen" | "in-progress" | "succeeded" | "waiting";
 export type MediaStreamTrackState = 'live' | 'ended';
 export type MediaDeviceKind = 'audioinput' | 'audiooutput' | 'videoinput';
 export type MediaSourceState = 'initializing' | 'live' | 'ended' | 'muted';
@@ -45,6 +45,8 @@ export type VideoFacingModeEnum = "user" | "environment" | "left" | "right";
 export type VideoResizeModeEnum = "none" | "crop-and-scale";
 export type AudioErrorType = 'init' | 'start-exception' | 'start-state-mismatch' | 'general';
 export type AudioState = 'start' | 'stop';
+export type ScreenCaptureMode = 'home-screen' | 'specified-screen' | 'specified-window';
+export type ScreenCaptureAudioFilterEnum = 'current-app' | 'notification';
 
 export type AlgorithmIdentifier = Algorithm | string;
 export type HighResTimeStamp = number;
@@ -682,6 +684,7 @@ export interface MediaTrackCapabilities {
   groupId?: string;
 }
 
+
 export interface MediaTrackConstraintSet {
   width?: ConstrainULong;
   height?: ConstrainULong;
@@ -698,6 +701,17 @@ export interface MediaTrackConstraintSet {
   channelCount?: ConstrainULong;
   deviceId?: ConstrainString;
   groupId?: ConstrainString;
+}
+
+
+// extensions for screen capture in OpenHarmony
+export interface MediaTrackConstraintSet {
+  ohosScreenCaptureMode?: ConstrainString;
+  ohosScreenCaptureDisplayId?: ConstrainULong;
+  ohosScreenCaptureMissionId?: ConstrainString;
+  ohosScreenCaptureWindowFilter?: ConstrainString;
+  ohosScreenCaptureAudioFilter?: ConstrainString;
+  ohosScreenCaptureSkipPrivacyMode?: ConstrainString;
 }
 
 // https://www.w3.org/TR/mediacapture-streams/#media-track-constraints
@@ -754,6 +768,11 @@ export interface MediaStreamConstraints {
 export interface DisplayMediaStreamOptions {
   video?: boolean | MediaTrackConstraints;
   audio?: boolean | MediaTrackConstraints;
+}
+
+// extension for screen capture in OpenHarmony
+export interface DisplayMediaStreamOptions {
+  ohosSystemAudio?: boolean | MediaTrackConstraints;
 }
 
 export interface MediaSource {
@@ -823,6 +842,7 @@ export interface DeviceChangeEvent extends Event {
 }
 
 // https://www.w3.org/TR/mediacapture-streams/#mediadevices
+// https://www.w3.org/TR/screen-capture/#mediadevices-additions
 export interface MediaDevices extends EventTarget {
   enumerateDevices(): Promise<MediaDeviceInfo[]>;
   getSupportedConstraints(): MediaTrackSupportedConstraints;

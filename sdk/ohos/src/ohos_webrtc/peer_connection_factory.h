@@ -16,7 +16,8 @@
 #ifndef WEBRTC_PEER_CONNECTION_FACTORY_H
 #define WEBRTC_PEER_CONNECTION_FACTORY_H
 
-#include "audio_device/audio_device_module.h"
+#include "video/video_track_source.h"
+#include "audio_device/ohos_audio_device_module.h"
 
 #include <memory>
 #include <mutex>
@@ -35,7 +36,7 @@ public:
     static void SetDefault(std::shared_ptr<PeerConnectionFactoryWrapper> wrapper);
 
     static std::shared_ptr<PeerConnectionFactoryWrapper> Create(
-        rtc::scoped_refptr<AudioDeviceModule> adm = nullptr,
+        rtc::scoped_refptr<OhosAudioDeviceModule> adm = nullptr,
         std::unique_ptr<VideoEncoderFactory> videoEncoderFactory = nullptr,
         std::unique_ptr<VideoDecoderFactory> videoDecoderFactory = nullptr,
         rtc::scoped_refptr<AudioProcessing> audioProcessing = nullptr);
@@ -68,9 +69,30 @@ public:
         return workerThread_.get();
     }
 
+    rtc::scoped_refptr<OhosAudioDeviceModule> GetAudioDeviceModule() const;
+
+    // Create audio/video source and save to cache
+    rtc::scoped_refptr<OhosLocalAudioSource>
+    CreateAudioSource(const cricket::AudioOptions& options, std::shared_ptr<AudioInput> audioInput = nullptr);
+    rtc::scoped_refptr<OhosVideoTrackSource> CreateVideoSource(std::unique_ptr<VideoCapturer> capturer);
+
+    // Create audio/video track
+    rtc::scoped_refptr<AudioTrackInterface>
+    CreateAudioTrack(const std::string& label, rtc::scoped_refptr<OhosLocalAudioSource> source);
+    rtc::scoped_refptr<VideoTrackInterface>
+    CreateVideoTrack(const std::string& label, rtc::scoped_refptr<OhosVideoTrackSource> source);
+
+    // Get audio/video source from cache
+    rtc::scoped_refptr<OhosLocalAudioSource> GetAudioSource(rtc::scoped_refptr<MediaStreamTrackInterface> track) const;
+    rtc::scoped_refptr<OhosVideoTrackSource> GetVideoSource(rtc::scoped_refptr<MediaStreamTrackInterface> track) const;
+
+    // Remove audio/video source from cache
+    void RemoveAudioSource(rtc::scoped_refptr<MediaStreamTrackInterface> track);
+    void RemoveVideoSource(rtc::scoped_refptr<MediaStreamTrackInterface> track);
+
 protected:
     bool Init(
-        rtc::scoped_refptr<AudioDeviceModule> adm, std::unique_ptr<VideoEncoderFactory> videoEncoderFactory,
+        rtc::scoped_refptr<OhosAudioDeviceModule> adm, std::unique_ptr<VideoEncoderFactory> videoEncoderFactory,
         std::unique_ptr<VideoDecoderFactory> videoDecoderFactory, rtc::scoped_refptr<AudioProcessing> audioProcessing);
 
 private:
@@ -82,6 +104,10 @@ private:
     std::unique_ptr<rtc::Thread> workerThread_;
     std::unique_ptr<rtc::Thread> signalingThread_;
     rtc::scoped_refptr<webrtc::PeerConnectionFactoryInterface> pcFactory_;
+    rtc::scoped_refptr<OhosAudioDeviceModule> adm_;
+
+    std::map<rtc::scoped_refptr<MediaStreamTrackInterface>, rtc::scoped_refptr<OhosLocalAudioSource>> audioSources_;
+    std::map<rtc::scoped_refptr<MediaStreamTrackInterface>, rtc::scoped_refptr<OhosVideoTrackSource>> videoSources_;
 };
 
 class NapiPeerConnectionFactory : public Napi::ObjectWrap<NapiPeerConnectionFactory> {

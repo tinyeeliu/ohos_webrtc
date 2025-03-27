@@ -38,7 +38,7 @@ const char kMethodNameGetAudioTracks[] = "getAudioTracks";
 const char kMethodNameGetVideoTracks[] = "getVideoTracks";
 const char kMethodNameToJson[] = "toJSON";
 
-FunctionReference NapiMediaStream::constructor_;
+static constexpr int callbackInfoLen = 2;
 
 void NapiMediaStream::Init(Napi::Env env, Object exports)
 {
@@ -57,111 +57,93 @@ void NapiMediaStream::Init(Napi::Env env, Object exports)
         });
     exports.Set(kClassName, func);
 
-    constructor_ = Persistent(func);
+    Constructor() = Persistent(func);
 }
 
-Object NapiMediaStream::NewInstance(Napi::Env env, rtc::scoped_refptr<MediaStreamInterface> stream)
+Object NapiMediaStream::NewInstance(
+    std::shared_ptr<PeerConnectionFactoryWrapper> factory, rtc::scoped_refptr<MediaStreamInterface> stream)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    if (!stream) {
+    auto env = Constructor().Env();
+    if (!factory || !stream) {
         NAPI_THROW(Error::New(env, "Invalid argument"), Object::New(env));
     }
 
-    auto external =
-        External<MediaStreamInterface>::New(env, stream.release(), [](Napi::Env, MediaStreamInterface* stream) {
-            auto status = stream->Release();
-            RTC_DLOG(LS_VERBOSE) << "NapiMediaStream release status=" << status;
-        });
+    return Constructor().New(
+        {External<std::shared_ptr<PeerConnectionFactoryWrapper>>::New(env, &factory),
+         Napi::External<rtc::scoped_refptr<MediaStreamInterface>>::New(env, &stream)});
+}
 
-    return constructor_.New({external});
+Napi::FunctionReference& NapiMediaStream::Constructor()
+{
+    static Napi::FunctionReference constructor;
+    return constructor;
 }
 
 NapiMediaStream::NapiMediaStream(const CallbackInfo& info) : ObjectWrap<NapiMediaStream>(info)
 {
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+    RTC_DLOG(LS_INFO) << __FUNCTION__;
 
-    if (info.Length() > 0 && info[0].IsExternal()) {
-        auto stream = info[0].As<External<MediaStreamInterface>>().Data();
-        stream_ = rtc::scoped_refptr<MediaStreamInterface>(stream);
-    }
-
-    AudioTrackVector audioTracks;
-    VideoTrackVector videoTracks;
-    if (info.Length() > 0 && info[0].IsObject()) {
+    auto env = info.Env();
+    if (info.Length() == callbackInfoLen && info[0].IsExternal() && info[1].IsExternal()) {
+        // Create from native with 2 parameters
+        factory_ = *info[0].As<External<std::shared_ptr<PeerConnectionFactoryWrapper>>>().Data();
+        stream_ = *info[1].As<External<rtc::scoped_refptr<MediaStreamInterface>>>().Data();
+    } else if (info.Length() > 0) {
+        // Create from ArkTS
         if (info[0].IsArray()) {
+            std::vector<NapiMediaStreamTrack*> napiTracks;
+
             auto jsTracks = info[0].As<Array>();
             for (uint32_t i = 0; i < jsTracks.Length(); i++) {
-                Napi::Value jsTrackValue = jsTracks[i];
-                auto napiTrack = NapiMediaStreamTrack::Unwrap(jsTrackValue.As<Object>());
+                auto napiTrack = NapiMediaStreamTrack::Unwrap(jsTracks.Get(i).As<Object>());
                 if (!napiTrack || !napiTrack->Get()) {
-                    NAPI_THROW_VOID(Error::New(info.Env(), "Invalid argument"));
+                    NAPI_THROW_VOID(Error::New(env, "Invalid argument"));
                 }
-
-                auto track = napiTrack->Get();
-                if (track->kind() == MediaStreamTrackInterface::kAudioKind) {
-                    auto audioTrack =
-                        rtc::scoped_refptr<AudioTrackInterface>(static_cast<AudioTrackInterface*>(track.get()));
-                    audioTracks.push_back(audioTrack);
-                } else if (track->kind() == MediaStreamTrackInterface::kVideoKind) {
-                    auto videoTrack =
-                        rtc::scoped_refptr<VideoTrackInterface>(static_cast<VideoTrackInterface*>(track.get()));
-                    videoTracks.push_back(videoTrack);
-                } else {
-                    RTC_LOG(LS_WARNING) << "Unknown type of media stream track: " << track->id();
-                }
+                napiTracks.push_back(napiTrack);
             }
-        } else {
+
+            if (!CreateMediaStream(napiTracks)) {
+                NAPI_THROW_VOID(Error::New(env, "Failed to create media stream"));
+            }
+        } else if (info[0].IsObject()) {
             auto napiStream = NapiMediaStream::Unwrap(info[0].As<Object>());
             if (!napiStream || !napiStream->Get()) {
-                NAPI_THROW_VOID(Error::New(info.Env(), "Invalid argument"));
+                NAPI_THROW_VOID(Error::New(env, "Invalid argument"));
             }
 
-            auto stream = napiStream->Get();
-            audioTracks = stream->GetAudioTracks();
-            videoTracks = stream->GetVideoTracks();
+            if (!CreateMediaStream(napiStream)) {
+                NAPI_THROW_VOID(Error::New(env, "Failed to create media stream"));
+            }
+        } else {
+            NAPI_THROW_VOID(Error::New(env, "Invalid argument"));
+        }
+    } else {
+        // Create from ArkTS with no parameter
+        if (!CreateMediaStream()) {
+            NAPI_THROW_VOID(Error::New(env, "Failed to create media stream"));
         }
     }
 
-    if (!stream_) {
-        auto pcFactory = PeerConnectionFactoryWrapper::GetDefault();
-        if (!pcFactory || !pcFactory->GetFactory()) {
-            NAPI_THROW_VOID(Error::New(info.Env(), "No default peer connection factory"));
-        }
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " stream_=" << stream_.get();
 
-        stream_ = pcFactory->GetFactory()->CreateLocalMediaStream(rtc::CreateRandomUuid());
-        if (!stream_) {
-            NAPI_THROW_VOID(Error::New(info.Env(), "Failed to create media stream"));
-        }
-    }
-
-    for (auto& track : audioTracks) {
-        stream_->AddTrack(track);
-    }
-
-    for (auto& track : videoTracks) {
-        stream_->AddTrack(track);
-    }
-
-    observer_.reset(new MediaStreamObserver(
-        stream_.get(),
-        [this](AudioTrackInterface* audio_track, MediaStreamInterface* media_stream) {
-            OnAudioTrackAddedToStream(audio_track, media_stream);
-        },
-        [this](AudioTrackInterface* audio_track, MediaStreamInterface* media_stream) {
-            OnAudioTrackRemovedFromStream(audio_track, media_stream);
-        },
-        [this](VideoTrackInterface* video_track, MediaStreamInterface* media_stream) {
-            OnVideoTrackAddedToStream(video_track, media_stream);
-        },
-        [this](VideoTrackInterface* video_track, MediaStreamInterface* media_stream) {
-            OnVideoTrackRemovedFromStream(video_track, media_stream);
-        }));
+    SetupObserver();
 }
 
 NapiMediaStream::~NapiMediaStream()
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " stream_=" << stream_.get();
+
+    for (auto track : stream_->GetAudioTracks()) {
+        factory_->RemoveAudioSource(track);
+    }
+
+    for (auto track : stream_->GetVideoTracks()) {
+        factory_->RemoveVideoSource(track);
+    }
 }
 
 Napi::Value NapiMediaStream::GetId(const Napi::CallbackInfo& info)
@@ -289,12 +271,12 @@ Napi::Value NapiMediaStream::GetTrackById(const Napi::CallbackInfo& info)
     auto trackId = info[0].As<String>().Utf8Value();
     auto audioTrack = stream_->FindAudioTrack(trackId);
     if (audioTrack) {
-        return NapiMediaStreamTrack::NewInstance(info.Env(), MediaStreamTrackWrapper::Create(audioTrack));
+        return NapiMediaStreamTrack::NewInstance(factory_, audioTrack);
     }
 
     auto videoTrack = stream_->FindVideoTrack(trackId);
     if (videoTrack) {
-        return NapiMediaStreamTrack::NewInstance(info.Env(), MediaStreamTrackWrapper::Create(videoTrack));
+        return NapiMediaStreamTrack::NewInstance(factory_, videoTrack);
     }
 
     RTC_LOG(LS_INFO) << "No track with id: " << trackId;
@@ -311,11 +293,10 @@ Napi::Value NapiMediaStream::GetTracks(const Napi::CallbackInfo& info)
 
     auto result = Array::New(info.Env(), audioTracks.size() + videoTracks.size());
     for (uint32_t i = 0; i < audioTracks.size(); i++) {
-        result[i] = NapiMediaStreamTrack::NewInstance(info.Env(), MediaStreamTrackWrapper::Create(audioTracks[i]));
+        result[i] = NapiMediaStreamTrack::NewInstance(factory_, audioTracks[i]);
     }
     for (uint32_t i = 0; i < videoTracks.size(); i++) {
-        result[audioTracks.size() + i] =
-            NapiMediaStreamTrack::NewInstance(info.Env(), MediaStreamTrackWrapper::Create(videoTracks[i]));
+        result[audioTracks.size() + i] = NapiMediaStreamTrack::NewInstance(factory_, videoTracks[i]);
     }
 
     return result;
@@ -329,7 +310,7 @@ Napi::Value NapiMediaStream::GetAudioTracks(const Napi::CallbackInfo& info)
 
     auto result = Array::New(info.Env(), audioTracks.size());
     for (uint32_t i = 0; i < audioTracks.size(); i++) {
-        result[i] = NapiMediaStreamTrack::NewInstance(info.Env(), MediaStreamTrackWrapper::Create(audioTracks[i]));
+        result[i] = NapiMediaStreamTrack::NewInstance(factory_, audioTracks[i]);
     }
 
     return result;
@@ -343,7 +324,7 @@ Napi::Value NapiMediaStream::GetVideoTracks(const Napi::CallbackInfo& info)
 
     auto result = Array::New(info.Env(), videoTracks.size());
     for (uint32_t i = 0; i < videoTracks.size(); i++) {
-        result[i] = NapiMediaStreamTrack::NewInstance(info.Env(), MediaStreamTrackWrapper::Create(videoTracks[i]));
+        result[i] = NapiMediaStreamTrack::NewInstance(factory_, videoTracks[i]);
     }
 
     return result;
@@ -359,6 +340,81 @@ Value NapiMediaStream::ToJson(const CallbackInfo& info)
 #endif
 
     return json;
+}
+
+bool NapiMediaStream::CreateMediaStream()
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    factory_ = PeerConnectionFactoryWrapper::GetDefault();
+    if (!factory_ || !factory_->GetFactory()) {
+        RTC_LOG(LS_WARNING) << "No default peer connection factory";
+        return false;
+    }
+
+    stream_ = factory_->GetFactory()->CreateLocalMediaStream(rtc::CreateRandomUuid());
+    if (!stream_) {
+        RTC_LOG(LS_WARNING) << "Failed to create local media stream";
+        return false;
+    }
+
+    return true;
+}
+
+bool NapiMediaStream::CreateMediaStream(const NapiMediaStream* stream)
+{
+    if (!CreateMediaStream()) {
+        return false;
+    }
+
+    for (auto& audioTrack : stream->Get()->GetAudioTracks()) {
+        stream_->AddTrack(audioTrack);
+    }
+
+    for (auto& videoTrack : stream->Get()->GetVideoTracks()) {
+        stream_->AddTrack(videoTrack);
+    }
+
+    return true;
+}
+
+bool NapiMediaStream::CreateMediaStream(const std::vector<NapiMediaStreamTrack*>& tracks)
+{
+    if (!CreateMediaStream()) {
+        return false;
+    }
+
+    for (auto& track : tracks) {
+        if (track->Get()->kind() == MediaStreamTrackInterface::kAudioKind) {
+            auto audioTrack =
+                rtc::scoped_refptr<AudioTrackInterface>(static_cast<AudioTrackInterface*>(track->Get().get()));
+            stream_->AddTrack(audioTrack);
+        } else if (track->Get()->kind() == MediaStreamTrackInterface::kVideoKind) {
+            auto videoTrack =
+                rtc::scoped_refptr<VideoTrackInterface>(static_cast<VideoTrackInterface*>(track->Get().get()));
+            stream_->AddTrack(videoTrack);
+        }
+    }
+
+    return true;
+}
+
+void NapiMediaStream::SetupObserver()
+{
+    observer_.reset(new MediaStreamObserver(
+        stream_.get(),
+        [this](AudioTrackInterface* audio_track, MediaStreamInterface* media_stream) {
+            OnAudioTrackAddedToStream(audio_track, media_stream);
+        },
+        [this](AudioTrackInterface* audio_track, MediaStreamInterface* media_stream) {
+            OnAudioTrackRemovedFromStream(audio_track, media_stream);
+        },
+        [this](VideoTrackInterface* video_track, MediaStreamInterface* media_stream) {
+            OnVideoTrackAddedToStream(video_track, media_stream);
+        },
+        [this](VideoTrackInterface* video_track, MediaStreamInterface* media_stream) {
+            OnVideoTrackRemovedFromStream(video_track, media_stream);
+        }));
 }
 
 void NapiMediaStream::OnAudioTrackAddedToStream(AudioTrackInterface* track, MediaStreamInterface* stream)

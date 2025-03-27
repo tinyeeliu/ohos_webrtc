@@ -412,6 +412,20 @@ bool DeviceSatisfiesConstraintSet(
     return true;
 }
 
+std::string CameraCaptureSettings::ToString() const
+{
+    std::ostringstream ss;
+
+    ss << "CameraCaptureSettings {";
+    ss << "captureMode: " << deviceId << ", ";
+    ss << "resolution: " << profile.resolution.width << "x" << profile.resolution.height << ", ";
+    ss << "format: " << static_cast<int32_t>(profile.format) << ", ";
+    ss << "framerate: " << profile.frameRateRange.min << "-" << profile.frameRateRange.max;
+    ss << "}";
+
+    return ss.str();
+}
+
 bool SelectSettingsForVideo(
     const std::vector<CameraDeviceInfo>& devices, const MediaTrackConstraints& constraints, int defaultWidth,
     int defaultHeight, double defaultFrameRate, CameraCaptureSettings& setting, std::string& failedConstraintName)
@@ -535,7 +549,7 @@ bool SelectSettingsForVideo(
 }
 
 template <typename T, typename ConstraintType>
-bool GetConstraint(const ConstraintType& constraint, T* value, size_t* mandatoryConstraints)
+bool GetConstraint(const ConstraintType& constraint, T* value)
 {
     if (constraint.HasExact()) {
         *value = constraint.Exact();
@@ -552,7 +566,7 @@ template <typename T, typename ConstraintType>
 void ConstraintToOptional(const ConstraintType& constraint, absl::optional<T>* valueOut)
 {
     T value;
-    bool present = GetConstraint(constraint, &value, nullptr);
+    bool present = GetConstraint(constraint, &value);
     if (present) {
         *valueOut = value;
     }
@@ -571,7 +585,7 @@ void CopyConstraintsIntoAudioOptions(const MediaTrackConstraints& constraints, c
     ConstraintToOptional<bool>(basicSet.noiseSuppression, &options.noise_suppression);
 }
 
-void GetScreenCaptureConstraints(const MediaTrackConstraints& constraints, int& width, int& height)
+void GetScreenCaptureOptionsFromConstraints(const MediaTrackConstraints& constraints, ScreenCaptureOptions& options)
 {
     if (constraints.IsNull()) {
         return;
@@ -580,8 +594,38 @@ void GetScreenCaptureConstraints(const MediaTrackConstraints& constraints, int& 
     // ignore advanced constraints
     auto& basicSet = constraints.Basic();
 
-    GetConstraint(basicSet.width, &width, nullptr);
-    GetConstraint(basicSet.height, &height, nullptr);
+    ConstraintToOptional<int32_t>(basicSet.width, &options.videoFrameWidth);
+    ConstraintToOptional<int32_t>(basicSet.height, &options.videoFrameHeight);
+
+    std::vector<std::string> captureModes;
+    GetConstraint(basicSet.ohosScreenCaptureMode, &captureModes);
+    if (captureModes.size() > 0) {
+        options.captureMode = ScreenCaptureOptions::CaptureModeFromString(captureModes[0]);
+    }
+
+    ConstraintToOptional<uint64_t>(basicSet.ohosScreenCaptureDisplayId, &options.displayId);
+
+    std::vector<std::string> missionIds;
+    GetConstraint(basicSet.ohosScreenCaptureMissionId, &missionIds);
+    for (const auto& missionId : missionIds) {
+        options.missionIds.push_back(std::stoull(missionId));
+    }
+
+    std::vector<std::string> filteredWindowIds;
+    GetConstraint(basicSet.ohosScreenCaptureWindowFilter, &filteredWindowIds);
+    for (const auto& windowId : filteredWindowIds) {
+        options.filteredWindowIds.push_back(std::stoull(windowId));
+    }
+
+    std::vector<std::string> filteredAudioContents;
+    GetConstraint(basicSet.ohosScreenCaptureAudioFilter, &filteredAudioContents);
+    options.filteredAudioContents = ScreenCaptureOptions::FilterableAudioContentFromString(filteredAudioContents);
+
+    std::vector<std::string> skipPrivacyModeWindowIds;
+    GetConstraint(basicSet.ohosScreenCaptureSkipPrivacyMode, &skipPrivacyModeWindowIds);
+    for (const auto& windowId : skipPrivacyModeWindowIds) {
+        options.skipPrivacyModeWindowIds.push_back(std::stoull(windowId));
+    }
 }
 
 } // namespace webrtc

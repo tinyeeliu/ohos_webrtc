@@ -22,20 +22,23 @@
 
 #include "api/ice_transport_interface.h"
 #include "p2p/base/ice_transport_internal.h"
+
+#include "event/event_target.h"
 #include "ice_candidate.h"
 
 namespace webrtc {
 
-class NapiPeerConnectionWrapper;
+class PeerConnectionFactoryWrapper;
 
-class NapiIceTransport : public Napi::ObjectWrap<NapiIceTransport>, public sigslot::has_slots<> {
+class NapiIceTransport : public NapiEventTarget<NapiIceTransport>, public sigslot::has_slots<> {
 public:
     static void Init(Napi::Env env, Napi::Object exports);
 
     static Napi::Object NewInstance(
-        Napi::Env env, rtc::scoped_refptr<IceTransportInterface> iceTransport, NapiPeerConnectionWrapper* pcWrapper);
+        Napi::Env env, std::shared_ptr<PeerConnectionFactoryWrapper> factory,
+        rtc::scoped_refptr<IceTransportInterface> iceTransport);
 
-    ~NapiIceTransport();
+    ~NapiIceTransport() override;
 
 protected:
     friend class ObjectWrap;
@@ -66,16 +69,8 @@ protected:
 private:
     static Napi::FunctionReference constructor_;
 
-    struct EventHandler {
-        Napi::FunctionReference ref;
-        Napi::ThreadSafeFunction tsfn;
-    };
-
-    mutable std::mutex mutex_;
-    std::map<std::string, EventHandler> eventHandlers_;
-
+    std::shared_ptr<PeerConnectionFactoryWrapper> factory_;
     rtc::scoped_refptr<IceTransportInterface> iceTransport_;
-    NapiPeerConnectionWrapper* pcWrapper_{};
 
     std::atomic<IceTransportState> iceTransportState_{IceTransportState::kNew};
     std::atomic<cricket::IceGatheringState> iceGatheringState_{cricket::kIceGatheringNew};

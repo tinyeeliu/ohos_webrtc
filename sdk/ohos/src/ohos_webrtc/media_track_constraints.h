@@ -52,6 +52,12 @@ public:
     NAPI_ATTRIBUTE_NAME_DECLARE(GoogNoiseSuppression, googNoiseSuppression);
     NAPI_ATTRIBUTE_NAME_DECLARE(GoogHighpassFilter, googHighpassFilter);
     NAPI_ATTRIBUTE_NAME_DECLARE(GoogAudioMirroring, googAudioMirroring);
+    NAPI_ATTRIBUTE_NAME_DECLARE(OhosScreenCaptureMode, ohosScreenCaptureMode);
+    NAPI_ATTRIBUTE_NAME_DECLARE(OhosScreenCaptureDisplayId, ohosScreenCaptureDisplayId);
+    NAPI_ATTRIBUTE_NAME_DECLARE(OhosScreenCaptureMissionId, ohosScreenCaptureMissionId);
+    NAPI_ATTRIBUTE_NAME_DECLARE(OhosScreenCaptureWindowFilter, ohosScreenCaptureWindowFilter);
+    NAPI_ATTRIBUTE_NAME_DECLARE(OhosScreenCaptureAudioFilter, ohosScreenCaptureAudioFilter);
+    NAPI_ATTRIBUTE_NAME_DECLARE(OhosScreenCaptureSkipPrivacyMode, ohosScreenCaptureSkipPrivacyMode);
 
     static std::vector<std::string> GetSupportedConstraints();
     static bool IsConstraintSupported(const std::string& name);

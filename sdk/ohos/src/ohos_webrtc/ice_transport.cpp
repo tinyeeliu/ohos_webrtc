@@ -65,6 +65,7 @@ const char kMethodNameGetSelectedCandidatePair[] = "getSelectedCandidatePair";
 const char kMethodNameToJson[] = "toJSON";
 
 FunctionReference NapiIceTransport::constructor_;
+static constexpr int callbackInfoLen = 2;
 
 void NapiIceTransport::Init(Napi::Env env, Napi::Object exports)
 {
@@ -95,67 +96,66 @@ void NapiIceTransport::Init(Napi::Env env, Napi::Object exports)
 NapiIceTransport::~NapiIceTransport()
 {
     RTC_DLOG(LS_INFO) << __FUNCTION__;
-
-    std::lock_guard<std::mutex> lock(mutex_);
-    for (auto& handler : eventHandlers_) {
-        handler.second.tsfn.Release();
-    }
 }
 
 Napi::Object NapiIceTransport::NewInstance(
-    Napi::Env env, rtc::scoped_refptr<IceTransportInterface> iceTransport, NapiPeerConnectionWrapper* pcWrapper)
+    Napi::Env env, std::shared_ptr<PeerConnectionFactoryWrapper> factory,
+    rtc::scoped_refptr<IceTransportInterface> iceTransport)
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    if (!iceTransport || !pcWrapper) {
+    if (!iceTransport || !factory) {
         NAPI_THROW(Error::New(env, "Invalid argument"), Object::New(env));
     }
 
+    auto externalFactory = External<std::shared_ptr<PeerConnectionFactoryWrapper>>::New(env, &factory);
     auto externalTransport = External<IceTransportInterface>::New(
         env, iceTransport.release(), [](Napi::Env env, IceTransportInterface* transport) { transport->Release(); });
-
-    auto externalPcWrapper = External<NapiPeerConnectionWrapper>::New(env, pcWrapper);
-
-    return constructor_.New({externalTransport, externalPcWrapper});
+    return constructor_.New({externalFactory, externalTransport});
 }
 
-NapiIceTransport::NapiIceTransport(const Napi::CallbackInfo& info) : Napi::ObjectWrap<NapiIceTransport>(info)
+NapiIceTransport::NapiIceTransport(const Napi::CallbackInfo& info) : NapiEventTarget<NapiIceTransport>(info)
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    if (info[0].IsExternal()) {
-        auto iceTransport = info[0].As<External<IceTransportInterface>>().Data();
-        iceTransport_ = rtc::scoped_refptr<IceTransportInterface>(iceTransport);
+    if (info.Length() != callbackInfoLen || !info[0].IsExternal() || !info[1].IsExternal()) {
+        // You cannot construct an RTCIceTransport
+        NAPI_THROW(Napi::Error::New(info.Env(), "Invalid Operation"));
+        return;
     }
 
-    if (info.Length() > 1 && info[1].IsExternal()) {
-        pcWrapper_ = info[1].As<External<NapiPeerConnectionWrapper>>().Data();
+    factory_ = *info[0].As<External<std::shared_ptr<PeerConnectionFactoryWrapper>>>().Data();
 
-        auto factoryWrapper = pcWrapper_->GetPeerConnectionFactoryWrapper();
-        cricket::IceTransportInternal* internal = nullptr;
+    auto iceTransport = info[1].As<External<IceTransportInterface>>().Data();
+    iceTransport_ = rtc::scoped_refptr<IceTransportInterface>(iceTransport);
 
-        factoryWrapper->GetNetworkThread()->BlockingCall([&internal, this] {
-            internal = iceTransport_->internal();
-            iceTransportState_ = internal->GetIceTransportState();
-            iceGatheringState_ = internal->gathering_state();
-
+    factory_->GetNetworkThread()->BlockingCall([this] {
+        auto internal = iceTransport_->internal();
+        if (internal) {
             internal->SignalIceTransportStateChanged.connect(this, &NapiIceTransport::OnStateChange);
             internal->SignalGatheringState.connect(this, &NapiIceTransport::OnGatheringStateChange);
             internal->SignalCandidatePairChanged.connect(this, &NapiIceTransport::OnSelectedCandidatePairChange);
-        });
-    }
+
+            iceTransportState_ = internal->GetIceTransportState();
+            iceGatheringState_ = internal->gathering_state();
+        } else {
+            iceTransportState_ = IceTransportState::kClosed;
+            iceGatheringState_ = cricket::kIceGatheringComplete;
+        }
+
+        if (iceTransportState_ == IceTransportState::kClosed) {
+            Stop();
+        }
+    });
 }
 
 Napi::Value NapiIceTransport::GetRole(const Napi::CallbackInfo& info)
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    auto factoryWrapper = pcWrapper_->GetPeerConnectionFactoryWrapper();
-
     cricket::IceRole iceRole;
 
-    factoryWrapper->GetNetworkThread()->BlockingCall(
-        [&iceRole, this] { iceRole = iceTransport_->internal()->GetIceRole(); });
+    factory_->GetNetworkThread()->BlockingCall([&iceRole, this] { iceRole = iceTransport_->internal()->GetIceRole(); });
 
     switch (iceRole) {
         case cricket::ICEROLE_CONTROLLING:
@@ -175,11 +175,9 @@ Napi::Value NapiIceTransport::GetComponent(const Napi::CallbackInfo& info)
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    auto factoryWrapper = pcWrapper_->GetPeerConnectionFactoryWrapper();
-
     int component = 0;
 
-    factoryWrapper->GetNetworkThread()->BlockingCall(
+    factory_->GetNetworkThread()->BlockingCall(
         [&component, this] { component = iceTransport_->internal()->component(); });
 
     if (component == kComponentIdRtp) {
@@ -242,13 +240,14 @@ Napi::Value NapiIceTransport::GetEventHandler(const Napi::CallbackInfo& info)
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    std::lock_guard<std::mutex> lock(mutex_);
-    auto it = eventHandlers_.find((const char*)info.Data());
-    if (it == eventHandlers_.end()) {
+    const auto type = (const char*)info.Data();
+
+    Function func;
+    if (!NapiEventTarget<NapiIceTransport>::GetEventHandler(type, func)) {
         return info.Env().Null();
     }
 
-    return it->second.ref.Value();
+    return func;
 }
 
 void NapiIceTransport::SetEventHandler(const Napi::CallbackInfo& info, const Napi::Value& value)
@@ -257,32 +256,12 @@ void NapiIceTransport::SetEventHandler(const Napi::CallbackInfo& info, const Nap
 
     const auto type = (const char*)info.Data();
 
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        auto it = eventHandlers_.find(type);
-        if (it != eventHandlers_.end()) {
-            it->second.tsfn.Release();
-            eventHandlers_.erase(it);
-        }
-    }
-
     if (value.IsFunction()) {
         auto fn = value.As<Function>();
-
-        Reference<Napi::Value>* context = new Reference<Napi::Value>;
-        *context = Persistent(info.This());
-
-        EventHandler handler;
-        handler.ref = Persistent(fn);
-        handler.tsfn =
-            ThreadSafeFunction::New(fn.Env(), fn, type, 0, 1, context, [](Napi::Env env, Reference<Napi::Value>* ctx) {
-                ctx->Reset();
-                delete ctx;
-            });
-        std::lock_guard<std::mutex> lock(mutex_);
-        eventHandlers_[type] = std::move(handler);
+        NapiEventTarget<NapiIceTransport>::SetEventHandler(type, fn);
     } else if (value.IsNull()) {
         RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " value is null";
+        RemoveEventHandler(type);
     } else {
         NAPI_THROW_VOID(Error::New(info.Env(), "value is error"));
     }
@@ -292,10 +271,8 @@ Napi::Value NapiIceTransport::GetSelectedCandidatePair(const Napi::CallbackInfo&
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    auto factoryWrapper = pcWrapper_->GetPeerConnectionFactoryWrapper();
-
     absl::optional<cricket::CandidatePair> candidatePair;
-    factoryWrapper->GetNetworkThread()->BlockingCall(
+    factory_->GetNetworkThread()->BlockingCall(
         [&candidatePair, this] { candidatePair = iceTransport_->internal()->GetSelectedCandidatePair(); });
 
     if (!candidatePair) {
@@ -322,72 +299,58 @@ Napi::Value NapiIceTransport::ToJson(const Napi::CallbackInfo& info)
 
 void NapiIceTransport::OnStateChange(cricket::IceTransportInternal* iceTransport)
 {
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
     iceTransportState_ = iceTransport_->internal()->GetIceTransportState();
 
-    std::lock_guard<std::mutex> lock(mutex_);
+    Dispatch(
+        CallbackEvent<NapiIceTransport>::Create([this, state = iceTransportState_.load()](NapiIceTransport& target) {
+            RTC_DCHECK_EQ(this, &target);
 
-    auto it = eventHandlers_.find(kEventNameStateChange);
-    if (it == eventHandlers_.end()) {
-        return;
-    }
+            auto env = target.Env();
+            Napi::HandleScope scope(env);
+            auto jsEvent = Object::New(env);
+            jsEvent.Set("type", String::New(env, kEventNameStateChange));
+            target.MakeCallback(kEventNameStateChange, {jsEvent});
 
-    auto& tsfn = it->second.tsfn;
-    Reference<Napi::Value>* context = tsfn.GetContext();
-    napi_status status = tsfn.NonBlockingCall([context](Napi::Env env, Napi::Function jsCallback) {
-        auto jsEvent = Object::New(env);
-        jsCallback.Call(context ? context->Value() : env.Undefined(), {jsEvent});
-    });
-    if (status != napi_ok) {
-        RTC_LOG(LS_ERROR) << " tsfn call error: " << status;
-    }
+            if (state == IceTransportState::kClosed) {
+                target.Stop();
+            }
+        }));
 }
 
 void NapiIceTransport::OnGatheringStateChange(cricket::IceTransportInternal* iceTransport)
 {
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
     iceGatheringState_ = iceTransport->gathering_state();
 
-    std::lock_guard<std::mutex> lock(mutex_);
+    Dispatch(
+        CallbackEvent<NapiIceTransport>::Create([this, state = iceGatheringState_.load()](NapiIceTransport& target) {
+            RTC_DCHECK_EQ(this, &target);
 
-    auto it = eventHandlers_.find(kEventNameGatheringStateChange);
-    if (it == eventHandlers_.end()) {
-        return;
-    }
-
-    auto& tsfn = it->second.tsfn;
-    Reference<Napi::Value>* context = tsfn.GetContext();
-    napi_status status = tsfn.NonBlockingCall([context](Napi::Env env, Napi::Function jsCallback) {
-        auto jsEvent = Object::New(env);
-        jsCallback.Call(context ? context->Value() : env.Undefined(), {jsEvent});
-    });
-    if (status != napi_ok) {
-        RTC_LOG(LS_ERROR) << " tsfn call error: " << status;
-    }
+            auto env = target.Env();
+            Napi::HandleScope scope(env);
+            auto jsEvent = Object::New(env);
+            jsEvent.Set("type", String::New(env, kEventNameGatheringStateChange));
+            target.MakeCallback(kEventNameGatheringStateChange, {jsEvent});
+        }));
 }
 
 void NapiIceTransport::OnSelectedCandidatePairChange(const cricket::CandidatePairChangeEvent& event)
 {
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    std::lock_guard<std::mutex> lock(mutex_);
+    Dispatch(
+        CallbackEvent<NapiIceTransport>::Create([this, state = iceGatheringState_.load()](NapiIceTransport& target) {
+            RTC_DCHECK_EQ(this, &target);
 
-    auto it = eventHandlers_.find(kEventNameSelectedCandidatePairChange);
-    if (it == eventHandlers_.end()) {
-        return;
-    }
-
-    auto& tsfn = it->second.tsfn;
-    Reference<Napi::Value>* context = tsfn.GetContext();
-    napi_status status = tsfn.NonBlockingCall([context](Napi::Env env, Napi::Function jsCallback) {
-        auto jsEvent = Object::New(env);
-        jsCallback.Call(context ? context->Value() : env.Undefined(), {jsEvent});
-    });
-    if (status != napi_ok) {
-        RTC_LOG(LS_ERROR) << " tsfn call error: " << status;
-    }
+            auto env = target.Env();
+            Napi::HandleScope scope(env);
+            auto jsEvent = Object::New(env);
+            jsEvent.Set("type", String::New(env, kEventNameSelectedCandidatePairChange));
+            target.MakeCallback(kEventNameSelectedCandidatePairChange, {jsEvent});
+        }));
 }
 
 } // namespace webrtc

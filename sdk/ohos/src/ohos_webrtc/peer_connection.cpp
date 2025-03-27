@@ -36,6 +36,7 @@
 #include "utils/marcos.h"
 #include "async_work/async_worker_certificate.h"
 #include "async_work/async_worker_get_stats.h"
+#include "audio_device/ohos_local_audio_source.h"
 
 namespace webrtc {
 
@@ -279,430 +280,6 @@ protected:
     }
 };
 
-/// NapiPeerConnectionWrapper
-std::unique_ptr<NapiPeerConnectionWrapper> NapiPeerConnectionWrapper::Create(
-    std::shared_ptr<PeerConnectionFactoryWrapper> factoryWrapper,
-    const PeerConnectionInterface::RTCConfiguration& config)
-{
-    RTC_DLOG(LS_INFO) << __FUNCTION__;
-
-    if (!factoryWrapper) {
-        RTC_DLOG(LS_INFO) << "Get default factory";
-        factoryWrapper = PeerConnectionFactoryWrapper::GetDefault();
-    }
-
-    if (!factoryWrapper || !factoryWrapper->GetFactory()) {
-        RTC_LOG(LS_ERROR) << "No factory";
-        return nullptr;
-    }
-
-    auto factory = factoryWrapper->GetFactory();
-    auto observer = std::make_unique<NapiPeerConnectionWrapper>();
-
-    PeerConnectionDependencies dependencies(observer.get());
-    auto result = factory->CreatePeerConnectionOrError(config, std::move(dependencies));
-    if (!result.ok()) {
-        RTC_LOG(LS_ERROR) << "CreatePeerConnection failed: " << result.error().message();
-        return nullptr;
-    }
-
-    observer->SetPeerConnectionFactoryWrapper(std::move(factoryWrapper));
-    observer->SetPeerConnection(result.value());
-
-    return observer;
-}
-
-NapiPeerConnectionWrapper::NapiPeerConnectionWrapper() : eventThread_(rtc::Thread::Create())
-{
-    eventThread_->SetName("pc_event_thread", nullptr);
-    if (!eventThread_->Start()) {
-        RTC_LOG(LS_ERROR) << "Failed to start event thread";
-    }
-}
-
-NapiPeerConnectionWrapper::~NapiPeerConnectionWrapper()
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-
-    RemoveAllEventHandlers();
-
-    eventThread_->Stop();
-}
-
-bool NapiPeerConnectionWrapper::GetEventHandler(const std::string& type, Napi::Function& fn)
-{
-    RTC_DLOG(LS_VERBOSE) << "NapiPeerConnectionWrapper::GetEventHandler type: " << type;
-
-    UNUSED std::lock_guard<std::mutex> lock(eventMutex_);
-    auto it = eventHandlers_.find(type);
-    if (it == eventHandlers_.end()) {
-        RTC_LOG(LS_VERBOSE) << "No event handler for type: " << type;
-        return false;
-    }
-
-    fn = it->second.ref.Value();
-
-    return true;
-}
-
-bool NapiPeerConnectionWrapper::SetEventHandler(const std::string& type, Napi::Function fn, Napi::Value receiver)
-{
-    RTC_DLOG(LS_VERBOSE) << "SetEventHandler type: " << type;
-
-    Reference<Napi::Value>* context = new Reference<Napi::Value>;
-    *context = Persistent(receiver);
-
-    EventHandler handler;
-    handler.ref = Persistent(fn);
-    handler.tsfn =
-        ThreadSafeFunction::New(fn.Env(), fn, type, 0, 1, context, [](Napi::Env, Reference<Napi::Value>* ctx) {
-            ctx->Reset();
-            delete ctx;
-        });
-
-    UNUSED std::lock_guard<std::mutex> lock(eventMutex_);
-    eventHandlers_[type] = std::move(handler);
-
-    return true;
-}
-
-bool NapiPeerConnectionWrapper::RemoveEventHandler(const std::string& type)
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-
-    UNUSED std::lock_guard<std::mutex> lock(eventMutex_);
-    auto it = eventHandlers_.find(type);
-    if (it != eventHandlers_.end()) {
-        it->second.tsfn.Release();
-        eventHandlers_.erase(it);
-    }
-
-    return true;
-}
-
-void NapiPeerConnectionWrapper::RemoveAllEventHandlers()
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-
-    UNUSED std::lock_guard<std::mutex> lock(eventMutex_);
-    for (auto& handler : eventHandlers_) {
-        handler.second.tsfn.Release();
-    }
-    eventHandlers_.clear();
-}
-
-bool NapiPeerConnectionWrapper::GetEventHandler(const std::string& type, Napi::ThreadSafeFunction& tsfn)
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " type=" << type;
-    RTC_DCHECK(eventThread_->IsCurrent());
-
-    UNUSED std::lock_guard<std::mutex> lock(eventMutex_);
-    auto it = eventHandlers_.find(type);
-    if (it == eventHandlers_.end()) {
-        RTC_LOG(LS_VERBOSE) << "No event handler for type: " << type;
-        return false;
-    }
-
-    tsfn = it->second.tsfn;
-
-    return true;
-}
-
-void NapiPeerConnectionWrapper::OnIceCandidate(const IceCandidateInterface* candidate)
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-
-    if (!candidate) {
-        RTC_LOG(LS_ERROR) << "The candidate is nullptr";
-        return;
-    }
-
-    std::string sdp;
-    if (!candidate->ToString(&sdp)) {
-        RTC_LOG(LS_ERROR) << "Failed to convert candidate to string, got so far: " << sdp;
-        return;
-    }
-
-    auto sdpMid = candidate->sdp_mid();
-    auto sdpMLineIndex = candidate->sdp_mline_index();
-    auto can = candidate->candidate();
-
-    // We do not have ownership of the candidate, so deep copy here
-    eventThread_->PostTask([this, sdp, sdpMid, sdpMLineIndex, can] {
-        ThreadSafeFunction tsfn;
-        if (!GetEventHandler(kEventIceCandidate, tsfn)) {
-            return;
-        }
-
-        Reference<Napi::Value>* context = tsfn.GetContext();
-        napi_status status =
-            tsfn.BlockingCall([context, sdp, sdpMid, sdpMLineIndex, can](Napi::Env env, Napi::Function jsCallback) {
-                auto jsEvent = Object::New(env);
-                jsEvent.Set("candidate", NativeToJsCandidate(env, sdpMid, sdpMLineIndex, sdp, can));
-                jsCallback.Call(context ? context->Value() : env.Undefined(), {jsEvent});
-            });
-        if (status != napi_ok) {
-            RTC_LOG(LS_ERROR) << "tsfn call error: " << status;
-        }
-    });
-}
-
-void NapiPeerConnectionWrapper::OnIceCandidateError(
-    const std::string& address, int port, const std::string& url, int errorCode, const std::string& errorText)
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-
-    eventThread_->PostTask([this, address, port, url, errorCode, errorText] {
-        ThreadSafeFunction tsfn;
-        if (!GetEventHandler(kEventIceCandidateError, tsfn)) {
-            return;
-        }
-
-        Reference<Napi::Value>* context = tsfn.GetContext();
-        napi_status status = tsfn.BlockingCall(
-            [context, address, port, url, errorCode, errorText](Napi::Env env, Napi::Function jsCallback) {
-                auto jsEvent = Object::New(env);
-                jsEvent.Set("address", String::New(env, address));
-                jsEvent.Set("port", Number::New(env, port));
-                jsEvent.Set("url", String::New(env, url));
-                jsEvent.Set("errorCode", Number::New(env, errorCode));
-                jsEvent.Set("errorText", String::New(env, errorText));
-
-                jsCallback.Call(context ? context->Value() : env.Undefined(), {jsEvent});
-            });
-        if (status != napi_ok) {
-            RTC_LOG(LS_ERROR) << "tsfn call error: " << status;
-        }
-    });
-}
-
-void NapiPeerConnectionWrapper::OnIceCandidatesRemoved(const std::vector<cricket::Candidate>& /*candidates*/)
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-}
-
-void NapiPeerConnectionWrapper::OnSignalingChange(PeerConnectionInterface::SignalingState new_state)
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " new_state=" << new_state;
-
-    eventThread_->PostTask([this] {
-        ThreadSafeFunction tsfn;
-        if (!GetEventHandler(kEventSignalingStateChange, tsfn)) {
-            return;
-        }
-
-        Reference<Napi::Value>* context = tsfn.GetContext();
-        napi_status status = tsfn.BlockingCall([context](Napi::Env env, Napi::Function jsCallback) {
-            auto jsEvent = Object::New(env);
-            jsCallback.Call(context ? context->Value() : env.Undefined(), {jsEvent});
-        });
-        if (status != napi_ok) {
-            RTC_LOG(LS_ERROR) << "tsfn call error: " << status;
-        }
-    });
-}
-
-void NapiPeerConnectionWrapper::OnIceConnectionChange(PeerConnectionInterface::IceConnectionState new_state)
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " new_state=" << new_state;
-    // use OnStandardizedIceConnectionChange
-}
-
-void NapiPeerConnectionWrapper::OnStandardizedIceConnectionChange(PeerConnectionInterface::IceConnectionState new_state)
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " new_state=" << new_state;
-
-    eventThread_->PostTask([this] {
-        ThreadSafeFunction tsfn;
-        if (!GetEventHandler(kEventIceConnectionStateChange, tsfn)) {
-            return;
-        }
-
-        Reference<Napi::Value>* context = tsfn.GetContext();
-        napi_status status = tsfn.BlockingCall([context](Napi::Env env, Napi::Function jsCallback) {
-            auto jsEvent = Object::New(env);
-            jsCallback.Call(context ? context->Value() : env.Undefined(), {jsEvent});
-        });
-        if (status != napi_ok) {
-            RTC_LOG(LS_ERROR) << "tsfn call error: " << status;
-        }
-    });
-}
-
-void NapiPeerConnectionWrapper::OnConnectionChange(PeerConnectionInterface::PeerConnectionState new_state)
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " new_state=" << new_state;
-
-    eventThread_->PostTask([this] {
-        ThreadSafeFunction tsfn;
-        if (!GetEventHandler(kEventConnectionStateChange, tsfn)) {
-            return;
-        }
-
-        Reference<Napi::Value>* context = tsfn.GetContext();
-        napi_status status = tsfn.BlockingCall([context](Napi::Env env, Napi::Function jsCallback) {
-            auto jsEvent = Object::New(env);
-            jsCallback.Call(context ? context->Value() : env.Undefined(), {jsEvent});
-        });
-        if (status != napi_ok) {
-            RTC_LOG(LS_ERROR) << "tsfn call error: " << status;
-        }
-    });
-}
-
-void NapiPeerConnectionWrapper::OnIceConnectionReceivingChange(bool /*receiving*/)
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-}
-
-void NapiPeerConnectionWrapper::OnIceGatheringChange(PeerConnectionInterface::IceGatheringState new_state)
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " new_state=" << new_state;
-
-    eventThread_->PostTask([this] {
-        ThreadSafeFunction tsfn;
-        if (!GetEventHandler(kEventIceGatheringStateChange, tsfn)) {
-            return;
-        }
-
-        Reference<Napi::Value>* context = tsfn.GetContext();
-        napi_status status = tsfn.BlockingCall([context](Napi::Env env, Napi::Function jsCallback) {
-            auto jsEvent = Object::New(env);
-            jsCallback.Call(context ? context->Value() : env.Undefined(), {jsEvent});
-        });
-        if (status != napi_ok) {
-            RTC_LOG(LS_ERROR) << "tsfn call error: " << status;
-        }
-    });
-}
-
-void NapiPeerConnectionWrapper::OnIceSelectedCandidatePairChanged(const cricket::CandidatePairChangeEvent& /*event*/)
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-}
-
-void NapiPeerConnectionWrapper::OnAddStream(rtc::scoped_refptr<MediaStreamInterface> /*stream*/)
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-}
-
-void NapiPeerConnectionWrapper::OnRemoveStream(rtc::scoped_refptr<MediaStreamInterface> /*stream*/)
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-}
-
-void NapiPeerConnectionWrapper::OnDataChannel(rtc::scoped_refptr<DataChannelInterface> channel)
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-
-    if (!channel) {
-        RTC_LOG(LS_ERROR) << "The channel is nullptr";
-        return;
-    }
-
-    eventThread_->PostTask([this, channel] {
-        ThreadSafeFunction tsfn;
-        if (!GetEventHandler(kEventDataChannel, tsfn)) {
-            return;
-        }
-
-        auto observer = NapiDataChannel::Observer::Create(channel.get());
-        channel->RegisterObserver(observer.get());
-
-        Reference<Napi::Value>* context = tsfn.GetContext();
-        napi_status status =
-            tsfn.BlockingCall([context, channel, obs = observer.release()](Napi::Env env, Napi::Function jsCallback) {
-                auto jsEvent = Object::New(env);
-                jsEvent.Set("channel", NapiDataChannel::NewInstance(env, channel, obs));
-                jsCallback.Call(context ? context->Value() : env.Undefined(), {jsEvent});
-            });
-        if (status != napi_ok) {
-            RTC_LOG(LS_ERROR) << "tsfn call error: " << status;
-        }
-    });
-}
-
-void NapiPeerConnectionWrapper::OnRenegotiationNeeded()
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-
-    eventThread_->PostTask([this] {
-        ThreadSafeFunction tsfn;
-        if (!GetEventHandler(kEventNegotiationNeeded, tsfn)) {
-            return;
-        }
-
-        Reference<Napi::Value>* context = tsfn.GetContext();
-        napi_status status = tsfn.BlockingCall([context](Napi::Env env, Napi::Function jsCallback) {
-            auto jsEvent = Object::New(env);
-            jsCallback.Call(context ? context->Value() : env.Undefined(), {jsEvent});
-        });
-        if (status != napi_ok) {
-            RTC_LOG(LS_ERROR) << "tsfn call error: " << status;
-        }
-    });
-}
-
-void NapiPeerConnectionWrapper::OnNegotiationNeededEvent(uint32_t event_id)
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " event_id=" << event_id;
-}
-
-void NapiPeerConnectionWrapper::OnAddTrack(
-    rtc::scoped_refptr<RtpReceiverInterface> /*receiver*/,
-    const std::vector<rtc::scoped_refptr<MediaStreamInterface>>& /*streams*/)
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-    // use OnTrack
-}
-
-void NapiPeerConnectionWrapper::OnTrack(rtc::scoped_refptr<RtpTransceiverInterface> transceiver)
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-
-    eventThread_->PostTask([this, transceiver] {
-        ThreadSafeFunction tsfn;
-        if (!GetEventHandler(kEventTrack, tsfn)) {
-            return;
-        }
-
-        auto receiver = transceiver->receiver();
-        if (!receiver) {
-            RTC_LOG(LS_ERROR) << "No receiver in the transceiver";
-            return;
-        }
-
-        Reference<Napi::Value>* context = tsfn.GetContext();
-        napi_status status = tsfn.BlockingCall(
-            [this, context, transceiver, pc = GetPeerConnection()](Napi::Env env, Napi::Function jsCallback) {
-                auto receiver = transceiver->receiver();
-                auto track = MediaStreamTrackWrapper::Create(receiver->track());
-
-                auto streams = receiver->streams();
-                auto jsStreams = Array::New(env, streams.size());
-                for (uint32_t i = 0; i < streams.size(); i++) {
-                    jsStreams[i] = NapiMediaStream::NewInstance(env, streams[i]);
-                }
-
-                auto jsEvent = Object::New(env);
-                jsEvent.Set("streams", jsStreams);
-                jsEvent.Set("track", NapiMediaStreamTrack::NewInstance(env, std::move(track)));
-                jsEvent.Set("receiver", NapiRtpReceiver::NewInstance(env, receiver, this));
-                jsEvent.Set("transceiver", NapiRtpTransceiver::NewInstance(env, transceiver, this));
-
-                jsCallback.Call(context ? context->Value() : env.Undefined(), {jsEvent});
-            });
-        if (status != napi_ok) {
-            RTC_LOG(LS_ERROR) << "tsfn call error: " << status;
-        }
-    });
-}
-
-void NapiPeerConnectionWrapper::OnRemoveTrack(rtc::scoped_refptr<RtpReceiverInterface> /*receiver*/)
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-}
-
 /// NapiPeerConnection
 FunctionReference NapiPeerConnection::constructor_;
 
@@ -774,34 +351,55 @@ void NapiPeerConnection::Init(class Env env, Object exports)
     exports.Set(kClassName, func);
 }
 
-Napi::Value NapiPeerConnection::NewInstance(Napi::Env env, std::unique_ptr<NapiPeerConnectionWrapper> observer)
+Napi::Value NapiPeerConnection::NewInstance(Napi::Value configuration,
+    std::shared_ptr<PeerConnectionFactoryWrapper> factory)
 {
     RTC_LOG(LS_INFO) << __FUNCTION__;
 
-    if (!observer || !observer->GetPeerConnection()) {
-        RTC_LOG(LS_ERROR) << "Invalid argument";
-        return env.Undefined();
+    auto env = constructor_.Env();
+    if (!factory || !factory->GetFactory()) {
+        NAPI_THROW(Error::New(env, "Invalid argument"), Object());
     }
 
-    auto externalObserver = External<NapiPeerConnectionWrapper>::New(env, observer.release());
-
-    return constructor_.New({externalObserver});
+    return constructor_.New(
+        {configuration, External<std::shared_ptr<PeerConnectionFactoryWrapper>>::New(env, &factory)});
 }
 
-NapiPeerConnection::NapiPeerConnection(const CallbackInfo& info) : ObjectWrap<NapiPeerConnection>(info)
+NapiPeerConnection::NapiPeerConnection(const CallbackInfo& info) : NapiEventTarget<NapiPeerConnection>(info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    if (info.Length() > 0 && info[0].IsExternal()) {
-        auto observer = info[0].As<External<NapiPeerConnectionWrapper>>().Data();
-        wrapper_ = std::unique_ptr<NapiPeerConnectionWrapper>(observer);
-        pc_ = wrapper_->GetPeerConnection();
+    if (!info.IsConstructCall()) {
+        NAPI_THROW_VOID(TypeError::New(info.Env(), "Use the new operator to construct the RTCPeerConnection"));
+        return;
     }
+
+    PeerConnectionInterface::RTCConfiguration config;
+    config.sdp_semantics = SdpSemantics::kUnifiedPlan;
+
+    if (info.Length() > 0 && info[0].IsObject()) {
+        JsToNativeConfiguration(info[0].As<Object>(), config);
+    }
+
+    if (info.Length() > 1 && info[1].IsExternal()) {
+        factory_ = *info[1].As<External<std::shared_ptr<PeerConnectionFactoryWrapper>>>().Data();
+    } else {
+        factory_ = PeerConnectionFactoryWrapper::GetDefault();
+    }
+
+    PeerConnectionDependencies deps(this);
+    auto result = factory_->GetFactory()->CreatePeerConnectionOrError(config, std::move(deps));
+    if (!result.ok()) {
+        RTC_LOG(LS_ERROR) << "Failed to create PeerConnection: " << result.error().message();
+        NAPI_THROW_VOID(TypeError::New(info.Env(), result.error().message()));
+    }
+
+    pc_ = result.MoveValue();
 }
 
 NapiPeerConnection::~NapiPeerConnection()
 {
-    RTC_LOG(LS_INFO) << __FUNCTION__;
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 }
 
 Napi::Value NapiPeerConnection::GetCanTrickleIceCandidates(const Napi::CallbackInfo& info)
@@ -1092,7 +690,7 @@ Napi::Value NapiPeerConnection::GetSctp(const Napi::CallbackInfo& info)
         return info.Env().Undefined();
     }
 
-    auto sctpTransport = NapiSctpTransport::NewInstance(info.Env(), transport, wrapper_.get());
+    auto sctpTransport = NapiSctpTransport::NewInstance(factory_, transport);
     sctpTransportRef_ = Persistent(sctpTransport);
 
     return sctpTransport;
@@ -1102,8 +700,10 @@ Napi::Value NapiPeerConnection::GetEventHandler(const Napi::CallbackInfo& info)
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
+    const auto type = (const char*)info.Data();
+
     Function fn;
-    if (!wrapper_->GetEventHandler((const char*)info.Data(), fn)) {
+    if (!NapiEventTarget<NapiPeerConnection>::GetEventHandler(type, fn)) {
         return info.Env().Null();
     }
 
@@ -1114,19 +714,22 @@ void NapiPeerConnection::SetEventHandler(const Napi::CallbackInfo& info, const N
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    wrapper_->RemoveEventHandler((const char*)info.Data());
+    const auto type = (const char*)info.Data();
 
     if (value.IsFunction()) {
-        Function cb = value.As<Function>();
-        if (!wrapper_->SetEventHandler((const char*)info.Data(), std::move(cb), info.This())) {
-            NAPI_THROW_VOID(Napi::Error::New(info.Env(), "Failed to set event handler"));
-        }
+        auto fn = value.As<Function>();
+        NapiEventTarget<NapiPeerConnection>::SetEventHandler(type, fn);
+    } else if (value.IsNull()) {
+        RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " value is null";
+        RemoveEventHandler(type);
+    } else {
+        NAPI_THROW_VOID(Error::New(info.Env(), "value is error"));
     }
 }
 
 Napi::Value NapiPeerConnection::AddTrack(const Napi::CallbackInfo& info)
 {
-    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
+    RTC_LOG(LS_INFO) << __FUNCTION__;
 
     if (info.Length() < 1) {
         NAPI_THROW(Error::New(info.Env(), "Wrong number of arguments"), info.Env().Undefined());
@@ -1165,13 +768,24 @@ Napi::Value NapiPeerConnection::AddTrack(const Napi::CallbackInfo& info)
         streamIds.push_back("stream_id");
     }
 
-    auto track = NapiMediaStreamTrack::Unwrap(jsTrack);
-    auto result_or_error = pc_->AddTrack(track->Get(), streamIds);
-    if (!result_or_error.ok()) {
-        RTC_LOG(LS_ERROR) << "Failed to add audio track to PeerConnection: " << result_or_error.error().message();
-        NAPI_THROW(Error::New(info.Env(), result_or_error.error().message()), info.Env().Undefined());
+    auto napiTrack = NapiMediaStreamTrack::Unwrap(jsTrack);
+    auto track = napiTrack->Get();
+    auto result = pc_->AddTrack(track, streamIds);
+    if (!result.ok()) {
+        RTC_LOG(LS_ERROR) << "Failed to add audio track to PeerConnection: " << result.error().message();
+        NAPI_THROW(Error::New(info.Env(), result.error().message()), info.Env().Undefined());
     }
-    return NapiRtpSender::NewInstance(info.Env(), result_or_error.value(), wrapper_.get());
+
+    if (track && track->kind() == MediaStreamTrackInterface::kAudioKind) {
+        // Add audio input to adm
+        auto source = factory_->GetAudioSource(track);
+        auto adm = factory_->GetAudioDeviceModule();
+        if (source && adm) {
+            adm->AddAudioInput(source->GetAudioInput());
+        }
+    }
+
+    return NapiRtpSender::NewInstance(factory_, pc_, result.value());
 }
 
 Napi::Value NapiPeerConnection::RemoveTrack(const Napi::CallbackInfo& info)
@@ -1205,6 +819,16 @@ Napi::Value NapiPeerConnection::RemoveTrack(const Napi::CallbackInfo& info)
                 break;
         }
         NAPI_THROW(Error::New(info.Env(), message), info.Env().Undefined());
+    }
+
+    auto track = sender->Get()->track();
+    if (track && track->kind() == MediaStreamTrackInterface::kAudioKind) {
+        // Remove audio input from adm
+        auto source = factory_->GetAudioSource(track);
+        auto adm = factory_->GetAudioDeviceModule();
+        if (adm && source) {
+            adm->RemoveAudioInput(source->GetAudioInput());
+        }
     }
 
     return info.Env().Undefined();
@@ -1345,7 +969,8 @@ Napi::Value NapiPeerConnection::CreateDataChannel(const Napi::CallbackInfo& info
                 Error::New(info.Env(), error.message() ? error.message() : "unknown error"), info.Env().Undefined());
         }
 
-        return NapiDataChannel::NewInstance(info.Env(), result.value());
+        auto observer = std::make_unique<DataChannelObserverTemp>(result.value());
+        return NapiDataChannel::NewInstance(info.Env(), std::move(observer));
     }
 
     if (!info[1].IsObject()) {
@@ -1362,7 +987,8 @@ Napi::Value NapiPeerConnection::CreateDataChannel(const Napi::CallbackInfo& info
         NAPI_THROW(Error::New(info.Env(), error.message() ? error.message() : "unknown error"), info.Env().Undefined());
     }
 
-    return NapiDataChannel::NewInstance(info.Env(), result.value());
+    auto observer = std::make_unique<DataChannelObserverTemp>(result.value());
+    return NapiDataChannel::NewInstance(info.Env(), std::move(observer));
 }
 
 Napi::Value NapiPeerConnection::AddIceCandidate(const Napi::CallbackInfo& info)
@@ -1435,7 +1061,7 @@ Napi::Value NapiPeerConnection::GetSenders(const Napi::CallbackInfo& info)
     auto senders = pc_->GetSenders();
     auto jsSenders = Array::New(info.Env(), senders.size());
     for (uint32_t i = 0; i < senders.size(); i++) {
-        jsSenders.Set(i, NapiRtpSender::NewInstance(info.Env(), senders[i], wrapper_.get()));
+        jsSenders.Set(i, NapiRtpSender::NewInstance(factory_, pc_, senders[i]));
     }
 
     return jsSenders;
@@ -1448,7 +1074,7 @@ Napi::Value NapiPeerConnection::GetReceivers(const Napi::CallbackInfo& info)
     auto receivers = pc_->GetReceivers();
     auto jsReceivers = Array::New(info.Env(), receivers.size());
     for (uint32_t i = 0; i < receivers.size(); i++) {
-        jsReceivers.Set(i, NapiRtpReceiver::NewInstance(info.Env(), receivers[i], wrapper_.get()));
+        jsReceivers.Set(i, NapiRtpReceiver::NewInstance(factory_, pc_, receivers[i]));
     }
 
     return jsReceivers;
@@ -1461,7 +1087,7 @@ Napi::Value NapiPeerConnection::GetTransceivers(const Napi::CallbackInfo& info)
     auto transceivers = pc_->GetTransceivers();
     auto jsTransceivers = Array::New(info.Env(), transceivers.size());
     for (uint32_t i = 0; i < transceivers.size(); i++) {
-        jsTransceivers.Set(i, NapiRtpTransceiver::NewInstance(info.Env(), transceivers[i], wrapper_.get()));
+        jsTransceivers.Set(i, NapiRtpTransceiver::NewInstance(factory_, pc_, transceivers[i]));
     }
 
     return jsTransceivers;
@@ -1557,13 +1183,13 @@ Napi::Value NapiPeerConnection::AddTransceiver(const Napi::CallbackInfo& info)
             if (!result_or_error.ok()) {
                 NAPI_THROW(Error::New(info.Env(), result_or_error.error().message()), info.Env().Undefined());
             }
-            return NapiRtpTransceiver::NewInstance(info.Env(), result_or_error.value(), wrapper_.get());
+            return NapiRtpTransceiver::NewInstance(factory_, pc_, result_or_error.value());
         } else {
             auto result_or_error = pc_->AddTransceiver(track->Get());
             if (!result_or_error.ok()) {
                 NAPI_THROW(Error::New(info.Env(), result_or_error.error().message()), info.Env().Undefined());
             }
-            return NapiRtpTransceiver::NewInstance(info.Env(), result_or_error.value(), wrapper_.get());
+            return NapiRtpTransceiver::NewInstance(factory_, pc_, result_or_error.value());
         }
     } else {
         std::string jsMediatype = info[0].As<String>().Utf8Value();
@@ -1580,17 +1206,17 @@ Napi::Value NapiPeerConnection::AddTransceiver(const Napi::CallbackInfo& info)
             auto jsInit = info[1].As<Object>();
             webrtc::RtpTransceiverInit init;
             PopulateTransceiverInit(jsInit, init);
-            auto result_or_error = pc_->AddTransceiver(mediaType, init);
-            if (!result_or_error.ok()) {
-                NAPI_THROW(Error::New(info.Env(), result_or_error.error().message()), info.Env().Undefined());
+            auto result = pc_->AddTransceiver(mediaType, init);
+            if (!result.ok()) {
+                NAPI_THROW(Error::New(info.Env(), result.error().message()), info.Env().Undefined());
             }
-            return NapiRtpTransceiver::NewInstance(info.Env(), result_or_error.value(), wrapper_.get());
+            return NapiRtpTransceiver::NewInstance(factory_, pc_, result.value());
         } else {
-            auto result_or_error = pc_->AddTransceiver(mediaType);
-            if (!result_or_error.ok()) {
-                NAPI_THROW(Error::New(info.Env(), result_or_error.error().message()), info.Env().Undefined());
+            auto result = pc_->AddTransceiver(mediaType);
+            if (!result.ok()) {
+                NAPI_THROW(Error::New(info.Env(), result.error().message()), info.Env().Undefined());
             }
-            return NapiRtpTransceiver::NewInstance(info.Env(), result_or_error.value(), wrapper_.get());
+            return NapiRtpTransceiver::NewInstance(factory_, pc_, result.value());
         }
     }
     NAPI_THROW(Error::New(info.Env(), "Invalid argument type for the first parameter"), info.Env().Undefined());
@@ -1705,6 +1331,243 @@ Napi::Value NapiPeerConnection::GenerateCertificate(const Napi::CallbackInfo& in
 
     asyncWorker->start(key_params, absl::nullopt);
     return asyncWorker->GetPromise();
+}
+
+void NapiPeerConnection::OnIceCandidate(const IceCandidateInterface* candidate)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    if (!candidate) {
+        RTC_LOG(LS_ERROR) << "The candidate is nullptr";
+        return;
+    }
+
+    std::string sdp;
+    if (!candidate->ToString(&sdp)) {
+        RTC_LOG(LS_ERROR) << "Failed to convert candidate to string, got so far: " << sdp;
+        return;
+    }
+
+    auto sdpMid = candidate->sdp_mid();
+    auto sdpMLineIndex = candidate->sdp_mline_index();
+    auto can = candidate->candidate();
+
+    Dispatch(
+        CallbackEvent<NapiPeerConnection>::Create([this, sdp, sdpMid, sdpMLineIndex, can](NapiPeerConnection& target) {
+            RTC_DCHECK_EQ(this, &target);
+
+            auto env = target.Env();
+            Napi::HandleScope scope(env);
+            auto jsEvent = Object::New(env);
+            jsEvent.Set("type", String::New(env, kEventIceCandidate));
+            jsEvent.Set("candidate", NativeToJsCandidate(env, sdpMid, sdpMLineIndex, sdp, can));
+            target.MakeCallback(kEventIceCandidate, {jsEvent});
+        }));
+}
+
+void NapiPeerConnection::OnIceCandidateError(
+    const std::string& address, int port, const std::string& url, int errorCode, const std::string& errorText)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    Dispatch(CallbackEvent<NapiPeerConnection>::Create(
+        [this, address, port, url, errorCode, errorText](NapiPeerConnection& target) {
+            RTC_DCHECK_EQ(this, &target);
+
+            auto env = target.Env();
+            Napi::HandleScope scope(env);
+            auto jsEvent = Object::New(env);
+            jsEvent.Set("type", String::New(env, kEventIceCandidateError));
+            jsEvent.Set("address", String::New(env, address));
+            jsEvent.Set("port", Number::New(env, port));
+            jsEvent.Set("url", String::New(env, url));
+            jsEvent.Set("errorCode", Number::New(env, errorCode));
+            jsEvent.Set("errorText", String::New(env, errorText));
+            target.MakeCallback(kEventIceCandidateError, {jsEvent});
+        }));
+}
+
+void NapiPeerConnection::OnIceCandidatesRemoved(const std::vector<cricket::Candidate>& candidates)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+}
+
+void NapiPeerConnection::OnSignalingChange(PeerConnectionInterface::SignalingState newState)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " newState=" << newState;
+
+    Dispatch(CallbackEvent<NapiPeerConnection>::Create([this, newState](NapiPeerConnection& target) {
+        RTC_DCHECK_EQ(this, &target);
+
+        auto env = target.Env();
+        Napi::HandleScope scope(env);
+        auto jsEvent = Object::New(env);
+        jsEvent.Set("type", String::New(env, kEventSignalingStateChange));
+        target.MakeCallback(kEventSignalingStateChange, {jsEvent});
+
+        if (newState == webrtc::PeerConnectionInterface::kClosed) {
+            Stop();
+        }
+    }));
+}
+
+void NapiPeerConnection::OnIceConnectionChange(PeerConnectionInterface::IceConnectionState newState)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " newState=" << newState;
+    // use OnStandardizedIceConnectionChange
+}
+
+void NapiPeerConnection::OnStandardizedIceConnectionChange(PeerConnectionInterface::IceConnectionState newState)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " newState=" << newState;
+
+    Dispatch(CallbackEvent<NapiPeerConnection>::Create([this](NapiPeerConnection& target) {
+        RTC_DCHECK_EQ(this, &target);
+
+        auto env = target.Env();
+        Napi::HandleScope scope(env);
+        auto jsEvent = Object::New(env);
+        jsEvent.Set("type", String::New(env, kEventIceConnectionStateChange));
+        target.MakeCallback(kEventIceConnectionStateChange, {jsEvent});
+    }));
+}
+
+void NapiPeerConnection::OnConnectionChange(PeerConnectionInterface::PeerConnectionState newState)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " newState=" << newState;
+
+    Dispatch(CallbackEvent<NapiPeerConnection>::Create([this](NapiPeerConnection& target) {
+        RTC_DCHECK_EQ(this, &target);
+
+        auto env = target.Env();
+        Napi::HandleScope scope(env);
+        auto jsEvent = Object::New(env);
+        jsEvent.Set("type", String::New(env, kEventConnectionStateChange));
+        target.MakeCallback(kEventConnectionStateChange, {jsEvent});
+    }));
+}
+
+void NapiPeerConnection::OnIceConnectionReceivingChange(bool receiving)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+}
+
+void NapiPeerConnection::OnIceGatheringChange(PeerConnectionInterface::IceGatheringState newState)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " newState=" << newState;
+
+    Dispatch(CallbackEvent<NapiPeerConnection>::Create([this](NapiPeerConnection& target) {
+        RTC_DCHECK_EQ(this, &target);
+
+        auto env = target.Env();
+        Napi::HandleScope scope(env);
+        auto jsEvent = Object::New(env);
+        jsEvent.Set("type", String::New(env, kEventIceGatheringStateChange));
+        target.MakeCallback(kEventIceGatheringStateChange, {jsEvent});
+    }));
+}
+
+void NapiPeerConnection::OnIceSelectedCandidatePairChanged(const cricket::CandidatePairChangeEvent& event)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+}
+
+void NapiPeerConnection::OnAddStream(rtc::scoped_refptr<MediaStreamInterface> stream)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+}
+
+void NapiPeerConnection::OnRemoveStream(rtc::scoped_refptr<MediaStreamInterface> stream)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+}
+
+void NapiPeerConnection::OnDataChannel(rtc::scoped_refptr<DataChannelInterface> channel)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    if (!channel) {
+        RTC_LOG(LS_ERROR) << "The channel is nullptr";
+        return;
+    }
+
+    auto observer = std::make_unique<DataChannelObserverTemp>(channel);
+    Dispatch(CallbackEvent<NapiPeerConnection>::Create([this, obs = observer.release()](NapiPeerConnection& target) {
+        RTC_DCHECK_EQ(this, &target);
+
+        auto env = target.Env();
+        Napi::HandleScope scope(env);
+        auto jsEvent = Object::New(env);
+        jsEvent.Set("type", String::New(env, kEventDataChannel));
+        jsEvent.Set("channel", NapiDataChannel::NewInstance(env, std::unique_ptr<DataChannelObserverTemp>(obs)));
+        target.MakeCallback(kEventDataChannel, {jsEvent});
+    }));
+}
+
+void NapiPeerConnection::OnRenegotiationNeeded()
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    Dispatch(CallbackEvent<NapiPeerConnection>::Create([this](NapiPeerConnection& target) {
+        RTC_DCHECK_EQ(this, &target);
+
+        auto env = target.Env();
+        Napi::HandleScope scope(env);
+        auto jsEvent = Object::New(env);
+        jsEvent.Set("type", String::New(env, kEventNegotiationNeeded));
+        target.MakeCallback(kEventNegotiationNeeded, {jsEvent});
+    }));
+}
+
+void NapiPeerConnection::OnNegotiationNeededEvent(uint32_t eventId)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " eventId=" << eventId;
+}
+
+void NapiPeerConnection::OnAddTrack(
+    rtc::scoped_refptr<RtpReceiverInterface> receiver,
+    const std::vector<rtc::scoped_refptr<MediaStreamInterface>>& streams)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+    // use OnTrack
+}
+
+void NapiPeerConnection::OnTrack(rtc::scoped_refptr<RtpTransceiverInterface> transceiver)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    Dispatch(CallbackEvent<NapiPeerConnection>::Create([this, transceiver](NapiPeerConnection& target) {
+        RTC_DCHECK_EQ(this, &target);
+
+        auto receiver = transceiver->receiver();
+        if (!receiver) {
+            RTC_LOG(LS_ERROR) << "No receiver in the transceiver";
+            return;
+        }
+
+        auto env = target.Env();
+        Napi::HandleScope scope(env);
+
+        auto streams = receiver->streams();
+        auto jsStreams = Array::New(env, streams.size());
+        for (uint32_t i = 0; i < streams.size(); i++) {
+            jsStreams[i] = NapiMediaStream::NewInstance(factory_, streams[i]);
+        }
+
+        auto jsEvent = Object::New(env);
+        jsEvent.Set("type", String::New(env, kEventTrack));
+        jsEvent.Set("streams", jsStreams);
+        jsEvent.Set("track", NapiMediaStreamTrack::NewInstance(factory_, receiver->track()));
+        jsEvent.Set("receiver", NapiRtpReceiver::NewInstance(factory_, pc_, receiver));
+        jsEvent.Set("transceiver", NapiRtpTransceiver::NewInstance(factory_, pc_, transceiver));
+
+        target.MakeCallback(kEventTrack, {jsEvent});
+    }));
+}
+
+void NapiPeerConnection::OnRemoveTrack(rtc::scoped_refptr<RtpReceiverInterface> receiver)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 }
 
 } // namespace webrtc

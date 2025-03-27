@@ -17,103 +17,182 @@
 #include "../peer_connection_factory.h"
 #include "../media_stream.h"
 #include "../media_stream_track.h"
-#include "../desktop_capture/desktop_capturer.h"
 #include "../video/video_track_source.h"
 #include "../user_media/media_constraints_util.h"
 #include "../render/egl_env.h"
+#include "../audio_device/audio_common.h"
+#include "../audio_device/ohos_local_audio_source.h"
+#include "../screen_capture/system_audio_receiver.h"
+#include "../screen_capture/screen_capturer.h"
 
 #include "rtc_base/logging.h"
 #include "rtc_base/helpers.h"
 
 namespace webrtc {
 
-AsyncWorkerGetDisplayMedia* AsyncWorkerGetDisplayMedia::Create(Napi::Env env, const char* resourceName)
+AsyncWorkerGetDisplayMedia* AsyncWorkerGetDisplayMedia::Create(Napi::Env env,
+    std::shared_ptr<PeerConnectionFactoryWrapper> factory)
 {
-    auto asyncWorker = new AsyncWorkerGetDisplayMedia(env, resourceName);
+    auto asyncWorker = new AsyncWorkerGetDisplayMedia(env, std::move(factory));
     return asyncWorker;
 }
 
-AsyncWorkerGetDisplayMedia::AsyncWorkerGetDisplayMedia(Napi::Env env, const char* resourceName)
-    : AsyncWorker(env, resourceName), deferred_(Napi::Promise::Deferred::New(env))
+AsyncWorkerGetDisplayMedia::AsyncWorkerGetDisplayMedia(
+    Napi::Env env, std::shared_ptr<PeerConnectionFactoryWrapper> factory)
+    : AsyncWorker(env, "getDisplayMedia"), deferred_(Napi::Promise::Deferred::New(env)), factory_(std::move(factory))
 {
 }
 
-void AsyncWorkerGetDisplayMedia::Start(MediaTrackConstraints audio, MediaTrackConstraints video)
+void AsyncWorkerGetDisplayMedia::Start(
+    MediaTrackConstraints audio, MediaTrackConstraints video, MediaTrackConstraints systemAudio)
 {
     audioConstraints_ = std::move(audio);
+    systemAudioConstraints_ = std::move(systemAudio);
     videoConstraints_ = std::move(video);
     Queue();
+}
+
+rtc::scoped_refptr<AudioTrackInterface> AsyncWorkerGetDisplayMedia::CreateAudioTrack(std::string* errorMessage)
+{
+    cricket::AudioOptions options;
+    CopyConstraintsIntoAudioOptions(audioConstraints_, options);
+
+    auto audioSource = factory_->CreateAudioSource(options);
+    if (!audioSource) {
+        if (errorMessage) {
+            *errorMessage = "Failed to create audio source";
+        }
+        return nullptr;
+    }
+    auto audioTrack = factory_->CreateAudioTrack(rtc::CreateRandomUuid(), audioSource);
+    if (!audioTrack) {
+        if (errorMessage) {
+            *errorMessage = "Failed to create audio track";
+        }
+        return nullptr;
+    }
+
+    return audioTrack;
+}
+
+rtc::scoped_refptr<AudioTrackInterface> AsyncWorkerGetDisplayMedia::CreateSystemAudioTrack(
+    std::shared_ptr<SystemAudioReceiver> systemAudioReceiver, std::string* errorMessage)
+{
+    cricket::AudioOptions options;
+    CopyConstraintsIntoAudioOptions(systemAudioConstraints_, options);
+
+    auto audioSource = factory_->CreateAudioSource(options, std::move(systemAudioReceiver));
+    if (!audioSource) {
+        if (errorMessage) {
+            *errorMessage = "Failed to create system audio source";
+        }
+        return nullptr;
+    }
+
+    auto audioTrack = factory_->CreateAudioTrack(rtc::CreateRandomUuid(), audioSource);
+    if (!audioTrack) {
+        if (errorMessage) {
+            *errorMessage = "Failed to create system audio track";
+        }
+        return nullptr;
+    }
+
+    return audioTrack;
+}
+
+rtc::scoped_refptr<VideoTrackInterface> AsyncWorkerGetDisplayMedia::CreateVideoTrack(
+    std::shared_ptr<SystemAudioReceiver> systemAudioReceiver, std::string* errorMessage)
+{
+    ScreenCaptureOptions options;
+    GetScreenCaptureOptionsFromConstraints(videoConstraints_, options);
+    RTC_DLOG(LS_INFO) << "Screen capture options: " << options.ToString();
+
+    auto screenCapturer = ScreenCapturer::Create(options, std::move(systemAudioReceiver));
+    if (!screenCapturer) {
+        if (errorMessage) {
+            *errorMessage = "Failed to create screen capturer";
+        }
+        return nullptr;
+    }
+
+    auto videoSource = factory_->CreateVideoSource(std::move(screenCapturer));
+    if (!videoSource) {
+        if (errorMessage) {
+            *errorMessage = "Failed to create video source";
+        }
+        return nullptr;
+    }
+
+    auto videoTrack = factory_->CreateVideoTrack(rtc::CreateRandomUuid(), videoSource);
+    if (!videoTrack) {
+        if (errorMessage) {
+            *errorMessage = "Failed to create video track";
+        }
+        return nullptr;
+    }
+
+    return videoTrack;
 }
 
 void AsyncWorkerGetDisplayMedia::Execute()
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    auto factoryWrapper = PeerConnectionFactoryWrapper::GetDefault();
-    if (!factoryWrapper) {
-        SetError("Internal error");
-        return;
-    }
-    auto factory = factoryWrapper->GetFactory();
-    if (!factory) {
+    if (!factory_) {
         SetError("Internal error");
         return;
     }
 
-    stream_ = factory->CreateLocalMediaStream(rtc::CreateRandomUuid());
+    stream_ = factory_->GetFactory()->CreateLocalMediaStream(rtc::CreateRandomUuid());
     if (!stream_) {
         SetError("Failed to create media stream");
         return;
     }
 
     if (!audioConstraints_.IsNull()) {
-        cricket::AudioOptions options;
-        CopyConstraintsIntoAudioOptions(audioConstraints_, options);
-
-        auto audioSource = factoryWrapper->GetFactory()->CreateAudioSource(options);
-        if (!audioSource) {
-            SetError("Failed to create audio source");
-            return;
-        }
-        auto audioTrack = factoryWrapper->GetFactory()->CreateAudioTrack(rtc::CreateRandomUuid(), audioSource.get());
-        if (!audioTrack) {
-            SetError("Failed to create audio track");
+        if (videoConstraints_.IsNull()) {
+            // Video should be enabled, or use <getUserMedia> instead.
+            SetError("Audio should not be enabled individually");
             return;
         }
 
-        stream_->AddTrack(audioTrack);
+        std::string errorMessage;
+        auto audioTrack = CreateAudioTrack(&errorMessage);
+        if (audioTrack) {
+            stream_->AddTrack(audioTrack);
+        } else {
+            SetError(errorMessage);
+            return;
+        }
+    }
+
+    std::shared_ptr<SystemAudioReceiver> systemAudioReceiver;
+    if (!systemAudioConstraints_.IsNull()) {
+        if (videoConstraints_.IsNull()) {
+            SetError("System audio should not be enabled individually");
+            return;
+        }
+
+        // Use default options
+        systemAudioReceiver = SystemAudioReceiver::Create();
+        std::string errorMessage;
+        auto audioTrack = CreateSystemAudioTrack(systemAudioReceiver, &errorMessage);
+        if (audioTrack) {
+            stream_->AddTrack(audioTrack);
+        } else {
+            SetError(errorMessage);
+            return;
+        }
     }
 
     if (!videoConstraints_.IsNull()) {
-        // default size
-        int width = 720;
-        int height = 1080;
-        GetScreenCaptureConstraints(videoConstraints_, width, height);
-
-        video::VideoProfile profile;
-        profile.resolution.width = width;
-        profile.resolution.height = height;
-        profile.format = video::PixelFormat::RGBA;
-        auto capturer = DesktopCapturer::Create(profile);
-        if (!capturer) {
-            SetError("Failed to create camera capturer");
-            return;
+        std::string errorMessage;
+        auto videoTrack = CreateVideoTrack(systemAudioReceiver, &errorMessage);
+        if (videoTrack) {
+            stream_->AddTrack(videoTrack);
+        } else {
+            SetError(errorMessage);
         }
-
-        auto videoSource = OhosVideoTrackSource::Create(
-            std::move(capturer), factoryWrapper->GetSignalingThread(), EglEnv::GetDefault().GetContext());
-        if (!videoSource) {
-            SetError("Failed to create video source");
-            return;
-        }
-
-        auto videoTrack = factoryWrapper->GetFactory()->CreateVideoTrack(videoSource, rtc::CreateRandomUuid());
-        if (!videoTrack) {
-            SetError("Failed to create video track");
-            return;
-        }
-
-        stream_->AddTrack(videoTrack);
     }
 }
 
@@ -121,7 +200,7 @@ void AsyncWorkerGetDisplayMedia::OnOK()
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    auto mediaStream = NapiMediaStream::NewInstance(Env(), stream_);
+    auto mediaStream = NapiMediaStream::NewInstance(factory_, stream_);
     if (Env().IsExceptionPending()) {
         deferred_.Reject(Env().GetAndClearPendingException().Value());
         return;
