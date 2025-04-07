@@ -626,6 +626,8 @@ void GetScreenCaptureOptionsFromConstraints(const MediaTrackConstraints& constra
     for (const auto& windowId : skipPrivacyModeWindowIds) {
         options.skipPrivacyModeWindowIds.push_back(std::stoull(windowId));
     }
+
+    ConstraintToOptional<bool>(basicSet.ohosScreenCaptureAutoRotation, &options.autoRotation);
 }
 
 } // namespace webrtc
