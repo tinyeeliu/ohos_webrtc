@@ -72,6 +72,7 @@ const std::map<std::string, bool> SUPPORTED_CONSTRAINTS_MAP = {
     {NapiMediaConstraints::kAttributeNameOhosScreenCaptureAudioFilter, true},
     {NapiMediaConstraints::kAttributeNameOhosScreenCaptureWindowFilter, true},
     {NapiMediaConstraints::kAttributeNameOhosScreenCaptureSkipPrivacyMode, true},
+    {NapiMediaConstraints::kAttributeNameOhosScreenCaptureAutoRotation, true},
 };
 
 bool IsConstraintSupported(const std::string& name)
@@ -356,6 +357,8 @@ bool ValidateAndCopyConstraintSetExtension(
                                    trackConstraints.ohosScreenCaptureSkipPrivacyMode, errorMessage)) {
         return false;
     }
+
+    ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.ohosScreenCaptureAutoRotation);
 
     return true;
 }

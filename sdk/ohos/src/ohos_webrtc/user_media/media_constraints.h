@@ -344,6 +344,7 @@ public:
     StringConstraint ohosScreenCaptureWindowFilter;
     StringConstraint ohosScreenCaptureAudioFilter;
     StringConstraint ohosScreenCaptureSkipPrivacyMode;
+    BooleanConstraint ohosScreenCaptureAutoRotation;
 
     bool HasMin() const;
     bool HasExact() const;
