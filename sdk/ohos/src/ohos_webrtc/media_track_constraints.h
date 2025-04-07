@@ -58,6 +58,7 @@ public:
     NAPI_ATTRIBUTE_NAME_DECLARE(OhosScreenCaptureWindowFilter, ohosScreenCaptureWindowFilter);
     NAPI_ATTRIBUTE_NAME_DECLARE(OhosScreenCaptureAudioFilter, ohosScreenCaptureAudioFilter);
     NAPI_ATTRIBUTE_NAME_DECLARE(OhosScreenCaptureSkipPrivacyMode, ohosScreenCaptureSkipPrivacyMode);
+    NAPI_ATTRIBUTE_NAME_DECLARE(OhosScreenCaptureAutoRotation, ohosScreenCaptureAutoRotation);
 
     static std::vector<std::string> GetSupportedConstraints();
     static bool IsConstraintSupported(const std::string& name);

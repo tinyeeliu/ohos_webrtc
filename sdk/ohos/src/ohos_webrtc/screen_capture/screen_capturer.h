@@ -21,6 +21,7 @@
 #include "../video/video_capturer.h"
 #include "../video/video_frame_receiver.h"
 #include "../helper/screen_capture.h"
+#include "../helper/display_manager.h"
 
 #include <memory>
 #include <cstdint>
@@ -34,7 +35,9 @@ namespace webrtc {
 
 class SystemAudioReceiver;
 
-class ScreenCapturer : public VideoCapturer, public VideoFrameReceiver::Callback {
+class ScreenCapturer : public VideoCapturer,
+                       public VideoFrameReceiver::Callback,
+                       public ohos::DisplayManager::ChangeObserver {
 public:
     class AudioObserver {
     public:
@@ -45,8 +48,8 @@ public:
         virtual void OnError(int32_t errorCode, const std::string& message) = 0;
     };
 
-    static std::unique_ptr<ScreenCapturer>
-    Create(ScreenCaptureOptions options, std::shared_ptr<SystemAudioReceiver> systemAudioReceiver = nullptr);
+    static std::unique_ptr<ScreenCapturer> Create(
+        ScreenCaptureOptions options, std::shared_ptr<SystemAudioReceiver> systemAudioReceiver = nullptr);
 
     // Do not use this constructor directly, use 'Create' above.
     ScreenCapturer(ScreenCaptureOptions options, std::shared_ptr<SystemAudioReceiver> systemAudioReceiver);
@@ -67,21 +70,30 @@ protected:
     void NotifyCaptureStart(bool success);
     void NotifyCaptureStop();
 
+    int32_t GetVideoFrameWidth() const;
+    uint64_t GetVideoFrameHeight() const;
+    uint64_t GetDisplayId() const;
+    bool IsAutoRotation() const;
+
+    uint32_t GetDefaultDisplayRotation() const;
+
 protected:
-    void
-    OnFrameAvailable(rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation) override;
+    void OnFrameAvailable(
+        rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation) override;
 
     static void OnError1(OH_AVScreenCapture* capture, int32_t errorCode, void* userData);
-    static void
-    OnStateChange1(struct OH_AVScreenCapture* capture, OH_AVScreenCaptureStateCode stateCode, void* userData);
-    static void OnBufferAvailable1(
-        OH_AVScreenCapture* capture, OH_AVBuffer* buffer, OH_AVScreenCaptureBufferType bufferType, int64_t timestamp,
-        void* userData);
+    static void OnStateChange1(
+        struct OH_AVScreenCapture* capture, OH_AVScreenCaptureStateCode stateCode, void* userData);
+    static void OnBufferAvailable1(OH_AVScreenCapture* capture, OH_AVBuffer* buffer,
+        OH_AVScreenCaptureBufferType bufferType, int64_t timestamp, void* userData);
 
     void OnError(OH_AVScreenCapture* capture, int32_t errorCode);
     void OnStateChange(struct OH_AVScreenCapture* capture, OH_AVScreenCaptureStateCode stateCode);
     void OnBufferAvailable(
         OH_AVScreenCapture* capture, OH_AVBuffer* buffer, OH_AVScreenCaptureBufferType bufferType, int64_t timestamp);
+
+    // ohos::DisplayManager::ChangeObserver implementation.
+    void OnDisplayChange(uint64_t displayId) override;
 
 private:
     const ScreenCaptureOptions options_;
@@ -89,6 +101,9 @@ private:
 
     bool isInitialized_{false};
     bool isStarted_{false};
+
+    uint32_t initDisplayRotation_{0};
+    std::atomic<uint32_t> displayRotation_{0};
 
     ohos::AVScreenCapture screenCapture_;
 
