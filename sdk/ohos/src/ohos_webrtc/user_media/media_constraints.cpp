@@ -280,7 +280,8 @@ MediaTrackConstraintSet::MediaTrackConstraintSet()
       ohosScreenCaptureMissionId("ohosScreenCaptureMissionId"),
       ohosScreenCaptureWindowFilter("ohosScreenCaptureWindowFilter"),
       ohosScreenCaptureAudioFilter("ohosScreenCaptureAudioFilter"),
-      ohosScreenCaptureSkipPrivacyMode("ohosScreenCaptureSkipPrivacyMode")
+      ohosScreenCaptureSkipPrivacyMode("ohosScreenCaptureSkipPrivacyMode"),
+      ohosScreenCaptureAutoRotation("ohosScreenCaptureAutoRotation")
 {
 }
 
@@ -323,6 +324,7 @@ std::vector<const BaseConstraint*> MediaTrackConstraintSet::AllConstraints() con
         &ohosScreenCaptureWindowFilter,
         &ohosScreenCaptureAudioFilter,
         &ohosScreenCaptureSkipPrivacyMode,
+        &ohosScreenCaptureAutoRotation,
     };
 }
 

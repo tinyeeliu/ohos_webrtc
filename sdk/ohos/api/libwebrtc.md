@@ -906,8 +906,8 @@ getStats(selector?: MediaStreamTrack): Promise<RTCStatsReport>;
 
 | 名称               | 类型               | 必填  | 说明                     |
 |------------------|------------------|-----|------------------------|
-| width            | ConstrainULong   | 否   | 表示媒体轨道需要满足的视频宽度约束条件    |
-| height           | ConstrainULong   | 否   | 表示媒体轨道需要满足的视频高度约束条件    |
+| width            | ConstrainULong   | 否   | 表示媒体轨道需要满足的视频宽度约束条件，以像素为单位。用于屏幕采集时，以设备自然方向为参考（手机为竖屏） |
+| height           | ConstrainULong   | 否   | 表示媒体轨道需要满足的视频高度约束条件，以像素为单位。用于屏幕采集时，以设备自然方向为参考（手机为竖屏） |
 | aspectRatio      | ConstrainDouble  | 否   | 表示媒体轨道需要满足的视频纵横比约束条件   |
 | frameRate        | ConstrainDouble  | 否   | 表示媒体轨道需要满足的帧率约束条件      |
 | facingMode       | ConstrainString  | 否   | 表示媒体轨道需要满足的摄像头朝向模式约束条件 |
@@ -921,6 +921,13 @@ getStats(selector?: MediaStreamTrack): Promise<RTCStatsReport>;
 | channelCount     | ConstrainULong   | 否   | 表示媒体轨道需要满足的音频通道数量约束条件  |
 | deviceId         | ConstrainString  | 否   | 表示媒体轨道需要满足的设备 ID 约束条件  |
 | groupId          | ConstrainString  | 否   | 表示媒体轨道需要满足的设备组 ID 约束条件 |
+| ohosScreenCaptureMode             | ConstrainString | 否   | 表示媒体轨道需要满足的屏幕采集模式约束条件，可选值：'home-screen'，'specified-screen'，'specified-window'，默认为 'home-screen' |
+| ohosScreenCaptureDisplayId        | ConstrainULong  | 否   | 表示媒体轨道需要满足的屏幕采集时指定屏幕 ID 约束条件，当 ohosScreenCaptureMode 为 'specified-screen' 时有效 |
+| ohosScreenCaptureMissionId        | ConstrainString | 否   | 表示媒体轨道需要满足的屏幕采集时指定窗口 ID 约束条件，当 ohosScreenCaptureMode 为 'specified-window' 时有效 |
+| ohosScreenCaptureWindowFilter     | ConstrainString | 否   | 表示媒体轨道需要满足的屏幕采集时指定过滤窗口 ID 约束条件 |
+| ohosScreenCaptureAudioFilter      | ConstrainString | 否   | 表示媒体轨道需要满足的屏幕采集时指定过滤音频类型约束条件，可选值：'current-app'，'notification' |
+| ohosScreenCaptureSkipPrivacyMode  | ConstrainString | 否   | 表示媒体轨道需要满足的屏幕采集时跳过隐私模式的窗口 ID 约束条件 |
+| ohosScreenCaptureAutoRotation     | ConstrainBoolean  | 否  | 表示媒体轨道需要满足的屏幕采集时是否自动旋转约束条件，默认开启自动旋转  |
 
 ## MediaTrackConstraints
 

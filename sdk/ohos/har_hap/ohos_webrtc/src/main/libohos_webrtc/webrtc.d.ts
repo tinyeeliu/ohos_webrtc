@@ -713,6 +713,7 @@ export interface MediaTrackConstraintSet {
   ohosScreenCaptureWindowFilter?: ConstrainString;
   ohosScreenCaptureAudioFilter?: ConstrainString;
   ohosScreenCaptureSkipPrivacyMode?: ConstrainString;
+  ohosScreenCaptureAutoRotation?: ConstrainBoolean;
 }
 
 // https://www.w3.org/TR/mediacapture-streams/#media-track-constraints

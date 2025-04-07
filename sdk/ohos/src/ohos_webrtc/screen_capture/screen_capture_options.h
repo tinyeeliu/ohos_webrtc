@@ -48,6 +48,8 @@ struct ScreenCaptureOptions {
     std::vector<int32_t> filteredAudioContents;
     // The ids of window whose privacy mode of current app would be skipped during the screen recording
     std::vector<int32_t> skipPrivacyModeWindowIds;
+    // Auto rotaion follow device display
+    std::optional<bool> autoRotation;
 };
 
 } // namespace webrtc
