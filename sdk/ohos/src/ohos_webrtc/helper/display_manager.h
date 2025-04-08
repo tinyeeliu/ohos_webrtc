@@ -34,33 +34,43 @@ public:
         virtual void OnDisplayChange(uint64_t displayId) = 0;
     };
 
-    static void RegisterChangeCallback(ChangeObserver* observer);
-    static void UnregisterChangeCallback(ChangeObserver* observer);
+    static DisplayManager& GetInstance();
 
-    static uint64_t GetDefaultDisplayId();
-    static int32_t GetDefaultDisplayWidth();
-    static int32_t GetDefaultDisplayHeight();
-    static NativeDisplayManager_Rotation GetDefaultDisplayRotation();
-    static NativeDisplayManager_Orientation GetDefaultDisplayOrientation();
+    void RegisterChangeCallback(ChangeObserver* observer);
+    void UnregisterChangeCallback(ChangeObserver* observer);
+
+    uint64_t GetDefaultDisplayId();
+    int32_t GetDefaultDisplayWidth();
+    int32_t GetDefaultDisplayHeight();
+    NativeDisplayManager_Rotation GetDefaultDisplayRotation();
+    NativeDisplayManager_Orientation GetDefaultDisplayOrientation();
 
 protected:
-    static void DisplayChangeCallback(uint64_t displayId);
-    static bool RegisterDisplayChangeListener();
-    static bool UnregisterDisplayChangeListener();
+    static void DisplayChangeCallback1(uint64_t displayId);
+    void DisplayChangeCallback(uint64_t displayId);
+    bool RegisterDisplayChangeListener();
+    bool UnregisterDisplayChangeListener();
 
 private:
-    static uint32_t listenerIndex;
-    static std::list<ChangeObserver*> changeObservers_;
-    static std::mutex mutex_;
+    uint32_t listenerIndex_{0};
+    std::list<ChangeObserver*> changeObservers_;
+    std::mutex mutex_;
 };
+
+inline DisplayManager& DisplayManager::GetInstance()
+{
+    static DisplayManager instance;
+    return instance;
+}
 
 inline uint64_t DisplayManager::GetDefaultDisplayId()
 {
     uint64_t displayId = 0;
     NativeDisplayManager_ErrorCode errCode = OH_NativeDisplayManager_GetDefaultDisplayId(&displayId);
     if (errCode != DISPLAY_MANAGER_OK) {
-        NATIVE_THROW_IF_FAILED(errCode == DISPLAY_MANAGER_OK, errCode, "NativeDisplayManager",
-            "Failed to get default display id", displayId);
+        NATIVE_THROW_IF_FAILED(
+            errCode == DISPLAY_MANAGER_OK, errCode, "NativeDisplayManager", "Failed to get default display id",
+            displayId);
     }
     return displayId;
 }
@@ -70,8 +80,9 @@ inline int32_t DisplayManager::GetDefaultDisplayWidth()
     int32_t width = 0;
     NativeDisplayManager_ErrorCode errCode = OH_NativeDisplayManager_GetDefaultDisplayWidth(&width);
     if (errCode != DISPLAY_MANAGER_OK) {
-        NATIVE_THROW_IF_FAILED(errCode == DISPLAY_MANAGER_OK, errCode, "NativeDisplayManager",
-            "Failed to get default display width", width);
+        NATIVE_THROW_IF_FAILED(
+            errCode == DISPLAY_MANAGER_OK, errCode, "NativeDisplayManager", "Failed to get default display width",
+            width);
     }
     return width;
 }
@@ -81,8 +92,9 @@ inline int32_t DisplayManager::GetDefaultDisplayHeight()
     int32_t height = 0;
     NativeDisplayManager_ErrorCode errCode = OH_NativeDisplayManager_GetDefaultDisplayHeight(&height);
     if (errCode != DISPLAY_MANAGER_OK) {
-        NATIVE_THROW_IF_FAILED(errCode == DISPLAY_MANAGER_OK, -1, "NativeDisplayManager",
-            "Failed to get default display height", DISPLAY_MANAGER_ROTATION_0);
+        NATIVE_THROW_IF_FAILED(
+            errCode == DISPLAY_MANAGER_OK, -1, "NativeDisplayManager", "Failed to get default display height",
+            DISPLAY_MANAGER_ROTATION_0);
     }
     return height;
 }
@@ -92,8 +104,9 @@ inline NativeDisplayManager_Rotation DisplayManager::GetDefaultDisplayRotation()
     NativeDisplayManager_Rotation displayRotation;
     NativeDisplayManager_ErrorCode errCode = OH_NativeDisplayManager_GetDefaultDisplayRotation(&displayRotation);
     if (errCode != DISPLAY_MANAGER_OK) {
-        NATIVE_THROW_IF_FAILED(errCode == DISPLAY_MANAGER_OK, -1, "NativeDisplayManager",
-            "Failed to get default display rotation", DISPLAY_MANAGER_ROTATION_0);
+        NATIVE_THROW_IF_FAILED(
+            errCode == DISPLAY_MANAGER_OK, -1, "NativeDisplayManager", "Failed to get default display rotation",
+            DISPLAY_MANAGER_ROTATION_0);
     }
     return displayRotation;
 }
@@ -103,8 +116,9 @@ inline NativeDisplayManager_Orientation DisplayManager::GetDefaultDisplayOrienta
     NativeDisplayManager_Orientation displayOrientation = DISPLAY_MANAGER_UNKNOWN;
     NativeDisplayManager_ErrorCode errCode = OH_NativeDisplayManager_GetDefaultDisplayOrientation(&displayOrientation);
     if (errCode != DISPLAY_MANAGER_OK) {
-        NATIVE_THROW_IF_FAILED(errCode == DISPLAY_MANAGER_OK, -1, "NativeDisplayManager",
-            "Failed to get default display orientation", displayOrientation);
+        NATIVE_THROW_IF_FAILED(
+            errCode == DISPLAY_MANAGER_OK, -1, "NativeDisplayManager", "Failed to get default display orientation",
+            displayOrientation);
     }
     return displayOrientation;
 }

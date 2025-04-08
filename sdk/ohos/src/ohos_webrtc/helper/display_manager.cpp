@@ -17,9 +17,10 @@
 
 namespace ohos {
 
-uint32_t DisplayManager::listenerIndex = 0;
-std::list<DisplayManager::ChangeObserver*> DisplayManager::changeObservers_;
-std::mutex DisplayManager::mutex_;
+void DisplayManager::DisplayChangeCallback1(uint64_t displayId)
+{
+    GetInstance().DisplayChangeCallback(displayId);
+}
 
 void DisplayManager::RegisterChangeCallback(ChangeObserver* observer)
 {
@@ -52,16 +53,15 @@ void DisplayManager::DisplayChangeCallback(uint64_t displayId)
     RTC_DLOG_F(LS_INFO) << "displayId=" << displayId;
 
     std::lock_guard<std::mutex> lock(mutex_);
-    std::for_each(changeObservers_.begin(), changeObservers_.end(), [displayId](auto* observer) {
-        observer->OnDisplayChange(displayId);
-    });
+    std::for_each(changeObservers_.begin(), changeObservers_.end(),
+        [displayId](auto* observer) { observer->OnDisplayChange(displayId); });
 }
 
 bool DisplayManager::RegisterDisplayChangeListener()
 {
     NativeDisplayManager_ErrorCode errCode =
-        OH_NativeDisplayManager_RegisterDisplayChangeListener(DisplayManager::DisplayChangeCallback, &listenerIndex);
-    RTC_DLOG_F(LS_INFO) << "listenerIndex=" << listenerIndex;
+        OH_NativeDisplayManager_RegisterDisplayChangeListener(DisplayManager::DisplayChangeCallback1, &listenerIndex_);
+    RTC_DLOG_F(LS_INFO) << "listenerIndex=" << listenerIndex_;
     if (errCode == DISPLAY_MANAGER_OK) {
         return true;
     } else {
@@ -72,8 +72,8 @@ bool DisplayManager::RegisterDisplayChangeListener()
 
 bool DisplayManager::UnregisterDisplayChangeListener()
 {
-    RTC_DLOG_F(LS_INFO) << "listenerIndex=" << listenerIndex;
-    NativeDisplayManager_ErrorCode errCode = OH_NativeDisplayManager_UnregisterDisplayChangeListener(listenerIndex);
+    RTC_DLOG_F(LS_INFO) << "listenerIndex=" << listenerIndex_;
+    NativeDisplayManager_ErrorCode errCode = OH_NativeDisplayManager_UnregisterDisplayChangeListener(listenerIndex_);
     if (errCode == DISPLAY_MANAGER_OK) {
         return true;
     } else {

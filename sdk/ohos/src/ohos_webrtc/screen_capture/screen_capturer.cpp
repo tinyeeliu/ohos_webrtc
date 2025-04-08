@@ -31,6 +31,8 @@ constexpr int32_t kVideoFrameHeight_Default = 1280;
 
 } // namespace
 
+using namespace ohos;
+
 std::unique_ptr<ScreenCapturer> ScreenCapturer::Create(
     ScreenCaptureOptions options, std::shared_ptr<SystemAudioReceiver> systemAudioReceiver)
 {
@@ -40,14 +42,12 @@ std::unique_ptr<ScreenCapturer> ScreenCapturer::Create(
 }
 
 ScreenCapturer::ScreenCapturer(ScreenCaptureOptions options, std::shared_ptr<SystemAudioReceiver> systemAudioReceiver)
-    : options_(std::move(options)),
-      systemAudioReceiver_(systemAudioReceiver),
-      screenCapture_(ohos::AVScreenCapture::Create())
+    : options_(std::move(options)), systemAudioReceiver_(systemAudioReceiver), screenCapture_(AVScreenCapture::Create())
 {
     RTC_DLOG(LS_INFO) << __FUNCTION__;
 
     if (IsAutoRotation()) {
-        ohos::DisplayManager::RegisterChangeCallback(this);
+        DisplayManager::GetInstance().RegisterChangeCallback(this);
     }
 }
 
@@ -58,7 +58,7 @@ ScreenCapturer::~ScreenCapturer()
     Release();
 
     if (IsAutoRotation()) {
-        ohos::DisplayManager::UnregisterChangeCallback(this);
+        DisplayManager::GetInstance().UnregisterChangeCallback(this);
     }
 }
 
@@ -100,7 +100,7 @@ void ScreenCapturer::Init(std::unique_ptr<VideoFrameReceiver> dataReceiver, Obse
     ret = OH_AVScreenCapture_SetDataCallback(screenCapture_.Raw(), ScreenCapturer::OnBufferAvailable1, this);
     RTC_LOG_IF(LS_ERROR, ret != AV_SCREEN_CAPTURE_ERR_OK) << "Failed to set data callback: " << ret;
 
-    auto contentFilter = ohos::AVScreenCaptureContentFilter::Create();
+    auto contentFilter = AVScreenCaptureContentFilter::Create();
     SetupContentFilter(contentFilter);
     ret = OH_AVScreenCapture_ExcludeContent(screenCapture_.Raw(), contentFilter.Raw());
     if (ret != AV_SCREEN_CAPTURE_ERR_OK) {
@@ -226,7 +226,7 @@ void ScreenCapturer::SetupConfig(int32_t width, int32_t height, OH_AVScreenCaptu
     config.videoInfo = videoInfo;
 }
 
-bool ScreenCapturer::SetupContentFilter(ohos::AVScreenCaptureContentFilter& contentFilter)
+bool ScreenCapturer::SetupContentFilter(AVScreenCaptureContentFilter& contentFilter)
 {
     if (!options_.filteredWindowIds.empty()) {
         auto ret = OH_AVScreenCapture_ContentFilter_AddWindowContent(contentFilter.Raw(),
@@ -285,7 +285,7 @@ uint64_t ScreenCapturer::GetVideoFrameHeight() const
 
 uint64_t ScreenCapturer::GetDisplayId() const
 {
-    return options_.displayId.value_or(ohos::DisplayManager::GetDefaultDisplayId());
+    return options_.displayId.value_or(DisplayManager::GetInstance().GetDefaultDisplayId());
 }
 
 bool ScreenCapturer::IsAutoRotation() const
@@ -295,7 +295,7 @@ bool ScreenCapturer::IsAutoRotation() const
 
 uint32_t ScreenCapturer::GetDefaultDisplayRotation() const
 {
-    NativeDisplayManager_Rotation displayRotation = ohos::DisplayManager::GetDefaultDisplayRotation();
+    NativeDisplayManager_Rotation displayRotation = DisplayManager::GetInstance().GetDefaultDisplayRotation();
     if (displayRotation) {
         switch (displayRotation) {
             case DISPLAY_MANAGER_ROTATION_0:
