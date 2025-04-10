@@ -31,8 +31,10 @@ constexpr int32_t kVideoFrameHeight_Default = 1280;
 
 } // namespace
 
-std::unique_ptr<ScreenCapturer> ScreenCapturer::Create(ScreenCaptureOptions options,
-    std::shared_ptr<SystemAudioReceiver> systemAudioReceiver)
+using namespace ohos;
+
+std::unique_ptr<ScreenCapturer> ScreenCapturer::Create(
+    ScreenCaptureOptions options, std::shared_ptr<SystemAudioReceiver> systemAudioReceiver)
 {
     RTC_DLOG(LS_INFO) << __FUNCTION__;
 
@@ -40,11 +42,13 @@ std::unique_ptr<ScreenCapturer> ScreenCapturer::Create(ScreenCaptureOptions opti
 }
 
 ScreenCapturer::ScreenCapturer(ScreenCaptureOptions options, std::shared_ptr<SystemAudioReceiver> systemAudioReceiver)
-    : options_(std::move(options)),
-      systemAudioReceiver_(systemAudioReceiver),
-      screenCapture_(ohos::AVScreenCapture::Create())
+    : options_(std::move(options)), systemAudioReceiver_(systemAudioReceiver), screenCapture_(AVScreenCapture::Create())
 {
     RTC_DLOG(LS_INFO) << __FUNCTION__;
+
+    if (IsAutoRotation()) {
+        DisplayManager::GetInstance().RegisterChangeCallback(this);
+    }
 }
 
 ScreenCapturer::~ScreenCapturer()
@@ -52,6 +56,10 @@ ScreenCapturer::~ScreenCapturer()
     RTC_DLOG(LS_INFO) << __FUNCTION__;
 
     Release();
+
+    if (IsAutoRotation()) {
+        DisplayManager::GetInstance().UnregisterChangeCallback(this);
+    }
 }
 
 void ScreenCapturer::Init(std::unique_ptr<VideoFrameReceiver> dataReceiver, Observer* observer)
@@ -63,8 +71,8 @@ void ScreenCapturer::Init(std::unique_ptr<VideoFrameReceiver> dataReceiver, Obse
         observer_ = observer;
     }
 
-    int32_t width = options_.videoFrameWidth.value_or(kVideoFrameWidth_Default);
-    int32_t height = options_.videoFrameHeight.value_or(kVideoFrameHeight_Default);
+    int32_t width = GetVideoFrameWidth();
+    int32_t height = GetVideoFrameHeight();
 
     dataReceiver_ = std::move(dataReceiver);
     dataReceiver_->SetVideoFrameSize(width, height);
@@ -92,7 +100,7 @@ void ScreenCapturer::Init(std::unique_ptr<VideoFrameReceiver> dataReceiver, Obse
     ret = OH_AVScreenCapture_SetDataCallback(screenCapture_.Raw(), ScreenCapturer::OnBufferAvailable1, this);
     RTC_LOG_IF(LS_ERROR, ret != AV_SCREEN_CAPTURE_ERR_OK) << "Failed to set data callback: " << ret;
 
-    auto contentFilter = ohos::AVScreenCaptureContentFilter::Create();
+    auto contentFilter = AVScreenCaptureContentFilter::Create();
     SetupContentFilter(contentFilter);
     ret = OH_AVScreenCapture_ExcludeContent(screenCapture_.Raw(), contentFilter.Raw());
     if (ret != AV_SCREEN_CAPTURE_ERR_OK) {
@@ -101,9 +109,8 @@ void ScreenCapturer::Init(std::unique_ptr<VideoFrameReceiver> dataReceiver, Obse
     }
 
     if (!options_.skipPrivacyModeWindowIds.empty()) {
-        ret = OH_AVScreenCapture_SkipPrivacyMode(
-            screenCapture_.Raw(), const_cast<int32_t*>(options_.skipPrivacyModeWindowIds.data()),
-            options_.skipPrivacyModeWindowIds.size());
+        ret = OH_AVScreenCapture_SkipPrivacyMode(screenCapture_.Raw(),
+            const_cast<int32_t*>(options_.skipPrivacyModeWindowIds.data()), options_.skipPrivacyModeWindowIds.size());
         if (ret != AV_SCREEN_CAPTURE_ERR_OK) {
             RTC_LOG(LS_ERROR) << "Failed to skip privacy mode: " << ret;
             return;
@@ -202,7 +209,7 @@ void ScreenCapturer::SetupConfig(int32_t width, int32_t height, OH_AVScreenCaptu
     OH_VideoInfo videoInfo{};
     OH_VideoCaptureInfo videoCapInfo{};
     if (captureMode == OH_CAPTURE_SPECIFIED_SCREEN) {
-        videoCapInfo.displayId = options_.displayId.value_or(-1);
+        videoCapInfo.displayId = GetDisplayId();
     } else if (captureMode == OH_CAPTURE_SPECIFIED_WINDOW) {
         videoCapInfo.missionIDs = const_cast<int32_t*>(options_.missionIds.data());
         videoCapInfo.missionIDsLen = options_.missionIds.size();
@@ -219,12 +226,11 @@ void ScreenCapturer::SetupConfig(int32_t width, int32_t height, OH_AVScreenCaptu
     config.videoInfo = videoInfo;
 }
 
-bool ScreenCapturer::SetupContentFilter(ohos::AVScreenCaptureContentFilter& contentFilter)
+bool ScreenCapturer::SetupContentFilter(AVScreenCaptureContentFilter& contentFilter)
 {
     if (!options_.filteredWindowIds.empty()) {
-        auto ret = OH_AVScreenCapture_ContentFilter_AddWindowContent(
-            contentFilter.Raw(), const_cast<int32_t*>(options_.filteredWindowIds.data()),
-            options_.filteredWindowIds.size());
+        auto ret = OH_AVScreenCapture_ContentFilter_AddWindowContent(contentFilter.Raw(),
+            const_cast<int32_t*>(options_.filteredWindowIds.data()), options_.filteredWindowIds.size());
         if (ret != AV_SCREEN_CAPTURE_ERR_OK) {
             RTC_LOG(LS_ERROR) << "Failed to add audio content filter: " << ret;
             return false;
@@ -267,14 +273,65 @@ void ScreenCapturer::NotifyCaptureStop()
     }
 }
 
+int32_t ScreenCapturer::GetVideoFrameWidth() const
+{
+    return options_.videoFrameWidth.value_or(kVideoFrameWidth_Default);
+}
+
+uint64_t ScreenCapturer::GetVideoFrameHeight() const
+{
+    return options_.videoFrameHeight.value_or(kVideoFrameHeight_Default);
+}
+
+uint64_t ScreenCapturer::GetDisplayId() const
+{
+    return options_.displayId.value_or(DisplayManager::GetInstance().GetDefaultDisplayId());
+}
+
+bool ScreenCapturer::IsAutoRotation() const
+{
+    return options_.autoRotation.value_or(true);
+}
+
+uint32_t ScreenCapturer::GetDefaultDisplayRotation() const
+{
+    NativeDisplayManager_Rotation displayRotation = DisplayManager::GetInstance().GetDefaultDisplayRotation();
+    if (displayRotation) {
+        switch (displayRotation) {
+            case DISPLAY_MANAGER_ROTATION_0:
+                return kVideoRotation_0;
+            case DISPLAY_MANAGER_ROTATION_90:
+                return kVideoRotation_90;
+            case DISPLAY_MANAGER_ROTATION_180:
+                return kVideoRotation_180;
+            case DISPLAY_MANAGER_ROTATION_270:
+                return kVideoRotation_270;
+            default:
+                break;
+        }
+    }
+
+    return kVideoRotation_0;
+}
+
 void ScreenCapturer::OnFrameAvailable(
     rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
+    // Ignore
+    (void)rotation;
+
+    constexpr uint32_t kVideoRotation_360 = 360;
+    uint32_t displayRotation = displayRotation_;
+    uint32_t targetRotation = (displayRotation >= initDisplayRotation_)
+                                  ? (displayRotation - initDisplayRotation_)
+                                  : (kVideoRotation_360 + displayRotation - initDisplayRotation_);
+    RTC_DLOG(LS_VERBOSE) << "targetRotation=" << targetRotation;
+
     UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
     if (observer_) {
-        observer_->OnFrameCaptured(buffer, timestampUs, rotation);
+        observer_->OnFrameCaptured(buffer, timestampUs, static_cast<VideoRotation>(targetRotation));
     }
 }
 
@@ -291,9 +348,8 @@ void ScreenCapturer::OnStateChange1(
     self->OnStateChange(capture, stateCode);
 }
 
-void ScreenCapturer::OnBufferAvailable1(
-    OH_AVScreenCapture* capture, OH_AVBuffer* buffer, OH_AVScreenCaptureBufferType bufferType, int64_t timestamp,
-    void* userData)
+void ScreenCapturer::OnBufferAvailable1(OH_AVScreenCapture* capture, OH_AVBuffer* buffer,
+    OH_AVScreenCaptureBufferType bufferType, int64_t timestamp, void* userData)
 {
     // surface模式时不触发
     ScreenCapturer* self = (ScreenCapturer*)userData;
@@ -313,6 +369,20 @@ void ScreenCapturer::OnStateChange(struct OH_AVScreenCapture* capture, OH_AVScre
 
     switch (stateCode) {
         case OH_SCREEN_CAPTURE_STATE_STARTED: {
+            displayRotation_ = initDisplayRotation_ = GetDefaultDisplayRotation();
+            RTC_DLOG(LS_INFO) << "Display rotation: " << displayRotation_;
+            if (displayRotation_ == kVideoRotation_90 || displayRotation_ == kVideoRotation_270) {
+                // Swap width and height in landscape
+                int32_t width = GetVideoFrameWidth();
+                int32_t height = GetVideoFrameHeight();
+                std::swap(width, height);
+                RTC_DLOG(LS_INFO) << "Video frame size: " << width << "x" << height;
+
+                dataReceiver_->SetVideoFrameSize(width, height);
+                OH_AVSCREEN_CAPTURE_ErrCode ret = OH_AVScreenCapture_ResizeCanvas(screenCapture_.Raw(), width, height);
+                RTC_LOG_IF(LS_ERROR, ret != AV_SCREEN_CAPTURE_ERR_OK) << "Failed to resize canvas: " << ret;
+            }
+
             NotifyCaptureStart(true);
             if (systemAudioReceiver_) {
                 systemAudioReceiver_->OnStarted(true);
@@ -370,6 +440,14 @@ void ScreenCapturer::OnBufferAvailable(
         default:
             break;
     }
+}
+
+void ScreenCapturer::OnDisplayChange(uint64_t displayId)
+{
+    RTC_LOG_F(LS_INFO) << "displayId=" << displayId;
+
+    displayRotation_ = GetDefaultDisplayRotation();
+    RTC_DLOG(LS_INFO) << "Display rotation: " << displayRotation_;
 }
 
 } // namespace webrtc
