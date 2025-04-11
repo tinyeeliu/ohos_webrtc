@@ -225,7 +225,7 @@ export default function PeerConnectionTest() {
 
     it("addIceCandidate", DEFAULT, async () => {
       let candidate: webrtc.RTCIceCandidate | undefined = undefined;
-      let pormise = new Promise<void>((resolve) => {
+      let icePromise = new Promise<void>((resolve) => {
         caller.onicecandidate = (event) => {
           console.info(TAG, 'onicecandidate: ', event.candidate);
           candidate = event.candidate;
@@ -250,7 +250,7 @@ export default function PeerConnectionTest() {
       await caller?.setLocalDescription(answer);
       console.info(TAG, 'caller.signalingState changed:', caller.signalingState);
 
-      await pormise;
+      await icePromise;
       expect(candidate).not().assertUndefined();
 
       try {
