@@ -158,7 +158,7 @@ void NativeWindowRendererGl::OnFrame(const VideoFrame& frame)
     }
 
     // 检测帧宽高变化
-    if (frame.width() != lastFrameWidth_ || frame.height() != lastFrameHeight_) {
+    // if (frame.width() != lastFrameWidth_ || frame.height() != lastFrameHeight_) {
 
         lastFrameWidth_ = frame.width();
         lastFrameHeight_ = frame.height();
@@ -172,7 +172,7 @@ void NativeWindowRendererGl::OnFrame(const VideoFrame& frame)
                                  << lastFrameHeight_;
             frameSizeChangeCallback_(lastFrameWidth_, lastFrameHeight_,lastFrameRotation_);
         }
-    }
+    // }
 
     thread_->PostTask([this, frame = frame] { RenderFrame(frame); });
 }
