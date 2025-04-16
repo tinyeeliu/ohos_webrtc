@@ -158,7 +158,7 @@ void NativeWindowRendererGl::OnFrame(const VideoFrame& frame)
     }
 
     // 检测帧宽高变化
-    if (frame.width() != lastFrameWidth_ || frame.height() != lastFrameHeight_) {
+    if (frame.width() != lastFrameWidth_ || frame.height() != lastFrameHeight_ || frame.rotation() != lastFrameRotation_) {
 
         lastFrameWidth_ = frame.width();
         lastFrameHeight_ = frame.height();
