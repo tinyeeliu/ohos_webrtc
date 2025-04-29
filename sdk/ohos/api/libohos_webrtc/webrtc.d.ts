@@ -354,6 +354,8 @@ export interface RTCPeerConnection extends EventTarget {
   addTransceiver(trackOrKind: MediaStreamTrack | string, init?: RTCRtpTransceiverInit): RTCRtpTransceiver;
   close(): void;
   getStats(selector?: MediaStreamTrack): Promise<RTCStatsReport>;
+  setAudioRecording(recording: boolean): void;
+  setAudioPlayout(playout: boolean): void;
 }
 
 declare var RTCPeerConnection: {
