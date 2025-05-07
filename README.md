@@ -1,3 +1,9 @@
+# 🚨 **重要提示 | IMPORTANT**
+>
+> **⚠️ 此代码仓已归档。新地址请访问 [ohos_webrtc](https://gitcode.com/openharmony-sig/ohos_webrtc)。| ⚠️ This repository has been archived. For the new address, please visit [ohos_webrtc](https://gitcode.com/openharmony-sig/ohos_webrtc).**
+>
+---
+>
 **WebRTC is a free, open software project** that provides browsers and mobile
 applications with Real-Time Communications (RTC) capabilities via simple APIs.
 The WebRTC components have been optimized to best serve this purpose.
