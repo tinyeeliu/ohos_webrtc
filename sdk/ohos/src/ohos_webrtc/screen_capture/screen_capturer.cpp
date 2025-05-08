@@ -183,6 +183,12 @@ void ScreenCapturer::Stop()
     }
 
     isStarted_ = false;
+
+    // No state change callback, notify manually.
+    NotifyCaptureStop();
+    if (systemAudioReceiver_) {
+        systemAudioReceiver_->OnStopped();
+    }
 }
 
 bool ScreenCapturer::IsScreencast()
