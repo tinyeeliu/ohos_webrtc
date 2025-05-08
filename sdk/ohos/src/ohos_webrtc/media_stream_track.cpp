@@ -14,6 +14,7 @@
  */
 
 #include "media_stream_track.h"
+#include "media_source.h"
 #include "peer_connection_factory.h"
 #include "audio_device/ohos_local_audio_source.h"
 #include "video/video_track_source.h"
@@ -38,6 +39,7 @@ const char kAttributeNameOnUnmute[] = "onunmute";
 const char kAttributeNameOnEnded[] = "onended";
 
 const char kMethodNameStop[] = "stop";
+const char kMethodNameGetSource[] = "getSource";
 const char kMethodNameToJson[] = "toJSON";
 
 const char kEnumMediaStreamTrackStateLive[] = "live";
@@ -58,6 +60,7 @@ void NapiMediaStreamTrack::Init(Napi::Env env, Object exports)
                 kAttributeNameEnabled),
             InstanceAccessor<&NapiMediaStreamTrack::GetReadyState>(kAttributeNameReadyState),
             InstanceMethod<&NapiMediaStreamTrack::Stop>(kMethodNameStop),
+            InstanceMethod<&NapiMediaStreamTrack::GetSource>(kMethodNameGetSource),
             InstanceMethod<&NapiMediaStreamTrack::ToJson>(kMethodNameToJson),
         });
     exports.Set(kClassName, func);
@@ -315,6 +318,29 @@ Napi::Value NapiMediaStreamTrack::Stop(const Napi::CallbackInfo& info)
     RemoveAllVideoSinks();
 
     return info.Env().Undefined();
+}
+
+Napi::Value NapiMediaStreamTrack::GetSource(const Napi::CallbackInfo& info)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    if (!track_) {
+        NAPI_THROW(Error::New(info.Env(), "Illegal state"), info.Env().Undefined());
+    }
+
+    if (IsAudioTrack()) {
+        auto source = factory_->GetAudioSource(track_);
+        if (source) {
+            return NapiAudioSource::NewInstance(info.Env(), source);
+        }
+    } else if (IsVideoTrack()) {
+        auto source = factory_->GetVideoSource(track_);
+        if (source) {
+            return NapiVideoSource::NewInstance(info.Env(), source);
+        }
+    }
+
+    return info.Env().Null();
 }
 
 Napi::Value NapiMediaStreamTrack::ToJson(const Napi::CallbackInfo& info)
