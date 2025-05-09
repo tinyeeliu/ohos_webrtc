@@ -424,6 +424,18 @@ struct Index {
       console.info(TAG, 'videoTrack: ' + JSON.stringify(this.localVideoTrack));
 
       if (this.localVideoTrack) {
+        let videoSource = this.localVideoTrack.getSource();
+        if (videoSource) {
+          this.localVideoSource = videoSource as webrtc.VideoSource;
+          console.info(TAG, 'videoSource: ' + JSON.stringify(this.localVideoSource));
+          this.localVideoSource!.oncapturerstarted = (event: webrtc.VideoCapturerStartedEvent) => {
+            console.info(TAG, 'oncapturerstarted: event=' + JSON.stringify(event));
+          };
+          this.localVideoSource!.oncapturerstopped = (event: webrtc.Event) => {
+            console.info(TAG, 'oncapturerstopped: event=' + JSON.stringify(event));
+          };
+        }
+
         this.mXComponentController1.setVideoTrack(this.localVideoTrack);
         this.mXComponentController1.setScalingMode(ScalingMode.AspectFit);
       }

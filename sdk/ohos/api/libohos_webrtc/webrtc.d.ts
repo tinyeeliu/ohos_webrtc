@@ -797,6 +797,7 @@ export interface MediaStreamTrack extends EventTarget {
   readonly readyState: MediaStreamTrackState;
 
   stop(): void;
+  getSource(): MediaSource | null;
 }
 
 export declare var MediaStreamTrack: {
