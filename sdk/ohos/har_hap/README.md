@@ -6,7 +6,7 @@
 
 ## 准备
 
-参考[文档](/docs/ohos/webrtc_build.md)编译生成`libohos_webrtc.so`动态库。
+参考[文档](../../../docs/ohos/webrtc_build.md)编译生成`libohos_webrtc.so`动态库。
 
 `arm64-v8a`版本放置在`ohos_webrtc/libs/arm64-v8a`目录下，可使用如下参数编译：
 ``` shell
