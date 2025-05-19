@@ -513,7 +513,7 @@ rtc::scoped_refptr<I420BufferInterface> YuvConverter::Convert(rtc::scoped_refptr
     }
 
     Matrix renderMatrix;
-    renderMatrix.PreScale(1.0f, -1.0f, 0.0f, 0.0f);
+    renderMatrix.PreScale(1.0f, -1.0f, 0.5f, 0.5f);
 
     // Draw Y
     drawer_->SetStepSize(1.0f);
