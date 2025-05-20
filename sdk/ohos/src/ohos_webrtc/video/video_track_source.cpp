@@ -292,6 +292,7 @@ void OhosVideoTrackSource::OnFrameCaptured(
     }
 
     auto frame = VideoFrame::Builder()
+                     .set_id(1)
                      .set_video_frame_buffer(buffer)
                      .set_rotation(rotation)
                      .set_timestamp_us(alignedTimestampUs)

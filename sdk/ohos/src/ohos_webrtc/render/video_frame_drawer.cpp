@@ -38,6 +38,9 @@ void VideoFrameDrawer::DrawFrame(
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
     renderMatrix_.Reset();
+    if (!frame.is_texture()) {
+      renderMatrix_.PreScale(1.0f, -1.0f, 0.5f, 0.5f); // I420-frames are upside down
+    }
     renderMatrix_.PreRotate(frame.rotation(), 0.5f, 0.5f);
     renderMatrix_.PreConcat(additionalRenderMatrix);
     RTC_DLOG(LS_VERBOSE) << "Render matrix: " << renderMatrix_;
@@ -58,14 +61,15 @@ void VideoFrameDrawer::DrawFrame(
                 glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
                 glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
                 glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+                glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
             }
         }
 
         auto buffer = frame.video_frame_buffer()->ToI420();
 
         const uint8_t* planes[] = {buffer->DataY(), buffer->DataU(), buffer->DataV()};
-        int planeWidths[] = {buffer->width(), buffer->width() / 2, buffer->width() / 2};
-        int planeHeights[] = {buffer->height(), buffer->height() / 2, buffer->height() / 2};
+        int planeWidths[] = {buffer->StrideY(), buffer->StrideU(), buffer->StrideV()};
+        int planeHeights[] = {buffer->height(), buffer->ChromaHeight(), buffer->ChromaHeight()};
 
         for (uint32_t i = 0; i < yuvTextures_.size(); i++) {
             glActiveTexture(GL_TEXTURE0 + i);

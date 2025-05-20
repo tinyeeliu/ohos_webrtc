@@ -167,7 +167,7 @@ void NativeWindowRendererRaster::RenderByteBuffer(rtc::scoped_refptr<I420BufferI
 
     int ret = libyuv::I420ToABGR(
         buffer->DataY(), buffer->StrideY(), buffer->DataU(), buffer->StrideU(), buffer->DataV(), buffer->StrideV(),
-        (uint8_t*)dstAddr, width * 4, width, height);
+        (uint8_t*)dstAddr, dstConfig.stride, width, height);
     if (ret != 0) {
         RTC_LOG(LS_ERROR) << "Failed to convert i420 to rgba: " << ret;
         window_.AbortBuffer(windowBuffer.Raw());
