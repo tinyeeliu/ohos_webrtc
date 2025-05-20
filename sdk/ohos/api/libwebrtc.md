@@ -874,6 +874,38 @@ getStats(selector?: MediaStreamTrack): Promise<RTCStatsReport>;
 | ----------------------- | ------------------------------------------------------------ |
 | Promise<RTCStatsReport> | 返回一个 Promise 对象，该对象在解析后会得到一个 RTCStatsReport ，其中包含了当前时间段内收集到的统计信息。 |
 
+### setAudioRecording
+
+setAudioRecording(recording: boolean): void
+
+启用/禁用音频流录制，默认开启。
+
+#### 参数
+
+| 参数名   | 类型             | 必填 | 说明                                 |
+| -------- | ---------------- | ---- | ------------------------------------ |
+| recording | boolean | 是   | 略 |
+
+#### 返回值
+
+无
+
+### setAudioPlayout
+
+setAudioPlayout(playout: boolean): void
+
+启用/禁用接收到的音频流的播放，默认启用。
+
+#### 参数
+
+| 参数名   | 类型             | 必填 | 说明                                 |
+| -------- | ---------------- | ---- | ------------------------------------ |
+| playout | boolean | 是   | 将`playout`设置为 false 将停止底层音频设备的播放，但将启动一个任务，该任务将每10ms轮询音频数据，以确保音频处理发生并更新音频统计信息。 |
+
+#### 返回值
+
+无
+
 ## MediaTrackCapabilities
 
 定义媒体轨道的各种能力和属性。
