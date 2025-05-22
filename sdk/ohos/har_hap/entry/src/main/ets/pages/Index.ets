@@ -44,7 +44,10 @@ struct Index {
   @State private myId: string = '';
   @State private peerId: string = '';
   @State muteBtnTitle: string = 'Mute';
+  @State cameraBtnTitle: string = 'Close Camera';
   private muted: boolean = false;
+  private cameraEnabled: boolean = true;
+  private useFrontCamera: boolean = false;
   private mXComponentController1: VideoRenderController = new VideoRenderController();
   private mXComponentController2: VideoRenderController = new VideoRenderController();
   private ws: webSocket.WebSocket = webSocket.createWebSocket();
@@ -56,6 +59,7 @@ struct Index {
   private localVideoTrack?: webrtc.MediaStreamTrack;
   private remoteAudioTrack?: webrtc.MediaStreamTrack;
   private remoteVideoTrack?: webrtc.MediaStreamTrack;
+  private videoRtpSender?: webrtc.RTCRtpSender;
   private adm?: webrtc.AudioDeviceModule;
   private pcf?: webrtc.PeerConnectionFactory;
   private pc?: webrtc.RTCPeerConnection;
@@ -171,6 +175,42 @@ struct Index {
             this.muteBtnTitle = this.muted ? 'Unmute' : 'Mute';
             this.pc?.setAudioPlayout(!this.muted);
             this.pc?.setAudioRecording(!this.muted);
+          })
+          .margin({ left: 10, right: 20 })
+
+        Button(this.cameraBtnTitle)
+          .width(180)
+          .height(54)
+          .fontSize(20)
+          .fontWeight(FontWeight.Bold)
+          .margin({ top: 20 })
+          .onClick(() => {
+            console.log(TAG, `${this.cameraEnabled ? 'Disable' : 'Enable'} camera`);
+            if (this.cameraEnabled) {
+              this.disableCamera();
+            } else {
+              this.enableCamera();
+            }
+            this.cameraEnabled = !this.cameraEnabled;
+            this.cameraBtnTitle = this.cameraEnabled ? 'Close Camera' : 'Open Camera';
+          })
+          .margin({ left: 10, right: 20 })
+
+        Button('Switch Camera')
+          .width(180)
+          .height(54)
+          .fontSize(20)
+          .fontWeight(FontWeight.Bold)
+          .margin({ top: 20 })
+          .onClick(() => {
+            console.log(TAG, "switch camera: " + this.useFrontCamera);
+            if (!this.cameraEnabled) {
+              console.info(TAG, 'Camera is disabled');
+              return;
+            }
+
+            this.useFrontCamera = !this.useFrontCamera;
+            this.switchCamera();
           })
           .margin({ left: 10, right: 20 })
 
@@ -407,7 +447,11 @@ struct Index {
     }
 
     if (!this.localVideoTrack) {
-      this.localVideoSource = this.pcf?.createVideoSource({width: 1280, height: 720, facingMode: 'user'}, false);
+      this.localVideoSource = this.pcf?.createVideoSource({
+        width: 1280,
+        height: 720,
+        facingMode: this.useFrontCamera ? 'user' : 'environment'
+      }, false);
       console.info(TAG, 'videoSource: ' + JSON.stringify(this.localVideoSource));
       this.localVideoSource!.oncapturerstarted = (event: webrtc.VideoCapturerStartedEvent) => {
         console.info(TAG, 'oncapturerstarted: event=' + JSON.stringify(event));
@@ -423,7 +467,7 @@ struct Index {
         this.mXComponentController1.setVideoTrack(this.localVideoTrack);
       }
 
-      this.mXComponentController1.setMirror(true);
+      this.mXComponentController1.setMirror(this.useFrontCamera);
       this.mXComponentController1.setScalingMode(ScalingMode.AspectFit);
     }
   }
@@ -474,9 +518,60 @@ struct Index {
     }
   }
 
+  async enableCamera() {
+    if (this.localVideoTrack) {
+      this.localVideoTrack.enabled = true;
+      this.mXComponentController1.setVideoTrack(this.localVideoTrack);
+      // this.videoRtpSender?.replaceTrack(this.localVideoTrack);
+    }
+  }
+
+  async disableCamera() {
+    this.mXComponentController1.setVideoTrack(null);
+    // this.videoRtpSender?.replaceTrack(null);
+    if (this.localVideoTrack) {
+      this.localVideoTrack.enabled = false;
+    }
+  }
+
+  async switchCamera() {
+    let stream = await this.mediaDevices.getUserMedia({
+      video:{
+        width: 1280,
+        height: 720,
+        facingMode: this.useFrontCamera ? 'user' : 'environment'
+      }
+    });
+    let videoTracks = stream.getVideoTracks();
+    if (videoTracks.length == 0) {
+      console.info(TAG, 'No video track');
+      return;
+    }
+
+    this.mXComponentController1.setVideoTrack(null);
+
+    await new Promise<void>(resolve => setTimeout(resolve, 500));
+
+    this.localVideoTrack = videoTracks[0];
+    let videoSource = this.localVideoTrack.getSource();
+    if (videoSource) {
+      this.localVideoSource = videoSource as webrtc.VideoSource;
+      console.info(TAG, 'local video source: ' + JSON.stringify(this.localVideoSource));
+      this.localVideoSource!.oncapturerstarted = (event: webrtc.VideoCapturerStartedEvent) => {
+        console.info(TAG, 'oncapturerstarted: event=' + JSON.stringify(event));
+      };
+      this.localVideoSource!.oncapturerstopped = (event: webrtc.Event) => {
+        console.info(TAG, 'oncapturerstopped: event=' + JSON.stringify(event));
+      };
+    }
+
+    this.mXComponentController1.setVideoTrack(this.localVideoTrack);
+    this.videoRtpSender?.replaceTrack(this.localVideoTrack);
+  }
+
   async createPeerConnection() {
-    // await this.prepareLocalMedia();
-    await this.prepareDisplayMedia();
+    await this.prepareLocalMedia();
+    // await this.prepareDisplayMedia();
 
     this.pc = this.pcf?.createPeerConnection({
       iceServers: [{ urls: STUN_SERVER }]
@@ -492,6 +587,7 @@ struct Index {
       if (event.track.kind == 'video') {
         this.remoteVideoTrack = event.track;
         this.mXComponentController2.setVideoTrack(event.track);
+        this.mXComponentController2.setScalingMode(ScalingMode.AspectFill);
       } else if (event.track.kind == 'audio') {
         this.remoteAudioTrack = event.track;
       }
@@ -563,8 +659,8 @@ struct Index {
       console.info(TAG, 'rtpSender2: ' + JSON.stringify(rtpSender2));
     }
     if (this.localVideoTrack) {
-      let rtpSender3 = this.pc.addTrack(this.localVideoTrack);
-      console.info(TAG, 'rtpSender3: ' + JSON.stringify(rtpSender3));
+      this.videoRtpSender = this.pc.addTrack(this.localVideoTrack);
+      console.info(TAG, 'video rtp sender: ' + JSON.stringify(this.videoRtpSender));
     }
 
     console.info(TAG, 'transceivers: ' + JSON.stringify(this.pc.getTransceivers()));
