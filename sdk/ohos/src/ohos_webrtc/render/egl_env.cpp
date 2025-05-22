@@ -196,7 +196,7 @@ bool EglEnv::CreateWindowSurface(ohos::NativeWindow window)
         return false;
     }
 
-    return false;
+    return true;
 }
 
 void EglEnv::ReleaseSurface()
@@ -210,7 +210,6 @@ void EglEnv::ReleaseSurface()
 bool EglEnv::MakeCurrent()
 {
     if (eglGetCurrentContext() == eglContext_) {
-        RTC_LOG(LS_VERBOSE) << "xxx";
         return true;
     }
 
@@ -258,8 +257,6 @@ bool EglEnv::SwapBuffers(uint64_t timestampNs)
         if (eglPresentationTimeANDROID_(eglDisplay_, eglSurface_, timestampNs) == EGL_FALSE) {
             RTC_LOG(LS_WARNING) << "Failed to eglPresentationTimeANDROID, errno: " << eglGetError();
         }
-    } else {
-        RTC_LOG(LS_WARNING) << "No egl extension of eglPresentationTimeANDROID";
     }
 
     if (eglSwapBuffers(eglDisplay_, eglSurface_) == EGL_FALSE) {
