@@ -343,7 +343,8 @@ void NapiPeerConnection::Init(class Env env, Object exports)
             InstanceMethod<&NapiPeerConnection::SetAudioRecording>(kMethodNameSetAudioRecording),
             InstanceMethod<&NapiPeerConnection::SetAudioPlayout>(kMethodNameSetAudioPlayout),
             StaticMethod<&NapiPeerConnection::GenerateCertificate>(kStaticMethodNameGenerateCertificate),
-        });
+        }
+    );
 
     if (func.IsEmpty() || func.IsUndefined()) {
         OH_LOG_Print(LOG_APP, LOG_ERROR, LOG_DOMAIN, "NapiPeerConnection", "func is empty or undefined");
