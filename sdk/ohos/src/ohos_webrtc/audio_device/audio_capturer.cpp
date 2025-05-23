@@ -86,6 +86,9 @@ int32_t AudioCapturer::Terminate()
     RTC_DCHECK(threadChecker_.IsCurrent());
     StopRecording();
     threadChecker_.Detach();
+    OH_RESULT_CHECK(OH_AudioCapturer_Release(capturer_), -1);
+
+    initialized_ = false;
 
     return 0;
 }
@@ -171,7 +174,7 @@ int32_t AudioCapturer::StartRecording()
     }
 
     OH_AudioStream_State state = GetCurrentState();
-    if (state != AUDIOSTREAM_STATE_PREPARED) {
+    if (state != AUDIOSTREAM_STATE_PREPARED && state != AUDIOSTREAM_STATE_STOPPED) {
         RTC_LOG(LS_ERROR) << "Invalid state: " << StateToString(state);
         NotifyError(AudioErrorType::START_STATE_MISMATCH, std::string("invalid state: ") + StateToString(state));
         return -1;
@@ -199,9 +202,6 @@ int32_t AudioCapturer::StopRecording()
     }
 
     OH_RESULT_CHECK(OH_AudioCapturer_Stop(capturer_), -1);
-    OH_RESULT_CHECK(OH_AudioCapturer_Release(capturer_), -1);
-
-    initialized_ = false;
     recording_ = false;
 
     NotifyStateChange(AudioStateType::STOP);

@@ -78,6 +78,8 @@ protected:
     Napi::Value Close(const Napi::CallbackInfo& info);
     Napi::Value GetStats(const Napi::CallbackInfo& info);
     Napi::Value ToJson(const Napi::CallbackInfo& info);
+    Napi::Value SetAudioRecording(const Napi::CallbackInfo& info);
+    Napi::Value SetAudioPlayout(const Napi::CallbackInfo& info);
 
     static Napi::Value GenerateCertificate(const Napi::CallbackInfo& info);
 

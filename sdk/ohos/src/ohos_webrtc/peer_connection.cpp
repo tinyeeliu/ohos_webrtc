@@ -110,6 +110,8 @@ const char kMethodNameAddTransceiver[] = "addTransceiver";
 const char kMethodNameClose[] = "close";
 const char kMethodNameGetStats[] = "getStats";
 const char kMethodNameToJson[] = "toJSON";
+const char kMethodNameSetAudioRecording[] = "setAudioRecording";
+const char kMethodNameSetAudioPlayout[] = "setAudioPlayout";
 
 const char kStaticMethodNameGenerateCertificate[] = "generateCertificate";
 
@@ -338,9 +340,10 @@ void NapiPeerConnection::Init(class Env env, Object exports)
             InstanceMethod<&NapiPeerConnection::Close>(kMethodNameClose),
             InstanceMethod<&NapiPeerConnection::GetStats>(kMethodNameGetStats),
             InstanceMethod<&NapiPeerConnection::ToJson>(kMethodNameToJson),
+            InstanceMethod<&NapiPeerConnection::SetAudioRecording>(kMethodNameSetAudioRecording),
+            InstanceMethod<&NapiPeerConnection::SetAudioPlayout>(kMethodNameSetAudioPlayout),
             StaticMethod<&NapiPeerConnection::GenerateCertificate>(kStaticMethodNameGenerateCertificate),
         });
-
     if (func.IsEmpty() || func.IsUndefined()) {
         OH_LOG_Print(LOG_APP, LOG_ERROR, LOG_DOMAIN, "NapiPeerConnection", "func is empty or undefined");
     }
@@ -1331,6 +1334,36 @@ Napi::Value NapiPeerConnection::GenerateCertificate(const Napi::CallbackInfo& in
 
     asyncWorker->start(key_params, absl::nullopt);
     return asyncWorker->GetPromise();
+}
+
+Napi::Value NapiPeerConnection::SetAudioRecording(const Napi::CallbackInfo& info)
+{
+    RTC_LOG(LS_INFO) << __FUNCTION__;
+
+    if (info.Length() < 1 || !info[0].IsBoolean()) {
+        NAPI_THROW(Error::New(info.Env(), "Invalid argument"), info.Env().Undefined());
+        return info.Env().Undefined();
+    }
+
+    bool recording = info[0].As<Boolean>().Value();
+    pc_->SetAudioRecording(recording);
+
+    return info.Env().Undefined();
+}
+
+Napi::Value NapiPeerConnection::SetAudioPlayout(const Napi::CallbackInfo& info)
+{
+    RTC_LOG(LS_INFO) << __FUNCTION__;
+
+    if (info.Length() < 1 || !info[0].IsBoolean()) {
+        NAPI_THROW(Error::New(info.Env(), "Invalid argument"), info.Env().Undefined());
+        return info.Env().Undefined();
+    }
+
+    bool playout = info[0].As<Napi::Boolean>();
+    pc_->SetAudioPlayout(playout);
+
+    return info.Env().Undefined();
 }
 
 void NapiPeerConnection::OnIceCandidate(const IceCandidateInterface* candidate)

@@ -114,6 +114,9 @@ int32_t AudioRenderer::Terminate()
     RTC_DCHECK(threadChecker_.IsCurrent());
     StopPlayout();
     threadChecker_.Detach();
+    OH_RESULT_CHECK(OH_AudioRenderer_Release(renderer_), -1);
+
+    initialized_ = false;
 
     return 0;
 }
@@ -209,7 +212,7 @@ int32_t AudioRenderer::StartPlayout()
     }
 
     OH_AudioStream_State state = GetCurrentState();
-    if (state != AUDIOSTREAM_STATE_PREPARED) {
+    if (state != AUDIOSTREAM_STATE_PREPARED && state != AUDIOSTREAM_STATE_STOPPED) {
         RTC_LOG(LS_ERROR) << "Invalid state: " << StateToString(state);
         NotifyError(AudioErrorType::START_STATE_MISMATCH, std::string("Invalid state: ") + StateToString(state));
         return -1;
@@ -237,9 +240,6 @@ int32_t AudioRenderer::StopPlayout()
     }
 
     OH_RESULT_CHECK(OH_AudioRenderer_Stop(renderer_), -1);
-    OH_RESULT_CHECK(OH_AudioRenderer_Release(renderer_), -1);
-
-    initialized_ = false;
     playing_ = false;
 
     NotifyStateChange(AudioStateType::STOP);

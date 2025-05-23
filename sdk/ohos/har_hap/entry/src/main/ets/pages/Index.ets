@@ -43,6 +43,8 @@ struct Index {
   @State statusText: string = '';
   @State private myId: string = '';
   @State private peerId: string = '';
+  @State muteBtnTitle: string = 'Mute';
+  private muted: boolean = false;
   private mXComponentController1: VideoRenderController = new VideoRenderController();
   private mXComponentController2: VideoRenderController = new VideoRenderController();
   private ws: webSocket.WebSocket = webSocket.createWebSocket();
@@ -151,6 +153,26 @@ struct Index {
             .fontSize(20)
             .fontWeight(FontWeight.Normal)
         }.layoutWeight('20%').visibility(Visibility.Hidden)
+
+      }
+      .alignSelf(ItemAlign.Start)
+      .padding({ top: 24 })
+
+      Row() {
+        Button(this.muteBtnTitle)
+          .width(150)
+          .height(54)
+          .fontSize(20)
+          .fontWeight(FontWeight.Bold)
+          .margin({ top: 20 })
+          .onClick(() => {
+            console.log(TAG, "audio muted: " + this.muted);
+            this.muted = !this.muted;
+            this.muteBtnTitle = this.muted ? 'Unmute' : 'Mute';
+            this.pc?.setAudioPlayout(!this.muted);
+            this.pc?.setAudioRecording(!this.muted);
+          })
+          .margin({ left: 10, right: 20 })
 
       }
       .alignSelf(ItemAlign.Start)
