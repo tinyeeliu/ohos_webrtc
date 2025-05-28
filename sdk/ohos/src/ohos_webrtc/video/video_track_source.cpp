@@ -292,11 +292,11 @@ void OhosVideoTrackSource::OnFrameCaptured(
     }
 
     auto frame = VideoFrame::Builder()
+                     .set_id(1)
                      .set_video_frame_buffer(buffer)
                      .set_rotation(rotation)
                      .set_timestamp_us(alignedTimestampUs)
                      .build();
-
     if (ApplyRotation() && frame.rotation() != kVideoRotation_0 && buffer->type() == VideoFrameBuffer::Type::kI420) {
         /* Apply pending rotation. */
         VideoFrame rotatedFrame(frame);
