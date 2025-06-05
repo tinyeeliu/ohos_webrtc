@@ -745,6 +745,10 @@ ninja -C ../out/ohos_webrtc -v -j32                 # -v 查看编译的具体�
 ![test](./pic/audio_unit_test1.png)
 ![test](./pic/audio_unit_test2.png)
 
+## 北向应用调用
+
+请阅读[北向应用如何使用三方库二进制文件](./webrtc_adapter_app.md)
+
 ## 编译/使用中遇到问题总结
 
 [常见问题总结](./webrtc_adapter_questions.md)
