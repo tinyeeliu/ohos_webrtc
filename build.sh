@@ -26,6 +26,7 @@ function downlaod_thirdparty() {
 
     if [ -d third_party ]
     then
+        echo "git clone webrtc third_party success!!"
         return 0
     fi
 
@@ -72,6 +73,7 @@ fi
 
 arguments="target_cpu=\"arm64\" \
     target_os=\"ohos\" \
+    target_sysroot==\"/root" \
     ohos_sdk_native_root=\"$OHOS_SDK_NATIVE_PATH\" \
     is_clang=true"
 

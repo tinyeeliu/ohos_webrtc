@@ -10,14 +10,14 @@
 
 `arm64-v8a`版本放置在`ohos_webrtc/libs/arm64-v8a`目录下，可使用如下参数编译：
 ``` shell
-gn gen out/arm64 --args='is_clang=true target_os="ohos" target_cpu="arm64" ohos_extra_ldflags="-static-libstdc++" is_official_build=true ohos_sdk_native_root="path/to/ohos/sdk"'
-ninja -C out/arm64
+gn gen out/arm64 --args='is_clang=true target_os="ohos" target_cpu="arm64" ohos_extra_ldflags="-static-libstdc++" is_official_build=true use_custom_libcxx=false rtc_use_dummy_audio_file_devices=true rtc_use_h264=true rtc_use_h265=true is_component_ffmpeg=true ohos_sdk_native_root="/root/ohos_sdk/linux/native"'
+ninja -C out/arm64 -v -j32
 ```
 
 `armeabi-v7a`版本放置在`ohos_webrtc/libs/armeabi-v7a`目录下，可使用如下参数编译：
 ``` shell
-gn gen out/arm32 --args='is_clang=true target_os="ohos" target_cpu="arm" arm_float_abi="softfp" ohos_extra_ldflags="-static-libstdc++" is_official_build=true ohos_sdk_native_root="path/to/ohos/sdk"'
-ninja -C out/arm32
+gn gen out/arm32 --args='is_clang=true target_os="ohos" target_cpu="arm" arm_float_abi="softfp" ohos_extra_ldflags="-static-libstdc++" is_official_build=true rtc_use_dummy_audio_file_devices=true rtc_use_h264=true rtc_use_h265=true is_component_ffmpeg=true ohos_sdk_native_root="/root/ohos_sdk/linux/native"'
+ninja -C out/arm32 -v -j32
 ```
 
 **注意**
