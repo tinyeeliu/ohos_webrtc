@@ -133,27 +133,35 @@ int32_t AudioRenderer::InitPlayout()
     RTC_DCHECK(!playing_);
 
     OH_AudioStreamBuilder* builder = nullptr;
+    auto defer = [this, builder](std::string msg)
+        {
+            RTC_DLOG(LS_ERROR) << msg;
+            if (builder) {
+                OH_AudioStreamBuilder_Destroy(builder);
+            }
+            NotifyError(AudioErrorType::INIT, msg);
+        };
     OH_RESULT_CHECK(
         OH_AudioStreamBuilder_Create(&builder, AUDIOSTREAM_TYPE_RENDERER),
         NotifyError(AudioErrorType::INIT, "System error"), -1);
 
     OH_RESULT_CHECK(
         OH_AudioStreamBuilder_SetRendererInfo(builder, static_cast<OH_AudioStream_Usage>(GetUsage())),
-        NotifyError(AudioErrorType::INIT, "failed to set renderer info"), -1);
+        defer("failed to set renderer info"), -1);
     OH_RESULT_CHECK(
         OH_AudioStreamBuilder_SetSamplingRate(builder, GetSampleRate()),
-        NotifyError(AudioErrorType::INIT, "failed to set sample rate"), -1);
+        defer("failed to set sample rate"), -1);
     OH_RESULT_CHECK(
         OH_AudioStreamBuilder_SetChannelCount(builder, GetChannelCount()),
-        NotifyError(AudioErrorType::INIT, "failed to set channel count"), -1);
+        defer("failed to set channel count"), -1);
     // Use s16le in webrtc
     OH_RESULT_CHECK(
         OH_AudioStreamBuilder_SetSampleFormat(builder, AUDIOSTREAM_SAMPLE_S16LE),
-        NotifyError(AudioErrorType::INIT, "failed to set sample format"), -1);
+        defer("failed to set sample format"), -1);
     OH_RESULT_CHECK(
         OH_AudioStreamBuilder_SetLatencyMode(
             builder, UseLowLatency() ? AUDIOSTREAM_LATENCY_MODE_FAST : AUDIOSTREAM_LATENCY_MODE_NORMAL),
-        NotifyError(AudioErrorType::INIT, "failed to set latency mode"), -1);
+        defer("failed to set latency mode"), -1);
 
     OH_AudioRenderer_Callbacks callbacks;
     callbacks.OH_AudioRenderer_OnWriteData = OnWriteData1;
@@ -162,20 +170,23 @@ int32_t AudioRenderer::InitPlayout()
     callbacks.OH_AudioRenderer_OnError = OnError1;
     OH_RESULT_CHECK(
         OH_AudioStreamBuilder_SetRendererCallback(builder, callbacks, this),
-        NotifyError(AudioErrorType::INIT, "failed to set renderer callback"), -1);
+        defer("failed to set renderer callback"), -1);
 
     OH_RESULT_CHECK(
         OH_AudioStreamBuilder_SetRendererOutputDeviceChangeCallback(builder, OnDeviceChangeCallback1, this),
-        NotifyError(AudioErrorType::INIT, "failed to set renderer callback"), -1);
+        defer("failed to set renderer callback"), -1);
 
     OH_AudioRenderer* stream = nullptr;
     OH_RESULT_CHECK(
         OH_AudioStreamBuilder_GenerateRenderer(builder, &stream),
-        NotifyError(AudioErrorType::INIT, "failed to generate renderer"), -1);
+        defer("failed to generate renderer"), -1);
 
     if (!CheckConfiguration(stream)) {
+        OH_AudioRenderer_Release(stream);
+        OH_AudioStreamBuilder_Destroy(builder);
         return -1;
     }
+    OH_AudioStreamBuilder_Destroy(builder);
 
     renderer_ = stream;
     initialized_ = true;

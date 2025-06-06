@@ -105,26 +105,34 @@ int32_t AudioCapturer::InitRecording()
     RTC_DCHECK(!recording_);
 
     OH_AudioStreamBuilder* builder = nullptr;
+    auto defer = [this, builder](std::string msg)
+        {
+            RTC_DLOG(LS_ERROR) << msg;
+            if (builder) {
+                OH_AudioStreamBuilder_Destroy(builder);
+            }
+            NotifyError(AudioErrorType::INIT, msg);
+        };
     OH_RESULT_CHECK(
         OH_AudioStreamBuilder_Create(&builder, AUDIOSTREAM_TYPE_CAPTURER),
         NotifyError(AudioErrorType::INIT, "system error"), -1);
 
     OH_RESULT_CHECK(
         OH_AudioStreamBuilder_SetCapturerInfo(builder, static_cast<OH_AudioStream_SourceType>(GetAudioSource())),
-        NotifyError(AudioErrorType::INIT, "failed to set capturer info"), -1);
+        defer("failed to set capturer info"), -1);
     OH_RESULT_CHECK(
         OH_AudioStreamBuilder_SetSamplingRate(builder, GetSampleRate()),
-        NotifyError(AudioErrorType::INIT, "failed to set sample rate"), -1);
+        defer("failed to set sample rate"), -1);
     OH_RESULT_CHECK(
         OH_AudioStreamBuilder_SetChannelCount(builder, GetChannelCount()),
-        NotifyError(AudioErrorType::INIT, "failed to set channel count"), -1);
+        defer("failed to set channel count"), -1);
     OH_RESULT_CHECK(
         OH_AudioStreamBuilder_SetSampleFormat(builder, static_cast<OH_AudioStream_SampleFormat>(GetSampleFormat())),
-        NotifyError(AudioErrorType::INIT, "failed to set sample format"), -1);
+        defer("failed to set sample format"), -1);
     OH_RESULT_CHECK(
         OH_AudioStreamBuilder_SetLatencyMode(
             builder, UseLowLatency() ? AUDIOSTREAM_LATENCY_MODE_FAST : AUDIOSTREAM_LATENCY_MODE_NORMAL),
-        NotifyError(AudioErrorType::INIT, "failed to set latency mode"), -1);
+        defer("failed to set latency mode"), -1);
 
     OH_AudioCapturer_Callbacks callbacks;
     callbacks.OH_AudioCapturer_OnReadData = OnReadData1;
@@ -133,17 +141,21 @@ int32_t AudioCapturer::InitRecording()
     callbacks.OH_AudioCapturer_OnError = OnError1;
     OH_RESULT_CHECK(
         OH_AudioStreamBuilder_SetCapturerCallback(builder, callbacks, this),
-        NotifyError(AudioErrorType::INIT, "failed to set capture callback"), -1);
+        defer("failed to set capture callback"), -1);
 
     OH_AudioCapturer* stream = nullptr;
     OH_RESULT_CHECK(
-        OH_AudioStreamBuilder_GenerateCapturer(builder, &stream), NotifyError(AudioErrorType::INIT, "system error"),
+        OH_AudioStreamBuilder_GenerateCapturer(builder, &stream),
+        defer("failed to generate capturer"),
         -1);
 
     if (!CheckConfiguration(stream)) {
+        OH_AudioCapturer_Release(stream);
+        OH_AudioStreamBuilder_Destroy(builder);
         return -1;
     }
-
+    OH_AudioStreamBuilder_Destroy(builder);
+    
     capturer_ = stream;
     initialized_ = true;
 

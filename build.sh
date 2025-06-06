@@ -10,9 +10,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#!/bin/sh
+#!/bin/bash
 
-function check_depot_tools(){
+check_depot_tools(){
     local tmp=`echo $PATH | grep "depot_tool"`
     if [ -z $tmp ]
     then
@@ -22,7 +22,7 @@ function check_depot_tools(){
     return 0
 }
 
-function downlaod_thirdparty() {
+downlaod_thirdparty() {
 
     if [ -d third_party ]
     then
@@ -42,7 +42,7 @@ function downlaod_thirdparty() {
     return 0
 }
 
-OHOS_SDK_NATIVE_PATH=/mnt/sdcard/workspace/sdk-linux-4.1.3.500/sdk/HarmonyOS-NEXT-DP1/base/native   # 用户需配置自己SDK路径
+OHOS_SDK_NATIVE_PATH=/home/wenchang/command-line-tools/sdk/default/openharmony/native   # 用户需配置自己SDK路径
 if [ ! -z $1 ]
 then
     OHOS_SDK_NATIVE_PATH=$1
@@ -82,7 +82,7 @@ then
     exit 1
 fi
 
-ninja -C out/webrtc -v -j32 > build.log
+ninja -C out/webrtc -v -j8
 if [ $? -ne 0 ]
 then
     echo "[ERROR] webrtc build failed! see the detailes in build.log file"
