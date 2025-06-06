@@ -42,63 +42,86 @@ export default class EntryAbility extends UIAbility {
       }
       hilog.info(0x0000, 'testTag', 'Succeeded in loading the content.');
     });
+
+    windowStage.getMainWindow().then((mainWindow) => {
+      // 设置隐藏状态栏和导航栏
+      mainWindow.setWindowLayoutFullScreen(true)
+      mainWindow.setWindowSystemBarEnable([ 'navigation'])
+    }).catch((err) => {
+      console.error('setWindowSystemBarEnable failed', JSON.stringify(err))
+    })
   }
 
-  onWindowStageDestroy(): void {
+  // onWindowStageDestroy(): void {
+  //   // Main window is destroyed, release UI related resources
+  //   hilog.info(0x0000, 'testTag', '%{public}s', 'Ability onWindowStageDestroy');
+  // }
+  //
+  // onForeground(): void {
+  //   // Ability has brought to foreground
+  //   hilog.info(0x0000, 'testTag', '%{public}s', 'Ability onForeground');
+  //
+  //   // Stop background running
+  //   try {
+  //     backgroundTaskManager.stopBackgroundRunning(this.context).then(() => {
+  //       console.info("Operation stopBackgroundRunning succeeded");
+  //     }).catch((error: BusinessError) => {
+  //       console.error(`Operation stopBackgroundRunning failed. code is ${error.code} message is ${error.message}`);
+  //     });
+  //   } catch (error) {
+  //     console.error(`Operation stopBackgroundRunning failed. code is ${(error as BusinessError).code} message is ${(error as BusinessError).message}`);
+  //   }
+  // }
+  //
+  // onBackground(): void {
+  //   // Ability has back to background
+  //   hilog.info(0x0000, 'testTag', '%{public}s', 'Ability onBackground');
+  //
+  //   // Request background running
+  //   let wantAgentInfo: wantAgent.WantAgentInfo = {
+  //     wants: [
+  //       {
+  //         bundleName: "com.archermind.webrtc",
+  //         abilityName: "EntryAbility"
+  //       }
+  //     ],
+  //     actionType: wantAgent.OperationType.START_ABILITY,
+  //     requestCode: 0,
+  //     wantAgentFlags: [wantAgent.WantAgentFlags.UPDATE_PRESENT_FLAG]
+  //   };
+  //
+  //   try {
+  //     wantAgent.getWantAgent(wantAgentInfo).then((wantAgentObj: WantAgent) => {
+  //       try {
+  //         let list: Array<string> = ["dataTransfer", "audioRecording", "audioPlayback"];
+  //         backgroundTaskManager.startBackgroundRunning(this.context, list, wantAgentObj)
+  //           .then((res: backgroundTaskManager.ContinuousTaskNotification) => {
+  //             hilog.info(0x0000, 'testTag', "Operation startBackgroundRunning succeeded");
+  //             // this.id = res.notificationId;
+  //           }).catch((error: BusinessError) => {
+  //           hilog.error(0x0000, 'testTag', `Operation startBackgroundRunning failed. code is ${error.code} message is ${error.message}`);
+  //         });
+  //       } catch (error) {
+  //         hilog.info(0x0000, 'testTag', `Operation startBackgroundRunning failed. code is ${(error as BusinessError).code} message is ${(error as BusinessError).message}`);
+  //       }
+  //     });
+  //   } catch (error) {
+  //     hilog.info(0x0000, 'testTag', `Operation getWantAgent failed. code is ${(error as BusinessError).code} message is ${(error as BusinessError).message}`);
+  //   }
+  // }
+
+  onWindowStageDestroy() {
     // Main window is destroyed, release UI related resources
     hilog.info(0x0000, 'testTag', '%{public}s', 'Ability onWindowStageDestroy');
   }
 
-  onForeground(): void {
+  onForeground() {
     // Ability has brought to foreground
     hilog.info(0x0000, 'testTag', '%{public}s', 'Ability onForeground');
-
-    // Stop background running
-    try {
-      backgroundTaskManager.stopBackgroundRunning(this.context).then(() => {
-        console.info("Operation stopBackgroundRunning succeeded");
-      }).catch((error: BusinessError) => {
-        console.error(`Operation stopBackgroundRunning failed. code is ${error.code} message is ${error.message}`);
-      });
-    } catch (error) {
-      console.error(`Operation stopBackgroundRunning failed. code is ${(error as BusinessError).code} message is ${(error as BusinessError).message}`);
-    }
   }
 
-  onBackground(): void {
+  onBackground() {
     // Ability has back to background
     hilog.info(0x0000, 'testTag', '%{public}s', 'Ability onBackground');
-
-    // Request background running
-    let wantAgentInfo: wantAgent.WantAgentInfo = {
-      wants: [
-        {
-          bundleName: "com.archermind.webrtc",
-          abilityName: "EntryAbility"
-        }
-      ],
-      actionType: wantAgent.OperationType.START_ABILITY,
-      requestCode: 0,
-      wantAgentFlags: [wantAgent.WantAgentFlags.UPDATE_PRESENT_FLAG]
-    };
-
-    try {
-      wantAgent.getWantAgent(wantAgentInfo).then((wantAgentObj: WantAgent) => {
-        try {
-          let list: Array<string> = ["dataTransfer", "audioRecording", "audioPlayback"];
-          backgroundTaskManager.startBackgroundRunning(this.context, list, wantAgentObj)
-            .then((res: backgroundTaskManager.ContinuousTaskNotification) => {
-              hilog.info(0x0000, 'testTag', "Operation startBackgroundRunning succeeded");
-              // this.id = res.notificationId;
-            }).catch((error: BusinessError) => {
-            hilog.error(0x0000, 'testTag', `Operation startBackgroundRunning failed. code is ${error.code} message is ${error.message}`);
-          });
-        } catch (error) {
-          hilog.info(0x0000, 'testTag', `Operation startBackgroundRunning failed. code is ${(error as BusinessError).code} message is ${(error as BusinessError).message}`);
-        }
-      });
-    } catch (error) {
-      hilog.info(0x0000, 'testTag', `Operation getWantAgent failed. code is ${(error as BusinessError).code} message is ${(error as BusinessError).message}`);
-    }
   }
 }

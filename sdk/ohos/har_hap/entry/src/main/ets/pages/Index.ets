@@ -18,14 +18,13 @@ import abilityAccessCtrl, { PermissionRequestResult } from '@ohos.abilityAccessC
 import webSocket from '@ohos.net.webSocket';
 import promptAction from '@ohos.promptAction';
 import util from '@ohos.util';
-// import buffer from '@ohos.buffer';
-import fs from '@ohos.file.fs';
 import audio from '@ohos.multimedia.audio';
 import { BusinessError } from '@kit.BasicServicesKit';
+// import buffer from '@ohos.buffer';
+import fs from '@ohos.file.fs';
 // import { util ,buffer} from '@kit.ArkTS';
 
 const TAG: string = '[chindeo_webrtc]';
-
 // 用于测试的信令服务器
 const SIGNAL_SERVER = `ws://192.168.20.19:3100/websocket`;
 // 用于测试的Web客户端地址
@@ -71,6 +70,7 @@ interface ServerInfo {
 }
 
 interface MessageData {
+  status:"";
   eventName:"";
   locId?:"";
   number?:"";
@@ -94,7 +94,8 @@ struct Index {
   @State private ws_status: boolean = false;
   @State private hardDecode: boolean = false;
   @State private isCallout: boolean = false;
-  @State private ices:webrtc.RTCIceCandidateInit[] = [];
+  @State private send_ices:webrtc.RTCIceCandidateInit[] = [];
+  // @State private rec_ices:webrtc.RTCIceCandidateInit[] = [];
   private mXComponentController1: VideoRenderController = new VideoRenderController();
   private mXComponentController2: VideoRenderController = new VideoRenderController();
   private ws: webSocket.WebSocket = webSocket.createWebSocket();
@@ -108,7 +109,8 @@ struct Index {
   private remoteVideoTrack?: webrtc.MediaStreamTrack;
   private adm?: webrtc.AudioDeviceModule;
   private pcf?: webrtc.PeerConnectionFactory;
-  private pc?: webrtc.RTCPeerConnection;
+  private send?: webrtc.RTCPeerConnection;
+  // private rec?: webrtc.RTCPeerConnection;
   // private recvChannel?: webrtc.RTCDataChannel;
   // private sendChannel?: webrtc.RTCDataChannel;
   private displayMediaStream?: webrtc.MediaStream;
@@ -333,31 +335,28 @@ struct Index {
   }
 
   aboutToAppear(): void {
-    // 设置音频策略，允许和其它音频流并发
-    let strategy: audio.AudioSessionStrategy = {
-      concurrencyMode: audio.AudioConcurrencyMode.CONCURRENCY_MIX_WITH_OTHERS
-    };
+    // // 设置音频策略，允许和其它音频流并发
+    // let strategy: audio.AudioSessionStrategy = {
+    //   concurrencyMode: audio.AudioConcurrencyMode.CONCURRENCY_PAUSE_OTHERS
+    // };
 
-    let audioManager = audio.getAudioManager();
+    // let audioManager = audio.getAudioManager();
+    // let audioSessionManager = audioManager.getSessionManager();
+    // audioSessionManager.activateAudioSession(strategy).then(() => {
+    //   console.info(TAG, 'activate AudioSession SUCCESS');
+    // }).catch((err: BusinessError) => {
+    //   console.error(`audio ERROR: ${err}`);
+    // });
 
-
-
-    let audioSessionManager = audioManager.getSessionManager();
-    audioSessionManager.activateAudioSession(strategy).then(() => {
-      console.info(TAG, 'activate AudioSession SUCCESS');
-    }).catch((err: BusinessError) => {
-      console.error(`audio ERROR: ${err}`);
-    });
-
-    audioManager.getAudioScene().then((scene) => {
-      console.info(TAG, 'getAudioScene :'+  scene.toString());
-    }).catch((err: BusinessError) => {
-      console.error(`audio getAudioScene ERROR: ${err}`);
-    });
-
-    audioManager.getVolumeManager().on("volumeChange",e =>{
-      console.error(`audio volumeChange: ${e.volume}`);
-    })
+    // audioManager.getAudioScene().then((scene) => {
+    //   console.info(TAG, 'getAudioScene :'+  scene.toString());
+    // }).catch((err: BusinessError) => {
+    //   console.error(`audio getAudioScene ERROR: ${err}`);
+    // });
+    //
+    // audioManager.getVolumeManager().on("volumeChange",e =>{
+    //   console.error(`audio volumeChange: ${e.volume}`);
+    // })
     //  audioManager.getRoutingManager().getDevices(audio.DeviceFlag.OUTPUT_DEVICES_FLAG).then(o =>{
     //   if (o.length === 0) {
     //     console.error("audio 无可用输出设备!");
@@ -419,10 +418,14 @@ struct Index {
       this.setStatus('Disconnected from server');
       this.status = "hangup"
 
-      if(this.pc){
-        this.pc.close()
-        this.pc = undefined;
+      if(this.send){
+        this.send.close()
+        this.send = undefined;
       }
+      // if(this.rec){
+      //   this.rec.close()
+      //   this.rec = undefined;
+      // }
       this.uuid=""
       this.buttonTitle = '拨打';
       this.answerBtn =Visibility.Hidden
@@ -446,7 +449,9 @@ struct Index {
                 let data = JSON.parse(msg.data) as Invite;
                 this.uuid = data.uuid
                 this.setStatus("Registered with server, waiting for call");
-                this.createPeerConnection();
+                this.prepareDisplayMedia();
+                this.send =  this.createPeerConnection(true);
+                // this.rec =  this.createPeerConnection(false);
                 this.status = "invite"
                 this.peerId = data.number
                 this.isCallout = data.isCallout
@@ -455,13 +460,13 @@ struct Index {
             } else if (msg && msg.eventName?.toString()=== '__sdp') {
               if(msg.data) {
                 let data = JSON.parse(msg.data) as webrtc.RTCSessionDescriptionInit;
-                console.warn(TAG,'parse sdp: '+ data.type,);
-                this.receiveSdp(data);
+                console.warn(TAG,'parse sdp: '+ data.type + "status:"+msg.status);
+                this.receiveSdp(data,msg.status);
               }
             } else if (msg && msg.eventName?.toString()=== '__candidate') {
               if(msg.data) {
                 let data = JSON.parse(msg.data) as webrtc.RTCIceCandidateInit;
-                this.receiveIce(data);
+                this.receiveIce(data,msg.status);
               }
             } else if (msg && msg.eventName?.toString()=== '__answer') {
               this.status = "answer"
@@ -489,7 +494,7 @@ struct Index {
   }
 
   aboutToDisappear(): void {
-    this.pcf?.stopAecDump();
+    // this.pcf?.stopAecDump();
     Logging.deleteInjectedLoggable();
 
     this.ws.close();
@@ -564,9 +569,9 @@ struct Index {
       });
     }
 
-    Logging.d(TAG, 'this.pcf: ' + JSON.stringify(this.pcf));
+    // Logging.d(TAG, 'this.pcf: ' + JSON.stringify(this.pcf));
     // MediaDevices 依赖默认的 PeerConnnectionFactory，且需要与创建 PeerConnection 的是同一个。
-    webrtc.PeerConnectionFactory.setDefault(this.pcf);
+    // webrtc.PeerConnectionFactory.setDefault(this.pcf);
     // let filesDir = getContext().filesDir;
     // let file = fs.openSync(filesDir + '/test.pcm', fs.OpenMode.READ_WRITE | fs.OpenMode.CREATE);
     // this.pcf.startAecDump(file.fd, -1);
@@ -644,14 +649,9 @@ struct Index {
     }
   }
 
-  async createPeerConnection() {
-    if (this.pc){
-      return
-    }
+   createPeerConnection(isSend:boolean): webrtc.RTCPeerConnection|undefined {
     // await this.prepareLocalMedia();
-    await this.prepareDisplayMedia();
-
-    this.pc = this.pcf?.createPeerConnection({
+    let pc = this.pcf?.createPeerConnection({
       // iceServers: [
       //   { urls: 'stun:47.112.22.152:3478' },
       //   {
@@ -667,11 +667,11 @@ struct Index {
       // ]
     });
 
-    if (!this.pc) {
+    if (!pc) {
       console.error(TAG, 'failed to create RTCPeerConnection');
-      return;
+      return undefined;
     }
-    this.pc.ontrack = (event: webrtc.RTCTrackEvent) => {
+    pc.ontrack = (event: webrtc.RTCTrackEvent) => {
       console.info(TAG, 'ontrack: ' + JSON.stringify(event));
       if (event.track.kind == 'video') {
         this.remoteVideoTrack = event.track;
@@ -681,41 +681,110 @@ struct Index {
         this.mXComponentController2.setVideoTrack(event.track);
       } else if (event.track.kind == 'audio' ) {
         this.remoteAudioTrack = event.track;
+
+        // let audioManager = audio.getAudioManager();
+        // let audioSessionManager = audioManager.getSessionManager();
+        // audioSessionManager.activateAudioSession(strategy).then(() => {
+        //   console.info(TAG, 'activate AudioSession SUCCESS');
+        // }).catch((err: BusinessError) => {
+        //   console.error(`audio ERROR: ${err}`);
+        // });
+
+        // audioManager.getAudioScene().then((scene) => {
+        //   console.info(TAG, 'getAudioScene :'+  scene.toString());
+        // }).catch((err: BusinessError) => {
+        //   console.error(`audio getAudioScene ERROR: ${err}`);
+        // });
+        //
+        // audioManager.getVolumeManager().on("volumeChange",e =>{
+        //   console.error(`audio volumeChange: ${e.volume}`);
+        // })
+        // audioManager.getStreamManager().isActive(audio.AudioVolumeType.VOICE_CALL).then(o =>{
+        //   console.error("audio 语音电话 isActive:"+ o);
+        // })
+        // audioManager.getStreamManager().isActive(audio.AudioVolumeType.RINGTONE).then(o =>{
+        //   console.error("audio 铃声 isActive:"+ o);
+        // })
+        // audioManager.getStreamManager().isActive(audio.AudioVolumeType.MEDIA).then(o =>{
+        //   console.error("audio 媒体 isActive:"+ o);
+        // })
+        // audioManager.getStreamManager().isActive(audio.AudioVolumeType.ALARM).then(o =>{
+        //   console.error("audio 闹钟 isActive:"+ o);
+        // })
+        // audioManager.getStreamManager().isActive(audio.AudioVolumeType.ACCESSIBILITY).then(o =>{
+        //   console.error("audio 无障碍 isActive:"+ o);
+        // })
+        // audioManager.getStreamManager().isActive(audio.AudioVolumeType.VOICE_ASSISTANT).then(o =>{
+        //   console.error("audio 语音助手 isActive:"+ o);
+        // })
+        //
+        //  audioManager.getRoutingManager().getDevices(audio.DeviceFlag.ALL_DEVICES_FLAG).then(o =>{
+        //   if (o.length === 0) {
+        //     console.error("audio 无可用输出设备!");
+        //   }
+        //   o.forEach(i =>{
+        //     console.error(`audio id:${i.id}
+        //     audio  name:${i.name}
+        //     audio  displayName:${i.displayName}
+        //     audio  sampleRates:${i.sampleRates}
+        //     audio  channelCounts:${i.channelCounts}
+        //     audio  channelMasks:${i.channelMasks}
+        //     audio  address:${i.address}
+        //     audio  encodingTypes:${i.encodingTypes}
+        //     audio  deviceType:${i.deviceType}
+        //     audio  deviceRole:${i.deviceRole}`)
+        //   })
+        // }).catch((err: BusinessError) =>{
+        //    console.error(`audio 无可用输出设备 ERROR: ${err}`);
+        //  });
       }
     };
-    this.pc.onsignalingstatechange = (event) => {
-      console.info(TAG, 'onsignalingstatechange: ' + this.pc?.signalingState);
-      if(this.pc?.signalingState=="stable"){
-        let ices = this.ices;
-        this.ices =[];
-        ices.forEach(ice =>{
-          this.pc?.addIceCandidate(ice).catch((e: Error) => {
-            console.error(TAG, "add ice candidate error: " + e);
-            this.setError(e.message);
-          });
-        })
+    pc.onsignalingstatechange = (event) => {
+      console.info(TAG, 'onsignalingstatechange: ' + pc?.signalingState);
+
+      if(pc?.signalingState=="stable"){
+        if (isSend){
+          let ices = this.send_ices;
+          this.send_ices =[];
+          ices.forEach(ice =>{
+            pc?.addIceCandidate(ice).catch((e: Error) => {
+              console.error(TAG, "add ice candidate error: " + e);
+              this.setError(e.message);
+            });
+          })
+        }else{
+          // let ices = this.rec_ices;
+          // this.rec_ices =[];
+          // ices.forEach(ice =>{
+          //   pc?.addIceCandidate(ice).catch((e: Error) => {
+          //     console.error(TAG, "add ice candidate error: " + e);
+          //     this.setError(e.message);
+          //   });
+          // })
+        }
+
       }
     }
-    this.pc.onconnectionstatechange = (event) => {
-      console.info(TAG, 'onconnectionstatechange: ' + this.pc?.connectionState);
-      if (this.pc){
-        this.setStatus(this.pc.connectionState)
+    pc.onconnectionstatechange = (event) => {
+      console.info(TAG, 'onconnectionstatechange: ' + pc?.connectionState);
+      if (pc){
+        this.setStatus(pc.connectionState)
       }
-      if (this.pc?.connectionState == 'failed') {
+      if (pc?.connectionState == 'failed') {
         this.setError("Peer connection failed");
         // this.ws.close();
-      } else if(this.pc?.connectionState=='connected' && this.status=="invite" && !this.isCallout){
+      } else if(pc?.connectionState=='connected' && this.status=="invite" && !this.isCallout){
         this.answerBtn = Visibility.Visible
         this.buttonTitle='挂断'
       }
     }
-    this.pc.onnegotiationneeded = (event) => {
+    pc.onnegotiationneeded = (event) => {
       // this is Index
-      console.info(TAG, 'onnegotiationneeded: this=' + JSON.stringify(this.pc));
-      console.info(TAG, 'onnegotiationneeded: event=' + JSON.stringify(event));
+      // console.info(TAG, 'onnegotiationneeded: this=' + JSON.stringify(pc));
+      // console.info(TAG, 'onnegotiationneeded: event=' + JSON.stringify(event));
     }
 
-    this.pc.onicecandidate = (event) => {
+    pc.onicecandidate = (event) => {
       // console.info(TAG, 'onicecandidate: this=' + JSON.stringify(this));
       console.info(TAG, 'onicecandidate: event=' + JSON.stringify(event));
       if (event.candidate) {
@@ -737,19 +806,21 @@ struct Index {
         // console.error(TAG,"localDescription: "+JSON.stringify(this.pc?.localDescription))
       }
     };
-    this.pc.onicecandidateerror = (event) => {
+    pc.onicecandidateerror = (event) => {
       console.error(TAG, 'onicecandidateerror: event=' + JSON.stringify(event));
     };
-    this.pc.oniceconnectionstatechange = (event) => {
-      console.info(TAG, 'oniceconnectionstatechange: ' + this.pc?.iceConnectionState);
-      if (this.pc?.iceConnectionState === 'failed') {
+    pc.oniceconnectionstatechange = (event) => {
+      let state = pc?.iceConnectionState
+      console.info(TAG, 'oniceconnectionstatechange: ' + state);
+      if (state === 'failed') {
         this.setError("Ice connection failed");
         this.ws.close();
       }
     };
-    this.pc.onicegatheringstatechange = (event) => {
-      console.info(TAG, 'onicegatheringstatechange: ' + this.pc?.iceGatheringState);
-      switch (this.pc?.iceGatheringState) {
+    pc.onicegatheringstatechange = (event) => {
+      let state = pc?.iceGatheringState
+      console.info(TAG, 'onicegatheringstatechange: ' +state);
+      switch (state) {
         case "new":
           console.info(TAG, 'onicegatheringstatechange: gathering is either just starting or has been reset');
           break;
@@ -775,7 +846,7 @@ struct Index {
     //   console.info(TAG, 'rtpSender3: ' + JSON.stringify(rtpSender3));
     // }
 
-    console.info(TAG, 'transceivers: ' + JSON.stringify(this.pc.getTransceivers()));
+    // console.info(TAG, 'transceivers: ' + JSON.stringify(pc.getTransceivers()));
 
     // 1to1 推流逻辑
 
@@ -815,6 +886,8 @@ struct Index {
     //   } catch (e) {
     //     console.error(TAG, 'sendOffer: ' + JSON.stringify(e));
     //   }
+
+    return pc
   }
 
   handleHangup(){
@@ -839,37 +912,35 @@ struct Index {
     this.uuid="";
     this.status="hangup";
     this.setStatus("Registering with server");
-    if(this.pc){
-      this.pc.close()
-      this.pc = undefined;
+    if(this.send){
+      this.send.close()
+      this.send = undefined;
     }
   }
 
-  // async sendOffer() {
-  //   try {
-  //     let offer = await this.pc?.createOffer();
-  //     console.info(TAG, 'createOffer: ' + JSON.stringify(offer));
-  //
-  //     this.pc?.setLocalDescription(offer);
-  //
-  //     this.sendMessage(JSON.stringify({ sdp: offer }));
-  //   } catch (e) {
-  //     console.error(TAG, 'sendOffer: ' + JSON.stringify(e));
-  //   }
-  // }
+  async sendOffer() {
+    try {
+      let offer = await this.send?.createOffer();
+      console.info(TAG, 'createOffer: ' + JSON.stringify(offer));
 
-  async sendAnswer() {
-    this.setStatus("Got SDP offer, creating answer");
-    if(!this.pc){
-        return
+      this.send?.setLocalDescription(offer);
+
+      this.sendMessage(JSON.stringify({ sdp: offer }));
+    } catch (e) {
+      console.error(TAG, 'sendOffer: ' + JSON.stringify(e));
     }
-    this.pc.createAnswer().then((desc) => {
-      // console.info(TAG, 'Success to create answer: ' + JSON.stringify(desc));
-      if(!this.pc){
+  }
 
+  async sendAnswer(pc?:webrtc.RTCPeerConnection) {
+    this.setStatus("Got SDP offer, creating answer");
+    if(!pc){
+      return
+    }
+   pc.createAnswer().then((desc) => {
+      // console.info(TAG, 'Success to create answer: ' + JSON.stringify(desc));
+      if(!pc){
         return
       }
-
       if(desc.sdp){
         // desc.sdp = this.preferCodec(desc.sdp, H264)
         // console.info(TAG, 'preferCodec: ' + desc.sdp);
@@ -899,9 +970,9 @@ struct Index {
         // desc.sdp= this.addNack(desc.sdp)
         // console.info(TAG, 'addNack: ' + desc.sdp);
       }
-      this.pc.setLocalDescription(desc).then(() => {
+     pc.setLocalDescription(desc).then(() => {
         this.setStatus("Sending SDP answer");
-        if(!this.pc){
+        if(!pc){
           return
         }
           this.sendMessage(JSON.stringify({
@@ -930,39 +1001,43 @@ struct Index {
     });
   }
 
-  async receiveSdp(sdp: webrtc.RTCSessionDescriptionInit) {
-    if(this.pc && this.isCallout && this.status==="invite"){
+  async receiveSdp(sdp: webrtc.RTCSessionDescriptionInit,status:string) {
+    let pc = this.send
+    // if (status=="answer"){
+    //   pc = this.rec
+    // }
+    if(pc && this.status==="invite"){
       console.info(TAG, 'display media Stream track status: ' + this.status )
       if (this.localAudioTrack) {
         console.info(TAG, 'display media Stream track localAudioTrack')
-        let rtpSender1 = this.pc.addTrack(this.localAudioTrack);
+        let rtpSender1 = pc.addTrack(this.localAudioTrack);
         console.info(TAG, 'rtpSender1: ' + JSON.stringify(rtpSender1));
       }
       if (this.localAudioTrack2) {
         console.info(TAG, 'display media Stream track localAudioTrack2')
-        let rtpSender2 = this.pc.addTrack(this.localAudioTrack2);
+        let rtpSender2 = pc.addTrack(this.localAudioTrack2);
         console.info(TAG, 'rtpSender2: ' + JSON.stringify(rtpSender2));
       }
       if (this.localVideoTrack) {
         console.info(TAG, 'display media Stream track localVideoTrack')
-        let rtpSender3 = this.pc.addTrack(this.localVideoTrack);
+        let rtpSender3 = pc.addTrack(this.localVideoTrack);
         console.info(TAG, 'rtpSender3: ' + JSON.stringify(rtpSender3));
       }
     }
 
     if (sdp.type === 'offer') {
       console.info(TAG, 'receive offer');
-      this.pc?.setRemoteDescription(sdp).then(() => {
-        this.setStatus("Remote SDP set");
-        this.sendAnswer();
+      pc?.setRemoteDescription(sdp).then(() => {
+        this.setStatus("Remote offer SDP set");
+        this.sendAnswer(pc);
       }).catch((e: Error) => {
         console.error(TAG, "Set remote description error: " + e);
         this.setError(e.message);
       });
     } else if (sdp.type === 'answer') {
       console.info(TAG, 'receive answer');
-      this.pc?.setRemoteDescription(sdp).then(() => {
-        this.setStatus("Remote SDP set");
+      pc?.setRemoteDescription(sdp).then(() => {
+        this.setStatus("Remote answer SDP set");
       }).catch((e: Error) => {
         console.error(TAG, "Set remote description error: " + e);
         this.setError(e.message);
@@ -972,15 +1047,24 @@ struct Index {
     }
   }
 
-  async receiveIce(ice: webrtc.RTCIceCandidateInit) {
-    console.info(TAG, 'receive icecandidate signalingState：'+this.pc?.signalingState);
-    if(this.pc?.signalingState==="stable"){
-      this.pc?.addIceCandidate(ice).catch((e: Error) => {
+  async receiveIce(ice: webrtc.RTCIceCandidateInit,status:string) {
+    let pc = this.send
+    // if (status == "answer"){
+    //   pc = this.rec
+    // }
+   let state= pc?.signalingState
+    console.info(TAG, 'receive icecandidate signalingState：'+state);
+    if(state==="stable"){
+      pc?.addIceCandidate(ice).catch((e: Error) => {
         console.error(TAG, "add ice candidate error: " + e);
         this.setError(e.message);
       });
     }else{
-      this.ices.push(ice);
+      // if(status=="answer"){
+      //   this.rec_ices.push(ice);
+      // }else if(status=="offer"){
+      //   this.send_ices.push(ice);
+      // }
     }
   }
 
