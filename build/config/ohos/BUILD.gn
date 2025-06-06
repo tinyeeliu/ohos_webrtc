@@ -26,7 +26,6 @@ config("compiler") {
     "-ffunction-sections",
     "-fno-short-enums",
     "-fno-addrsig",
-    "-fno-rtti",
   ]
 
   cflags += [
