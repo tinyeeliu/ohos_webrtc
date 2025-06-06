@@ -17,6 +17,7 @@ import webrtc, { Logging, LoggingSeverity, VideoRenderController, ScalingMode } 
 import abilityAccessCtrl, { PermissionRequestResult } from '@ohos.abilityAccessCtrl';
 import webSocket from '@ohos.net.webSocket';
 import promptAction from '@ohos.promptAction';
+import util from '@ohos.util';
 // import buffer from '@ohos.buffer';
 import fs from '@ohos.file.fs';
 import audio from '@ohos.multimedia.audio';
@@ -61,13 +62,12 @@ interface Invite {
   isVideo:false;
   isCallout:false;
 }
-// sdp?: webrtc.RTCSessionDescriptionInit;
-// ice?: webrtc.RTCIceCandidateInit;
 
 interface ServerInfo {
   serveNumber:"";
   serveIp:"";
   serveDisplayName:"";
+  status:number;
 }
 
 interface MessageData {
@@ -77,23 +77,16 @@ interface MessageData {
   data?:"";
 }
 
-interface WsTrack {
-  streamId: string;
-  videoTrackId: string;
-  audioTrackId: string;
-}
-
 @Entry
 @Component
 struct Index {
   @State buttonTitle: string = '拨打';
   @State answerBtn:number = Visibility.Hidden;
   @State remoteVideo:number = Visibility.Hidden;
-  @State registerBtn:number = Visibility.Hidden;
   @State serverText: string = '';
   @State statusText: string = '';
   @State private number: string = '';
-  @State private peerId: string = '1034';
+  @State private peerId: string = '1002';
   @State private uuid?: string = '';
   @State private locId: string = '12160708';
   @State private clientType: string = 'bed';
@@ -179,17 +172,11 @@ struct Index {
           .height(54)
           .fontSize(28)
           .margin({ top: 20 })
-          // .textAlign(TextAlign.Start)
           .backgroundColor(0xFFFFFF)
         Toggle({ type: ToggleType.Switch })
           .margin({ left: 100, right: 10 })
           .onChange((isOn: boolean) => {
-            // this.speakerMute = isOn
-            // this.adm.setSpeakerMute(this.speakerMute)
             this.adm?.setMicrophoneMute(isOn)
-            // this.adm.setNoiseSuppressorEnabled(true)
-            // this.pc?.setAudioPlayout(isOn);
-            // this.pc?.setAudioRecording(isOn);
           })
       }
       .backgroundColor(0xFFFFFF)
@@ -216,37 +203,13 @@ struct Index {
           .margin({ top: 20 })
           .onClick(() => {
             if (this.buttonTitle == '挂断') {
-              this.sendMessage(JSON.stringify(  {
-                eventName: '__apply',
-                locId: this.locId,
-                number: this.number.toString(),
-                clientType:this.clientType,
-                data: JSON.stringify(
-                  {
-                    to: this.peerId.toString(),
-                    uuid: this.uuid,
-                    isAll: true,
-                    apply:"hangup",
-                  }
-                )
-              }));
-              this.remoteVideo = Visibility.Hidden
-              this.answerBtn = Visibility.Hidden
-              this.buttonTitle = '拨打';
-              this.isCallout=false;
-              this.uuid="";
-              this.status="hangup";
-              this.setStatus("Registering with server");
+              this.handleHangup();
               return;
             }
 
             if (this.peerId.length < 2 || this.peerId.length > 4) {
               promptAction.showToast({ message: "请输入2到4位数ID" });
               return;
-            }
-
-            if (!this.pc){
-              this.createPeerConnection();
             }
 
             this.sendMessage(JSON.stringify(  {
@@ -296,7 +259,6 @@ struct Index {
           .margin({ left: 10, right: 20 })
 
         Button("注册")
-          .visibility(this.registerBtn)
           .width(150)
           .height(54)
           .fontSize(20)
@@ -304,61 +266,25 @@ struct Index {
           .margin({ top: 20 })
           .onClick(() => {
             this.ws.connect(SIGNAL_SERVER+`?locId=${this.locId}&number=${this.number}&displayName=${this.number}&clientType=${this.clientType}`, (err, success) => {
-              console.info(TAG, "Connecting to server"+err);
+              console.info(TAG, "Connecting to server"+ JSON.stringify(err));
             })
             this.ws_status=true;
-            // setTimeout(()=>{
-            //   this.sendMessage(JSON.stringify(  {
-            //     eventName: '__apply',
-            //     locId: this.locId,
-            //     number: this.number.toString(),
-            //     clientType:this.clientType,
-            //     data: JSON.stringify(
-            //       {
-            //         to: this.peerId.toString(),
-            //         uuid: this.uuid,
-            //         apply:"answer",
-            //         isVideo: true,
-            //       }
-            //     )
-            //   }));
-            // },1000)
           })
           .margin({ left: 10, right: 20 })
 
         Row() {
-          Checkbox({ name: 'remote_offerer', group: 'checkboxGroup' })
+          Checkbox({ name: 'remote_offer', group: 'checkboxGroup' })
             .select(false)
             .selectedColor(0x39a2db)
             .onChange((value: boolean) => {
-              console.info('remote_offerer change is' + value)
+              console.info('remote_offer change is' + value)
 
             }).margin({ right: 8 })
 
-          Text("Remote offerer")
+          Text("Remote offer")
             .fontSize(20)
             .fontWeight(FontWeight.Normal)
         }.layoutWeight('20%').visibility(Visibility.Hidden)
-
-      }
-      .alignSelf(ItemAlign.Start)
-      .padding({ top: 24 })
-
-      Row() {
-        Button(this.muteBtnTitle)
-          .width(150)
-          .height(54)
-          .fontSize(20)
-          .fontWeight(FontWeight.Bold)
-          .margin({ top: 20 })
-          .onClick(() => {
-            console.log(TAG, "audio muted: " + this.muted);
-            this.muted = !this.muted;
-            this.muteBtnTitle = this.muted ? 'Unmute' : 'Mute';
-            this.pc?.setAudioPlayout(!this.muted);
-            this.pc?.setAudioRecording(!this.muted);
-          })
-          .margin({ left: 10, right: 20 })
 
       }
       .alignSelf(ItemAlign.Start)
@@ -407,20 +333,31 @@ struct Index {
   }
 
   aboutToAppear(): void {
-    // // 设置音频策略，允许和其它音频流并发
-    // let strategy: audio.AudioSessionStrategy = {
-    //   concurrencyMode: audio.AudioConcurrencyMode.CONCURRENCY_MIX_WITH_OTHERS
-    // };
-    //
-    // let audioManager = audio.getAudioManager();
-    // audioManager.getAudioScene().then((scene) => {
-    //   console.info(TAG, 'getAudioScene :'+  scene.toString());
-    // }).catch((err: BusinessError) => {
-    //   console.error(`audio getAudioScene ERROR: ${err}`);
-    // });
-    // audioManager.getVolumeManager().on("volumeChange",e =>{
-    //   console.error(`audio volumeChange: ${e.volume}`);
-    // })
+    // 设置音频策略，允许和其它音频流并发
+    let strategy: audio.AudioSessionStrategy = {
+      concurrencyMode: audio.AudioConcurrencyMode.CONCURRENCY_MIX_WITH_OTHERS
+    };
+
+    let audioManager = audio.getAudioManager();
+
+
+
+    let audioSessionManager = audioManager.getSessionManager();
+    audioSessionManager.activateAudioSession(strategy).then(() => {
+      console.info(TAG, 'activate AudioSession SUCCESS');
+    }).catch((err: BusinessError) => {
+      console.error(`audio ERROR: ${err}`);
+    });
+
+    audioManager.getAudioScene().then((scene) => {
+      console.info(TAG, 'getAudioScene :'+  scene.toString());
+    }).catch((err: BusinessError) => {
+      console.error(`audio getAudioScene ERROR: ${err}`);
+    });
+
+    audioManager.getVolumeManager().on("volumeChange",e =>{
+      console.error(`audio volumeChange: ${e.volume}`);
+    })
     //  audioManager.getRoutingManager().getDevices(audio.DeviceFlag.OUTPUT_DEVICES_FLAG).then(o =>{
     //   if (o.length === 0) {
     //     console.error("audio 无可用输出设备!");
@@ -440,14 +377,6 @@ struct Index {
     // }).catch((err: BusinessError) =>{
     //    console.error(`audio 无可用输出设备 ERROR: ${err}`);
     //  });
-
-
-    // let audioSessionManager = audioManager.getSessionManager();
-    // audioSessionManager.activateAudioSession(strategy).then(() => {
-    //   console.info(TAG, 'activate AudioSession SUCCESS');
-    // }).catch((err: BusinessError) => {
-    //   console.error(`audio ERROR: ${err}`);
-    // });
 
     Logging.enableLogThreads();
     Logging.enableLogTimeStamps();
@@ -478,41 +407,33 @@ struct Index {
         this.setStatus("Connecting to server");
 
         this.number = "1100";
-        this.ws.connect(SIGNAL_SERVER+`?locId=${this.locId}&number=${this.number}&displayName=${this.number}&clientType=${this.clientType}`, (err, success) => {
-          console.info(TAG, "Connecting to server"+err);
-        })
-        this.ws_status=true;
       });
 
     this.ws.on('open', (err, data) => {
       console.info(TAG, 'websocket open');
-      this.ws_status=true;
-      // this.sendMessage("HELLO " + this.uuid);
       this.setStatus("Registering with server");
-      this.createPeerConnection();
     });
 
     this.ws.on('close', (err, data: webSocket.CloseResult) => {
       console.info(TAG, 'websocket closed');
       this.setStatus('Disconnected from server');
+      this.status = "hangup"
 
-      this.pc?.close();
-      this.pc = undefined;
+      if(this.pc){
+        this.pc.close()
+        this.pc = undefined;
+      }
+      this.uuid=""
+      this.buttonTitle = '拨打';
+      this.answerBtn =Visibility.Hidden
+      this.remoteVideo =Visibility.Hidden
       this.ws_status=false;
-      setTimeout(() => {
-        this.ws.connect(SIGNAL_SERVER+`?locId=${this.locId}&number=${this.number}&displayName=${this.number}&clientType=${this.clientType}`);
-        this.ws_status=true;
-        }, 1000);
     });
 
     this.ws.on('error', (err) => {
       console.info(TAG, 'websocket err: ' + err.code);
       this.setError("Unable to connect to server: " + err.message);
       this.ws_status=false;
-      setTimeout(() => {
-        this.ws.connect(SIGNAL_SERVER+`?locId=${this.locId}&number=${this.number}&displayName=${this.number}&clientType=${this.clientType}`);
-        this.ws_status=true;
-      }, 1000);
     });
 
     this.ws.on('message', (err, data: string | ArrayBuffer) => {
@@ -530,28 +451,6 @@ struct Index {
                 this.peerId = data.number
                 this.isCallout = data.isCallout
                 console.warn(TAG, '__invite from: ' + data.number);
-
-                // if( this.displayMediaStream){
-                //   let t: WsTrack =  {
-                //     streamId: this.displayMediaStream.id,
-                //     videoTrackId: "",
-                //     audioTrackId: "",
-                //   }
-                //   this.displayMediaStream?.getTracks().forEach(track=>{
-                //     if(track.kind == "video"){
-                //       t.videoTrackId = track.id
-                //     }else{
-                //       t.audioTrackId = track.id
-                //     }
-                //   })
-                //   this.sendMessage(JSON.stringify(  {
-                //     eventName: '__track',
-                //     locId: this.locId,
-                //     number: this.uuid.toString(),
-                //     clientType:this.clientType,
-                //     data: JSON.stringify(t)
-                //   }));
-                // }
               }
             } else if (msg && msg.eventName?.toString()=== '__sdp') {
               if(msg.data) {
@@ -566,32 +465,23 @@ struct Index {
               }
             } else if (msg && msg.eventName?.toString()=== '__answer') {
               this.status = "answer"
-              // this.handleAnswer(JSON.parse(message.data))
             } else if (msg && msg.eventName?.toString() === '__hangup') {
-              this.status = "hangup"
-
-              if(this.pc){
-                this.pc.close()
-                this.pc = undefined;
-              }
-              this.uuid=""
-              this.buttonTitle = '拨打';
-              this.answerBtn =Visibility.Hidden
-              this.remoteVideo =Visibility.Hidden
-              this.setStatus("Registering with server");
+              this.handleHangup()
             } else if (msg && msg.eventName?.toString()=== '__register') {
               if(msg.data){
                 let data = JSON.parse(msg.data) as ServerInfo;
                 this.serverText = "ip:"+ data.serveIp +" 号码："+ data.serveNumber +" 名称："+data.serveDisplayName
+                if (data.status==400){
+                  this.ws.close();
+                  this.setStatus("Register failed");
+                }else{
+                  this.ws_status=true;
+                }
               }
-              this.ws_status=true;
             }
-
           } catch (error) {
             console.error(TAG, 'receive invalid message: ' + data);
           }
-      //   }
-      // }
     });
 
     this.createAudioDeviceModule();
@@ -641,7 +531,6 @@ struct Index {
     this.adm = new webrtc.AudioDeviceModule({
       useStereoInput: true, useStereoOutput: true
     });
-    // this.adm.setSpeakerMute(false)
     this.adm.oncapturererror = (event) => {
       console.error(TAG, 'audio oncapturererror: ' + JSON.stringify(event));
     };
@@ -740,7 +629,7 @@ struct Index {
         }
 
         this.mXComponentController1.setVideoTrack(this.localVideoTrack);
-        // this.mXComponentController1.setScalingMode(ScalingMode.AspectFit);
+        this.mXComponentController1.setScalingMode(ScalingMode.AspectFit);
       }
 
       let audioTracks = this.displayMediaStream.getAudioTracks();
@@ -763,19 +652,19 @@ struct Index {
     await this.prepareDisplayMedia();
 
     this.pc = this.pcf?.createPeerConnection({
-      iceServers: [
-        { urls: 'stun:47.112.22.152:3478' },
-        {
-          username: 'Chindeo',
-          credential: 'P@ssw0rd',
-          urls: 'turn:47.112.22.152:3478?transport=udp'
-        },
-        {
-          username: 'Chindeo',
-          credential: 'P@ssw0rd',
-          urls: 'turn:47.112.22.152:3478?transport=tcp'
-        },
-      ]
+      // iceServers: [
+      //   { urls: 'stun:47.112.22.152:3478' },
+      //   {
+      //     username: 'Chindeo',
+      //     credential: 'P@ssw0rd',
+      //     urls: 'turn:47.112.22.152:3478?transport=udp'
+      //   },
+      //   {
+      //     username: 'Chindeo',
+      //     credential: 'P@ssw0rd',
+      //     urls: 'turn:47.112.22.152:3478?transport=tcp'
+      //   },
+      // ]
     });
 
     if (!this.pc) {
@@ -791,8 +680,7 @@ struct Index {
         this.mXComponentController2.setMirror(true);
         this.mXComponentController2.setVideoTrack(event.track);
       } else if (event.track.kind == 'audio' ) {
-        // this.remoteAudioTrack = event.track;
-
+        this.remoteAudioTrack = event.track;
       }
     };
     this.pc.onsignalingstatechange = (event) => {
@@ -810,6 +698,9 @@ struct Index {
     }
     this.pc.onconnectionstatechange = (event) => {
       console.info(TAG, 'onconnectionstatechange: ' + this.pc?.connectionState);
+      if (this.pc){
+        this.setStatus(this.pc.connectionState)
+      }
       if (this.pc?.connectionState == 'failed') {
         this.setError("Peer connection failed");
         // this.ws.close();
@@ -829,7 +720,6 @@ struct Index {
       console.info(TAG, 'onicecandidate: event=' + JSON.stringify(event));
       if (event.candidate) {
         this.sendMessage(JSON.stringify(
-          // { ice: event.candidate }
           {
             eventName: '__candidate',
             locId: this.locId,
@@ -843,6 +733,8 @@ struct Index {
             })
           }
         ));
+      }else{
+        // console.error(TAG,"localDescription: "+JSON.stringify(this.pc?.localDescription))
       }
     };
     this.pc.onicecandidateerror = (event) => {
@@ -869,16 +761,6 @@ struct Index {
           break;
       }
     };
-    // this.pc.ondatachannel = (event) => {
-    //   console.info(TAG, 'ondatachannel: this=' + JSON.stringify(this));
-    //   console.info(TAG, 'ondatachannel: event=' + JSON.stringify(event));
-    //   this.setStatus("Data channel created");
-    //   this.recvChannel = event.channel;
-    //   this.recvChannel.onopen = this.onDataChannelOpen;
-    //   this.recvChannel.onmessage = this.onDataChannelMessageReceived;
-    //   this.recvChannel.onerror = this.onDataChannelError;
-    //   this.recvChannel.onclose = this.onDataChannelClose;
-    // }
 
     // if (this.localAudioTrack) {
     //   let rtpSender1 = this.pc.addTrack(this.localAudioTrack);
@@ -895,48 +777,73 @@ struct Index {
 
     console.info(TAG, 'transceivers: ' + JSON.stringify(this.pc.getTransceivers()));
 
-  //   this.sendChannel = this.pc.createDataChannel("send");
-  //   console.info(TAG, 'sendChannel: ' + JSON.stringify(this.sendChannel));
-  //   this.sendChannel.onopen = (event) => {
-  //     // this is Index
-  //     console.info(TAG, '=dataChannel.OnOpen: this=', JSON.stringify(this));
-  //     console.info(TAG, "=dataChannel.OnOpen: ", event);
-  //
-  //     this.sendChannel?.send("Hi! (from ArkTS)");
-  //     let data1 = buffer.alloc(20, 0);
-  //     this.sendChannel?.send(data1.buffer);
-  //
-  //     let data2 = new Int32Array(new ArrayBuffer(20));
-  //     data2.fill(1);
-  //     this.sendChannel?.send(data2.buffer);
-  //
-  //     let data3 = new Uint8Array(20);
-  //     data3.fill(2);
-  //     this.sendChannel?.send(data3.buffer);
-  //   };
-  //   this.sendChannel.onmessage = this.onDataChannelMessageReceived;
-  //   this.sendChannel.onerror = this.onDataChannelError;
-  //   this.sendChannel.onclose = this.onDataChannelClose;
+    // 1to1 推流逻辑
+
+    // if (this.localAudioTrack) {
+    //   console.info(TAG, 'display media Stream track localAudioTrack')
+    //   let rtpSender1 = this.pc.addTrack(this.localAudioTrack);
+    //   console.info(TAG, 'rtpSender1: ' + JSON.stringify(rtpSender1));
+    // }
+    // if (this.localAudioTrack2) {
+    //   console.info(TAG, 'display media Stream track localAudioTrack2')
+    //   let rtpSender2 = this.pc.addTrack(this.localAudioTrack2);
+    //   console.info(TAG, 'rtpSender2: ' + JSON.stringify(rtpSender2));
+    // }
+    // if (this.localVideoTrack) {
+    //   console.info(TAG, 'display media Stream track localVideoTrack')
+    //   let rtpSender3 = this.pc.addTrack(this.localVideoTrack);
+    //   console.info(TAG, 'rtpSender3: ' + JSON.stringify(rtpSender3));
+    // }
+    //
+    //   try {
+    //     let offer = await this.pc.createOffer();
+    //     console.info(TAG, 'createOffer: ' + JSON.stringify(offer));
+    //     this.pc.setLocalDescription(offer);
+    //     // console.info(TAG, 'setLocalDescription');
+    //     // this.sendMessage(JSON.stringify({ sdp: offer }));
+    //     this.sendMessage(JSON.stringify({
+    //       eventName: '__sdp',
+    //       locId: this.locId,
+    //       number: this.peerId.toString(),
+    //       clientType:this.clientType,
+    //       data: JSON.stringify({
+    //         sdp: offer.sdp,
+    //         type:offer.type,
+    //         uuid: this.uuid,
+    //       })
+    //     }));
+    //   } catch (e) {
+    //     console.error(TAG, 'sendOffer: ' + JSON.stringify(e));
+    //   }
   }
 
-  // onDataChannelOpen(event: webrtc.Event) {
-  //   // this is webrtc.RTCDataChannel
-  //   console.info(TAG, "dataChannel.OnOpen: ", event);
-  //   if (this instanceof webrtc.RTCDataChannel) {
-  //     this.send("Hi! (from ArkTS)");
-  //   }
-  // }
-  //
-  // async onDataChannelError(event: webrtc.Event) {
-  //   // this is webrtc.RTCDataChannel
-  //   console.info(TAG, "dataChannel.OnError: ", event);
-  // }
-  //
-  // async onDataChannelClose(event: webrtc.Event) {
-  //   // this is webrtc.RTCDataChannel
-  //   console.info(TAG, 'dataChannel.OnClose: this=', JSON.stringify(this));
-  //   console.info(TAG, "dataChannel.OnClose", event);
-  // }
+  handleHangup(){
+    this.sendMessage(JSON.stringify(  {
+      eventName: '__apply',
+      locId: this.locId,
+      number: this.number.toString(),
+      clientType:this.clientType,
+      data: JSON.stringify(
+        {
+          to: this.peerId.toString(),
+          uuid: this.uuid,
+          isAll: true,
+          apply:"hangup",
+        }
+      )
+    }));
+    this.remoteVideo = Visibility.Hidden
+    this.answerBtn = Visibility.Hidden
+    this.buttonTitle = '拨打';
+    this.isCallout=false;
+    this.uuid="";
+    this.status="hangup";
+    this.setStatus("Registering with server");
+    if(this.pc){
+      this.pc.close()
+      this.pc = undefined;
+    }
+  }
 
   // async sendOffer() {
   //   try {
@@ -959,6 +866,7 @@ struct Index {
     this.pc.createAnswer().then((desc) => {
       // console.info(TAG, 'Success to create answer: ' + JSON.stringify(desc));
       if(!this.pc){
+
         return
       }
 
@@ -996,19 +904,17 @@ struct Index {
         if(!this.pc){
           return
         }
-        if(this.pc.localDescription){
           this.sendMessage(JSON.stringify({
             eventName: '__sdp',
             locId: this.locId,
             number: this.number.toString(),
             clientType:this.clientType,
             data: JSON.stringify({
-              sdp: this.pc.localDescription.sdp,
-              sdpType:this.pc?.localDescription?.type,
+              sdp: desc.sdp,
+              sdpType :desc.type,
               uuid: this.uuid,
             })
           }));
-        }
       });
     }).catch((e: Error) => {
       console.error(TAG, 'Failed to create answer: ' + e.message);
@@ -1287,5 +1193,25 @@ struct Index {
     }
 
     return newSdpDescription
+  }
+
+  // 2. 编码字符串 → Base64
+   btoaHarmony(input: string): string {
+    const base64Helper = new util.Base64Helper();
+    if (!input) return '';
+
+    // 字符串 → Uint8Array（UTF-8编码）
+    const encoder = new util.TextEncoder();
+    let uint8Array = encoder.encodeInto(input);
+
+     const padding = 3 - (uint8Array.length % 3);
+     if (padding !== 3) {
+       const paddedArray = new Uint8Array(uint8Array.length + padding);
+       paddedArray.set(uint8Array);
+       uint8Array = paddedArray;
+     }
+
+    // Base64 编码
+    return base64Helper.encodeToStringSync(uint8Array);
   }
 }
