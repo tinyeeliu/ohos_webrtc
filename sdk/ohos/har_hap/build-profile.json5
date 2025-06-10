@@ -14,41 +14,26 @@
         }
       }
     ],
-//    "signingConfigs": [
-//      {
-//        "name": "default",
-//        "material": {
-//          "storePassword": "00000016898B7E4E76E6E7089591AB3ECEC5C68F194BBD0C6E6C17446516E8FBDA0E8657F0A8",
-//          "certpath": "D:/admin/ShiMetaOS/signature/OpenHarmonyApplication.cer",
-//          "keyAlias": "OpenHarmony Application Release",
-//          "keyPassword": "0000001607C1E3DE9D968380A780032F24E0099F93A67F346F8C51189010440B5BF58E8E0147",
-//          "profile": "C:/Users/Administrator/.ohos/config/openharmony/default_har_hap_UETbCxM8KxO8W-0FkF0qBSW-08RCa-usa2bgncZ_eWs=.p7b",
-//          "signAlg": "SHA256withECDSA",
-//          "storeFile": "D:/admin/ShiMetaOS/signature/OpenHarmony.p12"
-//        }
-//      }
-//    ],
-
-//    "signingConfigs": [
-//      {
-//        "name": "default",
-//        "material": {
-//          "certpath": "C:/Users/Administrator/.ohos/config/openharmony/default_har_hap_UETbCxM8KxO8W-0FkF0qBSW-08RCa-usa2bgncZ_eWs=.cer",
-//          "keyAlias": "debugKey",
-//          "keyPassword": "0000001AF536166B450E591A11242989C06EF687A33F7083CE4A6A5C0E5BE63D319BA0CA83EC8C4AC866",
-//          "profile": "C:/Users/Administrator/.ohos/config/openharmony/default_har_hap_UETbCxM8KxO8W-0FkF0qBSW-08RCa-usa2bgncZ_eWs=.p7b",
-//          "signAlg": "SHA256withECDSA",
-//          "storeFile": "C:/Users/Administrator/.ohos/config/openharmony/default_har_hap_UETbCxM8KxO8W-0FkF0qBSW-08RCa-usa2bgncZ_eWs=.p12",
-//          "storePassword": "0000001AA09AFCF095B9367BD40D13A2E25282B5E20778E4E931A8619DC6F9540114AD20EE2FBD758BA9"
-//        }
-//      }
-//    ],
+    //    "signingConfigs": [
+    //      {
+    //        "name": "default",
+    //        "material": {
+    //          "storePassword": "00000016898B7E4E76E6E7089591AB3ECEC5C68F194BBD0C6E6C17446516E8FBDA0E8657F0A8",
+    //          "certpath": "D:/admin/ShiMetaOS/signature/OpenHarmonyApplication.cer",
+    //          "keyAlias": "OpenHarmony Application Release",
+    //          "keyPassword": "0000001607C1E3DE9D968380A780032F24E0099F93A67F346F8C51189010440B5BF58E8E0147",
+    //          "profile": "C:/Users/Administrator/.ohos/config/openharmony/default_har_hap_UETbCxM8KxO8W-0FkF0qBSW-08RCa-usa2bgncZ_eWs=.p7b",
+    //          "signAlg": "SHA256withECDSA",
+    //          "storeFile": "D:/admin/ShiMetaOS/signature/OpenHarmony.p12"
+    //        }
+    //      }
+    //    ],
     "products": [
       {
         "name": "default",
         "signingConfig": "default",
-        "compileSdkVersion": 13,
-        "compatibleSdkVersion": 13,
+        "compileSdkVersion": 12,
+        "compatibleSdkVersion": 12,
         "runtimeOS": "OpenHarmony"
       }
     ],

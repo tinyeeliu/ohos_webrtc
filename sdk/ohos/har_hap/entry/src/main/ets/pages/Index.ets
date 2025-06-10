@@ -80,20 +80,19 @@ interface MessageData {
 @Entry
 @Component
 struct Index {
-  @State buttonTitle: string = '拨打';
   @State answerBtn:number = Visibility.Hidden;
   @State remoteVideo:number = Visibility.Hidden;
   @State serverText: string = '';
   @State statusText: string = '';
   @State private number: string = '';
-  @State private peerId: string = '1002';
+  @State private peerId: string = '1034';
   @State private uuid?: string = '';
   @State private locId: string = '12160708';
   @State private clientType: string = 'bed';
   @State private status: string = 'hangup';
   @State private ws_status: boolean = false;
-  @State private hardDecode: boolean = false;
   @State private isCallout: boolean = false;
+  @State private isVideo: boolean = false;
   @State private send_ices:webrtc.RTCIceCandidateInit[] = [];
   // @State private rec_ices:webrtc.RTCIceCandidateInit[] = [];
   private mXComponentController1: VideoRenderController = new VideoRenderController();
@@ -111,26 +110,10 @@ struct Index {
   private pcf?: webrtc.PeerConnectionFactory;
   private send?: webrtc.RTCPeerConnection;
   // private rec?: webrtc.RTCPeerConnection;
-  // private recvChannel?: webrtc.RTCDataChannel;
-  // private sendChannel?: webrtc.RTCDataChannel;
   private displayMediaStream?: webrtc.MediaStream;
   private mediaDevices = new webrtc.MediaDevices();
-  // private onDataChannelMessageReceived = (event: webrtc.MessageEvent<string | ArrayBuffer>) => {
-  //   // this is Index
-  //   console.info(TAG, "dataChannel.OnMessage: ", event);
-  //   console.info(TAG, "dataChannel.OnMessage: (typeof event.data) = ", typeof event.data);
-  //   console.info(TAG, "dataChannel.OnMessage: (event.data instanceof ArrayBuffer) = ", event.data instanceof ArrayBuffer);
-  //
-  //   this.setStatus("Received data channel message");
-  //
-  //   if (typeof event.data === 'string' || event.data instanceof String) {
-  //     console.info(TAG, 'Incoming string message: ' + event.data);
-  //   } else {
-  //     console.info(TAG, 'Incoming data message');
-  //   }
-  // }
+  private  audioManager?: audio.AudioManager;
 
-  //
   build() {
     Column() {
       Row() {
@@ -197,39 +180,27 @@ struct Index {
             this.peerId = value;
           })
 
-        Button(this.buttonTitle)
+        Button("音频")
           .width(150)
           .height(54)
           .fontSize(20)
           .fontWeight(FontWeight.Bold)
           .margin({ top: 20 })
           .onClick(() => {
-            if (this.buttonTitle == '挂断') {
-              this.handleHangup();
-              return;
-            }
+            this.isVideo =false;
+            this.handleInvite();
+          })
+          .margin({ left: 10, right: 20 })
 
-            if (this.peerId.length < 2 || this.peerId.length > 4) {
-              promptAction.showToast({ message: "请输入2到4位数ID" });
-              return;
-            }
-
-            this.sendMessage(JSON.stringify(  {
-              eventName: '__apply',
-              locId: this.locId,
-              number: this.number.toString(),
-              clientType:this.clientType,
-              data: JSON.stringify(
-                {
-                  to: this.peerId.toString(),
-                  uuid: this.uuid,
-                  isVideo: true,
-                  apply:"invite"
-                }
-              )
-            }));
-            this.isCallout=true;
-            this.buttonTitle = '挂断';
+        Button("视频")
+          .width(150)
+          .height(54)
+          .fontSize(20)
+          .fontWeight(FontWeight.Bold)
+          .margin({ top: 20 })
+          .onClick(() => {
+            this.isVideo =true;
+            this.handleInvite();
           })
           .margin({ left: 10, right: 20 })
 
@@ -252,11 +223,23 @@ struct Index {
                     to: this.peerId.toString(),
                     uuid: this.uuid,
                     apply:"answer",
-                    isVideo: true,
+                    isVideo: this.isVideo,
                   }
                 )
               }));
             },1000)
+          })
+          .margin({ left: 10, right: 20 })
+
+        Button("挂断")
+          // .visibility(this.answerBtn)
+          .width(150)
+          .height(54)
+          .fontSize(20)
+          .fontWeight(FontWeight.Bold)
+          .margin({ top: 20 })
+          .onClick(() => {
+              this.handleHangup();
           })
           .margin({ left: 10, right: 20 })
 
@@ -335,47 +318,73 @@ struct Index {
   }
 
   aboutToAppear(): void {
+    this.audioManager = audio.getAudioManager();
     // // 设置音频策略，允许和其它音频流并发
     // let strategy: audio.AudioSessionStrategy = {
     //   concurrencyMode: audio.AudioConcurrencyMode.CONCURRENCY_PAUSE_OTHERS
     // };
-
-    // let audioManager = audio.getAudioManager();
-    // let audioSessionManager = audioManager.getSessionManager();
+    //
+    // let audioSessionManager =  this.audioManager.getSessionManager();
     // audioSessionManager.activateAudioSession(strategy).then(() => {
-    //   console.info(TAG, 'activate AudioSession SUCCESS');
+    //   console.info(TAG, 'audio activate AudioSession SUCCESS');
     // }).catch((err: BusinessError) => {
     //   console.error(`audio ERROR: ${err}`);
     // });
 
-    // audioManager.getAudioScene().then((scene) => {
-    //   console.info(TAG, 'getAudioScene :'+  scene.toString());
-    // }).catch((err: BusinessError) => {
-    //   console.error(`audio getAudioScene ERROR: ${err}`);
-    // });
-    //
-    // audioManager.getVolumeManager().on("volumeChange",e =>{
-    //   console.error(`audio volumeChange: ${e.volume}`);
-    // })
-    //  audioManager.getRoutingManager().getDevices(audio.DeviceFlag.OUTPUT_DEVICES_FLAG).then(o =>{
-    //   if (o.length === 0) {
-    //     console.error("audio 无可用输出设备!");
-    //   }
-    //   o.forEach(i =>{
-    //     console.error(`audio id:${i.id}
-    //     audio  name:${i.name}
-    //     audio  displayName:${i.displayName}
-    //     audio  sampleRates:${i.sampleRates}
-    //     audio  channelCounts:${i.channelCounts}
-    //     audio  channelMasks:${i.channelMasks}
-    //     audio  address:${i.address}
-    //     audio  encodingTypes:${i.encodingTypes}
-    //     audio  deviceType:${i.deviceType}
-    //     audio  deviceRole:${i.deviceRole}`)
+    // let audioRoutingManager = this.audioManager?.getRoutingManager();  // 再调用AudioManager的方法创建AudioRoutingManager实例
+    // let rendererInfo: audio.AudioRendererInfo = {
+    //   usage: audio.StreamUsage.STREAM_USAGE_MUSIC,// 音频流使用类型：音乐。根据业务场景配置，参考StreamUsage。
+    //   rendererFlags: 0 // 音频渲染器标志。
+    // };
+    // audioRoutingManager?.getPreferOutputDeviceForRendererInfo(rendererInfo).then((desc: audio.AudioDeviceDescriptors) => {
+    //   console.info(TAG,`device descriptor: ${desc}`);
+    //   desc.forEach(device =>{
+    //     console.info(TAG,`device renderer id : ${device.id}`);  // 设备连接状态变化，0为连接，1为断开连接
+    //     console.info(TAG,`device renderer sampleRates : ${device.sampleRates}`);
+    //     console.info(TAG,`device renderer channelCounts : ${device.channelCounts}`);  // 设备角色
+    //     console.info(TAG,`device renderer networkId : ${device.networkId}`);  // 设备类型
+    //     console.info(TAG,`device renderer volumeGroupId : ${device.volumeGroupId}`);  // 设备类型
+    //     console.info(TAG,`device renderer displayName : ${device.displayName}`);  // 设备类型
+    //     console.info(TAG,`device renderer name : ${device.name}`);  // 设备类型
+    //     console.info(TAG,`device renderer address : ${device.address}`);  // 设备类型
     //   })
-    // }).catch((err: BusinessError) =>{
-    //    console.error(`audio 无可用输出设备 ERROR: ${err}`);
-    //  });
+    // }).catch((err: BusinessError) => {
+    //   console.error(TAG,`Result ERROR: ${err}`);
+    // })
+    //
+    // audioRoutingManager?.getDevices(audio.DeviceFlag.OUTPUT_DEVICES_FLAG).then((data: audio.AudioDeviceDescriptors) => {
+    //   console.info(TAG,'Promise returned to indicate that the device list is obtained.');
+    //   data.forEach(device =>{
+    //     console.info(TAG,`device id : ${device.id}`);  // 设备连接状态变化，0为连接，1为断开连接
+    //     console.info(TAG,`device sampleRates : ${device.sampleRates}`);
+    //     console.info(TAG,`device channelCounts : ${device.channelCounts}`);  // 设备角色
+    //     console.info(TAG,`device networkId : ${device.networkId}`);  // 设备类型
+    //     console.info(TAG,`device volumeGroupId : ${device.volumeGroupId}`);  // 设备类型
+    //     console.info(TAG,`device displayName : ${device.displayName}`);  // 设备类型
+    //     console.info(TAG,`device name : ${device.name}`);  // 设备类型
+    //     console.info(TAG,`device address : ${device.address}`);  // 设备类型
+    //   })
+    // });
+    // let outputAudioDeviceDescriptor: audio.AudioDeviceDescriptors = [{
+    //   deviceRole : audio.DeviceRole.OUTPUT_DEVICE,
+    //   deviceType : audio.DeviceType.SPEAKER,
+    //   id : 1,
+    //   name : "",
+    //   address : "",
+    //   sampleRates : [44100],
+    //   channelCounts : [2],
+    //   channelMasks : [0],
+    //   networkId : audio.LOCAL_NETWORK_ID,
+    //   interruptGroupId : 1,
+    //   volumeGroupId : 1,
+    //   displayName : ""
+    // }];
+    //
+    // audioRoutingManager?.selectOutputDevice(outputAudioDeviceDescriptor).then(() => {
+    //   console.info(TAG,'Invoke selectOutputDevice succeeded.');
+    // }).catch((err: BusinessError) => {
+    //   console.error(TAG,`Invoke selectOutputDevice failed, code is ${err.code}, message is ${err.message}`);
+    // });
 
     Logging.enableLogThreads();
     Logging.enableLogTimeStamps();
@@ -427,7 +436,6 @@ struct Index {
       //   this.rec = undefined;
       // }
       this.uuid=""
-      this.buttonTitle = '拨打';
       this.answerBtn =Visibility.Hidden
       this.remoteVideo =Visibility.Hidden
       this.ws_status=false;
@@ -449,7 +457,7 @@ struct Index {
                 let data = JSON.parse(msg.data) as Invite;
                 this.uuid = data.uuid
                 this.setStatus("Registered with server, waiting for call");
-                this.prepareDisplayMedia();
+                this.prepareLocalMedia();
                 this.send =  this.createPeerConnection(true);
                 // this.rec =  this.createPeerConnection(false);
                 this.status = "invite"
@@ -534,7 +542,9 @@ struct Index {
 
   async createAudioDeviceModule() {
     this.adm = new webrtc.AudioDeviceModule({
-      useStereoInput: true, useStereoOutput: true
+      useStereoInput: true, useStereoOutput: true,
+      rendererUsage:audio.StreamUsage.STREAM_USAGE_VOICE_COMMUNICATION,
+      outputSampleRate:audio.AudioSamplingRate.SAMPLE_RATE_44100
     });
     this.adm.oncapturererror = (event) => {
       console.error(TAG, 'audio oncapturererror: ' + JSON.stringify(event));
@@ -561,13 +571,13 @@ struct Index {
       videoDecoderFactory: new webrtc.SoftwareVideoDecoderFactory(),
       adm: this.adm
     });
-    if (this.hardDecode){
-      this.pcf = new webrtc.PeerConnectionFactory({
-        videoEncoderFactory: new webrtc.HardwareVideoEncoderFactory(false),
-        videoDecoderFactory: new webrtc.HardwareVideoDecoderFactory(),
-        adm: this.adm
-      });
-    }
+    // if (this.hardDecode){
+    //   this.pcf = new webrtc.PeerConnectionFactory({
+    //     videoEncoderFactory: new webrtc.HardwareVideoEncoderFactory(),
+    //     videoDecoderFactory: new webrtc.HardwareVideoDecoderFactory(),
+    //     adm: this.adm
+    //   });
+    // }
 
     // Logging.d(TAG, 'this.pcf: ' + JSON.stringify(this.pcf));
     // MediaDevices 依赖默认的 PeerConnnectionFactory，且需要与创建 PeerConnection 的是同一个。
@@ -578,41 +588,41 @@ struct Index {
     // console.info(TAG, 'filesDir: ' + filesDir);
   }
 
-  // async prepareLocalMedia() {
-  //   if (!this.localAudioTrack) {
-  //     this.localAudioSource = this.pcf?.createAudioSource({ echoCancellation: true, noiseSuppression: true });
-  //     console.info(TAG, 'audioSource: ' + JSON.stringify(this.localAudioSource));
-  //
-  //     this.localAudioTrack = this.pcf?.createAudioTrack("audio", this.localAudioSource);
-  //     console.info(TAG, 'audioTrack: ' + JSON.stringify(this.localAudioTrack));
-  //   }
-  //
-  //   if (!this.localVideoTrack) {
-  //     this.localVideoSource = this.pcf?.createVideoSource({width: VIDEO_RESOLUTION_WIDTH, height: VIDEO_RESOLUTION_HEIGHT,frameRate:FPS}, false);
-  //     console.info(TAG, 'videoSource: ' + JSON.stringify(this.localVideoSource));
-  //     this.localVideoSource!.oncapturerstarted = (event: webrtc.VideoCapturerStartedEvent) => {
-  //       console.info(TAG, 'oncapturerstarted: event=' + JSON.stringify(event));
-  //     };
-  //     this.localVideoSource!.oncapturerstopped = (event: webrtc.Event) => {
-  //       console.info(TAG, 'oncapturerstopped: event=' + JSON.stringify(event));
-  //     };
-  //
-  //     this.localVideoTrack = this.pcf?.createVideoTrack("video", this.localVideoSource);
-  //     console.info(TAG, 'createVideoTrack' + '' + ': ' + JSON.stringify(this.localVideoTrack));
-  //
-  //     if (this.localVideoTrack) {
-  //       this.mXComponentController1.setVideoTrack(this.localVideoTrack);
-  //     }
-  //
-  //     // this.mXComponentController1.setMirror(true);
-  //     // this.mXComponentController1.setScalingMode(ScalingMode.AspectFit);
-  //   }
-  // }
+  async prepareLocalMedia() {
+    if (!this.localAudioTrack) {
+      this.localAudioSource = this.pcf?.createAudioSource({ echoCancellation: true, noiseSuppression: true });
+      console.info(TAG, 'audioSource: ' + JSON.stringify(this.localAudioSource));
+
+      this.localAudioTrack = this.pcf?.createAudioTrack("audio", this.localAudioSource);
+      console.info(TAG, 'audioTrack: ' + JSON.stringify(this.localAudioTrack));
+    }
+
+    if (this.isVideo && !this.localVideoTrack) {
+      this.localVideoSource = this.pcf?.createVideoSource({width: VIDEO_RESOLUTION_WIDTH, height: VIDEO_RESOLUTION_HEIGHT,frameRate:FPS}, false);
+      console.info(TAG, 'videoSource: ' + JSON.stringify(this.localVideoSource));
+      this.localVideoSource!.oncapturerstarted = (event: webrtc.VideoCapturerStartedEvent) => {
+        console.info(TAG, 'oncapturerstarted: event=' + JSON.stringify(event));
+      };
+      this.localVideoSource!.oncapturerstopped = (event: webrtc.Event) => {
+        console.info(TAG, 'oncapturerstopped: event=' + JSON.stringify(event));
+      };
+
+      this.localVideoTrack = this.pcf?.createVideoTrack("video", this.localVideoSource);
+      console.info(TAG, 'createVideoTrack' + '' + ': ' + JSON.stringify(this.localVideoTrack));
+
+      if (this.localVideoTrack) {
+        this.mXComponentController1.setVideoTrack(this.localVideoTrack);
+      }
+
+      this.mXComponentController1.setMirror(true);
+      this.mXComponentController1.setScalingMode(ScalingMode.AspectFit);
+    }
+  }
 
   async prepareDisplayMedia() {
     if (!this.displayMediaStream) {
       this.displayMediaStream = await this.mediaDevices.getUserMedia({
-        video:true,
+        video:this.isVideo,
         audio: true,
         // ohosSystemAudio: true,
       });
@@ -620,7 +630,7 @@ struct Index {
       this.localVideoTrack = this.displayMediaStream.getVideoTracks()[0];
       console.info(TAG, 'videoTrack: ' + JSON.stringify(this.localVideoTrack));
 
-      if (this.localVideoTrack) {
+      if (this.isVideo && this.localVideoTrack) {
         let videoSource = this.localVideoTrack.getSource();
         if (videoSource) {
           this.localVideoSource = videoSource as webrtc.VideoSource;
@@ -650,7 +660,6 @@ struct Index {
   }
 
    createPeerConnection(isSend:boolean): webrtc.RTCPeerConnection|undefined {
-    // await this.prepareLocalMedia();
     let pc = this.pcf?.createPeerConnection({
       // iceServers: [
       //   { urls: 'stun:47.112.22.152:3478' },
@@ -671,73 +680,40 @@ struct Index {
       console.error(TAG, 'failed to create RTCPeerConnection');
       return undefined;
     }
+
     pc.ontrack = (event: webrtc.RTCTrackEvent) => {
       console.info(TAG, 'ontrack: ' + JSON.stringify(event));
+
+      // audioStreamManager?.on('audioRendererChange',  (AudioRendererChangeInfoArray: audio.AudioRendererChangeInfoArray) => {
+      //   for (let i = 0; i < AudioRendererChangeInfoArray.length; i++) {
+      //     let AudioRendererChangeInfo = AudioRendererChangeInfoArray[i];
+      //     console.info(TAG,`## RendererChange on is called for ${i} ##`);
+      //     console.info(TAG,`StreamId for ${i} is: ${AudioRendererChangeInfo.streamId}`);
+      //     console.info(TAG,`Content ${i} is: ${AudioRendererChangeInfo.rendererInfo.content}`);
+      //     console.info(TAG,`Stream ${i} is: ${AudioRendererChangeInfo.rendererInfo.usage}`);
+      //     console.info(TAG,`Flag ${i} is: ${AudioRendererChangeInfo.rendererInfo.rendererFlags}`);
+      //     for (let j = 0;j < AudioRendererChangeInfo.deviceDescriptors.length; j++) {
+      //       console.info(`TAG,Id: ${i} : ${AudioRendererChangeInfo.deviceDescriptors[j].id}`);
+      //       console.info(TAG,`Type: ${i} : ${AudioRendererChangeInfo.deviceDescriptors[j].deviceType}`);
+      //       console.info(TAG,`Role: ${i} : ${AudioRendererChangeInfo.deviceDescriptors[j].deviceRole}`);
+      //       console.info(TAG,`Name: ${i} : ${AudioRendererChangeInfo.deviceDescriptors[j].name}`);
+      //       console.info(TAG,`Address: ${i} : ${AudioRendererChangeInfo.deviceDescriptors[j].address}`);
+      //       console.info(TAG,`SampleRates: ${i} : ${AudioRendererChangeInfo.deviceDescriptors[j].sampleRates[0]}`);
+      //       console.info(TAG,`ChannelCount ${i} : ${AudioRendererChangeInfo.deviceDescriptors[j].channelCounts[0]}`);
+      //       console.info(TAG,`ChannelMask: ${i} : ${AudioRendererChangeInfo.deviceDescriptors[j].channelMasks}`);
+      //     }
+      //   }
+      // });
+      this.remoteVideo = Visibility.Visible
+      this.answerBtn =Visibility.Hidden
       if (event.track.kind == 'video') {
         this.remoteVideoTrack = event.track;
-        this.remoteVideo = Visibility.Visible
-        this.answerBtn =Visibility.Hidden
         this.mXComponentController2.setMirror(true);
         this.mXComponentController2.setVideoTrack(event.track);
       } else if (event.track.kind == 'audio' ) {
         this.remoteAudioTrack = event.track;
-
-        // let audioManager = audio.getAudioManager();
-        // let audioSessionManager = audioManager.getSessionManager();
-        // audioSessionManager.activateAudioSession(strategy).then(() => {
-        //   console.info(TAG, 'activate AudioSession SUCCESS');
-        // }).catch((err: BusinessError) => {
-        //   console.error(`audio ERROR: ${err}`);
-        // });
-
-        // audioManager.getAudioScene().then((scene) => {
-        //   console.info(TAG, 'getAudioScene :'+  scene.toString());
-        // }).catch((err: BusinessError) => {
-        //   console.error(`audio getAudioScene ERROR: ${err}`);
-        // });
-        //
-        // audioManager.getVolumeManager().on("volumeChange",e =>{
-        //   console.error(`audio volumeChange: ${e.volume}`);
-        // })
-        // audioManager.getStreamManager().isActive(audio.AudioVolumeType.VOICE_CALL).then(o =>{
-        //   console.error("audio 语音电话 isActive:"+ o);
-        // })
-        // audioManager.getStreamManager().isActive(audio.AudioVolumeType.RINGTONE).then(o =>{
-        //   console.error("audio 铃声 isActive:"+ o);
-        // })
-        // audioManager.getStreamManager().isActive(audio.AudioVolumeType.MEDIA).then(o =>{
-        //   console.error("audio 媒体 isActive:"+ o);
-        // })
-        // audioManager.getStreamManager().isActive(audio.AudioVolumeType.ALARM).then(o =>{
-        //   console.error("audio 闹钟 isActive:"+ o);
-        // })
-        // audioManager.getStreamManager().isActive(audio.AudioVolumeType.ACCESSIBILITY).then(o =>{
-        //   console.error("audio 无障碍 isActive:"+ o);
-        // })
-        // audioManager.getStreamManager().isActive(audio.AudioVolumeType.VOICE_ASSISTANT).then(o =>{
-        //   console.error("audio 语音助手 isActive:"+ o);
-        // })
-        //
-        //  audioManager.getRoutingManager().getDevices(audio.DeviceFlag.ALL_DEVICES_FLAG).then(o =>{
-        //   if (o.length === 0) {
-        //     console.error("audio 无可用输出设备!");
-        //   }
-        //   o.forEach(i =>{
-        //     console.error(`audio id:${i.id}
-        //     audio  name:${i.name}
-        //     audio  displayName:${i.displayName}
-        //     audio  sampleRates:${i.sampleRates}
-        //     audio  channelCounts:${i.channelCounts}
-        //     audio  channelMasks:${i.channelMasks}
-        //     audio  address:${i.address}
-        //     audio  encodingTypes:${i.encodingTypes}
-        //     audio  deviceType:${i.deviceType}
-        //     audio  deviceRole:${i.deviceRole}`)
-        //   })
-        // }).catch((err: BusinessError) =>{
-        //    console.error(`audio 无可用输出设备 ERROR: ${err}`);
-        //  });
       }
+
     };
     pc.onsignalingstatechange = (event) => {
       console.info(TAG, 'onsignalingstatechange: ' + pc?.signalingState);
@@ -775,7 +751,6 @@ struct Index {
         // this.ws.close();
       } else if(pc?.connectionState=='connected' && this.status=="invite" && !this.isCallout){
         this.answerBtn = Visibility.Visible
-        this.buttonTitle='挂断'
       }
     }
     pc.onnegotiationneeded = (event) => {
@@ -890,6 +865,28 @@ struct Index {
     return pc
   }
 
+  handleInvite(){
+    if (this.peerId.length < 2 || this.peerId.length > 4) {
+      promptAction.showToast({ message: "请输入2到4位数ID" });
+      return;
+    }
+    this.sendMessage(JSON.stringify(  {
+      eventName: '__apply',
+      locId: this.locId,
+      number: this.number.toString(),
+      clientType:this.clientType,
+      data: JSON.stringify(
+        {
+          to: this.peerId.toString(),
+          uuid: this.uuid,
+          isVideo: this.isVideo,
+          apply:"invite"
+        }
+      )
+    }));
+    this.isCallout=true;
+  }
+
   handleHangup(){
     this.sendMessage(JSON.stringify(  {
       eventName: '__apply',
@@ -907,7 +904,6 @@ struct Index {
     }));
     this.remoteVideo = Visibility.Hidden
     this.answerBtn = Visibility.Hidden
-    this.buttonTitle = '拨打';
     this.isCallout=false;
     this.uuid="";
     this.status="hangup";
@@ -936,6 +932,8 @@ struct Index {
     if(!pc){
       return
     }
+    // pc.addTransceiver('audio', { direction: 'recvonly' })
+    // pc.addTransceiver('video', { direction: 'recvonly' })
    pc.createAnswer().then((desc) => {
       // console.info(TAG, 'Success to create answer: ' + JSON.stringify(desc));
       if(!pc){
