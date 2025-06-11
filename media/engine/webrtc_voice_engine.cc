@@ -509,7 +509,7 @@ void WebRtcVoiceEngine::ApplyOptions(const AudioOptions& options_in) {
     options.echo_cancellation = false;
     RTC_LOG(LS_INFO) << "Always disable AEC on iOS. Use built-in instead.";
   }
-#elif defined(WEBRTC_ANDROID)
+#elif defined(WEBRTC_ANDROID) || defined(WEBRTC_OHOS)
   use_mobile_software_aec = true;
 #endif
 
@@ -520,7 +520,7 @@ void WebRtcVoiceEngine::ApplyOptions(const AudioOptions& options_in) {
   RTC_LOG(LS_INFO) << "Always disable AGC on iOS. Use built-in instead.";
 #endif
 
-#if defined(WEBRTC_IOS) || defined(WEBRTC_ANDROID)
+#if defined(WEBRTC_IOS) || defined(WEBRTC_ANDROID) || defined(WEBRTC_OHOS)
   // Turn off the gain control if specified by the field trial.
   // The purpose of the field trial is to reduce the amount of resampling
   // performed inside the audio processing module on mobile platforms by
@@ -619,7 +619,7 @@ void WebRtcVoiceEngine::ApplyOptions(const AudioOptions& options_in) {
   if (options.auto_gain_control) {
     const bool enabled = *options.auto_gain_control;
     apm_config.gain_controller1.enabled = enabled;
-#if defined(WEBRTC_IOS) || defined(WEBRTC_ANDROID)
+#if defined(WEBRTC_IOS) || defined(WEBRTC_ANDROID) || defined(WEBRTC_OHOS)
     apm_config.gain_controller1.mode =
         apm_config.gain_controller1.kFixedDigital;
 #else
