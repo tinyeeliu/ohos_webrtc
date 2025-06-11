@@ -86,7 +86,10 @@ int32_t AudioCapturer::Terminate()
     RTC_DCHECK(threadChecker_.IsCurrent());
     StopRecording();
     threadChecker_.Detach();
-    OH_RESULT_CHECK(OH_AudioCapturer_Release(capturer_), -1);
+    if (capturer_) {
+        OH_RESULT_CHECK(OH_AudioCapturer_Release(capturer_), -1);
+    }
+    capturer_ = nullptr;
 
     initialized_ = false;
 
