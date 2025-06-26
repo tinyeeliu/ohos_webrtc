@@ -20,19 +20,19 @@ native API header files.
 ### Build With OHOS SDK
 
 1. How to build WebRTC with OHOS SDK followed [this article](./docs/ohos/webrtc_adapter_ohos.md).
-2. OHOS Audio adapter code: [ohos audio](./modules/audio_device/ohos)
-3. How to use OHOS Video for webrtc followed [this project](https://gitee.com/han_jin_fei/oh_web-rtc)
+2. OHOS Audio adapter code: [ohos audio](./modules/audio_device/ohos).
+3. How to use OHOS Video for webrtc followed [this project](https://gitee.com/han_jin_fei/oh_web-rtc).
 
 ### More info
 
- * Official web site: http://www.webrtc.org
- * Master source code repo: https://webrtc.googlesource.com/src
- * Samples and reference apps: https://github.com/webrtc
- * Mailing list: http://groups.google.com/group/discuss-webrtc
- * Continuous build: https://ci.chromium.org/p/webrtc/g/ci/console
- * [Coding style guide](g3doc/style-guide.md)
- * [Code of conduct](CODE_OF_CONDUCT.md)
- * [Reporting bugs](docs/bug-reporting.md)
- * [Documentation](g3doc/sitemap.md)
+ * Official web site: http://www.webrtc.org.
+ * Master source code repo: https://webrtc.googlesource.com/src.
+ * Samples and reference apps: https://github.com/webrtc.
+ * Mailing list: http://groups.google.com/group/discuss-webrtc.
+ * Continuous build: https://ci.chromium.org/p/webrtc/g/ci/console.
+ * [Coding style guide](g3doc/style-guide.md).
+ * [Code of conduct](CODE_OF_CONDUCT.md).
+ * [Reporting bugs](docs/bug-reporting.md).
+ * [Documentation](g3doc/sitemap.md).
 
 [native-dev]: https://webrtc.googlesource.com/src/+/main/docs/native-code/
