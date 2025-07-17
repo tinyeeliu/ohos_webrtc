@@ -133,6 +133,10 @@ export interface RTCTrackEvent extends Event {
   readonly transceiver: RTCRtpTransceiver;
 }
 
+export interface RTCAddStreamEvent extends Event {
+  readonly stream: MediaStream;
+}
+
 // https://www.w3.org/TR/webrtc/#rtcpeerconnectioniceevent
 export interface RTCPeerConnectionIceEvent extends Event {
   readonly candidate?: RTCIceCandidate;
@@ -336,6 +340,7 @@ export interface RTCPeerConnection extends EventTarget {
   onconnectionstatechange: ((this: RTCPeerConnection, ev: Event) => any) | null;
   ontrack: ((this: RTCPeerConnection, ev: RTCTrackEvent) => any) | null;
   ondatachannel: ((this: RTCPeerConnection, ev: RTCDataChannelEvent) => any) | null;
+  onaddstream: ((this: RTCPeerConnection, ev: RTCAddStreamEvent) => any) | null;
 
   addTrack(track: MediaStreamTrack, ...streams: MediaStream[]): RTCRtpSender;
   removeTrack(sender: RTCRtpSender): void;
@@ -367,6 +372,7 @@ declare var RTCPeerConnection: {
 
 // https://www.w3.org/TR/webrtc/#rtcrtpreceiver-interface
 export interface RTCRtpReceiver {
+  readonly id: string;
   readonly track: MediaStreamTrack;
   readonly transport: RTCDtlsTransport | null;
 
@@ -452,6 +458,7 @@ export interface RTCRtpSynchronizationSource extends RTCRtpContributingSource {
 // https://www.w3.org/TR/webrtc/#rtcrtpsender-interface
 // https://www.w3.org/TR/webrtc/#rtcrtpsender-interface-extensions
 export interface RTCRtpSender {
+  readonly id: string;
   readonly track: MediaStreamTrack | null;
   readonly transport: RTCDtlsTransport | null;
   readonly dtmf: RTCDTMFSender | null;
@@ -788,6 +795,8 @@ export interface AudioSource extends MediaSource {
 export interface VideoSource extends MediaSource {
   oncapturerstarted: ((this: VideoSource, ev: VideoCapturerStartedEvent) => any) | null;
   oncapturerstopped: ((this: VideoSource, ev: Event) => any) | null;
+  startCapture(): void;
+  stopCapture(): void;
 }
 
 // https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack

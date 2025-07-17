@@ -44,6 +44,7 @@ protected:
 
     static Napi::Value GetCapabilities(const Napi::CallbackInfo& info);
 
+    Napi::Value GetId(const Napi::CallbackInfo& info);
     Napi::Value GetTrack(const Napi::CallbackInfo& info);
     Napi::Value GetTransport(const Napi::CallbackInfo& info);
 

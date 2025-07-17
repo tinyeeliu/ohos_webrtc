@@ -73,7 +73,13 @@ fi
 arguments="target_cpu=\"arm64\" \
     target_os=\"ohos\" \
     ohos_sdk_native_root=\"$OHOS_SDK_NATIVE_PATH\" \
-    is_clang=true"
+    is_clang=true \
+    ffmpeg_branding=\"Chrome\" \
+    rtc_use_h264=true \
+    rtc_use_h265=true \
+    is_component_ffmpeg=true \
+    ohos_extra_ldflags=\"-static-libstdc++\" \
+    is_official_build=true"
 
 gn gen out/webrtc --args="$arguments"
 if [ $? -ne 0 ]
@@ -82,12 +88,15 @@ then
     exit 1
 fi
 
-ninja -C out/webrtc -v -j32 > build.log
+ninja -C out/webrtc -v -j8 > build.log
 if [ $? -ne 0 ]
 then
     echo "[ERROR] webrtc build failed! see the detailes in build.log file"
     exit 1
 fi
+
+cd out/webrtc && tar -czvf libohos_webrtc.tar.gz libohos_webrtc.so libffmpeg.so
+mv libohos_webrtc.tar.gz ../../libohos_webrtc.tar.gz
 
 echo "### webrtc build success!! ###"
 

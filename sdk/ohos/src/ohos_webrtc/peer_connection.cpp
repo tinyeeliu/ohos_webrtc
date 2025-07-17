@@ -91,6 +91,7 @@ const char kAttributeNameOnNegotiationNeeded[] = "onnegotiationneeded";
 const char kAttributeNameOnSignalingStateChange[] = "onsignalingstatechange";
 const char kAttributeNameOnTrack[] = "ontrack";
 const char kAttributeNameOnDataChannel[] = "ondatachannel";
+const char kAttributeNameOnAddStream[] = "onaddstream";
 
 const char kMethodNameAddTrack[] = "addTrack";
 const char kMethodNameRemoveTrack[] = "removeTrack";
@@ -124,6 +125,7 @@ const char kEventNegotiationNeeded[] = "negotiationneeded";
 const char kEventSignalingStateChange[] = "signalingstatechange";
 const char kEventTrack[] = "track";
 const char kEventDataChannel[] = "datachannel";
+const char kEventAddStream[] = "addstream";
 
 template <typename T>
 class BaseSdpObserver : public T {
@@ -322,6 +324,8 @@ void NapiPeerConnection::Init(class Env env, Object exports)
                 kAttributeNameOnTrack, napi_default, (void*)kEventTrack),
             InstanceAccessor<&NapiPeerConnection::GetEventHandler, &NapiPeerConnection::SetEventHandler>(
                 kAttributeNameOnDataChannel, napi_default, (void*)kEventDataChannel),
+            InstanceAccessor<&NapiPeerConnection::GetEventHandler, &NapiPeerConnection::SetEventHandler>(
+                kAttributeNameOnAddStream, napi_default, (void*)kEventAddStream),
             InstanceMethod<&NapiPeerConnection::AddTrack>(kMethodNameAddTrack),
             InstanceMethod<&NapiPeerConnection::RemoveTrack>(kMethodNameRemoveTrack),
             InstanceMethod<&NapiPeerConnection::SetLocalDescription>(kMethodNameSetLocalDescription),
@@ -1508,6 +1512,17 @@ void NapiPeerConnection::OnIceSelectedCandidatePairChanged(const cricket::Candid
 void NapiPeerConnection::OnAddStream(rtc::scoped_refptr<MediaStreamInterface> stream)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    Dispatch(CallbackEvent<NapiPeerConnection>::Create([this, stream](NapiPeerConnection& target) {
+        RTC_DCHECK_EQ(this, &target);
+
+        auto env = target.Env();
+        Napi::HandleScope scope(env);
+        auto jsEvent = Object::New(env);
+        jsEvent.Set("type", String::New(env, kEventAddStream));
+        jsEvent.Set("stream", NapiMediaStream::NewInstance(factory_, stream));
+        target.MakeCallback(kEventAddStream, {jsEvent});
+    }));
 }
 
 void NapiPeerConnection::OnRemoveStream(rtc::scoped_refptr<MediaStreamInterface> stream)
