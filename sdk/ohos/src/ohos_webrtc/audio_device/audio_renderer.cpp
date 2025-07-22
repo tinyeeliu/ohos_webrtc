@@ -507,4 +507,10 @@ void AudioRenderer::NotifyStateChange(AudioStateType state)
     }
 }
 
+OH_AudioStream_Result AudioRenderer::SetDefaultOutputDevice(OH_AudioDevice_Type deviceType)
+{
+  RTC_DLOG(LS_INFO) << __FUNCTION__ << " deviceType=" << deviceType;
+  return OH_AudioRenderer_SetDefaultOutputDevice(renderer_, deviceType);
+}
+
 } // namespace webrtc

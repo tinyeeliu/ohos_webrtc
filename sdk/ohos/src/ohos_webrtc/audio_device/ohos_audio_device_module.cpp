@@ -42,6 +42,7 @@ const char kAttributeNameOnRendererStateChange[] = "onrendererstatechange";
 const char kMethodNameSetSpeakerMute[] = "setSpeakerMute";
 const char kMethodNameSetMicrophoneMute[] = "setMicrophoneMute";
 const char kMethodNameSetNoiseSuppressorEnabled[] = "setNoiseSuppressorEnabled";
+const char kMethodNameSetDefaultOutputDevice[] = "setDefaultOutputDevice";
 const char kMethodNameIsBuiltInAcousticEchoCancelerSupported[] = "isBuiltInAcousticEchoCancelerSupported";
 const char kMethodNameIsBuiltInNoiseSuppressorSupported[] = "isBuiltInNoiseSuppressorSupported";
 const char kMethodNameToJson[] = "toJSON";
@@ -880,6 +881,14 @@ void OhosAudioDeviceModule::OnAudioOutputStateChange(AudioOutput* output, AudioS
     }
 }
 
+int32_t OhosAudioDeviceModule::SetDefaultOutputDevice(int32_t type)
+{
+  RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+  OH_AudioStream_Result result = ((AudioRenderer *)output_.get())->SetDefaultOutputDevice(static_cast<OH_AudioDevice_Type>(type));
+  return static_cast<int32_t>(result);
+}
+
 FunctionReference NapiAudioDeviceModule::constructor_;
 
 void NapiAudioDeviceModule::Init(Napi::Env env, Napi::Object exports)
@@ -902,6 +911,7 @@ void NapiAudioDeviceModule::Init(Napi::Env env, Napi::Object exports)
             InstanceMethod<&NapiAudioDeviceModule::SetSpeakerMute>(kMethodNameSetSpeakerMute),
             InstanceMethod<&NapiAudioDeviceModule::SetMicrophoneMute>(kMethodNameSetMicrophoneMute),
             InstanceMethod<&NapiAudioDeviceModule::SetNoiseSuppressorEnabled>(kMethodNameSetNoiseSuppressorEnabled),
+            InstanceMethod<&NapiAudioDeviceModule::SetDefaultOutputDevice>(kMethodNameSetDefaultOutputDevice),
             InstanceMethod<&NapiAudioDeviceModule::ToJson>(kMethodNameToJson),
             StaticMethod<&NapiAudioDeviceModule::isBuiltInAcousticEchoCancelerSupported>(
                 kMethodNameIsBuiltInAcousticEchoCancelerSupported),
@@ -1070,6 +1080,14 @@ Napi::Value NapiAudioDeviceModule::SetNoiseSuppressorEnabled(const Napi::Callbac
 
     // Noise suppressor is not supported.
     return Boolean::New(info.Env(), false);
+}
+
+Napi::Value NapiAudioDeviceModule::SetDefaultOutputDevice(const Napi::CallbackInfo& info) 
+{
+  RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+  adm_->SetDefaultOutputDevice(info[0].As<Napi::Number>().Int32Value());
+  return info.Env().Undefined();
 }
 
 Napi::Value NapiAudioDeviceModule::ToJson(const Napi::CallbackInfo& info)

@@ -63,6 +63,8 @@ public:
     int32_t GetChannelCount() const override;
     bool UseLowLatency() const override;
 
+    OH_AudioStream_Result SetDefaultOutputDevice(OH_AudioDevice_Type deviceType);
+
 protected:
     static int32_t OnWriteData1(OH_AudioRenderer* renderer, void* userData, void* buffer, int32_t length);
     static int32_t OnStreamEvent1(OH_AudioRenderer* renderer, void* userData, OH_AudioStream_Event event);

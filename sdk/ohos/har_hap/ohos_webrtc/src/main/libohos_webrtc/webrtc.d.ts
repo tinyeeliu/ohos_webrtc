@@ -959,6 +959,7 @@ export interface AudioDeviceModule {
   setSpeakerMute(mute: boolean): void;
   setMicrophoneMute(mute: boolean): void;
   setNoiseSuppressorEnabled(enabled: boolean): boolean;
+  setDefaultOutputDevice(deviceType: number): void;
 }
 
 declare var AudioDeviceModule: {
