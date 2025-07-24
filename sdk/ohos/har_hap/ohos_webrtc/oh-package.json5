@@ -1,5 +1,5 @@
 {
-  "name": "@ohos/webrtc",
+  "name": "@xw/webrtc",
   "version": "1.0.0-rc2",
   "description": "ArkTS interfaces of webrtc for OpenHarmony.",
   "keywords": ["webrtc"],

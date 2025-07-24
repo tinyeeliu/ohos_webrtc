@@ -1,0 +1,1 @@
+sdk/ohos/har_hap/ohos_webrtc/libs/*/*.so filter=lfs diff=lfs merge=lfs -text
