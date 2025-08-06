@@ -143,6 +143,7 @@ if (is_ohos) {
       "../../modules/video_coding/codecs/av1:libaom_av1_encoder",
       "../../modules/video_coding/codecs/av1:dav1d_decoder",
       "../../rtc_base:checks",
+      "../../rtc_base:log_sinks",
       "//third_party/libyuv",
     ]
 

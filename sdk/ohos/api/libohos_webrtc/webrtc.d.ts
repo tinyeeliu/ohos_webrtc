@@ -1041,6 +1041,7 @@ export class NativeLogging {
   static injectLoggable(loggable: Loggable, severity: number): void;
   static deleteLoggable(): void;
   static enableLogToDebugOutput(severity): void;
+  static enableLogToFile(severity: number, filename: string): void;
   static enableLogThreads(): void;
   static enableLogTimeStamps(): void;
   static log(message: string, severity: number, tag: string): void;

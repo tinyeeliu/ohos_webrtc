@@ -30,6 +30,7 @@ protected:
     static Napi::Value InjectLoggable(const Napi::CallbackInfo& info);
     static Napi::Value DeleteLoggable(const Napi::CallbackInfo& info);
     static Napi::Value EnableLogToDebugOutput(const Napi::CallbackInfo& info);
+    static Napi::Value EnableLogToFile(const Napi::CallbackInfo& info);
     static Napi::Value EnableLogThreads(const Napi::CallbackInfo& info);
     static Napi::Value EnableLogTimeStamps(const Napi::CallbackInfo& info);
     static Napi::Value Log(const Napi::CallbackInfo& info);

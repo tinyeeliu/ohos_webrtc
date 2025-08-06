@@ -16,6 +16,9 @@
 #include "native_logging.h"
 #include "hilog_sink.h"
 #include "log_sink.h"
+#include "rtc_base/log_sinks.h"
+
+#include <filesystem>
 
 #include "hilog/log.h"
 
@@ -28,6 +31,7 @@ const char kClassName[] = "NativeLogging";
 const char kMethodNameInjectLoggable[] = "injectLoggable";
 const char kMethodNameDeleteLoggable[] = "deleteLoggable";
 const char kMethodNameEnableLogToDebugOutput[] = "enableLogToDebugOutput";
+static constexpr char kMethodNameEnableLogToFile[] = "enableLogToFile";
 const char kMethodNameEnableLogThreads[] = "enableLogThreads";
 const char kMethodNameEnableLogTimeStamps[] = "enableLogTimeStamps";
 const char kMethodNameLog[] = "log";
@@ -35,6 +39,7 @@ const char kMethodNameLog[] = "log";
 struct StaticObjectContainer {
     std::unique_ptr<LogSink> logSink;
     std::unique_ptr<HilogSink> hilogSink;
+    std::unique_ptr<rtc::FileRotatingLogSink> fileSink;
 };
 
 StaticObjectContainer& GetStaticObjects()
@@ -53,6 +58,7 @@ void NapiNativeLogging::Init(class Env env, Object exports)
             StaticMethod<&NapiNativeLogging::InjectLoggable>(kMethodNameInjectLoggable),
             StaticMethod<&NapiNativeLogging::DeleteLoggable>(kMethodNameDeleteLoggable),
             StaticMethod<&NapiNativeLogging::EnableLogToDebugOutput>(kMethodNameEnableLogToDebugOutput),
+            StaticMethod<&NapiNativeLogging::EnableLogToFile>(kMethodNameEnableLogToFile),
             StaticMethod<&NapiNativeLogging::EnableLogThreads>(kMethodNameEnableLogThreads),
             StaticMethod<&NapiNativeLogging::EnableLogTimeStamps>(kMethodNameEnableLogTimeStamps),
             StaticMethod<&NapiNativeLogging::Log>(kMethodNameLog),
@@ -120,8 +126,43 @@ Napi::Value NapiNativeLogging::EnableLogToDebugOutput(const Napi::CallbackInfo& 
         if (!hilogSink) {
             hilogSink = std::make_unique<HilogSink>();
         }
-        rtc::LogMessage::AddLogToStream(hilogSink.get(), rtc::LS_VERBOSE);
+        rtc::LogMessage::AddLogToStream(hilogSink.get(), static_cast<rtc::LoggingSeverity>(severity));
     }
+    return info.Env().Undefined();
+}
+
+Napi::Value NapiNativeLogging::EnableLogToFile(const Napi::CallbackInfo& info)
+{
+    OH_LOG_Print(LOG_APP, LOG_DEBUG, LOG_DOMAIN, kClassName, __FUNCTION__);
+
+    if (info.Length() < 2 || !info[0].IsNumber() || !info[1].IsString()) {
+        NAPI_THROW(Error::New(info.Env(), "Invalid arguments"), info.Env().Undefined());
+    }
+
+    auto severity = info[0].As<Number>().Int32Value();
+    if (severity < rtc::LS_VERBOSE || severity > rtc::LS_NONE) {
+        NAPI_THROW(Error::New(info.Env(), "Invalid arguments"), info.Env().Undefined());
+    }
+
+    auto filename = info[1].As<String>().Utf8Value();
+    OH_LOG_Print(
+        LOG_APP, LOG_DEBUG, LOG_DOMAIN, kClassName, "severity=%{public}d, filename=%{public}s", severity,
+        filename.c_str());
+    auto pos = filename.find_last_of('/');
+    if (pos == std::string::npos) {
+        NAPI_THROW(Error::New(info.Env(), "Invalid arguments"), info.Env().Undefined());
+    }
+
+    auto& fileSink = GetStaticObjects().fileSink;
+    if (fileSink) {
+        rtc::LogMessage::RemoveLogToStream(fileSink.get());
+        fileSink.reset();
+    }
+
+    fileSink = std::make_unique<rtc::FileRotatingLogSink>(filename.substr(0, pos), filename.substr(pos), 20000000, 10);
+    fileSink->Init();
+    rtc::LogMessage::AddLogToStream(fileSink.get(), static_cast<rtc::LoggingSeverity>(severity));
+
     return info.Env().Undefined();
 }
 
@@ -144,30 +185,13 @@ Napi::Value NapiNativeLogging::Log(const Napi::CallbackInfo& info)
     }
 
     auto message = info[0].As<String>().Utf8Value();
-    auto severity = info[1].As<Number>().Int32Value();
+    auto severity = static_cast<rtc::LoggingSeverity>(info[1].As<Number>().Int32Value());
     auto tag = info[2].As<String>().Utf8Value();
 
-    LogLevel level = LOG_DEBUG;
-    switch (severity) {
-        case rtc::LS_VERBOSE:
-            level = LOG_DEBUG;
-            break;
-        case rtc::LS_INFO:
-            level = LOG_INFO;
-            break;
-        case rtc::LS_WARNING:
-            level = LOG_WARN;
-            break;
-        case rtc::LS_ERROR:
-            level = LOG_ERROR;
-            break;
-        case rtc::LS_NONE:
-            return info.Env().Undefined();
-        default:
-            break;
+    if (!::rtc::LogMessage::IsNoop(severity)) {
+        // The file and line is meaningless here
+        RTC_LOG_FILE_LINE(severity, __FILE__, __LINE__) << "[" << tag << "] " << message;
     }
-
-    OH_LOG_Print(LOG_APP, level, LOG_DOMAIN, tag.c_str(), "%{public}s", message.c_str());
 
     return info.Env().Undefined();
 }

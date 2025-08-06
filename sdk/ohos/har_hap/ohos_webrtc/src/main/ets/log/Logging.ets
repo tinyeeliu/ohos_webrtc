@@ -52,6 +52,15 @@ export class Logging {
     Logging.loggingEnabled = true;
   }
 
+  static enableLogToFile(severity: LoggingSeverity, filename: string) {
+    if (Logging.loggable != null) {
+      throw new Error("Logging to native debug output not supported while Loggable is injected."
+        + "Delete the Loggable before calling this method.");
+    }
+    NativeLogging.enableLogToFile(severity, filename);
+    Logging.loggingEnabled = true;
+  }
+
   static log(severity: LoggingSeverity, tag: string, message: string) {
     if (Logging.loggable) {
       // Filter log messages below loggableSeverity.

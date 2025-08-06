@@ -2702,6 +2702,19 @@ static enableLogToDebugOutput(severity: LoggingSeverity): void
 |----------|-----------------|-----|---------------------|
 | severity | LoggingSeverity | 是   | 日志级别，低于此级别的日志消息将被丢弃 |
 
+### enableLogToFile
+
+static enableLogToFile(severity: LoggingSeverity, filename: string)
+
+将指定级别的日志输出到文件。
+
+参数：
+
+| 参数名      | 类型              | 必填  | 说明                  |
+|----------|-----------------|-----|---------------------|
+| severity | LoggingSeverity | 是   | 日志级别，低于此级别的日志消息将被丢弃 |
+| filename | string          | 是   | 文件路径 |
+
 ### log
 
 static log(severity: LoggingSeverity, tag: string, message: string): void
