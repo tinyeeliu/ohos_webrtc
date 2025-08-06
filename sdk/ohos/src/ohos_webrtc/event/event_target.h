@@ -56,6 +56,10 @@ public:
     {
         RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
+        if (shouldStop_) {
+            return;
+        }
+
         this->Enqueue(std::move(event));
 
         napi_status status = tsfn_.BlockingCall([](Napi::Env env, Napi::Function func) { func.Call({}); });
@@ -67,7 +71,11 @@ public:
     virtual void Stop()
     {
         shouldStop_ = true;
-        Dispatch(EmptyEvent<T>::Create());
+        this->Enqueue(EmptyEvent<T>::Create());
+        napi_status status = tsfn_.BlockingCall([](Napi::Env env, Napi::Function func) { func.Call({}); });
+        if (status != napi_ok) {
+            RTC_LOG(LS_ERROR) << " tsfn call error: " << status;
+        }
     }
 
     bool ShouldStop() const
@@ -128,7 +136,8 @@ protected:
             event->Process(*target);
         }
 
-        if (shouldStop_) {
+        if (shouldStop_ && !didStopped_) {
+            didStopped_ = true;
             this->DidStop();
             this->Unref();
         }
@@ -156,6 +165,7 @@ protected:
     }
 
 private:
+    bool didStopped_{false};
     std::atomic<bool> shouldStop_{false};
     mutable std::mutex mutex_;
     std::map<std::string, Napi::FunctionReference> eventHandlers_;
