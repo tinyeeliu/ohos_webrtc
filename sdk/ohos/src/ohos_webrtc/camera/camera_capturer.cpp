@@ -114,7 +114,7 @@ bool CameraCapturer::IsScreencast()
 
 void CameraCapturer::StartInternal()
 {
-    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
+    RTC_LOG(LS_INFO) << __FUNCTION__;
 
     if (!isInitialized_) {
         RTC_LOG(LS_ERROR) << "Not initialized";
@@ -140,6 +140,7 @@ void CameraCapturer::StartInternal()
 
     if (deviceIndex == -1) {
         RTC_LOG(LS_ERROR) << "No specific camera device found";
+        NotifyCapturedStart(false);
         return;
     }
 
@@ -181,17 +182,20 @@ void CameraCapturer::StartInternal()
 
     if (!videoProfile && !previewProfile) {
         RTC_LOG(LS_ERROR) << "No specific camera device found";
+        NotifyCapturedStart(false);
         return;
     }
 
     input_ = CameraManager::GetInstance().CreateCameraInput(device);
     if (input_.IsEmpty()) {
         RTC_LOG(LS_ERROR) << "Failed to create camera input";
+        NotifyCapturedStart(false);
         return;
     }
 
     if (!input_.Open()) {
         RTC_LOG(LS_ERROR) << "Failed to open camera input";
+        NotifyCapturedStart(false);
         return;
     }
 
@@ -200,6 +204,7 @@ void CameraCapturer::StartInternal()
     previewOutput_ = CameraManager::GetInstance().CreatePreviewOutput(previewProfile, surfaceId);
     if (previewOutput_.IsEmpty()) {
         RTC_LOG(LS_ERROR) << "Failed to create camera preview output";
+        NotifyCapturedStart(false);
         return;
     }
     previewOutput_.AddObserver(this);
@@ -213,6 +218,7 @@ void CameraCapturer::StartInternal()
 
     if (!captureSession_.BeginConfig()) {
         RTC_LOG(LS_ERROR) << "Failed to begin capture session config";
+        NotifyCapturedStart(false);
         return;
     }
 
@@ -222,6 +228,7 @@ void CameraCapturer::StartInternal()
 
     if (!captureSession_.CommitConfig()) {
         RTC_LOG(LS_ERROR) << "Failed to commit capture session config";
+        NotifyCapturedStart(false);
         return;
     }
 
@@ -236,7 +243,7 @@ void CameraCapturer::StartInternal()
 
 void CameraCapturer::StopInternal()
 {
-    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
+    RTC_LOG(LS_INFO) << __FUNCTION__;
 
     if (!isStarted_) {
         RTC_LOG(LS_ERROR) << "Capture session is not started";
@@ -256,6 +263,7 @@ void CameraCapturer::StopInternal()
     captureSession_.Reset();
 
     isStarted_ = false;
+    NotifyCapturedStop();
 }
 
 void CameraCapturer::OnCameraManagerStatusCallback(Camera_StatusInfo* status)
