@@ -22,14 +22,14 @@
 
 #include "video/video_track_source.h"
 #include "audio_device/ohos_local_audio_source.h"
+#include "event/event_target.h"
 #include "utils/marcos.h"
 
 namespace webrtc {
 
 class OhosLocalAudioSource;
 
-template <typename T>
-class NapiMediaSource : public Napi::ObjectWrap<T> {
+class NapiMediaSource {
 public:
     NAPI_ATTRIBUTE_NAME_DECLARE(State, state);
     NAPI_METHOD_NAME_DECLARE(Release, release);
@@ -39,10 +39,10 @@ public:
     NAPI_ENUM_NAME_DECLARE(SourceStateEnded, ended);
     NAPI_ENUM_NAME_DECLARE(SourceStateMuted, muted);
 
-    explicit NapiMediaSource(const Napi::CallbackInfo& info) : Napi::ObjectWrap<T>(info) {}
+    virtual ~NapiMediaSource() = 0;
 };
 
-class NapiAudioSource : public NapiMediaSource<NapiAudioSource> {
+class NapiAudioSource : public Napi::ObjectWrap<NapiAudioSource>, public NapiMediaSource {
 public:
     NAPI_CLASS_NAME_DECLARE(AudioSource);
     NAPI_METHOD_NAME_DECLARE(SetVolume, setVolume);
@@ -58,6 +58,7 @@ public:
 protected:
     friend class ObjectWrap;
 
+    static Napi::FunctionReference& Constructor();
     explicit NapiAudioSource(const Napi::CallbackInfo& info);
 
     Napi::Value GetState(const Napi::CallbackInfo& info);
@@ -66,18 +67,18 @@ protected:
     Napi::Value ToJson(const Napi::CallbackInfo& info);
 
 private:
-    static Napi::FunctionReference constructor_;
-
     rtc::scoped_refptr<OhosLocalAudioSource> source_;
 };
 
-class NapiVideoSource : public NapiMediaSource<NapiVideoSource>, public VideoCapturer::Observer {
+class NapiVideoSource : public NapiEventTarget<NapiVideoSource>, public NapiMediaSource, public VideoCapturer::Observer {
 public:
     NAPI_CLASS_NAME_DECLARE(VideoSource);
     NAPI_ATTRIBUTE_NAME_DECLARE(OnCapturerStarted, oncapturerstarted);
     NAPI_ATTRIBUTE_NAME_DECLARE(OnCapturerStopped, oncapturerstopped);
+    NAPI_ATTRIBUTE_NAME_DECLARE(OnError, onerror);
     NAPI_EVENT_NAME_DECLARE(CapturerStarted, capturerstarted);
     NAPI_EVENT_NAME_DECLARE(CapturerStopped, capturerstopped);
+    NAPI_EVENT_NAME_DECLARE(Error, error);
     NAPI_METHOD_NAME_DECLARE(StartCapture, startCapture);
     NAPI_METHOD_NAME_DECLARE(StopCapture, stopCapture);
 
@@ -95,6 +96,7 @@ public:
 protected:
     friend class ObjectWrap;
 
+    static Napi::FunctionReference& Constructor();
     explicit NapiVideoSource(const Napi::CallbackInfo& info);
 
     Napi::Value GetState(const Napi::CallbackInfo& info);
@@ -107,23 +109,11 @@ protected:
 
 protected:
     // VideoCapturer::Observer
-    void OnCapturerStarted(bool success) override;
+    void OnCapturerStarted() override;
     void OnCapturerStopped() override;
-    void
-    OnFrameCaptured(rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation) override
-    {
-    }
+    void OnCapturerError(int32_t code, const std::string& message) override;
 
 private:
-    bool GetEventHandler(const std::string& type, Napi::Function& fn);
-    bool GetEventHandler(const std::string& type, Napi::ThreadSafeFunction& tsfn);
-    bool SetEventHandler(const std::string& type, Napi::Function fn, Napi::Value receiver);
-    bool RemoveEventHandler(const std::string& type);
-    void RemoveAllEventHandlers();
-
-private:
-    static Napi::FunctionReference constructor_;
-
     rtc::scoped_refptr<OhosVideoTrackSource> source_;
     rtc::Thread* signalThread_{};
 

@@ -85,6 +85,7 @@ if (is_ohos) {
         "$ohos_webrtc_src_path/user_media/media_constraints.cpp",
         "$ohos_webrtc_src_path/user_media/media_constraints_util.cpp",
         "$ohos_webrtc_src_path/video/texture_buffer.cpp",
+        "$ohos_webrtc_src_path/video/video_capturer.cpp",
         "$ohos_webrtc_src_path/video/video_frame_receiver_gl.cpp",
         "$ohos_webrtc_src_path/video/video_frame_receiver_native.cpp",
         "$ohos_webrtc_src_path/video/video_track_source.cpp",

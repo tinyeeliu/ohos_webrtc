@@ -168,8 +168,10 @@ export interface MediaStreamTrackEvent extends Event {
   readonly track: MediaStreamTrack;
 }
 
-export interface VideoCapturerStartedEvent extends Event {
-  readonly success: boolean;
+export interface VideoSourceErrorEvent extends Event {
+  readonly domain?: string;
+  readonly errorCode: number;
+  readonly errorText: string;
 }
 
 // https://www.w3.org/TR/WebCryptoAPI/#algorithm
@@ -785,9 +787,14 @@ export interface AudioSource extends MediaSource {
   setVolume(volume: number);
 }
 
-export interface VideoSource extends MediaSource {
-  oncapturerstarted: ((this: VideoSource, ev: VideoCapturerStartedEvent) => any) | null;
+export interface VideoSource extends MediaSource, EventTarget {
+  oncapturerstarted: ((this: VideoSource, ev: Event) => any) | null;
   oncapturerstopped: ((this: VideoSource, ev: Event) => any) | null;
+  onerror: ((this: VideoSource, ev: VideoSourceErrorEvent) => any) | null;
+
+  startCapture(): void;
+  stopCapture(): void;
+  release(): void;
 }
 
 // https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack

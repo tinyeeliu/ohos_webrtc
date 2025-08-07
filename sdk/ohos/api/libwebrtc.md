@@ -2062,13 +2062,57 @@ setVolume(volume: number);
 | ----- | ---------------- | ---- |----| -------------------------- |
 | oncapturerstarted | EventHandler \| null | 是   | 是  | 该事件处理器的事件类型为 capturerstarted |
 | oncapturerstopped | EventHandler \| null | 是   | 是  | 该事件处理器的事件类型为 capturerstopped |
+| onerror           | EventHandler \| null | 是   | 是  | 该事件处理器的事件类型为 error |
 
 ### 事件
 
 | 名称              | 接口                        | 说明                 |
 |-----------------|---------------------------|--------------------|
-| capturerstarted | VideoCapturerStartedEvent | 该视频源开始采集（成功或失败）时触发 |
+| capturerstarted | Event                     | 该视频源开始采集（成功或失败）时触发 |
 | capturerstopped | Event                     | 视频源停止采集时触发         |
+| error           | VideoSourceErrorEvent     | 视频源发生错误时触发         |
+
+### startCapture
+
+startCapture(): void
+
+手动开始捕获。调用此方法后，VideoSource 不再触发自动启动或停止。
+
+#### 参数
+
+无
+
+#### 返回值
+
+无
+
+### stopCapture
+
+stopCapture(): void
+
+手动停止捕获。调用此方法后，VideoSource 不再触发自动启动或停止。
+
+#### 参数
+
+无
+
+#### 返回值
+
+无
+
+### release
+
+release(): void
+
+该实例不再使用后，调用此方法释放相关资源。
+
+#### 参数
+
+无
+
+#### 返回值
+
+无
 
 ## VideoTrack
 

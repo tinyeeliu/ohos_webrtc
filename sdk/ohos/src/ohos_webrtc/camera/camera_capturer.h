@@ -33,10 +33,9 @@
 
 namespace webrtc {
 
-class CameraCapturer : public VideoCapturer,
+class CameraCapturer : public VideoCapturerBase,
                        public VideoFrameReceiver::Callback,
-                       public ohos::CameraPreviewOutput::Observer,
-                       public ohos::CameraVideoOutput::Observer {
+                       public ohos::CameraPreviewOutput::Observer {
 public:
     static std::unique_ptr<CameraCapturer> Create(std::string deviceId, video::VideoProfile profile);
 
@@ -51,10 +50,6 @@ public:
     bool IsScreencast() override;
 
 protected:
-    void NotifyCapturedStart(bool success);
-    void NotifyCapturedStop();
-
-protected:
     void StartInternal();
     void StopInternal();
 
@@ -62,9 +57,6 @@ protected:
     void OnPreviewOutputFrameStart() override;
     void OnPreviewOutputFrameEnd(int32_t frameCount) override;
     void OnPreviewOutputError(Camera_ErrorCode errorCode) override;
-    void OnVideoOutputFrameStart() override;
-    void OnVideoOutputFrameEnd(int32_t frameCount) override;
-    void OnVideoOutputError(Camera_ErrorCode errorCode) override;
 
     void
     OnFrameAvailable(rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation) override;
@@ -82,13 +74,9 @@ private:
 
     ohos::CameraInput input_;
     ohos::CameraPreviewOutput previewOutput_;
-    ohos::CameraVideoOutput videoOutput_;
     ohos::CameraCaptureSession captureSession_;
 
     std::unique_ptr<VideoFrameReceiver> dataReceiver_;
-
-    VideoCapturer::Observer* observer_{};
-    std::mutex obsMutex_;
 };
 
 } // namespace webrtc

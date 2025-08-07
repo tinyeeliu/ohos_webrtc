@@ -42,7 +42,10 @@ std::unique_ptr<ScreenCapturer> ScreenCapturer::Create(
 }
 
 ScreenCapturer::ScreenCapturer(ScreenCaptureOptions options, std::shared_ptr<SystemAudioReceiver> systemAudioReceiver)
-    : options_(std::move(options)), systemAudioReceiver_(systemAudioReceiver), screenCapture_(AVScreenCapture::Create())
+    : VideoCapturerBase(),
+      options_(std::move(options)),
+      systemAudioReceiver_(systemAudioReceiver),
+      screenCapture_(AVScreenCapture::Create())
 {
     RTC_DLOG(LS_INFO) << __FUNCTION__;
 
@@ -66,10 +69,7 @@ void ScreenCapturer::Init(std::unique_ptr<VideoFrameReceiver> dataReceiver, Obse
 {
     RTC_LOG(LS_INFO) << __FUNCTION__;
 
-    {
-        UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
-        observer_ = observer;
-    }
+    SetObserver(observer);
 
     int32_t width = GetVideoFrameWidth();
     int32_t height = GetVideoFrameHeight();
@@ -87,6 +87,7 @@ void ScreenCapturer::Init(std::unique_ptr<VideoFrameReceiver> dataReceiver, Obse
     OH_AVSCREEN_CAPTURE_ErrCode ret = OH_AVScreenCapture_Init(screenCapture_.Raw(), config);
     if (ret != AV_SCREEN_CAPTURE_ERR_OK) {
         RTC_LOG(LS_ERROR) << "Failed to init: " << ret;
+        NotifyCapturerError(-1, "Internal error");
         return;
     }
 
@@ -105,6 +106,7 @@ void ScreenCapturer::Init(std::unique_ptr<VideoFrameReceiver> dataReceiver, Obse
     ret = OH_AVScreenCapture_ExcludeContent(screenCapture_.Raw(), contentFilter.Raw());
     if (ret != AV_SCREEN_CAPTURE_ERR_OK) {
         RTC_LOG(LS_ERROR) << "Failed to exclude content: " << ret;
+        NotifyCapturerError(-1, "Internal error");
         return;
     }
 
@@ -113,6 +115,7 @@ void ScreenCapturer::Init(std::unique_ptr<VideoFrameReceiver> dataReceiver, Obse
             const_cast<int32_t*>(options_.skipPrivacyModeWindowIds.data()), options_.skipPrivacyModeWindowIds.size());
         if (ret != AV_SCREEN_CAPTURE_ERR_OK) {
             RTC_LOG(LS_ERROR) << "Failed to skip privacy mode: " << ret;
+            NotifyCapturerError(-1, "Internal error");
             return;
         }
     }
@@ -124,13 +127,11 @@ void ScreenCapturer::Release()
 {
     RTC_LOG(LS_INFO) << __FUNCTION__;
 
-    screenCapture_.Reset();
+    SetObserver(nullptr);
+    Stop();
     dataReceiver_.reset();
 
-    {
-        UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
-        observer_ = nullptr;
-    }
+    isInitialized_ = false;
 }
 
 void ScreenCapturer::Start()
@@ -144,7 +145,7 @@ void ScreenCapturer::Start()
 
     if (!isInitialized_) {
         RTC_LOG(LS_ERROR) << "Not initialized";
-        NotifyCaptureStart(false);
+        NotifyCapturerError(-1, "Not initialized");
         return;
     }
 
@@ -154,13 +155,14 @@ void ScreenCapturer::Start()
     OHNativeWindow* window = nullptr;
     int32_t ret = OH_NativeWindow_CreateNativeWindowFromSurfaceId(surfaceId, &window);
     if (ret != 0) {
-        RTC_LOG(LS_ERROR) << "Failed to create native window from surface id: " << ret;
+        NotifyCapturerError(-1, "Internal error");
         return;
     }
 
     ret = OH_AVScreenCapture_StartScreenCaptureWithSurface(screenCapture_.Raw(), window);
     if (ret != AV_SCREEN_CAPTURE_ERR_OK) {
         RTC_LOG(LS_ERROR) << "Failed to start screen capture width surface: " << ret;
+        NotifyCapturerError(-1, "Internal error");
         return;
     }
 
@@ -185,7 +187,7 @@ void ScreenCapturer::Stop()
     isStarted_ = false;
 
     // No state change callback, notify manually.
-    NotifyCaptureStop();
+    NotifyCapturerStopped();
     if (systemAudioReceiver_) {
         systemAudioReceiver_->OnStopped();
     }
@@ -261,22 +263,6 @@ bool ScreenCapturer::SetupContentFilter(AVScreenCaptureContentFilter& contentFil
     }
 
     return true;
-}
-
-void ScreenCapturer::NotifyCaptureStart(bool success)
-{
-    UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
-    if (observer_) {
-        observer_->OnCapturerStarted(success);
-    }
-}
-
-void ScreenCapturer::NotifyCaptureStop()
-{
-    UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
-    if (observer_) {
-        observer_->OnCapturerStopped();
-    }
 }
 
 int32_t ScreenCapturer::GetVideoFrameWidth() const
@@ -389,7 +375,7 @@ void ScreenCapturer::OnStateChange(struct OH_AVScreenCapture* capture, OH_AVScre
                 RTC_LOG_IF(LS_ERROR, ret != AV_SCREEN_CAPTURE_ERR_OK) << "Failed to resize canvas: " << ret;
             }
 
-            NotifyCaptureStart(true);
+            NotifyCapturerStarted();
             if (systemAudioReceiver_) {
                 systemAudioReceiver_->OnStarted(true);
             }
@@ -397,7 +383,7 @@ void ScreenCapturer::OnStateChange(struct OH_AVScreenCapture* capture, OH_AVScre
         }
         case OH_SCREEN_CAPTURE_STATE_CANCELED:
         case OH_SCREEN_CAPTURE_STATE_STOPPED_BY_USER: {
-            NotifyCaptureStop();
+            NotifyCapturerStopped();
             if (systemAudioReceiver_) {
                 systemAudioReceiver_->OnStopped();
             }
@@ -406,7 +392,7 @@ void ScreenCapturer::OnStateChange(struct OH_AVScreenCapture* capture, OH_AVScre
         case OH_SCREEN_CAPTURE_STATE_INTERRUPTED_BY_OTHER:
         case OH_SCREEN_CAPTURE_STATE_STOPPED_BY_CALL:
         case OH_SCREEN_CAPTURE_STATE_STOPPED_BY_USER_SWITCHES: {
-            NotifyCaptureStop();
+            NotifyCapturerStopped();
             if (systemAudioReceiver_) {
                 systemAudioReceiver_->OnError(0, "Interrupted");
             }

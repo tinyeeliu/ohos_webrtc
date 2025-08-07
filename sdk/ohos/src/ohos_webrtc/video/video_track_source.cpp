@@ -75,14 +75,20 @@ void OhosVideoTrackSource::Start()
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    thread_->PostTask([this] { capturer_->Start(); });
+    thread_->PostTask([this] {
+        autoStartStop_ = false;
+        capturer_->Start();
+    });
 }
 
 void OhosVideoTrackSource::Stop()
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    thread_->PostTask([this] { capturer_->Stop(); });
+    thread_->PostTask([this] {
+        autoStartStop_ = false;
+        capturer_->Stop();
+    });
 }
 
 void OhosVideoTrackSource::SetCapturerObserver(VideoCapturer::Observer* observer)
@@ -151,9 +157,15 @@ void OhosVideoTrackSource::AddOrUpdateSink(rtc::VideoSinkInterface<VideoFrame>* 
     broadcaster_.AddOrUpdateSink(sink, wants);
     videoAdapter_.OnSinkWants(broadcaster_.wants());
 
-    if (broadcaster_.frame_wanted()) {
-        thread_->PostTask([this] { capturer_->Start(); });
+    if (!broadcaster_.frame_wanted()) {
+        return;
     }
+
+    thread_->PostTask([this] {
+        if (autoStartStop_) {
+            capturer_->Start();
+        }
+    });
 }
 
 void OhosVideoTrackSource::RemoveSink(rtc::VideoSinkInterface<VideoFrame>* sink)
@@ -163,9 +175,15 @@ void OhosVideoTrackSource::RemoveSink(rtc::VideoSinkInterface<VideoFrame>* sink)
     broadcaster_.RemoveSink(sink);
     videoAdapter_.OnSinkWants(broadcaster_.wants());
 
-    if (!broadcaster_.frame_wanted()) {
-        thread_->PostTask([this] { capturer_->Stop(); });
+    if (broadcaster_.frame_wanted()) {
+        return;
     }
+
+    thread_->PostTask([this] {
+        if (autoStartStop_) {
+            capturer_->Stop();
+        }
+    });
 }
 
 MediaSourceInterface::SourceState OhosVideoTrackSource::state() const
@@ -217,19 +235,14 @@ void OhosVideoTrackSource::ProcessConstraints(const VideoTrackSourceConstraints&
     broadcaster_.ProcessConstraints(constraints);
 }
 
-void OhosVideoTrackSource::OnCapturerStarted(bool success)
+void OhosVideoTrackSource::OnCapturerStarted()
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-    SetState(success);
+    SetState(true);
 
-    VideoCapturer::Observer* observer = nullptr;
-    {
-        UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
-        observer = capturerObserver_;
-    }
-
-    if (observer) {
-        observer->OnCapturerStarted(success);
+    UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
+    if (capturerObserver_) {
+        capturerObserver_->OnCapturerStarted();
     }
 }
 
@@ -238,14 +251,20 @@ void OhosVideoTrackSource::OnCapturerStopped()
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
     SetState(false);
 
-    VideoCapturer::Observer* observer = nullptr;
-    {
-        UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
-        observer = capturerObserver_;
+    UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
+    if (capturerObserver_) {
+        capturerObserver_->OnCapturerStopped();
     }
+}
 
-    if (observer) {
-        observer->OnCapturerStopped();
+void OhosVideoTrackSource::OnCapturerError(int32_t code, const std::string& message)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+    SetState(false);
+
+    UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
+    if (capturerObserver_) {
+        capturerObserver_->OnCapturerError(code, message);
     }
 }
 

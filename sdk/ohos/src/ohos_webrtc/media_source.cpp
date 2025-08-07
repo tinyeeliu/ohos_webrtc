@@ -21,7 +21,7 @@ namespace webrtc {
 
 using namespace Napi;
 
-FunctionReference NapiAudioSource::constructor_;
+NapiMediaSource::~NapiMediaSource() = default;
 
 void NapiAudioSource::Init(Napi::Env env, Napi::Object exports)
 {
@@ -35,7 +35,7 @@ void NapiAudioSource::Init(Napi::Env env, Napi::Object exports)
         });
     exports.Set(kClassName, func);
 
-    constructor_ = Persistent(func);
+    Constructor() = Persistent(func);
 }
 
 Napi::Object NapiAudioSource::NewInstance(Napi::Env env, rtc::scoped_refptr<OhosLocalAudioSource> source)
@@ -47,10 +47,16 @@ Napi::Object NapiAudioSource::NewInstance(Napi::Env env, rtc::scoped_refptr<Ohos
     auto external = External<OhosLocalAudioSource>::New(
         env, source.release(), [](Napi::Env /*env*/, OhosLocalAudioSource* source) { source->Release(); });
 
-    return constructor_.New({external});
+    return Constructor().New({external});
 }
 
-NapiAudioSource::NapiAudioSource(const Napi::CallbackInfo& info) : NapiMediaSource<NapiAudioSource>(info)
+Napi::FunctionReference& NapiAudioSource::Constructor()
+{
+    static Napi::FunctionReference constructor;
+    return constructor;
+}
+
+NapiAudioSource::NapiAudioSource(const Napi::CallbackInfo& info) : Napi::ObjectWrap<NapiAudioSource>(info)
 {
     if (info[0].IsExternal()) {
         auto source = info[0].As<External<OhosLocalAudioSource>>().Data();
@@ -138,8 +144,6 @@ Value NapiAudioSource::ToJson(const CallbackInfo& info)
     return json;
 }
 
-FunctionReference NapiVideoSource::constructor_;
-
 void NapiVideoSource::Init(Napi::Env env, Napi::Object exports)
 {
     Function func = DefineClass(
@@ -157,7 +161,7 @@ void NapiVideoSource::Init(Napi::Env env, Napi::Object exports)
         });
     exports.Set(kClassName, func);
 
-    constructor_ = Persistent(func);
+    Constructor() = Persistent(func);
 }
 
 Napi::Object NapiVideoSource::NewInstance(Napi::Env env, rtc::scoped_refptr<OhosVideoTrackSource> source)
@@ -166,17 +170,21 @@ Napi::Object NapiVideoSource::NewInstance(Napi::Env env, rtc::scoped_refptr<Ohos
         NAPI_THROW(Error::New(env, "Invalid argument"), Object());
     }
 
-    auto external = External<OhosVideoTrackSource>::New(
-        env, source.release(), [](Napi::Env /*env*/, OhosVideoTrackSource* source) { source->Release(); });
+    auto external = External<rtc::scoped_refptr<OhosVideoTrackSource>>::New(env, &source);
 
-    return constructor_.New({external});
+    return Constructor().New({external});
 }
 
-NapiVideoSource::NapiVideoSource(const Napi::CallbackInfo& info) : NapiMediaSource<NapiVideoSource>(info)
+Napi::FunctionReference& NapiVideoSource::Constructor()
+{
+    static Napi::FunctionReference constructor;
+    return constructor;
+}
+
+NapiVideoSource::NapiVideoSource(const Napi::CallbackInfo& info) : NapiEventTarget<NapiVideoSource>(info)
 {
     if (info[0].IsExternal()) {
-        auto source = info[0].As<External<OhosVideoTrackSource>>().Data();
-        source_ = rtc::scoped_refptr<OhosVideoTrackSource>(source);
+        source_ = *info[0].As<External<rtc::scoped_refptr<OhosVideoTrackSource>>>().Data();
     }
 
     if (source_) {
@@ -188,10 +196,10 @@ NapiVideoSource::~NapiVideoSource()
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    source_->SetCapturerObserver(nullptr);
-    source_ = nullptr;
-
-    RemoveAllEventHandlers();
+    if (source_) {
+        source_->SetCapturerObserver(nullptr);
+        source_ = nullptr;
+    }
 }
 
 Napi::Value NapiVideoSource::GetState(const Napi::CallbackInfo& info)
@@ -222,59 +230,64 @@ Napi::Value NapiVideoSource::GetState(const Napi::CallbackInfo& info)
 
 Napi::Value NapiVideoSource::Release(const Napi::CallbackInfo& info)
 {
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+    RTC_LOG(LS_INFO) << __FUNCTION__;
 
     if (!source_) {
         NAPI_THROW(Error::New(info.Env(), "Illegal state"), info.Env().Undefined());
     }
 
-    source_->AddRef();
-
     source_->SetCapturerObserver(nullptr);
     source_ = nullptr;
 
-    RemoveAllEventHandlers();
+    Stop();
 
     return info.Env().Undefined();
 }
 
 Napi::Value NapiVideoSource::GetEventHandler(const Napi::CallbackInfo& info)
 {
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
     if (!source_) {
         NAPI_THROW(Error::New(info.Env(), "Illegal state"), info.Env().Undefined());
     }
 
-    Function fn;
-    if (!GetEventHandler((const char*)info.Data(), fn)) {
+    const auto type = (const char*)info.Data();
+
+    Function func;
+    if (!NapiEventTarget<NapiVideoSource>::GetEventHandler(type, func)) {
         return info.Env().Null();
     }
 
-    return fn;
+    return func;
 }
 
 void NapiVideoSource::SetEventHandler(const Napi::CallbackInfo& info, const Napi::Value& value)
 {
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
+
+    if (!value.IsFunction() && !value.IsNull()) {
+        NAPI_THROW_VOID(Error::New(info.Env(), "Invalid argument"));
+    }
 
     if (!source_) {
         NAPI_THROW_VOID(Error::New(info.Env(), "Illegal state"));
     }
 
-    RemoveEventHandler((const char*)info.Data());
+    const auto type = (const char*)info.Data();
 
     if (value.IsFunction()) {
-        Function cb = value.As<Function>();
-        if (!SetEventHandler((const char*)info.Data(), std::move(cb), info.This())) {
-            NAPI_THROW_VOID(Napi::Error::New(info.Env(), "Failed to set event handler"));
-        }
+        auto fn = value.As<Function>();
+        NapiEventTarget<NapiVideoSource>::SetEventHandler(type, fn);
+    } else if (value.IsNull()) {
+        RTC_DLOG_F(LS_VERBOSE) << "Value is null";
+        RemoveEventHandler(type);
     }
 }
 
 Napi::Value NapiVideoSource::StartCapture(const Napi::CallbackInfo& info)
 {
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+    RTC_LOG(LS_INFO) << __FUNCTION__;
 
     if (!source_) {
         NAPI_THROW(Error::New(info.Env(), "Illegal state"), info.Env().Undefined());
@@ -287,7 +300,7 @@ Napi::Value NapiVideoSource::StartCapture(const Napi::CallbackInfo& info)
 
 Napi::Value NapiVideoSource::StopCapture(const Napi::CallbackInfo& info)
 {
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+    RTC_LOG(LS_INFO) << __FUNCTION__;
 
     if (!source_) {
         NAPI_THROW(Error::New(info.Env(), "Illegal state"), info.Env().Undefined());
@@ -308,125 +321,60 @@ Value NapiVideoSource::ToJson(const CallbackInfo& info)
     return json;
 }
 
-void NapiVideoSource::OnCapturerStarted(bool success)
+void NapiVideoSource::OnCapturerStarted()
 {
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    ThreadSafeFunction tsfn;
-    if (!GetEventHandler(kEventNameCapturerStarted, tsfn)) {
-        return;
-    }
+    Dispatch(
+        CallbackEvent<NapiVideoSource>::Create([this](NapiVideoSource& target) {
+            RTC_LOG(LS_VERBOSE) << "Callback event: " << kEventNameCapturerStarted;
+            RTC_DCHECK_EQ(this, &target);
 
-    Reference<Napi::Value>* context = tsfn.GetContext();
-    napi_status status = tsfn.BlockingCall([context, success](Napi::Env env, Napi::Function jsCallback) {
-        auto jsEvent = Object::New(env);
-        jsEvent.Set("type", String::New(env, "VideoCapturerStartedEvent"));
-        jsEvent.Set("success", Boolean::New(env, success));
-        jsCallback.Call(context ? context->Value() : env.Undefined(), {jsEvent});
-    });
-
-    if (status != napi_ok) {
-        RTC_LOG(LS_ERROR) << "tsfn call error: " << status;
-    }
+            auto env = target.Env();
+            Napi::HandleScope scope(env);
+            auto jsEvent = Object::New(env);
+            jsEvent.Set("type", String::New(env, kEventNameCapturerStarted));
+            // jsEvent.Set("success", Boolean::New(env, success));
+            target.MakeCallback(kEventNameCapturerStarted, {jsEvent});
+        }));
 }
 
 void NapiVideoSource::OnCapturerStopped()
 {
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    ThreadSafeFunction tsfn;
-    if (!GetEventHandler(kEventNameCapturerStopped, tsfn)) {
-        return;
-    }
+    Dispatch(
+        CallbackEvent<NapiVideoSource>::Create([this](NapiVideoSource& target) {
+            RTC_LOG(LS_VERBOSE) << "Callback event: " << kEventNameCapturerStopped;
+            RTC_DCHECK_EQ(this, &target);
 
-    Reference<Napi::Value>* context = tsfn.GetContext();
-    napi_status status = tsfn.BlockingCall([context](Napi::Env env, Napi::Function jsCallback) {
-        auto jsEvent = Object::New(env);
-        jsEvent.Set("type", String::New(env, "Event"));
-        jsCallback.Call(context ? context->Value() : env.Undefined(), {jsEvent});
-    });
-
-    if (status != napi_ok) {
-        RTC_LOG(LS_ERROR) << "tsfn call error: " << status;
-    }
+            auto env = target.Env();
+            Napi::HandleScope scope(env);
+            auto jsEvent = Object::New(env);
+            jsEvent.Set("type", String::New(env, kEventNameCapturerStopped));
+            jsEvent.Set("stopType", String::New(env, "normal"));
+            target.MakeCallback(kEventNameCapturerStopped, {jsEvent});
+        }));
 }
 
-bool NapiVideoSource::GetEventHandler(const std::string& type, Napi::Function& fn)
+void NapiVideoSource::OnCapturerError(int32_t code, const std::string& message)
 {
-    RTC_DLOG(LS_VERBOSE) << "NapiPeerConnectionWrapper::GetEventHandler type: " << type;
+    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    UNUSED std::lock_guard<std::mutex> lock(eventMutex_);
-    auto it = eventHandlers_.find(type);
-    if (it == eventHandlers_.end()) {
-        RTC_LOG(LS_VERBOSE) << "No event handler for type: " << type;
-        return false;
-    }
+    Dispatch(
+        CallbackEvent<NapiVideoSource>::Create([this, code, message](NapiVideoSource& target) {
+            RTC_LOG(LS_ERROR) << "Callback event: " << kEventNameError;
+            RTC_DCHECK_EQ(this, &target);
 
-    fn = it->second.ref.Value();
+            auto env = target.Env();
+            Napi::HandleScope scope(env);
 
-    return true;
-}
-
-bool NapiVideoSource::GetEventHandler(const std::string& type, Napi::ThreadSafeFunction& tsfn)
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " type=" << type;
-
-    UNUSED std::lock_guard<std::mutex> lock(eventMutex_);
-    auto it = eventHandlers_.find(type);
-    if (it == eventHandlers_.end()) {
-        RTC_LOG(LS_VERBOSE) << "No event handler for type: " << type;
-        return false;
-    }
-
-    tsfn = it->second.tsfn;
-
-    return true;
-}
-
-bool NapiVideoSource::SetEventHandler(const std::string& type, Napi::Function fn, Napi::Value receiver)
-{
-    RTC_DLOG(LS_VERBOSE) << "SetEventHandler type: " << type;
-
-    Reference<Napi::Value>* context = new Reference<Napi::Value>;
-    *context = Persistent(receiver);
-
-    EventHandler handler;
-    handler.ref = Persistent(fn);
-    handler.tsfn =
-        ThreadSafeFunction::New(fn.Env(), fn, type, 0, 1, context, [](Napi::Env, Reference<Napi::Value>* ctx) {
-            ctx->Reset();
-            delete ctx;
-        });
-
-    UNUSED std::lock_guard<std::mutex> lock(eventMutex_);
-    eventHandlers_[type] = std::move(handler);
-
-    return true;
-}
-
-bool NapiVideoSource::RemoveEventHandler(const std::string& type)
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-
-    UNUSED std::lock_guard<std::mutex> lock(eventMutex_);
-    auto it = eventHandlers_.find(type);
-    if (it != eventHandlers_.end()) {
-        it->second.tsfn.Release();
-        eventHandlers_.erase(it);
-    }
-
-    return true;
-}
-
-void NapiVideoSource::RemoveAllEventHandlers()
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-
-    UNUSED std::lock_guard<std::mutex> lock(eventMutex_);
-    for (auto& handler : eventHandlers_) {
-        handler.second.tsfn.Release();
-    }
-    eventHandlers_.clear();
+            auto jsEvent = Object::New(env);
+            jsEvent.Set("type", String::New(env, kEventNameError));
+            jsEvent.Set("errorCode", Number::New(env, code));
+            jsEvent.Set("errorText", String::New(env, message));
+            target.MakeCallback(kEventNameError, {jsEvent});
+        }));
 }
 
 } // namespace webrtc

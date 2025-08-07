@@ -35,7 +35,7 @@ namespace webrtc {
 
 class SystemAudioReceiver;
 
-class ScreenCapturer : public VideoCapturer,
+class ScreenCapturer : public VideoCapturerBase,
                        public VideoFrameReceiver::Callback,
                        public ohos::DisplayManager::ChangeObserver {
 public:
@@ -66,9 +66,6 @@ public:
 protected:
     void SetupConfig(int32_t width, int32_t height, OH_AVScreenCaptureConfig& config);
     bool SetupContentFilter(ohos::AVScreenCaptureContentFilter& contentFilter);
-
-    void NotifyCaptureStart(bool success);
-    void NotifyCaptureStop();
 
     int32_t GetVideoFrameWidth() const;
     uint64_t GetVideoFrameHeight() const;
@@ -108,9 +105,6 @@ private:
     ohos::AVScreenCapture screenCapture_;
 
     std::unique_ptr<VideoFrameReceiver> dataReceiver_;
-
-    Observer* observer_{};
-    mutable std::mutex obsMutex_;
 };
 
 } // namespace webrtc

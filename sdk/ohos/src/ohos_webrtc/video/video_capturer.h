@@ -31,10 +31,14 @@ public:
     class Observer {
     public:
         virtual ~Observer() {}
-        virtual void OnCapturerStarted(bool success) = 0;
+
+        virtual void OnCapturerStarted() = 0;
         virtual void OnCapturerStopped() = 0;
+        virtual void OnCapturerError(int32_t code, const std::string& message) = 0;
         virtual void
-        OnFrameCaptured(rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation) = 0;
+        OnFrameCaptured(rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation)
+        {
+        }
     };
 
     virtual ~VideoCapturer() = default;
@@ -44,6 +48,24 @@ public:
     virtual void Start() = 0;
     virtual void Stop() = 0;
     virtual bool IsScreencast() = 0;
+};
+
+class VideoCapturerBase : public VideoCapturer {
+public:
+    VideoCapturerBase();
+    ~VideoCapturerBase() override;
+
+protected:
+    void SetObserver(Observer* observer);
+
+    void NotifyCapturerStarted();
+    void NotifyCapturerStopped();
+    void NotifyCapturerError(int32_t code, const std::string& message);
+    void NotifyFrameCaptured(rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation);
+
+protected:
+    Observer* observer_{};
+    mutable std::mutex obsMutex_;
 };
 
 } // namespace webrtc

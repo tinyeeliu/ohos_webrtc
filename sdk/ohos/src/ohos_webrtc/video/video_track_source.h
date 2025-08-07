@@ -83,8 +83,9 @@ protected:
     void ProcessConstraints(const VideoTrackSourceConstraints& constraints) override;
 
     // VideoCapturer::Observer
-    void OnCapturerStarted(bool success) override;
+    void OnCapturerStarted() override;
     void OnCapturerStopped() override;
+    void OnCapturerError(int32_t code, const std::string& message) override;
     void
     OnFrameCaptured(rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation) override;
 
@@ -101,6 +102,7 @@ private:
     std::mutex obsMutex_;
     VideoCapturer::Observer* capturerObserver_{};
     rtc::TimestampAligner timestampAligner_;
+    bool autoStartStop_{true};
 };
 
 } // namespace webrtc

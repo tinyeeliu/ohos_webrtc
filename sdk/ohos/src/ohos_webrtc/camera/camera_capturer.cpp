@@ -31,7 +31,7 @@ std::unique_ptr<CameraCapturer> CameraCapturer::Create(std::string deviceId, vid
 }
 
 CameraCapturer::CameraCapturer(std::string deviceId, video::VideoProfile profile)
-    : deviceId_(deviceId), profile_(profile)
+    : VideoCapturerBase(), deviceId_(deviceId), profile_(profile)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << ": " << this;
 }
@@ -43,30 +43,11 @@ CameraCapturer::~CameraCapturer()
     Release();
 }
 
-void CameraCapturer::NotifyCapturedStart(bool success)
-{
-    UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
-    if (observer_) {
-        observer_->OnCapturerStarted(success);
-    }
-}
-
-void CameraCapturer::NotifyCapturedStop()
-{
-    UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
-    if (observer_) {
-        observer_->OnCapturerStopped();
-    }
-}
-
 void CameraCapturer::Init(std::unique_ptr<VideoFrameReceiver> dataReceiver, VideoCapturer::Observer* observer)
 {
     RTC_LOG(LS_INFO) << __FUNCTION__;
 
-    {
-        UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
-        observer_ = observer;
-    }
+    SetObserver(observer);
 
     dataReceiver_ = std::move(dataReceiver);
     dataReceiver_->SetVideoFrameSize(profile_.resolution.width, profile_.resolution.height);
@@ -81,13 +62,8 @@ void CameraCapturer::Release()
 {
     RTC_LOG(LS_INFO) << __FUNCTION__;
 
+    SetObserver(nullptr);
     Stop();
-
-    {
-        UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
-        observer_ = nullptr;
-    }
-
     dataReceiver_.reset();
 
     isInitialized_ = false;
@@ -118,7 +94,7 @@ void CameraCapturer::StartInternal()
 
     if (!isInitialized_) {
         RTC_LOG(LS_ERROR) << "Not initialized";
-        NotifyCapturedStart(false);
+        NotifyCapturerError(-1, "Not initialized");
         return;
     }
 
@@ -140,7 +116,7 @@ void CameraCapturer::StartInternal()
 
     if (deviceIndex == -1) {
         RTC_LOG(LS_ERROR) << "No specific camera device found";
-        NotifyCapturedStart(false);
+        NotifyCapturerError(-1, "No specific camera device found");
         return;
     }
 
@@ -165,7 +141,6 @@ void CameraCapturer::StartInternal()
     }
 
     Camera_Profile* previewProfile = nullptr;
-    Camera_VideoProfile* videoProfile = nullptr;
     auto capability = CameraManager::GetInstance().GetSupportedCameraOutputCapability(device);
     for (uint32_t i = 0; i < capability.PreviewProfileSize(); i++) {
         Camera_Profile* p = capability.GetPreviewProfile(i);
@@ -180,22 +155,22 @@ void CameraCapturer::StartInternal()
         }
     }
 
-    if (!videoProfile && !previewProfile) {
-        RTC_LOG(LS_ERROR) << "No specific camera device found";
-        NotifyCapturedStart(false);
+    if (!previewProfile) {
+        RTC_LOG(LS_ERROR) << "No specific profile found";
+        NotifyCapturerError(-1, "No specific profile found");
         return;
     }
 
     input_ = CameraManager::GetInstance().CreateCameraInput(device);
     if (input_.IsEmpty()) {
         RTC_LOG(LS_ERROR) << "Failed to create camera input";
-        NotifyCapturedStart(false);
+        NotifyCapturerError(-1, "Failed to create camera input");
         return;
     }
 
     if (!input_.Open()) {
         RTC_LOG(LS_ERROR) << "Failed to open camera input";
-        NotifyCapturedStart(false);
+        NotifyCapturerError(-1, "Failed to open camera input");
         return;
     }
 
@@ -204,7 +179,7 @@ void CameraCapturer::StartInternal()
     previewOutput_ = CameraManager::GetInstance().CreatePreviewOutput(previewProfile, surfaceId);
     if (previewOutput_.IsEmpty()) {
         RTC_LOG(LS_ERROR) << "Failed to create camera preview output";
-        NotifyCapturedStart(false);
+        NotifyCapturerError(-1, "Failed to create camera preview output");
         return;
     }
     previewOutput_.AddObserver(this);
@@ -218,7 +193,7 @@ void CameraCapturer::StartInternal()
 
     if (!captureSession_.BeginConfig()) {
         RTC_LOG(LS_ERROR) << "Failed to begin capture session config";
-        NotifyCapturedStart(false);
+        NotifyCapturerError(-1, "ailed to begin capture session config");
         return;
     }
 
@@ -228,13 +203,13 @@ void CameraCapturer::StartInternal()
 
     if (!captureSession_.CommitConfig()) {
         RTC_LOG(LS_ERROR) << "Failed to commit capture session config";
-        NotifyCapturedStart(false);
+        NotifyCapturerError(-1, "Failed to commit capture session config");
         return;
     }
 
     if (!captureSession_.Start()) {
         RTC_LOG(LS_ERROR) << "Failed to start capture session";
-        NotifyCapturedStart(false);
+        NotifyCapturerError(-1, "Failed to start capture session");
         return;
     }
 
@@ -263,48 +238,29 @@ void CameraCapturer::StopInternal()
     captureSession_.Reset();
 
     isStarted_ = false;
-    NotifyCapturedStop();
+    NotifyCapturerStopped();
 }
 
 void CameraCapturer::OnCameraManagerStatusCallback(Camera_StatusInfo* status)
 {
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+    RTC_LOG(LS_INFO) << __FUNCTION__;
 }
 
 void CameraCapturer::OnPreviewOutputFrameStart()
 {
-    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
+    RTC_LOG(LS_INFO) << __FUNCTION__;
 
-    NotifyCapturedStart(true);
+    NotifyCapturerStarted();
 }
 
 void CameraCapturer::OnPreviewOutputFrameEnd(int32_t frameCount)
 {
-    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
+    RTC_LOG(LS_INFO) << __FUNCTION__;
 
-    NotifyCapturedStop();
+    NotifyCapturerStopped();
 }
 
 void CameraCapturer::OnPreviewOutputError(Camera_ErrorCode errorCode)
-{
-    RTC_LOG(LS_ERROR) << __FUNCTION__ << ": errorCode=" << errorCode;
-}
-
-void CameraCapturer::OnVideoOutputFrameStart()
-{
-    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
-
-    NotifyCapturedStart(true);
-}
-
-void CameraCapturer::OnVideoOutputFrameEnd(int32_t frameCount)
-{
-    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
-
-    NotifyCapturedStop();
-}
-
-void CameraCapturer::OnVideoOutputError(Camera_ErrorCode errorCode)
 {
     RTC_LOG(LS_ERROR) << __FUNCTION__ << ": errorCode=" << errorCode;
 }
@@ -339,10 +295,7 @@ void CameraCapturer::OnFrameAvailable(
             textureBuffer->GetTexture(), textureBuffer->width(), textureBuffer->height(), newMatrix);
     }
 
-    UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
-    if (observer_) {
-        observer_->OnFrameCaptured(buffer, timestampUs, static_cast<VideoRotation>(cameraOrientation));
-    }
+    NotifyFrameCaptured(buffer, timestampUs, static_cast<VideoRotation>(cameraOrientation));
 }
 
 } // namespace webrtc
