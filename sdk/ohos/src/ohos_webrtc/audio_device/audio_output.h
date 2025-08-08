@@ -61,6 +61,8 @@ public:
     virtual int32_t PlayoutDelay(uint16_t* delayMs) const = 0;
     virtual int GetPlayoutUnderrunCount() = 0;
 
+    virtual void SetDefaultOutputDevice(int32_t deviceType, std::function<void(bool)> callback) = 0;
+
     virtual absl::optional<AudioDeviceModule::Stats> GetStats() const
     {
         return absl::nullopt;

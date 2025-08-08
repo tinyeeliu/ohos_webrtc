@@ -42,6 +42,7 @@ const char kAttributeNameOnRendererStateChange[] = "onrendererstatechange";
 const char kMethodNameSetSpeakerMute[] = "setSpeakerMute";
 const char kMethodNameSetMicrophoneMute[] = "setMicrophoneMute";
 const char kMethodNameSetNoiseSuppressorEnabled[] = "setNoiseSuppressorEnabled";
+const char kMethodNameSetDefaultOutputDevice[] = "setDefaultOutputDevice";
 const char kMethodNameIsBuiltInAcousticEchoCancelerSupported[] = "isBuiltInAcousticEchoCancelerSupported";
 const char kMethodNameIsBuiltInNoiseSuppressorSupported[] = "isBuiltInNoiseSuppressorSupported";
 const char kMethodNameToJson[] = "toJSON";
@@ -214,6 +215,11 @@ void OhosAudioDeviceModule::UnregisterOutputObserver(AudioOutput::Observer* obs)
         std::lock_guard<std::mutex> lock(outputObsMutex_);
         outputObservers_.erase(obs);
     }
+}
+
+void OhosAudioDeviceModule::SetDefaultOutputDevice(int32_t deviceType, std::function<void(bool)> callback)
+{ 
+    output_->SetDefaultOutputDevice(deviceType, std::move(callback));
 }
 
 int32_t OhosAudioDeviceModule::ActiveAudioLayer(AudioDeviceModule::AudioLayer* audioLayer) const
@@ -902,6 +908,7 @@ void NapiAudioDeviceModule::Init(Napi::Env env, Napi::Object exports)
             InstanceMethod<&NapiAudioDeviceModule::SetSpeakerMute>(kMethodNameSetSpeakerMute),
             InstanceMethod<&NapiAudioDeviceModule::SetMicrophoneMute>(kMethodNameSetMicrophoneMute),
             InstanceMethod<&NapiAudioDeviceModule::SetNoiseSuppressorEnabled>(kMethodNameSetNoiseSuppressorEnabled),
+            InstanceMethod<&NapiAudioDeviceModule::SetDefaultOutputDevice>(kMethodNameSetDefaultOutputDevice),
             InstanceMethod<&NapiAudioDeviceModule::ToJson>(kMethodNameToJson),
             StaticMethod<&NapiAudioDeviceModule::isBuiltInAcousticEchoCancelerSupported>(
                 kMethodNameIsBuiltInAcousticEchoCancelerSupported),
@@ -1046,6 +1053,29 @@ void NapiAudioDeviceModule::SetEventHandler(const Napi::CallbackInfo& info, cons
 
     std::lock_guard<std::mutex> lock(mutex_);
     eventHandlers_[type] = std::move(handler);
+}
+
+Napi::Value NapiAudioDeviceModule::SetDefaultOutputDevice(const Napi::CallbackInfo& info)
+{
+    RTC_LOG(LS_INFO) << __FUNCTION__;
+
+    if (info.Length() < 1 || !info[0].IsNumber()) {
+        NAPI_THROW(Error::New(info.Env(), "Invalid argument"), info.Env().Undefined());
+    }
+
+    auto deferred = Promise::Deferred::New(info.Env());
+    auto tsfn = ThreadSafeFunction::New(
+        info.Env(),
+        Function::New(info.Env(), [deferred](const CallbackInfo& info) { deferred.Resolve(info.Env().Undefined()); }),
+        "SetDefaultOutputDevice", 0, 1);
+
+    adm_->SetDefaultOutputDevice(info[0].As<Number>().Int32Value(), [tsfn](bool success) {
+        RTC_DLOG(LS_INFO) << "SetDefaultOutputDevice complete: " << success;
+        tsfn.BlockingCall([](Napi::Env env, Napi::Function jsCallback) { jsCallback.Call({}); });
+        tsfn.Release();
+    });
+
+    return deferred.Promise();
 }
 
 Napi::Value NapiAudioDeviceModule::SetSpeakerMute(const Napi::CallbackInfo& info)

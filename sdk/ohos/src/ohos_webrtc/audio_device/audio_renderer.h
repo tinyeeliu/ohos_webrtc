@@ -26,6 +26,7 @@
 
 #include "api/sequence_checker.h"
 #include "rtc_base/race_checker.h"
+#include "rtc_base/thread.h"
 #include "modules/audio_device/fine_audio_buffer.h"
 
 #include "audio_output.h"
@@ -63,6 +64,8 @@ public:
     int32_t GetChannelCount() const override;
     bool UseLowLatency() const override;
 
+    void SetDefaultOutputDevice(int32_t deviceType, std::function<void(bool)> callback) override;
+
 protected:
     static int32_t OnWriteData1(OH_AudioRenderer* renderer, void* userData, void* buffer, int32_t length);
     static int32_t OnStreamEvent1(OH_AudioRenderer* renderer, void* userData, OH_AudioStream_Event event);
@@ -92,6 +95,10 @@ private:
     rtc::RaceChecker dataRaceChecker_;
 
     const AudioOutputOptions options_;
+
+    // Change default output device in worker thread.
+    rtc::Thread* workerThread_{nullptr};
+    OH_AudioDevice_Type defaultDevice_{AUDIO_DEVICE_TYPE_DEFAULT};
 
     // Samples to be played are replaced by zeros if `mute_` is set to true.
     // Can be used to ensure that the speaker is fully muted.

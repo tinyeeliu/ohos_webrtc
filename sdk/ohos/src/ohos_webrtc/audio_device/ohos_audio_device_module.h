@@ -56,6 +56,8 @@ public:
     void RegisterOutputObserver(AudioOutput::Observer* obs);
     void UnregisterOutputObserver(AudioOutput::Observer* obs);
 
+    void SetDefaultOutputDevice(int32_t deviceType, std::function<void(bool)> callback);
+
 protected:
     enum class InitStatus {
         OK = 0,
@@ -192,6 +194,7 @@ protected:
     Napi::Value SetSpeakerMute(const Napi::CallbackInfo& info);
     Napi::Value SetMicrophoneMute(const Napi::CallbackInfo& info);
     Napi::Value SetNoiseSuppressorEnabled(const Napi::CallbackInfo& info);
+    Napi::Value SetDefaultOutputDevice(const Napi::CallbackInfo& info);
     Napi::Value ToJson(const Napi::CallbackInfo& info);
 
     static Napi::Value isBuiltInAcousticEchoCancelerSupported(const Napi::CallbackInfo& info);

@@ -2391,6 +2391,25 @@ setNoiseSuppressorEnabled(enabled: boolean): boolean;
 |---------|--------------------|
 | boolean | true: 成功，false: 失败 |
 
+### setDefaultOutputDevice
+
+setDefaultOutputDevice(deviceType: number): Promise<void>
+
+设置默认的音频输出设备。本接口仅适用于[rendererUsage](#audiodevicemoduleoptions)为语音消息、VoIP语音通话或者VoIP视频通话的场景，支持听筒、扬声器和系统默认设备。
+更多说明参见系统接口[文档](https://docs.openharmony.cn/pages/v5.1/zh-cn/application-dev/reference/apis-audio-kit/js-apis-audio.md#setdefaultoutputdevice12)。
+
+参数：
+
+| 参数名     | 类型      | 必填  | 说明               |
+|---------|---------|-----|------------------|
+| deviceType | number | 是   | 设备类型，参见 @ohos.multimedia.audio.DeviceType。仅支持以下设备：EARPIECE（听筒）、SPEAKER（扬声器）和DEFAULT（系统默认设备）。 |
+
+返回值
+
+| 类型                                    | 说明                      |
+|---------------------------------------|-------------------------|
+| Promise\<void> | 无返回结果的 Promise 对象。 |
+
 ### isBuiltInAcousticEchoCancelerSupported
 
 static isBuiltInAcousticEchoCancelerSupported(): boolean

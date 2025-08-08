@@ -104,6 +104,7 @@ int32_t AudioRenderer::Init()
     RTC_DLOG(LS_INFO) << __FUNCTION__;
 
     RTC_DCHECK(threadChecker_.IsCurrent());
+    workerThread_ = rtc::Thread::Current();
     return 0;
 }
 
@@ -112,6 +113,7 @@ int32_t AudioRenderer::Terminate()
     RTC_DLOG(LS_INFO) << __FUNCTION__;
 
     RTC_DCHECK(threadChecker_.IsCurrent());
+    workerThread_ = nullptr;
     StopPlayout();
     threadChecker_.Detach();
     OH_RESULT_CHECK(OH_AudioRenderer_Release(renderer_), -1);
@@ -216,6 +218,11 @@ int32_t AudioRenderer::StartPlayout()
         RTC_LOG(LS_ERROR) << "Invalid state: " << StateToString(state);
         NotifyError(AudioErrorType::START_STATE_MISMATCH, std::string("Invalid state: ") + StateToString(state));
         return -1;
+    }
+
+    auto result = OH_AudioRenderer_SetDefaultOutputDevice(renderer_, defaultDevice_);
+    if (result != AUDIOSTREAM_SUCCESS) {
+        RTC_LOG(LS_ERROR) << "Failed to set default output device: " << result;
     }
 
     OH_RESULT_CHECK(
@@ -329,6 +336,39 @@ int32_t AudioRenderer::SetMute(bool mute)
 
     mute_ = mute;
     return 0;
+}
+
+void AudioRenderer::SetDefaultOutputDevice(int32_t deviceType, std::function<void(bool)> callback)
+{
+    RTC_LOG(LS_INFO) << __FUNCTION__ << ": deviceType=" << deviceType;
+
+    if (workerThread_ && !workerThread_->IsCurrent()) {
+        workerThread_->PostTask(
+            [this, deviceType, cb = std::move(callback)] { SetDefaultOutputDevice(deviceType, std::move(cb)); });
+        return;
+    }
+
+    auto defaultDevice = static_cast<OH_AudioDevice_Type>(deviceType);
+    if (defaultDevice_ != defaultDevice) {
+        defaultDevice_ = defaultDevice;
+        if (renderer_) {
+            RTC_DLOG(LS_VERBOSE) << "Change default output device: " << deviceType;
+            // This can be a time-consuming operation.
+            auto result =
+                OH_AudioRenderer_SetDefaultOutputDevice(renderer_, defaultDevice);
+            RTC_DLOG(LS_VERBOSE) << "Change default output device done";
+            if (result != AUDIOSTREAM_SUCCESS) {
+                RTC_LOG(LS_ERROR) << "SetSpeakerPreferred fail, result=" << result;
+                if (callback) {
+                    callback(false);
+                }
+                return;
+            }
+        }
+    }
+    if (callback) {
+        callback(true);
+    }
 }
 
 int32_t AudioRenderer::OnWriteData(OH_AudioRenderer* renderer, void* buffer, int32_t length)
