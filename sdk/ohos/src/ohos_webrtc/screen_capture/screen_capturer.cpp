@@ -29,6 +29,38 @@ namespace {
 constexpr int32_t kVideoFrameWidth_Default = 720;
 constexpr int32_t kVideoFrameHeight_Default = 1280;
 
+std::string ScreenCaptureStateCodeToString(OH_AVScreenCaptureStateCode stateCode)
+{
+    switch (stateCode) {
+        case OH_SCREEN_CAPTURE_STATE_STARTED:
+            return "Started";
+        case OH_SCREEN_CAPTURE_STATE_CANCELED:
+            return "Denied by user";
+        case OH_SCREEN_CAPTURE_STATE_MIC_UNAVAILABLE:
+            return "Mic unavailable";
+        case OH_SCREEN_CAPTURE_STATE_INTERRUPTED_BY_OTHER:
+            return "Interrupted by other";
+        case OH_SCREEN_CAPTURE_STATE_STOPPED_BY_USER:
+            return "Stopped by user";
+        case OH_SCREEN_CAPTURE_STATE_STOPPED_BY_CALL:
+            return "Stopped by call";
+        case OH_SCREEN_CAPTURE_STATE_STOPPED_BY_USER_SWITCHES:
+            return "Stopped by user switches";
+        case OH_SCREEN_CAPTURE_STATE_ENTER_PRIVATE_SCENE:
+            return "Enter private scene";
+        case OH_SCREEN_CAPTURE_STATE_EXIT_PRIVATE_SCENE:
+            return "Exit private scene";
+        case OH_SCREEN_CAPTURE_STATE_MIC_MUTED_BY_USER:
+            return "Mic muted by user";
+        case OH_SCREEN_CAPTURE_STATE_MIC_UNMUTED_BY_USER:
+            return "Mic unmuted by user";
+        default:
+            break;
+    }
+
+    return "";
+}
+
 } // namespace
 
 using namespace ohos;
@@ -44,14 +76,9 @@ std::unique_ptr<ScreenCapturer> ScreenCapturer::Create(
 ScreenCapturer::ScreenCapturer(ScreenCaptureOptions options, std::shared_ptr<SystemAudioReceiver> systemAudioReceiver)
     : VideoCapturerBase(),
       options_(std::move(options)),
-      systemAudioReceiver_(systemAudioReceiver),
-      screenCapture_(AVScreenCapture::Create())
+      systemAudioReceiver_(systemAudioReceiver)
 {
     RTC_DLOG(LS_INFO) << __FUNCTION__;
-
-    if (IsAutoRotation()) {
-        DisplayManager::GetInstance().RegisterChangeCallback(this);
-    }
 }
 
 ScreenCapturer::~ScreenCapturer()
@@ -59,10 +86,6 @@ ScreenCapturer::~ScreenCapturer()
     RTC_DLOG(LS_INFO) << __FUNCTION__;
 
     Release();
-
-    if (IsAutoRotation()) {
-        DisplayManager::GetInstance().UnregisterChangeCallback(this);
-    }
 }
 
 void ScreenCapturer::Init(std::unique_ptr<VideoFrameReceiver> dataReceiver, Observer* observer)
@@ -81,9 +104,39 @@ void ScreenCapturer::Init(std::unique_ptr<VideoFrameReceiver> dataReceiver, Obse
     dataReceiver_->SetTimestampConverter(
         TimestampConverter([](int64_t timestamp) { return TimestampCast<std::nano, std::micro>(timestamp); }));
 
-    OH_AVScreenCaptureConfig config{};
-    SetupConfig(width, height, config);
+    isInitialized_ = true;
+}
 
+void ScreenCapturer::Release()
+{
+    RTC_LOG(LS_INFO) << __FUNCTION__;
+
+    SetObserver(nullptr);
+    Stop();
+    dataReceiver_.reset();
+
+    isInitialized_ = false;
+}
+
+void ScreenCapturer::Start()
+{
+    RTC_LOG(LS_INFO) << __FUNCTION__;
+
+    if (isStarted_) {
+        RTC_LOG(LS_WARNING) << "Capture is started";
+        return;
+    }
+
+    if (!isInitialized_) {
+        RTC_LOG(LS_ERROR) << "Not initialized";
+        NotifyCapturerError(-1, "Not initialized");
+        return;
+    }
+
+    OH_AVScreenCaptureConfig config{};
+    SetupConfig(GetVideoFrameWidth(), GetVideoFrameHeight(), config);
+
+    screenCapture_ = AVScreenCapture::Create();
     OH_AVSCREEN_CAPTURE_ErrCode ret = OH_AVScreenCapture_Init(screenCapture_.Raw(), config);
     if (ret != AV_SCREEN_CAPTURE_ERR_OK) {
         RTC_LOG(LS_ERROR) << "Failed to init: " << ret;
@@ -120,41 +173,12 @@ void ScreenCapturer::Init(std::unique_ptr<VideoFrameReceiver> dataReceiver, Obse
         }
     }
 
-    isInitialized_ = true;
-}
-
-void ScreenCapturer::Release()
-{
-    RTC_LOG(LS_INFO) << __FUNCTION__;
-
-    SetObserver(nullptr);
-    Stop();
-    dataReceiver_.reset();
-
-    isInitialized_ = false;
-}
-
-void ScreenCapturer::Start()
-{
-    RTC_LOG(LS_INFO) << __FUNCTION__;
-
-    if (isStarted_) {
-        RTC_LOG(LS_WARNING) << "Capture is started";
-        return;
-    }
-
-    if (!isInitialized_) {
-        RTC_LOG(LS_ERROR) << "Not initialized";
-        NotifyCapturerError(-1, "Not initialized");
-        return;
-    }
-
     uint64_t surfaceId = dataReceiver_->GetSurfaceId();
     RTC_DLOG(LS_INFO) << "surfaceId: " << surfaceId;
 
     OHNativeWindow* window = nullptr;
-    int32_t ret = OH_NativeWindow_CreateNativeWindowFromSurfaceId(surfaceId, &window);
-    if (ret != 0) {
+    if (OH_NativeWindow_CreateNativeWindowFromSurfaceId(surfaceId, &window) != 0) {
+        RTC_LOG(LS_ERROR) << "Failed to create native window from surface id";
         NotifyCapturerError(-1, "Internal error");
         return;
     }
@@ -179,12 +203,14 @@ void ScreenCapturer::Stop()
     }
 
     OH_AVSCREEN_CAPTURE_ErrCode ret = OH_AVScreenCapture_StopScreenCapture(screenCapture_.Raw());
-    if (ret != AV_SCREEN_CAPTURE_ERR_OK) {
-        RTC_LOG(LS_ERROR) << "Failed to stop screen capture: " << ret;
-        return;
-    }
+    RTC_LOG_IF(LS_ERROR, ret != AV_SCREEN_CAPTURE_ERR_OK) << "Failed to stop screen capture: " << ret;
+    screenCapture_.Reset();
 
     isStarted_ = false;
+
+    if (IsAutoRotation()) {
+        DisplayManager::GetInstance().UnregisterChangeCallback(this);
+    }
 
     // No state change callback, notify manually.
     NotifyCapturerStopped();
@@ -356,7 +382,7 @@ void ScreenCapturer::OnError(OH_AVScreenCapture* capture, int32_t errorCode)
 
 void ScreenCapturer::OnStateChange(struct OH_AVScreenCapture* capture, OH_AVScreenCaptureStateCode stateCode)
 {
-    RTC_LOG(LS_INFO) << "State change: " << stateCode;
+    RTC_LOG(LS_INFO) << "State change: " << stateCode << ", " << ScreenCaptureStateCodeToString(stateCode);
     (void)capture;
 
     switch (stateCode) {
@@ -375,6 +401,10 @@ void ScreenCapturer::OnStateChange(struct OH_AVScreenCapture* capture, OH_AVScre
                 RTC_LOG_IF(LS_ERROR, ret != AV_SCREEN_CAPTURE_ERR_OK) << "Failed to resize canvas: " << ret;
             }
 
+            if (IsAutoRotation()) {
+                DisplayManager::GetInstance().RegisterChangeCallback(this);
+            }
+
             NotifyCapturerStarted();
             if (systemAudioReceiver_) {
                 systemAudioReceiver_->OnStarted(true);
@@ -382,17 +412,25 @@ void ScreenCapturer::OnStateChange(struct OH_AVScreenCapture* capture, OH_AVScre
             break;
         }
         case OH_SCREEN_CAPTURE_STATE_CANCELED:
-        case OH_SCREEN_CAPTURE_STATE_STOPPED_BY_USER: {
-            NotifyCapturerStopped();
-            if (systemAudioReceiver_) {
-                systemAudioReceiver_->OnStopped();
-            }
+        case OH_SCREEN_CAPTURE_STATE_MIC_UNAVAILABLE: {
+            OH_AVSCREEN_CAPTURE_ErrCode ret = OH_AVScreenCapture_StopScreenCapture(screenCapture_.Raw());
+            RTC_LOG_IF(LS_ERROR, ret != AV_SCREEN_CAPTURE_ERR_OK) << "Failed to stop screen capture: " << ret;
+            isStarted_ = false;
+            NotifyCapturerError(-1, ScreenCaptureStateCodeToString(stateCode));
             break;
         }
         case OH_SCREEN_CAPTURE_STATE_INTERRUPTED_BY_OTHER:
+        case OH_SCREEN_CAPTURE_STATE_STOPPED_BY_USER:
         case OH_SCREEN_CAPTURE_STATE_STOPPED_BY_CALL:
         case OH_SCREEN_CAPTURE_STATE_STOPPED_BY_USER_SWITCHES: {
-            NotifyCapturerStopped();
+            if (IsAutoRotation()) {
+                DisplayManager::GetInstance().UnregisterChangeCallback(this);
+            }
+
+            OH_AVSCREEN_CAPTURE_ErrCode ret = OH_AVScreenCapture_StopScreenCapture(screenCapture_.Raw());
+            RTC_LOG_IF(LS_ERROR, ret != AV_SCREEN_CAPTURE_ERR_OK) << "Failed to stop screen capture: " << ret;
+            isStarted_ = false;
+            NotifyCapturerError(-1, ScreenCaptureStateCodeToString(stateCode));
             if (systemAudioReceiver_) {
                 systemAudioReceiver_->OnError(0, "Interrupted");
             }
