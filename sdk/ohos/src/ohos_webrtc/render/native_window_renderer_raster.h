@@ -28,18 +28,16 @@ namespace adapter {
 
 class NativeWindowRendererRaster : public NativeWindowRenderer {
 public:
-    static std::unique_ptr<NativeWindowRendererRaster> Create(ohos::NativeWindow window);
+    static std::unique_ptr<NativeWindowRendererRaster> Create(ohos::NativeWindow window, const std::string& threadName);
 
     // Do not use this constructor directly, use 'Create' above.
-    explicit NativeWindowRendererRaster(ohos::NativeWindow window);
+    explicit NativeWindowRendererRaster(ohos::NativeWindow window, const std::string& threadName);
     ~NativeWindowRendererRaster() override;
 
-protected:
-    void OnFrame(const VideoFrame& frame) override;
-    void OnDiscardedFrame() override;
-    void OnConstraintsChanged(const webrtc::VideoTrackSourceConstraints& constraints) override;
+    void RenderFrame(const VideoFrame& frame) override;
 
-    void RenderByteBuffer(rtc::scoped_refptr<I420BufferInterface> buffer);
+protected:
+    void RenderFrameInternal(const VideoFrame& frame);
 
 private:
     int32_t width_{};

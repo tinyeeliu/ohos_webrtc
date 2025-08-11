@@ -16,32 +16,50 @@
 import { NativeVideoRenderer, MediaStreamTrack } from 'libohos_webrtc.so';
 import { Logging } from '../log/Logging'
 
-const TAG: string = '[XComponentController1]';
+const TAG: string = '[VideoRenderController]';
 
 export enum ScalingMode { Fill, AspectFill, AspectFit }
 
 export class VideoRenderController extends XComponentController {
-  private renderer: NativeVideoRenderer = new NativeVideoRenderer();
+  private mirror: boolean = false;
+  private mirrorVertically: boolean = false;
+  private scalingMode: ScalingMode = ScalingMode.Fill;
+  private videoTrack: MediaStreamTrack | null = null;
+  private renderer?: NativeVideoRenderer;
 
   setVideoTrack(track: MediaStreamTrack | null): void {
-    this.renderer.setVideoTrack(track);
+    this.videoTrack = track;
+    this.renderer?.setVideoTrack(track);
   }
 
   setMirror(mirror: boolean) : void {
-    this.renderer.setMirror(mirror);
+    this.mirror = mirror;
+    this.renderer?.setMirror(mirror);
   }
   
   setMirrorVertically(mirrorVertically: boolean): void {
-    this.renderer.setMirrorVertically(mirrorVertically);
+    this.mirrorVertically = mirrorVertically;
+    this.renderer?.setMirrorVertically(mirrorVertically);
   }
 
   setScalingMode(mode: ScalingMode) : void {
-    this.renderer.setScalingMode(mode);
+    this.scalingMode = mode;
+    this.renderer?.setScalingMode(mode);
   }
 
   onSurfaceCreated(surfaceId: string): void {
     Logging.d(TAG, 'onSurfaceCreated surfaceId: ' + surfaceId);
-    this.renderer.init(surfaceId);
+    this.renderer = new NativeVideoRenderer(surfaceId);
+    this.renderer.setMirror(this.mirror);
+    this.renderer.setMirrorVertically(this.mirrorVertically);
+    this.renderer.setScalingMode(this.scalingMode);
+    this.renderer.setVideoTrack(this.videoTrack);
+    this.renderer.onfirstframerendered = (event) => {
+      Logging.d(TAG, 'onfirstframerendered: ' + JSON.stringify(event));
+    }
+    this.renderer.onframeresolutionchanged = (event) => {
+      Logging.d(TAG, 'onframeresolutionchanged: ' + JSON.stringify(event));
+    }
   }
 
   onSurfaceChanged(surfaceId: string, rect: SurfaceRect): void
@@ -53,6 +71,7 @@ export class VideoRenderController extends XComponentController {
   onSurfaceDestroyed(surfaceId: string): void
   {
     Logging.d(TAG, 'onSurfaceDestroyed surfaceId: ' + surfaceId);
-    this.renderer.release();
+    this.renderer?.release();
+    this.renderer = undefined;
   }
 }

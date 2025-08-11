@@ -125,28 +125,31 @@ NativeWindowRendererGl::~NativeWindowRendererGl()
     thread_->Stop();
 }
 
-void NativeWindowRendererGl::SetMirrorHorizontally(bool mirror)
+int32_t NativeWindowRendererGl::SetMirrorHorizontally(bool mirror)
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__ << " mirror: " << mirror;
 
     thread_->PostTask([this, mirror] { mirrorHorizontally_ = mirror; });
+    return 0;
 }
 
-void NativeWindowRendererGl::SetMirrorVertically(bool mirror)
+int32_t NativeWindowRendererGl::SetMirrorVertically(bool mirror)
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__ << " mirror: " << mirror;
 
     thread_->PostTask([this, mirror] { mirrorVertically_ = mirror; });
+    return 0;
 }
 
-void NativeWindowRendererGl::SetScalingMode(ScalingMode scaleMode)
+int32_t NativeWindowRendererGl::SetScalingMode(ScalingMode scaleMode)
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__ << " scaleMode: " << scaleMode;
 
     thread_->PostTask([this, scaleMode] { scaleMode_ = scaleMode; });
+    return 0;
 }
 
-void NativeWindowRendererGl::OnFrame(const VideoFrame& frame)
+void NativeWindowRendererGl::RenderFrame(const VideoFrame& frame)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " this=" << this;
     RTC_DLOG(LS_VERBOSE) << "render frame, id=" << frame.id() << " size=" << frame.width() << "x" << frame.height()
@@ -157,20 +160,10 @@ void NativeWindowRendererGl::OnFrame(const VideoFrame& frame)
         return;
     }
 
-    thread_->PostTask([this, frame = frame] { RenderFrame(frame); });
+    thread_->PostTask([this, frame] { RenderFrameInternal(frame); });
 }
 
-void NativeWindowRendererGl::OnDiscardedFrame()
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-}
-
-void NativeWindowRendererGl::OnConstraintsChanged(const webrtc::VideoTrackSourceConstraints& constraints)
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-}
-
-void NativeWindowRendererGl::RenderFrame(const VideoFrame& frame)
+void NativeWindowRendererGl::RenderFrameInternal(const VideoFrame& frame)
 {
     int viewportX = 0;
     int viewportY = 0;

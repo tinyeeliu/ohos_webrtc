@@ -2981,13 +2981,22 @@ let mediaStream = await mediaDevices.getDisplayMedia({video: {width: 720, height
 | 名称       | 类型                                              | 可读 | 可写  | 说明                                    |
 |----------|-------------------------------------------------|---|-----|---------------------------------------|
 | surfaceId | string                                          | 是 | 否   | 窗口对应的Surface Id，由 init 接口设置。          |
-| videoTrack     | [MediaDeviceKind](#mediadevicekind)\| undefined | 是   | 否   | 关联的视频轨道，由 setVideoTrack 接口设置。         |
+| videoTrack     | [MediaStreamTrack](#mediastreamtrack)\| undefined | 是   | 否   | 关联的视频轨道，由 setVideoTrack 接口设置。已废弃。         |
+| onfirstframerendered      | EventHandler \| null | 是   | 是  | 该事件处理器的事件类型为 firstframerendered |
+| onframeresolutionchanged  | EventHandler \| null | 是   | 是  | 该事件处理器的事件类型为 frameresolutionchanged |
 
-### init
+### 事件
 
-init(surfaceId: string): void
+| 名称              | 接口                        | 说明                 |
+|-------------------|---------------------------|---------------------|
+| firstframerendered      | Event               | 渲染首帧时触发             |
+| frameresolutionchanged  | VideoResolutionChangedEvent | 分辨率或旋转角度变化时触发  |
 
-使用窗口对应的 surfaceId 初始化，创建相关的渲染环境。
+### 构造函数
+
+new(surfaceId: string): NativeVideoRenderer
+
+使用 XComponent 组件对应的 surfaceId 构造实例，并创建相关的渲染环境。
 
 #### 参数
 
@@ -3019,7 +3028,7 @@ setVideoTrack(videoTrack: MediaStreamTrack | null): void
 
 | 参数名       | 类型     | 必填 | 说明                                                                                           |
 |-----------|--------|----|----------------------------------------------------------------------------------------------|
-| videoTrack | [MediaDeviceKind](#mediadevicekind)\| null | 是  | 当 videoTrack 不为 null 且 kind 为 video 时，关联该视频轨道，并接收其视频流；当 videoTrack 为 null 时，解除与当前视频轨道的关联，停止接收视频流。 |
+| videoTrack | [MediaStreamTrack](#mediastreamtrack)\| null | 是  | 当 videoTrack 不为 null 且 kind 为 video 时，关联该视频轨道，并接收其视频流；当 videoTrack 为 null 时，解除与当前视频轨道的关联，停止接收视频流。 |
 
 #### 返回值
 
@@ -3109,7 +3118,7 @@ nativeVideoRenderer.setScalingMode(1);
 
 release(): void
 
-释放窗口对应的渲染环境，及其它资源。
+释放窗口对应的渲染环境，及其它资源。当 surfaceId 对应的 XComponent 组件释放时，必须调用此方法，且之后该实例不可再使用。
 
 #### 参数
 
@@ -3133,7 +3142,7 @@ setVideoTrack(track: MediaStreamTrack | null): void
 
 | 参数名       | 类型     | 必填 | 说明                                                                                           |
 |-----------|--------|----|----------------------------------------------------------------------------------------------|
-| videoTrack | [MediaDeviceKind](#mediadevicekind)\| null | 是  | 当 videoTrack 不为 null 且 kind 为 video 时，关联该视频轨道，并接收其视频流；当 videoTrack 为 null 时，解除与当前视频轨道的关联，停止接收视频流。 |
+| videoTrack | [MediaStreamTrack](#mediastreamtrack)\| null | 是  | 当 videoTrack 不为 null 且 kind 为 video 时，关联该视频轨道，并接收其视频流；当 videoTrack 为 null 时，解除与当前视频轨道的关联，停止接收视频流。 |
 
 #### 返回值
 

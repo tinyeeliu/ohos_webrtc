@@ -16,9 +16,9 @@
 #ifndef WEBRTC_NATIVE_VIDEO_RENDERER_H
 #define WEBRTC_NATIVE_VIDEO_RENDERER_H
 
+#include "egl_env.h"
 #include "native_window_renderer.h"
-#include "../media_stream_track.h"
-#include "../render/egl_env.h"
+#include "../event/event_target.h"
 #include "../utils/marcos.h"
 
 #include <memory>
@@ -28,24 +28,30 @@
 
 namespace webrtc {
 
-class NapiNativeVideoRenderer : public Napi::ObjectWrap<NapiNativeVideoRenderer> {
+class NativeVideoRenderer;
+
+class NapiNativeVideoRenderer : public NapiEventTarget<NapiNativeVideoRenderer> {
 public:
     NAPI_CLASS_NAME_DECLARE(NativeVideoRenderer);
     NAPI_ATTRIBUTE_NAME_DECLARE(SurfaceId, surfaceId);
     NAPI_ATTRIBUTE_NAME_DECLARE(VideoTrack, videoTrack);
     NAPI_ATTRIBUTE_NAME_DECLARE(SharedContext, sharedContext);
-    NAPI_METHOD_NAME_DECLARE(Init, init);
+    NAPI_ATTRIBUTE_NAME_DECLARE(OnFirstFrameRendered, onfirstframerendered);
+    NAPI_ATTRIBUTE_NAME_DECLARE(OnFrameResolutionChanged, onframeresolutionchanged);
     NAPI_METHOD_NAME_DECLARE(SetVideoTrack, setVideoTrack);
     NAPI_METHOD_NAME_DECLARE(SetMirror, setMirror);
     NAPI_METHOD_NAME_DECLARE(SetMirrorVertically, setMirrorVertically);
     NAPI_METHOD_NAME_DECLARE(SetScalingMode, setScalingMode);
     NAPI_METHOD_NAME_DECLARE(Release, release);
     NAPI_METHOD_NAME_DECLARE(ToJson, toJSON);
+    NAPI_EVENT_NAME_DECLARE(FirstFrameRendered, firstframerendered);
+    NAPI_EVENT_NAME_DECLARE(FrameResolutionChanged, frameresolutionchanged);
 
     static void Init(Napi::Env env, Napi::Object exports);
 
 protected:
     friend class ObjectWrap;
+    static Napi::FunctionReference& Constructor();
     explicit NapiNativeVideoRenderer(const Napi::CallbackInfo& info);
     ~NapiNativeVideoRenderer() override;
 
@@ -53,26 +59,27 @@ protected:
     Napi::Value GetSharedContext(const Napi::CallbackInfo& info);
     Napi::Value GetVideoTrack(const Napi::CallbackInfo& info);
     Napi::Value SetVideoTrack(const Napi::CallbackInfo& info);
-    Napi::Value Init(const Napi::CallbackInfo& info);
-    Napi::Value Release(const Napi::CallbackInfo& info);
     Napi::Value SetMirror(const Napi::CallbackInfo& info);
     Napi::Value SetMirrorVertically(const Napi::CallbackInfo& info);
     Napi::Value SetScalingMode(const Napi::CallbackInfo& info);
+    Napi::Value Release(const Napi::CallbackInfo& info);
     Napi::Value ToJson(const Napi::CallbackInfo& info);
+    
+    Napi::Value GetEventHandler(const Napi::CallbackInfo& info);
+    void SetEventHandler(const Napi::CallbackInfo& info, const Napi::Value& value);
 
-    void AddSink();
+protected:
+    bool Init();
     void RemoveSink();
+    void NotifyFirstFrameRendered();
+    void NotifyFrameResolutionChanged(int32_t width, int32_t height, int32_t rotation);
 
 private:
-    static Napi::FunctionReference constructor_;
-
     std::optional<std::string> surfaceId_;
     std::shared_ptr<EglContext> sharedContext_;
-
-    // weak reference
+    std::unique_ptr<NativeVideoRenderer> renderer_;
+    // Persistent reference
     Napi::ObjectReference jsTrackRef_;
-
-    std::unique_ptr<adapter::NativeWindowRenderer> renderer_;
 };
 
 } // namespace webrtc

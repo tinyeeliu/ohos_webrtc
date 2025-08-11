@@ -40,19 +40,17 @@ public:
 
     ~NativeWindowRendererGl() override;
 
-    void SetMirrorHorizontally(bool mirror) override;
-    void SetMirrorVertically(bool mirror) override;
-    void SetScalingMode(ScalingMode scaleMode) override;
+    int32_t SetMirrorHorizontally(bool mirror) override;
+    int32_t SetMirrorVertically(bool mirror) override;
+    int32_t SetScalingMode(ScalingMode scaleMode) override;
+
+    void RenderFrame(const VideoFrame& frame) override;
 
 protected:
     NativeWindowRendererGl(
         ohos::NativeWindow window, std::shared_ptr<EglContext> sharedContext, const std::string& threadName);
 
-    void OnFrame(const VideoFrame& frame) override;
-    void OnDiscardedFrame() override;
-    void OnConstraintsChanged(const webrtc::VideoTrackSourceConstraints& constraints) override;
-
-    void RenderFrame(const VideoFrame& frame);
+    void RenderFrameInternal(const VideoFrame& frame);
 
 private:
     int32_t width_{};

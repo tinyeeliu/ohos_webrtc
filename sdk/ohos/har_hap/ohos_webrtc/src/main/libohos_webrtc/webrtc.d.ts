@@ -174,6 +174,12 @@ export interface VideoSourceErrorEvent extends Event {
   readonly errorText: string;
 }
 
+export interface VideoResolutionChangedEvent extends Event {
+  readonly width: number;
+  readonly height: number;
+  readonly rotation: number;
+}
+
 // https://www.w3.org/TR/WebCryptoAPI/#algorithm
 export interface Algorithm {
   name: string;
@@ -867,9 +873,14 @@ declare var MediaDevices: {
 
 export interface NativeVideoRenderer {
   readonly surfaceId?: string;
-  readonly videoTrack?: MediaStreamTrack;
+  /**
+   * @deprecated
+   */
+  readonly videoTrack: MediaStreamTrack | null;
 
-  init(surfaceId: string): void;
+  onfirstframerendered: ((this: NativeVideoRenderer, event: Event) => any) | null;
+  onframeresolutionchanged: ((this: NativeVideoRenderer, event: VideoResolutionChangedEvent) => any) | null;
+
   setVideoTrack(videoTrack: MediaStreamTrack | null): void;
   setMirror(mirrorHorizontally: boolean): void;
   setMirrorVertically(mirrorVertically: boolean): void;
@@ -879,7 +890,7 @@ export interface NativeVideoRenderer {
 
 declare var NativeVideoRenderer: {
   prototype: NativeVideoRenderer;
-  new(): NativeVideoRenderer;
+  new(surfaceId: string): NativeVideoRenderer;
 };
 
 export interface AudioError extends Error {

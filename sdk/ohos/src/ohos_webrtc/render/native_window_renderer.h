@@ -19,12 +19,11 @@
 #include "../helper/native_window.h"
 
 #include "api/video/video_frame.h"
-#include "api/video/video_sink_interface.h"
 
 namespace webrtc {
 namespace adapter {
 
-class NativeWindowRenderer : public rtc::VideoSinkInterface<VideoFrame> {
+class NativeWindowRenderer {
 public:
     enum class ScalingMode {
         // Scale the content to fit the size of the window by changing the aspect ratio of the content if necessary.
@@ -41,9 +40,11 @@ public:
 
     uint64_t GetSurfaceId() const;
 
-    virtual void SetMirrorHorizontally(bool mirror) {}
-    virtual void SetMirrorVertically(bool mirror) {}
-    virtual void SetScalingMode(ScalingMode scaleMode) {}
+    virtual int32_t SetMirrorHorizontally(bool mirror) { return -1; }
+    virtual int32_t SetMirrorVertically(bool mirror) { return -1; }
+    virtual int32_t SetScalingMode(ScalingMode scaleMode) { return -1; }
+    
+    virtual void RenderFrame(const VideoFrame& frame) = 0;
 
 protected:
     explicit NativeWindowRenderer(ohos::NativeWindow window);

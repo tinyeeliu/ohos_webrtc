@@ -22,16 +22,16 @@
 namespace webrtc {
 namespace adapter {
 
-std::unique_ptr<NativeWindowRendererRaster> NativeWindowRendererRaster::Create(ohos::NativeWindow window)
+std::unique_ptr<NativeWindowRendererRaster> NativeWindowRendererRaster::Create(ohos::NativeWindow window, const std::string& threadName)
 {
     if (window.IsEmpty()) {
         return nullptr;
     }
 
-    return std::make_unique<NativeWindowRendererRaster>(std::move(window));
+    return std::make_unique<NativeWindowRendererRaster>(std::move(window), threadName);
 }
 
-NativeWindowRendererRaster::NativeWindowRendererRaster(ohos::NativeWindow window)
+NativeWindowRendererRaster::NativeWindowRendererRaster(ohos::NativeWindow window, const std::string& threadName)
     : NativeWindowRenderer(std::move(window)), thread_(rtc::Thread::Create())
 {
     // [height] is before [width]
@@ -77,7 +77,7 @@ NativeWindowRendererRaster::NativeWindowRendererRaster(ohos::NativeWindow window
         RTC_LOG(LS_ERROR) << "Failed to set scale mode: " << ret;
     }
 
-    thread_->SetName("window-renderer-thread", this);
+    thread_->SetName(threadName, this);
     thread_->Start();
 }
 
@@ -86,7 +86,7 @@ NativeWindowRendererRaster::~NativeWindowRendererRaster()
     thread_->Stop();
 }
 
-void NativeWindowRendererRaster::OnFrame(const VideoFrame& frame)
+void NativeWindowRendererRaster::RenderFrame(const VideoFrame& frame)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " this=" << this;
     RTC_DLOG(LS_VERBOSE) << "render frame, id=" << frame.id() << " size=" << frame.width() << "x" << frame.height()
@@ -97,23 +97,14 @@ void NativeWindowRendererRaster::OnFrame(const VideoFrame& frame)
         return;
     }
 
-    thread_->PostTask([this, frame] { RenderByteBuffer(frame.video_frame_buffer()->ToI420()); });
+    thread_->PostTask([this, frame] { RenderFrameInternal(frame); });
 }
 
-void NativeWindowRendererRaster::OnDiscardedFrame()
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-}
-
-void NativeWindowRendererRaster::OnConstraintsChanged(const webrtc::VideoTrackSourceConstraints& constraints)
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-}
-
-void NativeWindowRendererRaster::RenderByteBuffer(rtc::scoped_refptr<I420BufferInterface> buffer)
+void NativeWindowRendererRaster::RenderFrameInternal(const VideoFrame& frame)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " enter, this=" << this;
 
+    auto buffer = frame.video_frame_buffer()->ToI420();
     if (!buffer) {
         RTC_LOG(LS_ERROR) << "Buffer is nullptr";
         return;
