@@ -19,13 +19,13 @@
 ```shell
 #!/bin/bash
 
-mkdir include
+mkdir -p include
 
-src=`find ./ -name "*.h*"`
+src=$(find . -path ./include -prune -o -name "*.h*" -print)
 for obj in $src
 do
-	echo "$src"
-	cp --parents $obj ./include
+    echo "$obj"
+    cp --parents "$obj" ./include
 done
 ```
 
