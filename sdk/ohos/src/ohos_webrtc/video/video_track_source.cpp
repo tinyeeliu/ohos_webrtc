@@ -316,10 +316,10 @@ void OhosVideoTrackSource::OnFrameCaptured(
                      .set_rotation(rotation)
                      .set_timestamp_us(alignedTimestampUs)
                      .build();
-    if (ApplyRotation() && frame.rotation() != kVideoRotation_0 && buffer->type() == VideoFrameBuffer::Type::kI420) {
+    if (ApplyRotation() && frame.rotation() != kVideoRotation_0) {
         /* Apply pending rotation. */
         VideoFrame rotatedFrame(frame);
-        rotatedFrame.set_video_frame_buffer(I420Buffer::Rotate(*buffer->GetI420(), frame.rotation()));
+        rotatedFrame.set_video_frame_buffer(I420Buffer::Rotate(*buffer->ToI420(), frame.rotation()));
         rotatedFrame.set_rotation(kVideoRotation_0);
         broadcaster_.OnFrame(rotatedFrame);
     } else {
