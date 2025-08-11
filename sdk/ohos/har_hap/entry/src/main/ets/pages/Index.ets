@@ -44,10 +44,13 @@ struct Index {
   @State private myId: string = '';
   @State private peerId: string = '';
   @State muteBtnTitle: string = 'Mute';
+  @State speakerBtnTitle: string = 'Speaker';
   @State cameraBtnTitle: string = 'Close Camera';
+  private isScreenCast: boolean = false;
   private muted: boolean = false;
   private cameraEnabled: boolean = true;
   private useFrontCamera: boolean = false;
+  private useSpeaker: boolean = false;
   private mXComponentController1: VideoRenderController = new VideoRenderController();
   private mXComponentController2: VideoRenderController = new VideoRenderController();
   private ws: webSocket.WebSocket = webSocket.createWebSocket();
@@ -71,7 +74,8 @@ struct Index {
     // this is Index
     console.info(TAG, "dataChannel.OnMessage: ", event);
     console.info(TAG, "dataChannel.OnMessage: (typeof event.data) = ", typeof event.data);
-    console.info(TAG, "dataChannel.OnMessage: (event.data instanceof ArrayBuffer) = ", event.data instanceof ArrayBuffer);
+    console.info(TAG, "dataChannel.OnMessage: (event.data instanceof ArrayBuffer) = ",
+      event.data instanceof ArrayBuffer);
 
     this.setStatus("Received data channel message");
 
@@ -84,85 +88,91 @@ struct Index {
 
   //
   build() {
-    Column() {
-      Row() {
-        Text("状态")
-          .fontSize(32)
-          .fontWeight(FontWeight.Normal)
-          .margin({ right: 24 })
-        Text(this.statusText)
-          .fontSize(32)
-          .fontWeight(FontWeight.Bold)
-      }
-      .alignSelf(ItemAlign.Start)
-
-      Row() {
-        Text("本机ID")
-          .fontSize(32)
-          .fontWeight(FontWeight.Normal)
-          .margin({ right: 24 })
-          .align(Alignment.Start)
-        Text(this.myId)
-          .fontSize(32)
-          .fontWeight(FontWeight.Bold)
-      }
-      .alignSelf(ItemAlign.Start)
-      .padding({ top: 10 })
-
-      Row() {
-        TextInput({ placeholder: '请输入对端ID' })
-          .width(200)
-          .height(54)
-          .fontSize(28)
-          .fontWeight(FontWeight.Normal)
-          .type(InputType.Number)
-          .layoutWeight('20%')
-          .onChange((value: string) => {
-            this.peerId = value;
-          })
-
-        Button(this.buttonTitle)
-          .width(150)
-          .height(54)
-          .fontSize(20)
-          .fontWeight(FontWeight.Bold)
-          .margin({ top: 20 })
-          .onClick(() => {
-            if (this.buttonTitle == 'Disconnect') {
-              this.ws.close();
-              this.buttonTitle = 'Connect';
-              return;
-            }
-
-            if (this.peerId.length < 2 || this.peerId.length > 4) {
-              promptAction.showToast({ message: "请输入2到4位数ID" });
-              return;
-            }
-
-            this.sendMessage('SESSION ' + this.peerId);
-            this.buttonTitle = 'Disconnect';
-          })
-          .margin({ left: 10, right: 20 })
-
+    List({ space: 10 }) {
+      ListItem() {
         Row() {
-          Checkbox({ name: 'remote_offerer', group: 'checkboxGroup' })
-            .select(false)
-            .selectedColor(0x39a2db)
-            .onChange((value: boolean) => {
-              console.info('remote_offerer change is' + value)
-
-            }).margin({ right: 8 })
-
-          Text("Remote offerer")
-            .fontSize(20)
+          Text("状态")
+            .fontSize(32)
             .fontWeight(FontWeight.Normal)
-        }.layoutWeight('20%').visibility(Visibility.Hidden)
-
+            .margin({ right: 24 })
+          Text(this.statusText)
+            .fontSize(32)
+            .fontWeight(FontWeight.Bold)
+        }
+        .alignSelf(ItemAlign.Start)
       }
-      .alignSelf(ItemAlign.Start)
-      .padding({ top: 24 })
 
-      Row() {
+      ListItem() {
+        Row() {
+          Text("本机ID")
+            .fontSize(32)
+            .fontWeight(FontWeight.Normal)
+            .margin({ right: 24 })
+            .align(Alignment.Start)
+          Text(this.myId)
+            .fontSize(32)
+            .fontWeight(FontWeight.Bold)
+        }
+        .alignSelf(ItemAlign.Start)
+        .padding({ top: 10 })
+      }
+
+      ListItem() {
+        Row() {
+          TextInput({ placeholder: '请输入对端ID' })
+            .width(200)
+            .height(54)
+            .fontSize(28)
+            .fontWeight(FontWeight.Normal)
+            .type(InputType.Number)
+            .layoutWeight('20%')
+            .onChange((value: string) => {
+              this.peerId = value;
+            })
+
+          Button(this.buttonTitle)
+            .width(150)
+            .height(54)
+            .fontSize(20)
+            .fontWeight(FontWeight.Bold)
+            .margin({ top: 20 })
+            .onClick(() => {
+              if (this.buttonTitle == 'Disconnect') {
+                this.ws.close();
+                this.buttonTitle = 'Connect';
+                return;
+              }
+
+              if (this.peerId.length < 2 || this.peerId.length > 4) {
+                promptAction.showToast({ message: "请输入2到4位数ID" });
+                return;
+              }
+
+              this.sendMessage('SESSION ' + this.peerId);
+              this.buttonTitle = 'Disconnect';
+            })
+            .margin({ left: 10, right: 20 })
+
+          Row() {
+            Checkbox({ name: 'remote_offerer', group: 'checkboxGroup' })
+              .select(false)
+              .selectedColor(0x39a2db)
+              .onChange((value: boolean) => {
+                console.info('remote_offerer change is' + value)
+
+              }).margin({ right: 8 })
+
+            Text("Remote offerer")
+              .fontSize(20)
+              .fontWeight(FontWeight.Normal)
+          }.layoutWeight('20%').visibility(Visibility.Hidden)
+
+        }
+        .alignSelf(ItemAlign.Start)
+        .padding({ top: 24 })
+      }
+
+      ListItem() {
         Button(this.muteBtnTitle)
           .width(150)
           .height(54)
@@ -176,8 +186,34 @@ struct Index {
             this.pc?.setAudioPlayout(!this.muted);
             this.pc?.setAudioRecording(!this.muted);
           })
-          .margin({ left: 10, right: 20 })
+      }
 
+      ListItem() {
+        Button(this.speakerBtnTitle)
+          .width(150)
+          .height(54)
+          .fontSize(20)
+          .fontWeight(FontWeight.Bold)
+          .margin({ top: 20 })
+          .onClick(() => {
+            Logging.d(TAG, "use speaker: " + this.useSpeaker);
+            if (this.adm) {
+              this.useSpeaker = !this.useSpeaker;
+              this.speakerBtnTitle = this.useSpeaker ? 'Earpiece' : 'Speaker';
+              this.adm.setDefaultOutputDevice(this.useSpeaker ? audio.DeviceType.SPEAKER : audio.DeviceType.EARPIECE)
+                .then(() => {
+                  Logging.d(TAG, 'Set default output device done');
+                })
+                .catch((e: Error) => {
+                  Logging.d(TAG, 'Set default output device error: ' + JSON.stringify(e));
+                });
+            } else {
+              Logging.d(TAG, 'No adm');
+            }
+          })
+      }
+
+      ListItem() {
         Button(this.cameraBtnTitle)
           .width(180)
           .height(54)
@@ -194,8 +230,9 @@ struct Index {
             this.cameraEnabled = !this.cameraEnabled;
             this.cameraBtnTitle = this.cameraEnabled ? 'Close Camera' : 'Open Camera';
           })
-          .margin({ left: 10, right: 20 })
+      }
 
+      ListItem() {
         Button('Switch Camera')
           .width(180)
           .height(54)
@@ -212,51 +249,56 @@ struct Index {
             this.useFrontCamera = !this.useFrontCamera;
             this.switchCamera();
           })
-          .margin({ left: 10, right: 20 })
-
       }
-      .alignSelf(ItemAlign.Start)
-      .padding({ top: 24 })
 
-      Row() {
-        XComponent({
-          id: "local-video",
-          type: XComponentType.SURFACE,
-          controller: this.mXComponentController1
-        })
-          .width('480px')
-          .height('480px')
-          .onLoad((context?) => {
-            console.log(TAG, "context: " + context);
-            console.log(TAG, "surfaceId: " + this.mXComponentController1.getXComponentSurfaceId());
+      ListItem() {
+        Row() {
+          XComponent({
+            id: "local-video",
+            type: XComponentType.SURFACE,
+            controller: this.mXComponentController1
           })
-          .onDestroy(() => {
-            console.log(TAG, "onDestroy");
-          })
+            .width('480px')
+            .height('480px')
+            .onLoad((context?) => {
+              console.log(TAG, "context: " + context);
+              console.log(TAG, "surfaceId: " + this.mXComponentController1.getXComponentSurfaceId());
+              this.mXComponentController1.setScalingMode(ScalingMode.AspectFit);
+            })
+            .onDestroy(() => {
+              console.log(TAG, "onDestroy");
+            })
 
-        XComponent({
-          id: "remote-video",
-          type: XComponentType.SURFACE,
-          controller: this.mXComponentController2
-        })
-          .width('480px')
-          .height('480px')
-          .onLoad((context?) => {
-            console.log(TAG, "context: " + JSON.stringify(context));
-            console.log(TAG, "surfaceId: " + this.mXComponentController2.getXComponentSurfaceId());
+          XComponent({
+            id: "remote-video",
+            type: XComponentType.SURFACE,
+            controller: this.mXComponentController2
           })
-          .onDestroy(() => {
-            console.log(TAG, "onDestroy");
-          })
+            .width('480px')
+            .height('480px')
+            .onLoad((context?) => {
+              console.log(TAG, "context: " + JSON.stringify(context));
+              console.log(TAG, "surfaceId: " + this.mXComponentController2.getXComponentSurfaceId());
+              this.mXComponentController2.setScalingMode(ScalingMode.AspectFill);
+            })
+            .onDestroy(() => {
+              console.log(TAG, "onDestroy");
+            })
+        }
+        .alignSelf(ItemAlign.Start)
+        .padding({ top: 10 })
       }
-      .alignSelf(ItemAlign.Start)
-      .padding({ top: 10 })
 
     }
     .width('100%')
     .height('100%')
-    .margin({ left: 24, right: 24, top: 24, bottom: 24 })
-    .justifyContent(FlexAlign.Start)
+    .alignListItem(ListItemAlign.Start)
+    .padding({
+      left: 20,
+      right: 20,
+      top: 20,
+      bottom: 20
+    })
   }
 
   aboutToAppear(): void {
@@ -276,13 +318,16 @@ struct Index {
     Logging.enableLogThreads();
     Logging.enableLogTimeStamps();
     Logging.enableLogToDebugOutput(LoggingSeverity.VERBOSE);
+    // 日志写文件
+    Logging.enableLogToFile(LoggingSeverity.VERBOSE, getContext().tempDir + '/webrtc.log');
 
     abilityAccessCtrl.createAtManager()
       .requestPermissionsFromUser(getContext(), ['ohos.permission.CAMERA', 'ohos.permission.MICROPHONE'])
       .then(async (result: PermissionRequestResult) => {
         let granted = true;
         for (let index = 0; index < result.permissions.length; index++) {
-          console.info(TAG, "request permission [" + result.permissions[index] + "] with result: " + result.authResults[index]);
+          console.info(TAG,
+            "request permission [" + result.permissions[index] + "] with result: " + result.authResults[index]);
           if (result.authResults[index] != abilityAccessCtrl.GrantStatus.PERMISSION_GRANTED) {
             granted = false;
           }
@@ -372,14 +417,24 @@ struct Index {
     this.ws.off('close');
     this.ws.off('error');
     this.ws.off('message');
+
+    // !!!: 必须调用 release 方法，否则该实例及相关资源无法释放
+    this.localVideoSource?.release();
   }
 
   onPageShow(): void {
-    console.info(TAG, 'onPageShow');
+    Logging.d(TAG, 'onPageShow');
+    if (!this.isScreenCast) {
+      this.enableCamera();
+    }
   }
 
   onPageHide(): void {
-    console.info(TAG, 'onPageHide');
+    Logging.d(TAG, 'onPageHide');
+
+    if (!this.isScreenCast) {
+      this.disableCamera();
+    }
   }
 
   getRandomId() {
@@ -403,6 +458,7 @@ struct Index {
 
   async createAudioDeviceModule() {
     this.adm = new webrtc.AudioDeviceModule({ useStereoInput: true, useStereoOutput: true });
+    this.adm.setDefaultOutputDevice(this.useSpeaker ? audio.DeviceType.SPEAKER : audio.DeviceType.EARPIECE);
     this.adm.oncapturererror = (event) => {
       console.error(TAG, 'oncapturererror: ' + JSON.stringify(event));
     };
@@ -453,11 +509,14 @@ struct Index {
         facingMode: this.useFrontCamera ? 'user' : 'environment'
       }, false);
       console.info(TAG, 'videoSource: ' + JSON.stringify(this.localVideoSource));
-      this.localVideoSource!.oncapturerstarted = (event: webrtc.VideoCapturerStartedEvent) => {
-        console.info(TAG, 'oncapturerstarted: event=' + JSON.stringify(event));
+      this.localVideoSource!.oncapturerstarted = (event: webrtc.Event) => {
+        Logging.d(TAG, 'oncapturerstarted: event=' + JSON.stringify(event));
       };
       this.localVideoSource!.oncapturerstopped = (event: webrtc.Event) => {
-        console.info(TAG, 'oncapturerstopped: event=' + JSON.stringify(event));
+        Logging.d(TAG, 'oncapturerstopped: event=' + JSON.stringify(event));
+      };
+      this.localVideoSource!.onerror = (event: webrtc.VideoSourceErrorEvent) => {
+        Logging.e(TAG, 'onerror: event=' + JSON.stringify(event));
       };
 
       this.localVideoTrack = this.pcf?.createVideoTrack("video", this.localVideoSource);
@@ -465,10 +524,8 @@ struct Index {
 
       if (this.localVideoTrack) {
         this.mXComponentController1.setVideoTrack(this.localVideoTrack);
+        this.mXComponentController1.setMirror(this.useFrontCamera);
       }
-
-      this.mXComponentController1.setMirror(this.useFrontCamera);
-      this.mXComponentController1.setScalingMode(ScalingMode.AspectFit);
     }
   }
 
@@ -484,7 +541,8 @@ struct Index {
         ohosSystemAudio: true
       });
 
-      this.displayMediaStream.getTracks().forEach((track) => console.info(TAG, 'display media Stream track: ' + JSON.stringify(track)));
+      this.displayMediaStream.getTracks()
+        .forEach((track) => console.info(TAG, 'display media Stream track: ' + JSON.stringify(track)));
 
       this.localVideoTrack = this.displayMediaStream.getVideoTracks()[0];
       console.info(TAG, 'videoTrack: ' + JSON.stringify(this.localVideoTrack));
@@ -494,16 +552,18 @@ struct Index {
         if (videoSource) {
           this.localVideoSource = videoSource as webrtc.VideoSource;
           console.info(TAG, 'videoSource: ' + JSON.stringify(this.localVideoSource));
-          this.localVideoSource!.oncapturerstarted = (event: webrtc.VideoCapturerStartedEvent) => {
+          this.localVideoSource!.oncapturerstarted = (event: webrtc.Event) => {
             console.info(TAG, 'oncapturerstarted: event=' + JSON.stringify(event));
           };
           this.localVideoSource!.oncapturerstopped = (event: webrtc.Event) => {
             console.info(TAG, 'oncapturerstopped: event=' + JSON.stringify(event));
           };
+          this.localVideoSource!.onerror = (event: webrtc.VideoSourceErrorEvent) => {
+            console.error(TAG, 'onerror: event=' + JSON.stringify(event));
+          };
         }
 
         this.mXComponentController1.setVideoTrack(this.localVideoTrack);
-        this.mXComponentController1.setScalingMode(ScalingMode.AspectFit);
       }
 
       let audioTracks = this.displayMediaStream.getAudioTracks();
@@ -519,24 +579,57 @@ struct Index {
   }
 
   async enableCamera() {
+    Logging.d(TAG, 'Enable camera');
+    // 方式1（添加 VideoSink，VideoSource 自动启动）
     if (this.localVideoTrack) {
-      this.localVideoTrack.enabled = true;
       this.mXComponentController1.setVideoTrack(this.localVideoTrack);
-      // this.videoRtpSender?.replaceTrack(this.localVideoTrack);
+      this.mXComponentController1.setMirror(this.useFrontCamera);
+      this.videoRtpSender?.replaceTrack(this.localVideoTrack);
     }
+    // 方式2（手动启动 VideoSource，使用此方式后，VideoSource 不再触发自动启动或停止）
+    // this.localVideoSource?.startCapture();
   }
 
   async disableCamera() {
+    Logging.d(TAG, 'Disable camera');
+    // 方式1（移除所有 VideoSink，VideoSource 自动停止）
     this.mXComponentController1.setVideoTrack(null);
-    // this.videoRtpSender?.replaceTrack(null);
-    if (this.localVideoTrack) {
-      this.localVideoTrack.enabled = false;
-    }
+    this.videoRtpSender?.replaceTrack(null);
+    // 方式2（手动停止 VideoSource，使用此方式后，VideoSource 不再触发自动启动或停止）
+    // this.localVideoSource?.stopCapture();
+
+    // 这种方式会让 VideoSource 生成黑帧，但不会停止 VideoSource
+    // this.localVideoTrack?.enabled = false;
   }
 
   async switchCamera() {
+    Logging.d(TAG, 'Close current camera device');
+
+    // 关闭当前摄像头
+    this.disableCamera();
+
+    // !!!: 等待一段时间再打开其它摄像头设备
+    // 方式1
+    await new Promise<void>(resolve => setTimeout(resolve, 500));
+    // 方式2（等待 oncapturerstopped 回调，该方式不一定可靠）
+    // if (this.localVideoSource) {
+    //   // 等待当前摄像头设备关闭
+    //   await new Promise<void>((resolve) => {
+    //     this.localVideoSource!.oncapturerstopped = (event) => {
+    //       Logging.d(TAG, 'oncapturerstopped: event=' + JSON.stringify(event));
+    //       resolve();
+    //     }
+    //   });
+    // }
+
+    Logging.d(TAG, 'Current camera device is closed');
+
+    // !!!: 必须调用 release 方法，否则该实例及相关资源无法释放
+    this.localVideoSource?.release();
+    this.localVideoSource = undefined;
+
     let stream = await this.mediaDevices.getUserMedia({
-      video:{
+      video: {
         width: 1280,
         height: 720,
         facingMode: this.useFrontCamera ? 'user' : 'environment'
@@ -544,29 +637,28 @@ struct Index {
     });
     let videoTracks = stream.getVideoTracks();
     if (videoTracks.length == 0) {
-      console.info(TAG, 'No video track');
+      Logging.e(TAG, 'No video track');
       return;
     }
 
-    this.mXComponentController1.setVideoTrack(null);
-
-    await new Promise<void>(resolve => setTimeout(resolve, 500));
-
     this.localVideoTrack = videoTracks[0];
     let videoSource = this.localVideoTrack.getSource();
-    if (videoSource) {
-      this.localVideoSource = videoSource as webrtc.VideoSource;
+    this.localVideoSource = videoSource ? (videoSource as webrtc.VideoSource) : undefined;
+    if (this.localVideoSource) {
       console.info(TAG, 'local video source: ' + JSON.stringify(this.localVideoSource));
-      this.localVideoSource!.oncapturerstarted = (event: webrtc.VideoCapturerStartedEvent) => {
+      this.localVideoSource!.oncapturerstarted = (event: webrtc.Event) => {
         console.info(TAG, 'oncapturerstarted: event=' + JSON.stringify(event));
       };
       this.localVideoSource!.oncapturerstopped = (event: webrtc.Event) => {
         console.info(TAG, 'oncapturerstopped: event=' + JSON.stringify(event));
       };
+      this.localVideoSource!.onerror = (event: webrtc.VideoSourceErrorEvent) => {
+        console.info(TAG, 'onerror: event=' + JSON.stringify(event));
+      };
     }
 
-    this.mXComponentController1.setVideoTrack(this.localVideoTrack);
-    this.videoRtpSender?.replaceTrack(this.localVideoTrack);
+    // 打开另一颗摄像头
+    this.enableCamera();
   }
 
   async createPeerConnection() {
@@ -587,7 +679,6 @@ struct Index {
       if (event.track.kind == 'video') {
         this.remoteVideoTrack = event.track;
         this.mXComponentController2.setVideoTrack(event.track);
-        this.mXComponentController2.setScalingMode(ScalingMode.AspectFill);
       } else if (event.track.kind == 'audio') {
         this.remoteAudioTrack = event.track;
       }
@@ -739,8 +830,12 @@ struct Index {
   async sendMessage(message: string) {
     console.info(TAG, 'websocket send: ' + message);
     this.ws.send(message, (error, success) => {
-      if (success) console.info(TAG, 'websocket send success: ' + message);
-      else console.error(TAG, 'websocket send error: ' + error);
+      if (success) {
+        console.info(TAG, 'websocket send success: ' + message);
+      } else {
+        console.error(TAG,
+          'websocket send error: ' + error);
+      }
     });
   }
 
