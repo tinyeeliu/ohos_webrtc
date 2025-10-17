@@ -1,0 +1,529 @@
+diff -Nuar src/build/config/BUILDCONFIG.gn src_ohos/build/config/BUILDCONFIG.gn
+--- src/build/config/BUILDCONFIG.gn	2025-10-07 09:27:23.940634942 +0800
++++ src_ohos/build/config/BUILDCONFIG.gn	2025-10-07 16:44:35.314755019 +0800
+@@ -241,6 +241,8 @@
+ if (target_os == "android") {
+   assert(host_os == "linux", "Android builds are only supported on Linux.")
+   _default_toolchain = "//build/toolchain/android:android_clang_$target_cpu"
++} else if (target_os == "ohos") {
++  _default_toolchain = "//build/toolchain/ohos:ohos_clang_$target_cpu"
+ } else if (target_os == "chromeos" || target_os == "linux") {
+   # See comments in build/toolchain/cros/BUILD.gn about board compiles.
+   if (is_clang) {
+@@ -304,6 +306,7 @@
+ # aix or one of the BSDs. If you need to check these, just check the
+ # current_os value directly.
+ 
++is_ohos = current_os == "ohos"
+ is_android = current_os == "android"
+ is_chromeos = current_os == "chromeos"
+ is_fuchsia = current_os == "fuchsia"
+@@ -391,11 +394,14 @@
+   default_compiler_configs +=
+       [ "//build/config/android:default_orderfile_instrumentation" ]
+ }
++if (is_ohos) {
++  default_compiler_configs += [ "//build/config/ohos:compiler" ]
++}
+ 
+ if (is_clang && !is_nacl) {
+   default_compiler_configs += [
+     "//build/config/clang:extra_warnings",
+-    "//build/config/clang:find_bad_constructs",
++    #"//build/config/clang:find_bad_constructs",
+     "//build/config/clang:unsafe_buffers",
+   ]
+ }
+diff -Nuar src/build/config/clang/BUILD.gn src_ohos/build/config/clang/BUILD.gn
+--- src/build/config/clang/BUILD.gn	2025-10-07 09:27:23.971451168 +0800
++++ src_ohos/build/config/clang/BUILD.gn	2025-10-07 16:05:44.949571816 +0800
+@@ -174,6 +174,14 @@
+         } else {
+           assert(false)  # Unhandled cpu type
+         }
++      } else if (is_ohos) {
++        if (current_cpu == "x64") {
++          _dir = "x86_64-linux-ohos"
++        } else if (current_cpu == "arm64") {
++          _dir = "aarch64-linux-ohos"
++        } else {
++          assert(false)  # Unhandled cpu type
++        }
+       } else if (is_fuchsia) {
+         if (current_cpu == "x64") {
+           _dir = "x86_64-unknown-fuchsia"
+diff -Nuar src/build/config/clang/clang.gni src_ohos/build/config/clang/clang.gni
+--- src/build/config/clang/clang.gni	2025-10-07 09:27:23.971451168 +0800
++++ src_ohos/build/config/clang/clang.gni	2025-10-07 16:04:01.945537957 +0800
+@@ -7,13 +7,26 @@
+ 
+ default_clang_base_path = "//third_party/llvm-build/Release+Asserts"
+ 
++if (is_ohos) {
++    declare_args() {
++        ohos_sdk_native_root = "//buildtools/ohos-sdk/linux/native"
++    }
++    default_clang_base_path = "${ohos_sdk_native_root}/llvm"
++    clang_lib_path = "${default_clang_base_path}/lib"
++}
++
+ declare_args() {
+   # Indicates if the build should use the Chrome-specific plugins for enforcing
+   # coding guidelines, etc. Only used when compiling with Chrome's Clang, not
+   # Chrome OS's.
+-  clang_use_chrome_plugins =
++
++  if (is_ohos) {
++    clang_use_chrome_plugins = false
++  } else {
++    clang_use_chrome_plugins =
+       is_clang && !is_nacl && current_os != "zos" &&
+       default_toolchain != "//build/toolchain/cros:target"
++  }
+ 
+   # Use this instead of clang_use_chrome_plugins to enable just the raw-ptr-plugin.
+   clang_use_raw_ptr_plugin = false
+diff -Nuar src/build/config/compiler/BUILD.gn src_ohos/build/config/compiler/BUILD.gn
+--- src/build/config/compiler/BUILD.gn	2025-10-07 09:27:23.975559998 +0800
++++ src_ohos/build/config/compiler/BUILD.gn	2025-10-07 16:23:35.931394167 +0800
+@@ -590,8 +590,8 @@
+     if (default_toolchain != "//build/toolchain/cros:target" &&
+         !llvm_android_mainline) {
+       cflags += [
+-        "-mllvm",
+-        "-split-threshold-for-reg-with-hint=0",
++        #"-mllvm",
++        #"-split-threshold-for-reg-with-hint=0",
+       ]
+       if (use_thin_lto && is_a_target_toolchain) {
+         if (is_win) {
+@@ -1632,8 +1632,11 @@
+       current_os != "zos") {
+     update_args = [
+       "--print-revision",
+-      "--verify-version=$clang_version",
+     ]
++    if (!is_ohos) {
++      update_args += [ "--verify-version=$clang_version" ]
++    }
++
+     if (llvm_force_head_revision) {
+       update_args += [ "--llvm-force-head-revision" ]
+     }
+@@ -1790,12 +1793,12 @@
+   if (is_win) {
+     cflags = [ "/WX" ]
+   } else {
+-    cflags = [ "-Werror" ]
++    #cflags = [ "-Werror" ]
+ 
+     # The compiler driver can sometimes (rarely) emit warnings before calling
+     # the actual linker.  Make sure these warnings are treated as errors as
+     # well.
+-    ldflags = [ "-Werror" ]
++    #ldflags = [ "-Werror" ]
+   }
+ 
+   # Turn rustc warnings into the "deny" lint level, which produce compiler
+diff -Nuar src/build/config/ohos/BUILD.gn src_ohos/build/config/ohos/BUILD.gn
+--- src/build/config/ohos/BUILD.gn	1970-01-01 08:00:00.000000000 +0800
++++ src_ohos/build/config/ohos/BUILD.gn	2025-10-07 16:21:14.179890536 +0800
+@@ -0,0 +1,75 @@
++import("//build/config/sysroot.gni")
++import("//build/config/clang/clang.gni")
++assert(is_ohos)
++
++ohos_clang_base_path = "${ohos_sdk_native_root}/llvm"
++ohos_clang_version = "19"
++
++if (is_ohos) {
++  if (current_cpu == "arm64") {
++    abi_target = "aarch64-linux-ohos"
++  } else if (current_cpu == "x86_64") {
++    abi_target = "x86_64-linux-ohos"
++  } else {
++    assert(false, "Architecture not supported")
++  }
++}
++
++
++config("compiler") {
++  cflags = [
++    "-ffunction-sections",
++    "-fno-short-enums",
++    "-fno-addrsig",
++  ]
++
++  cflags += [
++    "-Wno-unknown-warning-option",
++    "-Wno-int-conversion",
++    "-Wno-unused-variable",
++    "-Wno-misleading-indentation",
++    "-Wno-missing-field-initializers",
++    "-Wno-unused-parameter",
++    "-Wno-c++11-narrowing",
++    "-Wno-unneeded-internal-declaration",
++    "-Wno-undefined-var-template",
++    "-Wno-implicit-int-float-conversion",
++  ]
++  defines = [
++    # The NDK has these things, but doesn't define the constants to say that it
++    # does. Define them here instead.
++    "HAVE_SYS_UIO_H",
++  ]
++
++  defines += [
++    "OHOS",
++    "__MUSL__",
++    "_LIBCPP_HAS_MUSL_LIBC",
++    "__BUILD_LINUX_WITH_CLANG",
++    "__GNU_SOURCE",
++    "_GNU_SOURCE",
++  ]
++
++  ldflags = [
++    "-Wl,--no-undefined",
++    "-Wl,--exclude-libs=libunwind_llvm.a",
++    "-Wl,--exclude-libs=libc++_static.a",
++
++    # Don't allow visible symbols from libraries that contain
++    # assembly code with symbols that aren't hidden properly.
++    # http://crbug.com/448386
++    "-Wl,--exclude-libs=libvpx_assembly_arm.a",
++  ]
++
++  cflags += [ "--target=$abi_target" ]
++  include_dirs = [
++    "${sysroot}/usr/include/${abi_target}",
++    "${ohos_clang_base_path}/lib/clang/${ohos_clang_version}/include",
++  ]
++
++  ldflags += [ "--target=$abi_target" ]
++
++  # Assign any flags set for the C compiler to asmflags so that they are sent
++  # to the assembler.
++  asmflags = cflags
++}
+diff -Nuar src/build/config/sysroot.gni src_ohos/build/config/sysroot.gni
+--- src/build/config/sysroot.gni	2025-10-07 09:27:24.023735252 +0800
++++ src_ohos/build/config/sysroot.gni	2025-10-07 16:06:54.231018423 +0800
+@@ -34,6 +34,9 @@
+ 
+     # Android uses unified headers, and thus a single compile time sysroot
+     sysroot = "$android_toolchain_root/sysroot"
++  } else if (is_ohos) {
++    import("//build/config/clang/clang.gni")
++    sysroot = "${ohos_sdk_native_root}/sysroot"
+   } else if ((is_linux || is_chromeos) && use_sysroot) {
+     # By default build against a sysroot image downloaded from Cloud Storage
+     # during gclient runhooks.
+diff -Nuar src/build/nocompile.gni src_ohos/build/nocompile.gni
+--- src/build/nocompile.gni	2025-10-07 09:27:24.103501489 +0800
++++ src_ohos/build/nocompile.gni	2025-10-07 16:44:08.193029154 +0800
+@@ -78,7 +78,7 @@
+ 
+       # Disable the checks that the Chrome style plugin normally enforces to
+       # reduce the amount of boilerplate needed in nocompile tests.
+-      configs -= [ "//build/config/clang:find_bad_constructs" ]
++      #configs -= [ "//build/config/clang:find_bad_constructs" ]
+ 
+       if (is_win) {
+         result_path =
+diff -Nuar src/build/toolchain/gcc_toolchain.gni src_ohos/build/toolchain/gcc_toolchain.gni
+--- src/build/toolchain/gcc_toolchain.gni	2025-10-07 09:27:24.166905422 +0800
++++ src_ohos/build/toolchain/gcc_toolchain.gni	2025-10-07 16:18:11.982770116 +0800
+@@ -129,6 +129,32 @@
+       rebuild_string = ""
+     }
+ 
++    if (is_ohos) {
++      if (defined(invoker.libs_section_prefix)) {
++        libs_section_prefix = invoker.libs_section_prefix
++      } else {
++        libs_section_prefix = ""
++      }
++
++      if (defined(invoker.libs_section_postfix)) {
++        libs_section_postfix = invoker.libs_section_postfix
++      } else {
++        libs_section_postfix = ""
++      }
++
++      if (defined(invoker.solink_libs_section_prefix)) {
++        solink_libs_section_prefix = invoker.solink_libs_section_prefix
++      } else {
++        solink_libs_section_prefix = ""
++      }
++
++      if (defined(invoker.solink_libs_section_postfix)) {
++        solink_libs_section_postfix = invoker.solink_libs_section_postfix
++      } else {
++        solink_libs_section_postfix = ""
++      }
++    }
++
+     # GN's syntax can't handle more than one scope dereference at once, like
+     # "invoker.toolchain_args.foo", so make a temporary to hold the toolchain
+     # args so we can do "invoker_toolchain_args.foo".
+@@ -479,6 +505,8 @@
+         # --whole-archive, --no-whole-archive flags are not available on the aix
+         # ld.
+         rspfile_content = "{{inputs}} {{solibs}} {{libs}}"
++      } else if (is_ohos) {
++        rspfile_content = "-Wl,--whole-archive {{inputs}} {{solibs}} -Wl,--no-whole-archive $solink_libs_section_prefix {{libs}} $solink_libs_section_postfix"
+       } else {
+         rspfile_content = "-Wl,--whole-archive {{inputs}} {{solibs}} -Wl,--no-whole-archive {{libs}}"
+       }
+@@ -559,7 +587,11 @@
+         strip_command = "${invoker.strip} -o \"$sofile\" \"$unstripped_sofile\""
+         command += " && " + strip_command
+       }
+-      rspfile_content = "$whole_archive_flag {{inputs}} {{solibs}} $no_whole_archive_flag {{libs}} {{rlibs}}"
++      if (is_ohos) {
++        rspfile_content = "-Wl,--whole-archive {{inputs}} {{solibs}} -Wl,--no-whole-archive $solink_libs_section_prefix {{libs}} $solink_libs_section_postfix"
++      } else {
++        rspfile_content = "$whole_archive_flag {{inputs}} {{solibs}} $no_whole_archive_flag {{libs}} {{rlibs}}"
++      }
+ 
+       description = "SOLINK_MODULE $sofile"
+ 
+@@ -617,7 +649,11 @@
+       # We need to specify link groups, at least, for single pass linkers. I.e.
+       # Rust libraries are alpha-sorted instead of by dependencies so they fail
+       # to link if not properly ordered or grouped.
+-      link_command = "$ld {{ldflags}}${extra_ldflags} -o \"$unstripped_outfile\" $start_group_flag @\"$rspfile\" $end_group_flag {{solibs}} {{libs}} $start_group_flag {{rlibs}} $end_group_flag"
++      if (is_ohos) {
++        link_command = "$ld {{ldflags}}${extra_ldflags} -o \"$unstripped_outfile\" $libs_section_prefix $start_group_flag @\"$rspfile\" {{solibs}} {{libs}} $end_group_flag  $libs_section_postfix"
++      } else {
++        link_command = "$ld {{ldflags}}${extra_ldflags} -o \"$unstripped_outfile\" $start_group_flag @\"$rspfile\" $end_group_flag {{solibs}} {{libs}} $start_group_flag {{rlibs}} $end_group_flag"
++      }
+ 
+       # Generate a map file to be used for binary size analysis.
+       # Map file adds ~10% to the link time on a z620.
+diff -Nuar src/build/toolchain/ohos/BUILD.gn src_ohos/build/toolchain/ohos/BUILD.gn
+--- src/build/toolchain/ohos/BUILD.gn	1970-01-01 08:00:00.000000000 +0800
++++ src_ohos/build/toolchain/ohos/BUILD.gn	2025-10-07 16:19:49.199658084 +0800
+@@ -0,0 +1,103 @@
++import("//build/config/sysroot.gni")
++import("//build/toolchain/gcc_toolchain.gni")
++
++declare_args() {
++  # Whether unstripped binaries, i.e. compiled with debug symbols, should be
++  # considered runtime_deps rather than stripped ones.
++  ohos_unstripped_runtime_outputs = true
++  ohos_extra_cflags = ""
++  ohos_extra_cppflags = ""
++  ohos_extra_cxxflags = ""
++  ohos_extra_asmflags = ""
++  ohos_extra_ldflags = ""
++}
++
++# The ohos clang toolchains share most of the same parameters, so we have this
++# wrapper around gcc_toolchain to avoid duplication of logic.
++#
++# Parameters:
++#  - toolchain_root
++#      Path to cpu-specific toolchain within the ndk.
++#  - sysroot
++#      Sysroot for this architecture.
++#  - lib_dir
++#      Subdirectory inside of sysroot where libs go.
++#  - binary_prefix
++#      Prefix of compiler executables.
++template("ohos_clang_toolchain") {
++  gcc_toolchain(target_name) {
++    assert(defined(invoker.toolchain_args),
++           "toolchain_args must be defined for ohos_clang_toolchain()")
++    toolchain_args = invoker.toolchain_args
++    toolchain_args.current_os = "ohos"
++
++    # Output linker map files for binary size analysis.
++    enable_linker_map = true
++
++    ohos_libc_dir =
++        rebase_path(invoker.sysroot + "/" + invoker.lib_dir, root_build_dir)
++ #   libs_section_prefix = "${ohos_libc_dir}/Scrt1.o"
++ #   libs_section_prefix += " ${ohos_libc_dir}/crti.o"
++ #   libs_section_postfix = "${ohos_libc_dir}/crtn.o"
++
++    if (invoker.target_name == "ohos_clang_arm") {
++      abi_target = "arm-linux-ohos"
++    } else if (invoker.target_name == "ohos_clang_arm64") {
++      abi_target = "aarch64-linux-ohos"
++    } else if (invoker.target_name == "ohos_clang_x86_64") {
++      abi_target = "x86_64-linux-ohos"
++    }
++
++    clang_rt_dir =
++        rebase_path("${clang_lib_path}/${abi_target}/nanlegacy",
++                    root_build_dir)
++    print("ohos_libc_dir :", ohos_libc_dir)
++    print("clang_rt_dir :", clang_rt_dir)
++#    solink_libs_section_prefix = "${ohos_libc_dir}/crti.o"
++#    solink_libs_section_prefix += " ${clang_rt_dir}/clang_rt.crtbegin.o"
++#    solink_libs_section_postfix = "${ohos_libc_dir}/crtn.o"
++#    solink_libs_section_postfix += " ${clang_rt_dir}/clang_rt.crtend.o"
++
++    _prefix = rebase_path("${clang_base_path}/bin", root_build_dir)
++    cc = "${_prefix}/clang"
++    cxx = "${_prefix}/clang++"
++    ar = "${_prefix}/llvm-ar"
++    ld = cxx
++    readelf = "${_prefix}/llvm-readobj"
++    nm = "${_prefix}/llvm-nm"
++    if (!is_debug) {
++      strip = rebase_path("${clang_base_path}/bin/llvm-strip", root_build_dir)
++      use_unstripped_as_runtime_outputs = ohos_unstripped_runtime_outputs
++    }
++    extra_cflags = ohos_extra_cflags
++    extra_cppflags = ohos_extra_cppflags
++    extra_cxxflags = ohos_extra_cxxflags
++    extra_asmflags = ohos_extra_asmflags
++    extra_ldflags = ohos_extra_ldflags
++  }
++}
++
++
++ohos_clang_toolchain("ohos_clang_arm") {
++  sysroot = "${sysroot}"
++  lib_dir = "usr/lib/arm-linux-ohos"
++  toolchain_args = {
++    current_cpu = "arm"
++  }
++}
++
++ohos_clang_toolchain("ohos_clang_arm64") {
++  sysroot = "${sysroot}"
++  lib_dir = "usr/lib/aarch64-linux-ohos"
++  toolchain_args = {
++    current_cpu = "arm64"
++  }
++}
++
++ohos_clang_toolchain("ohos_clang_x86_64") {
++  sysroot = "${sysroot}"
++  lib_dir = "usr/lib/x86_64-linux-ohos"
++  toolchain_args = {
++    current_cpu = "x86_64"
++  }
++}
+diff -Nuar src/build/toolchain/toolchain.gni src_ohos/build/toolchain/toolchain.gni
+--- src/build/toolchain/toolchain.gni	2025-10-07 09:27:24.179177151 +0800
++++ src_ohos/build/toolchain/toolchain.gni	2025-10-07 16:07:41.227157399 +0800
+@@ -51,7 +51,11 @@
+   if (llvm_android_mainline) {  # https://crbug.com/1481060
+     clang_version = "17"
+   } else {
+-    clang_version = "20"
++    if (is_ohos) {
++      clang_version = "19"
++    } else {
++      clang_version = "20"
++    }
+   }
+ }
+ 
+diff -Nuar src/BUILD.gn src_ohos/BUILD.gn
+--- src/BUILD.gn	2025-10-07 09:27:09.979414046 +0800
++++ src_ohos/BUILD.gn	2025-10-07 16:30:39.115969328 +0800
+@@ -215,6 +215,9 @@
+       "WEBRTC_IOS",
+     ]
+   }
++  if (is_ohos) {
++    defines += [ "WEBRTC_OHOS", "WEBRTC_LINUX" ]
++  }
+   if (is_linux || is_chromeos) {
+     defines += [ "WEBRTC_LINUX" ]
+   }
+diff -Nuar src/modules/video_capture/BUILD.gn src_ohos/modules/video_capture/BUILD.gn
+--- src/modules/video_capture/BUILD.gn	2025-10-07 09:27:10.625561505 +0800
++++ src_ohos/modules/video_capture/BUILD.gn	2025-10-07 16:26:33.080892973 +0800
+@@ -72,7 +72,7 @@
+       "video_capture_options.h",
+     ]
+ 
+-    if (is_linux || is_chromeos) {
++    if (is_linux || is_chromeos || is_ohos) {
+       sources += [
+         "linux/device_info_linux.cc",
+         "linux/device_info_v4l2.cc",
+diff -Nuar src/rtc_base/platform_thread_types.cc src_ohos/rtc_base/platform_thread_types.cc
+--- src/rtc_base/platform_thread_types.cc	2025-10-07 09:27:10.918808404 +0800
++++ src_ohos/rtc_base/platform_thread_types.cc	2025-10-07 16:31:37.124728129 +0800
+@@ -40,7 +40,7 @@
+ #elif defined(WEBRTC_POSIX)
+ #if defined(WEBRTC_MAC) || defined(WEBRTC_IOS)
+   return pthread_mach_thread_np(pthread_self());
+-#elif defined(WEBRTC_ANDROID)
++#elif defined(WEBRTC_ANDROID) || defined(WEBRTC_OHOS)
+   return gettid();
+ #elif defined(WEBRTC_FUCHSIA)
+   return zx_thread_self();
+diff -Nuar src/third_party/dav1d/BUILD.gn src_ohos/third_party/dav1d/BUILD.gn
+--- src/third_party/dav1d/BUILD.gn	2025-10-07 09:27:33.685072622 +0800
++++ src_ohos/third_party/dav1d/BUILD.gn	2025-10-07 16:32:35.327611419 +0800
+@@ -57,7 +57,7 @@
+     defines = [ "CONFIG_LOG=1" ]
+   }
+ 
+-  if (!is_android && !is_win) {
++  if (!is_android && !is_win && !is_ohos) {
+     defines += [
+       "HAVE_PTHREAD_GETAFFINITY_NP=1",
+       "HAVE_PTHREAD_SETAFFINITY_NP=1",
+diff -Nuar src/third_party/libevent/BUILD.gn src_ohos/third_party/libevent/BUILD.gn
+--- src/third_party/libevent/BUILD.gn	2025-10-07 09:27:34.010159921 +0800
++++ src_ohos/third_party/libevent/BUILD.gn	2025-10-07 16:25:37.212163612 +0800
+@@ -37,13 +37,13 @@
+       "mac/event-config.h",
+     ]
+     include_dirs += [ "mac" ]
+-  } else if (is_linux || is_chromeos) {
++  } else if (is_linux || is_chromeos || is_ohos) {
+     sources += [
+       "epoll.c",
+       "linux/config.h",
+       "linux/event-config.h",
+     ]
+-    include_dirs += [ "linux" ]
++    include_dirs += [ "linux", "compat" ]
+   } else if (is_android) {
+     sources += [
+       "android/config.h",
+diff -Nuar src/third_party/libxml/BUILD.gn src_ohos/third_party/libxml/BUILD.gn
+--- src/third_party/libxml/BUILD.gn	2025-10-07 09:27:34.043130343 +0800
++++ src_ohos/third_party/libxml/BUILD.gn	2025-10-07 16:29:12.929821561 +0800
+@@ -4,7 +4,7 @@
+ 
+ # Define an "os_include" variable that points at the OS-specific generated
+ # headers.  These were generated by running the configure script offline.
+-if (is_linux || is_chromeos || is_android || is_nacl || is_fuchsia) {
++if (is_linux || is_chromeos || is_android || is_nacl || is_fuchsia || is_ohos) {
+   os_include = "linux"
+ } else if (is_apple) {
+   os_include = "mac"
+diff -Nuar src/third_party/zlib/BUILD.gn src_ohos/third_party/zlib/BUILD.gn
+--- src/third_party/zlib/BUILD.gn	2025-10-07 09:27:35.524249932 +0800
++++ src_ohos/third_party/zlib/BUILD.gn	2025-10-07 16:27:42.021200973 +0800
+@@ -128,7 +128,7 @@
+     defines = [ "CRC32_ARMV8_CRC32" ]
+     if (is_android) {
+       defines += [ "ARMV8_OS_ANDROID" ]
+-    } else if (is_linux || is_chromeos) {
++    } else if (is_linux || is_chromeos || is_ohos) {
+       defines += [ "ARMV8_OS_LINUX" ]
+     } else if (is_mac) {
+       defines += [ "ARMV8_OS_MACOS" ]
+diff -Nuar src/webrtc.gni src_ohos/webrtc.gni
+--- src/webrtc.gni	2025-10-07 09:27:11.180169607 +0800
++++ src_ohos/webrtc.gni	2025-10-07 16:44:51.891012698 +0800
+@@ -386,7 +386,7 @@
+ 
+ # Common configs to remove or add in all rtc targets.
+ rtc_remove_configs = []
+-if (!build_with_chromium && is_clang) {
++if (!build_with_chromium && is_clang && !is_ohos) {
+   rtc_remove_configs += [ "//build/config/clang:find_bad_constructs" ]
+ }
+ rtc_add_configs = rtc_common_configs
