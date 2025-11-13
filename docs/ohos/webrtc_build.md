@@ -58,9 +58,13 @@ WebRTC (Web Real-Time Communications) 是一项实时通讯技术，它允许网
   ```shell
   cd ohos_webrtc                                                    # 进入到webrtc源码目录
   git clone https://gitee.com/zhong-luping/webrtc_third_party.git   # 下载依赖仓
-  mv webrtc_third_party/third_party ./                              # 将三方库目录移到wenrtc根目录
+  mv webrtc_third_party/third_party ./                              # 将三方库目录移到wenrtc根目录  
   rm -rf webrtc_third_party                                         # 删除多余文件夹
   ```
+- 若为x64编译，还需要修改third_party/libjpeg_turbo/BUILD.gn ,为OHOS平台x64架构禁用SIMD优化。
+ ```shell
+  mv -f third_party_libjpeg_turbo/BUILD.gn third_party/libjpeg_turbo/BUILD.gn
+ ```
 
 - 下载子模块
   
@@ -72,11 +76,19 @@ WebRTC (Web Real-Time Communications) 是一项实时通讯技术，它允许网
 - 执行编译命令
   
   编译时除了需配置基本的信息外，还需要配置SDK的路径，其变量名称为：`ohos_sdk_native_root`,其路径需要配置到sdk的native目录。具体编译配置如下：
+- Arm64平台编译
 
   ```shell
   gn gen out/webrtc --args='is_clang=true target_cpu="arm64" target_os="ohos" ohos_sdk_native_root="/owner/workspace/ohos-sdk/linux/native/"'  # ohos_sdk_native_root 需要配置用户自己SDK的路径
   ninja -C out/webrtc -v -j32                 # 执行编译，-v 查看编译的具体过程， -j32使用32个线程进行编译，提升编译速度
   ```
+- x64平台编译  
+    ```shell
+  gn gen out/webrtc_x86_64 --args='is_clang=true target_cpu="x64" target_os="ohos" ohos_sdk_native_root="/owner/workspace/ohos-sdk/linux/native/"'  # ohos_sdk_native_root 需要配置用户自己SDK的路径
+  ninja -C out/webrtc_x86_64 -v -j32                 # 执行编译，-v 查看编译的具体过程， -j32使用32个线程进行编译，提升编译速度
+  ```
+
+
 
   编译成功后会在out/webrtc/obj目录下生成libwebrtc.a, 在out/webrtc目录下生成对应的测试用例，其中ohos_test是视频了OH平台的音频测试用例。
   
@@ -85,11 +97,16 @@ WebRTC (Web Real-Time Communications) 是一项实时通讯技术，它允许网
 ### 自动编译
 
   除上述手动操作编译外，也可以通过本仓库提供的`build.sh`文件进行自动编译，执行自动编译时需要注意的是需要用户提供自己本地SDK路径，具体方式如下:
-
+Arm64平台编译
   ```shell
   cd ohos_webrtc                                        # 进入到webrtc源码目录
   ./build.sh /owner/workspace/ohos-sdk/linux/native/    # 执行build.sh 脚本，后面参数需是用户本地的SDK路径，具体到native目录。
   ```
+x64
+  ```shell
+  cd ohos_webrtc                                        # 进入到webrtc源码目录
+  ./build-x64.sh /owner/workspace/ohos-sdk/linux/native/
+  
 
 ## 测试验证
 
