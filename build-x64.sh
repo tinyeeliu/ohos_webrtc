@@ -77,6 +77,8 @@ fi
  arguments="target_cpu=\"x64\" \
     target_os=\"ohos\" \
     ohos_sdk_native_root=\"$OHOS_SDK_NATIVE_PATH\" \
+    ohos_extra_ldflags=\"-static-libstdc++\" \
+    is_official_build=true \
     is_clang=true"
 
 # 生成x86_64架构的构建目录（out/webrtc_x86_64，避免与arm64目录冲突）
