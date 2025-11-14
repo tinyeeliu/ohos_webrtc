@@ -73,6 +73,8 @@ fi
 arguments="target_cpu=\"arm64\" \
     target_os=\"ohos\" \
     ohos_sdk_native_root=\"$OHOS_SDK_NATIVE_PATH\" \
+    ohos_extra_ldflags=\"-static-libstdc++\" \
+    is_official_build=true \
     is_clang=true"
 
 gn gen out/webrtc --args="$arguments"
