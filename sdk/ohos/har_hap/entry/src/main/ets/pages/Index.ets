@@ -45,6 +45,8 @@ struct Index {
   @State private peerId: string = '';
   @State muteBtnTitle: string = 'Mute';
   private muted: boolean = false;
+  @State micBtnTitle: string = 'MIC ON';
+  private micOFF: boolean = false;
   private mXComponentController1: VideoRenderController = new VideoRenderController();
   private mXComponentController2: VideoRenderController = new VideoRenderController();
   private ws: webSocket.WebSocket = webSocket.createWebSocket();
@@ -170,7 +172,20 @@ struct Index {
             this.muted = !this.muted;
             this.muteBtnTitle = this.muted ? 'Unmute' : 'Mute';
             this.pc?.setAudioPlayout(!this.muted);
-            this.pc?.setAudioRecording(!this.muted);
+          })
+          .margin({ left: 10, right: 20 })
+
+        Button(this.micBtnTitle)
+          .width(150)
+          .height(54)
+          .fontSize(20)
+          .fontWeight(FontWeight.Bold)
+          .margin({ top: 20 })
+          .onClick(() => {
+            console.log(TAG, "Microphone : " + this.micOFF);
+            this.micOFF = !this.micOFF;
+            this.micBtnTitle = this.micOFF ? 'MIC OFF' : 'MIC ON';
+            this.pc?.setAudioRecording(!this.micOFF);
           })
           .margin({ left: 10, right: 20 })
 
@@ -436,7 +451,7 @@ struct Index {
           height: 1280,
           ohosScreenCaptureAudioFilter: 'current-app', // 过滤当前应用播放的音频
         },
-        audio: true,
+        audio: false,   // 系统声音不捕获
         ohosSystemAudio: true
       });
 
@@ -475,8 +490,10 @@ struct Index {
   }
 
   async createPeerConnection() {
-    // await this.prepareLocalMedia();
-    await this.prepareDisplayMedia();
+    // 设置捕获相机画面
+    await this.prepareLocalMedia();
+    // 设置捕获设备桌面
+    // await this.prepareDisplayMedia();
 
     this.pc = this.pcf?.createPeerConnection({
       iceServers: [{ urls: STUN_SERVER }]
