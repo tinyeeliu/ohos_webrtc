@@ -62,6 +62,8 @@ public:
     void Stop() override;
 
     bool IsScreencast() override;
+    void SwitchCamera() override;
+    void SwitchCamera(const std::string& cameraId) override;
 
 protected:
     void SetupConfig(int32_t width, int32_t height, OH_AVScreenCaptureConfig& config);
