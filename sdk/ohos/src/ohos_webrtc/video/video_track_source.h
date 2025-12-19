@@ -42,6 +42,9 @@ public:
     void Start();
     void Stop();
 
+    void SwitchCamera();
+    void SwitchCamera(const std::string& cameraId);
+
     void SetCapturerObserver(VideoCapturer::Observer* observer);
 
 protected:
@@ -87,6 +90,8 @@ protected:
     void OnCapturerStopped() override;
     void
     OnFrameCaptured(rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation) override;
+    void OnCameraSwitchDone(const std::string& newCameraId) override;
+    void OnCameraSwitchError(const std::string& errorMessage) override;
 
 private:
     std::unique_ptr<rtc::Thread> thread_;

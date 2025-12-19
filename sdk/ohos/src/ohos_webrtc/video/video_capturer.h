@@ -35,6 +35,8 @@ public:
         virtual void OnCapturerStopped() = 0;
         virtual void
         OnFrameCaptured(rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation) = 0;
+        virtual void OnCameraSwitchDone(const std::string& newCameraId) = 0;
+        virtual void OnCameraSwitchError(const std::string& errorMessage) = 0;
     };
 
     virtual ~VideoCapturer() = default;
@@ -44,6 +46,8 @@ public:
     virtual void Start() = 0;
     virtual void Stop() = 0;
     virtual bool IsScreencast() = 0;
+    virtual void SwitchCamera() = 0;
+    virtual void SwitchCamera(const std::string& cameraId) = 0;
 };
 
 } // namespace webrtc
