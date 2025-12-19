@@ -31,7 +31,7 @@ std::unique_ptr<CameraCapturer> CameraCapturer::Create(std::string deviceId, vid
 }
 
 CameraCapturer::CameraCapturer(std::string deviceId, video::VideoProfile profile)
-    : deviceId_(deviceId), profile_(profile)
+    : deviceId_(deviceId), profile_(profile), isSwitching_(false), finalRotation_(VideoRotation::kVideoRotation_0)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << ": " << this;
 }
@@ -110,6 +110,117 @@ void CameraCapturer::Stop()
 bool CameraCapturer::IsScreencast()
 {
     return false;
+}
+
+void CameraCapturer::SwitchCamera()
+{
+    RTC_LOG(LS_INFO) << __FUNCTION__;
+
+    if (isSwitching_) {
+        RTC_LOG(LS_WARNING) << "Camera switch already in progress";
+        return;
+    }
+
+    auto devices = CameraManager::GetInstance().GetSupportedCameras();
+    if (devices.Size() < 2) {
+        RTC_LOG(LS_ERROR) << "No camera to switch to";
+        {
+            UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
+            if (observer_) {
+                observer_->OnCameraSwitchError("No camera to switch to");
+            }
+        }
+        return;
+    }
+
+    // Find current camera index
+    int currentIndex = -1;
+    for (std::size_t i = 0; i < devices.Size(); i++) {
+        if (deviceId_ == devices[i]->cameraId) {
+            currentIndex = i;
+            break;
+        }
+    }
+
+    if (currentIndex == -1) {
+        RTC_LOG(LS_ERROR) << "Current camera not found";
+        {
+            UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
+            if (observer_) {
+                observer_->OnCameraSwitchError("Current camera not found");
+            }
+        }
+        return;
+    }
+
+    // Get next camera
+    std::size_t nextIndex = (currentIndex + 1) % devices.Size();
+    std::string nextCameraId = devices[nextIndex]->cameraId;
+
+    SwitchCamera(nextCameraId);
+}
+
+void CameraCapturer::SwitchCamera(const std::string& cameraId)
+{
+    RTC_LOG(LS_INFO) << __FUNCTION__ << ": Switching to camera " << cameraId;
+
+    if (isSwitching_) {
+        RTC_LOG(LS_WARNING) << "Camera switch already in progress";
+        return;
+    }
+
+    if (!isStarted_) {
+        RTC_LOG(LS_ERROR) << "Camera is not started";
+        {
+            UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
+            if (observer_) {
+                observer_->OnCameraSwitchError("Camera is not started");
+            }
+        }
+        return;
+    }
+
+    // Check if camera exists
+    auto devices = CameraManager::GetInstance().GetSupportedCameras();
+    bool cameraExists = false;
+    for (std::size_t i = 0; i < devices.Size(); i++) {
+        if (cameraId == devices[i]->cameraId) {
+            cameraExists = true;
+            break;
+        }
+    }
+
+    if (!cameraExists) {
+        RTC_LOG(LS_ERROR) << "Camera not found: " << cameraId;
+        {
+            UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
+            if (observer_) {
+                observer_->OnCameraSwitchError("Camera not found: " + cameraId);
+            }
+        }
+        return;
+    }
+
+    isSwitching_ = true;
+
+    // Stop current camera
+    StopInternal();
+
+    // Update device ID
+    deviceId_ = cameraId;
+
+    // Restart camera
+    StartInternal();
+
+    isSwitching_ = false;
+
+    // Notify success
+    {
+        UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
+        if (observer_) {
+            observer_->OnCameraSwitchDone(cameraId);
+        }
+    }
 }
 
 Camera_Device* CameraCapturer::SelectCameraDevice()
