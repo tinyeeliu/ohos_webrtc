@@ -172,6 +172,14 @@ export interface VideoCapturerStartedEvent extends Event {
   readonly success: boolean;
 }
 
+export interface CameraSwitchDoneEvent extends Event {
+  readonly newCameraId: string;
+}
+
+export interface CameraSwitchErrorEvent extends Event {
+  readonly errorMessage: string;
+}
+
 // https://www.w3.org/TR/WebCryptoAPI/#algorithm
 export interface Algorithm {
   name: string;
@@ -793,6 +801,11 @@ export interface AudioSource extends MediaSource {
 export interface VideoSource extends MediaSource {
   oncapturerstarted: ((this: VideoSource, ev: VideoCapturerStartedEvent) => any) | null;
   oncapturerstopped: ((this: VideoSource, ev: Event) => any) | null;
+  oncameraswitchdone: ((this: VideoSource, ev: CameraSwitchDoneEvent) => any) | null;
+  oncameraswitcherror: ((this: VideoSource, ev: CameraSwitchErrorEvent) => any) | null;
+  
+  switchCamera(): void;
+  switchCamera(cameraId: string): void;
 }
 
 // https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
