@@ -299,4 +299,48 @@ void OhosVideoTrackSource::OnFrameCaptured(
     broadcaster_.OnFrame(frame);
 }
 
+void OhosVideoTrackSource::SwitchCamera()
+{
+    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
+    
+    thread_->PostTask([this] { capturer_->SwitchCamera(); });
+}
+
+void OhosVideoTrackSource::SwitchCamera(const std::string& cameraId)
+{
+    RTC_LOG(LS_VERBOSE) << __FUNCTION__ << ": cameraId=" << cameraId;
+    
+    thread_->PostTask([this, cameraId] { capturer_->SwitchCamera(cameraId); });
+}
+
+void OhosVideoTrackSource::OnCameraSwitchDone(const std::string& newCameraId)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << ": newCameraId=" << newCameraId;
+    
+    VideoCapturer::Observer* observer = nullptr;
+    {
+        UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
+        observer = capturerObserver_;
+    }
+    
+    if (observer) {
+        observer->OnCameraSwitchDone(newCameraId);
+    }
+}
+
+void OhosVideoTrackSource::OnCameraSwitchError(const std::string& errorMessage)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << ": errorMessage=" << errorMessage;
+    
+    VideoCapturer::Observer* observer = nullptr;
+    {
+        UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
+        observer = capturerObserver_;
+    }
+    
+    if (observer) {
+        observer->OnCameraSwitchError(errorMessage);
+    }
+}
+
 } // namespace webrtc
