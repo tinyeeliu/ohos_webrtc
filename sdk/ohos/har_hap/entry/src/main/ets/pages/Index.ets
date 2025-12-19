@@ -179,6 +179,23 @@ struct Index {
       .padding({ top: 24 })
 
       Row() {
+        Button("switchCamera")
+          .width(150)
+          .height(54)
+          .fontSize(20)
+          .fontWeight(FontWeight.Bold)
+          .margin({ top: 20 })
+          .onClick(() => {
+            if(this.localVideoSource){
+              this.localVideoSource.switchCamera();
+            }
+          })
+          .margin({ left: 10, right: 20 })
+      }
+      .alignSelf(ItemAlign.Start)
+      .padding({ top: 24 })
+
+      Row() {
         XComponent({
           id: "local-video",
           type: XComponentType.SURFACE,
