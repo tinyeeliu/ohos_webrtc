@@ -2062,6 +2062,40 @@ setVolume(volume: number);
 | ----- | ---------------- | ---- |----| -------------------------- |
 | oncapturerstarted | EventHandler \| null | 是   | 是  | 该事件处理器的事件类型为 capturerstarted |
 | oncapturerstopped | EventHandler \| null | 是   | 是  | 该事件处理器的事件类型为 capturerstopped |
+| oncameraswitchdone | EventHandler \| null | 是   | 是  | 该事件处理器的事件类型为 cameraswitchdone |
+| oncameraswitcherror | EventHandler \| null | 是   | 是  | 该事件处理器的事件类型为 cameraswitcherror |
+
+### 方法
+
+#### switchCamera
+
+switchCamera(): void
+
+自动切换到下一个可用摄像头。
+
+##### 参数
+
+无
+
+##### 返回值
+
+无
+
+#### switchCamera
+
+switchCamera(cameraId: string): void
+
+切换到指定ID的摄像头。
+
+##### 参数
+
+| 参数名   | 类型     | 必填 | 说明                     |
+| -------- | -------- | ---- | ------------------------ |
+| cameraId | string   | 是   | 目标摄像头的ID           |
+
+##### 返回值
+
+无
 
 ### 事件
 
@@ -2069,6 +2103,28 @@ setVolume(volume: number);
 |-----------------|---------------------------|--------------------|
 | capturerstarted | VideoCapturerStartedEvent | 该视频源开始采集（成功或失败）时触发 |
 | capturerstopped | Event                     | 视频源停止采集时触发         |
+| cameraswitchdone | CameraSwitchDoneEvent     | 摄像头切换成功后触发       |
+| cameraswitcherror | CameraSwitchErrorEvent   | 摄像头切换失败时触发       |
+
+## CameraSwitchDoneEvent
+
+摄像头切换成功事件。
+
+### 属性
+
+| 名称          | 类型     | 可读 | 可写 | 说明              |
+| ------------- | -------- | ---- | ---- | ----------------- |
+| newCameraId   | string   | 是   | 否   | 切换后的摄像头ID   |
+
+## CameraSwitchErrorEvent
+
+摄像头切换失败事件。
+
+### 属性
+
+| 名称          | 类型     | 可读 | 可写 | 说明              |
+| ------------- | -------- | ---- | ---- | ----------------- |
+| errorMessage  | string   | 是   | 否   | 错误信息          |
 
 ## VideoTrack
 
