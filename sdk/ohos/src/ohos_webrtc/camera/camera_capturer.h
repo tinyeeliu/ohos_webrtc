@@ -49,6 +49,8 @@ public:
     void Start() override;
     void Stop() override;
     bool IsScreencast() override;
+    void SwitchCamera() override;
+    void SwitchCamera(const std::string& cameraId) override;
 
 protected:
     void NotifyCapturedStart(bool success);
@@ -70,11 +72,12 @@ protected:
     OnFrameAvailable(rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation) override;
 
 private:
-    const std::string deviceId_;
+    std::string deviceId_;
     const video::VideoProfile profile_;
 
     bool isInitialized_{false};
     bool isStarted_{false};
+    bool isSwitching_{false};
 
     bool useVideoSceneMode_{false};
     bool isCameraFrontFacing_{false};

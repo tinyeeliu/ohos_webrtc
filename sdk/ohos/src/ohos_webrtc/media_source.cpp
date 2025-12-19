@@ -150,9 +150,14 @@ void NapiVideoSource::Init(Napi::Env env, Napi::Object exports)
                 kAttributeNameOnCapturerStarted, napi_default, (void*)kEventNameCapturerStarted),
             InstanceAccessor<&NapiVideoSource::GetEventHandler, &NapiVideoSource::SetEventHandler>(
                 kAttributeNameOnCapturerStopped, napi_default, (void*)kEventNameCapturerStopped),
+            InstanceAccessor<&NapiVideoSource::GetEventHandler, &NapiVideoSource::SetEventHandler>(
+                kAttributeNameOnCameraSwitchDone, napi_default, (void*)kEventNameCameraSwitchDone),
+            InstanceAccessor<&NapiVideoSource::GetEventHandler, &NapiVideoSource::SetEventHandler>(
+                kAttributeNameOnCameraSwitchError, napi_default, (void*)kEventNameCameraSwitchError),
             InstanceMethod<&NapiVideoSource::Release>(kMethodNameRelease),
             InstanceMethod<&NapiVideoSource::StartCapture>(kMethodNameStartCapture),
             InstanceMethod<&NapiVideoSource::StopCapture>(kMethodNameStopCapture),
+            InstanceMethod<&NapiVideoSource::SwitchCamera>(kMethodNameSwitchCamera),
             InstanceMethod<&NapiVideoSource::ToJson>(kMethodNameToJson),
         });
     exports.Set(kClassName, func);
@@ -308,6 +313,27 @@ Value NapiVideoSource::ToJson(const CallbackInfo& info)
     return json;
 }
 
+Value NapiVideoSource::SwitchCamera(const Napi::CallbackInfo& info)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    if (!source_) {
+        NAPI_THROW(Error::New(info.Env(), "Illegal state"), info.Env().Undefined());
+    }
+
+    if (info.Length() > 0) {
+        if (!info[0].IsString()) {
+            NAPI_THROW(TypeError::New(info.Env(), "Invalid argument"), info.Env().Undefined());
+        }
+        std::string cameraId = info[0].As<String>().Utf8Value();
+        source_->SwitchCamera(cameraId);
+    } else {
+        source_->SwitchCamera();
+    }
+
+    return info.Env().Undefined();
+}
+
 void NapiVideoSource::OnCapturerStarted(bool success)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
@@ -343,6 +369,50 @@ void NapiVideoSource::OnCapturerStopped()
     napi_status status = tsfn.BlockingCall([context](Napi::Env env, Napi::Function jsCallback) {
         auto jsEvent = Object::New(env);
         jsEvent.Set("type", String::New(env, "Event"));
+        jsCallback.Call(context ? context->Value() : env.Undefined(), {jsEvent});
+    });
+
+    if (status != napi_ok) {
+        RTC_LOG(LS_ERROR) << "tsfn call error: " << status;
+    }
+}
+
+void NapiVideoSource::OnCameraSwitchDone(const std::string& newCameraId)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << ": newCameraId=" << newCameraId;
+
+    ThreadSafeFunction tsfn;
+    if (!GetEventHandler(kEventNameCameraSwitchDone, tsfn)) {
+        return;
+    }
+
+    Reference<Napi::Value>* context = tsfn.GetContext();
+    napi_status status = tsfn.BlockingCall([context, newCameraId](Napi::Env env, Napi::Function jsCallback) {
+        auto jsEvent = Object::New(env);
+        jsEvent.Set("type", String::New(env, "CameraSwitchDoneEvent"));
+        jsEvent.Set("newCameraId", String::New(env, newCameraId));
+        jsCallback.Call(context ? context->Value() : env.Undefined(), {jsEvent});
+    });
+
+    if (status != napi_ok) {
+        RTC_LOG(LS_ERROR) << "tsfn call error: " << status;
+    }
+}
+
+void NapiVideoSource::OnCameraSwitchError(const std::string& errorMessage)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << ": errorMessage=" << errorMessage;
+
+    ThreadSafeFunction tsfn;
+    if (!GetEventHandler(kEventNameCameraSwitchError, tsfn)) {
+        return;
+    }
+
+    Reference<Napi::Value>* context = tsfn.GetContext();
+    napi_status status = tsfn.BlockingCall([context, errorMessage](Napi::Env env, Napi::Function jsCallback) {
+        auto jsEvent = Object::New(env);
+        jsEvent.Set("type", String::New(env, "CameraSwitchErrorEvent"));
+        jsEvent.Set("errorMessage", String::New(env, errorMessage));
         jsCallback.Call(context ? context->Value() : env.Undefined(), {jsEvent});
     });
 
