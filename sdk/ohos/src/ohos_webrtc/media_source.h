@@ -108,6 +108,7 @@ protected:
     void SetEventHandler(const Napi::CallbackInfo& info, const Napi::Value& value);
     Napi::Value StartCapture(const Napi::CallbackInfo& info);
     Napi::Value StopCapture(const Napi::CallbackInfo& info);
+    Napi::Value SwitchCamera(const Napi::CallbackInfo& info);
     Napi::Value ToJson(const Napi::CallbackInfo& info);
 
 protected:

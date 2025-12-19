@@ -196,6 +196,24 @@ bool ScreenCapturer::IsScreencast()
     return true;
 }
 
+void ScreenCapturer::SwitchCamera()
+{
+    // Screen capture doesn't support camera switching
+    RTC_DLOG(LS_INFO) << __FUNCTION__ << ": Screen capture doesn't support camera switching";
+}
+
+void ScreenCapturer::SwitchCamera(const std::string& cameraId)
+{
+    // Screen capture doesn't support camera switching
+    RTC_DLOG(LS_INFO) << __FUNCTION__ << ": Screen capture doesn't support camera switching, cameraId=" << cameraId;
+    
+    // Notify observer about camera switch error
+    std::lock_guard<std::mutex> lock(obsMutex_);
+    if (observer_) {
+        observer_->OnCameraSwitchError("Screen capture doesn't support camera switching");
+    }
+}
+
 void ScreenCapturer::SetupConfig(int32_t width, int32_t height, OH_AVScreenCaptureConfig& config)
 {
     OH_CaptureMode captureMode = static_cast<OH_CaptureMode>(options_.captureMode.value_or(OH_CAPTURE_HOME_SCREEN));
