@@ -26,6 +26,7 @@
 #include <memory>
 #include <cstdint>
 #include <mutex>
+#include <atomic>
 
 #include <ohcamera/camera_manager.h>
 
@@ -38,7 +39,7 @@ class CameraCapturer : public VideoCapturer,
                        public VideoFrameReceiver::Callback,
                        public ohos::CameraPreviewOutput::Observer,
                        public ohos::CameraVideoOutput::Observer,
-                       public ohos::DisplayManager::ChangeObserver {
+                       public ohos::DisplayManager::ChangeObserver {  // 新增：屏幕旋转回调继承
 public:
     static std::unique_ptr<CameraCapturer> Create(std::string deviceId, video::VideoProfile profile);
 
@@ -51,6 +52,8 @@ public:
     void Start() override;
     void Stop() override;
     bool IsScreencast() override;
+    void SwitchCamera() override;  // 保留：摄像头切换函数
+    void SwitchCamera(const std::string& cameraId) override;  // 保留：摄像头切换重载函数
 
 protected:
     void NotifyCapturedStart(bool success);
@@ -68,21 +71,22 @@ protected:
     void OnVideoOutputFrameEnd(int32_t frameCount) override;
     void OnVideoOutputError(Camera_ErrorCode errorCode) override;
 
-    void
-    OnFrameAvailable(rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation) override;
-    void OnDisplayChange(uint64_t displayId) override;
+    void OnFrameAvailable(rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation) override;
+    void OnDisplayChange(uint64_t displayId) override;  // 新增：屏幕旋转回调函数
 
 private:
+    // 新增：远程版本的私有辅助函数声明（与cpp文件匹配）
     Camera_Device* SelectCameraDevice();
     void GetCameraOrientationAndSceneMode(Camera_Device* device);
     Camera_Profile* FindPreviewProfile(ohos::CameraOutputCapability& capability, Camera_Device* device);
     bool StartCaptureSession(Camera_Profile* previewProfile);
 
-    const std::string deviceId_;
+    std::string deviceId_;  // 修改：去掉const（摄像头切换需要修改deviceId_）
     const video::VideoProfile profile_;
 
     bool isInitialized_{false};
     bool isStarted_{false};
+    bool isSwitching_{false};  // 保留：摄像头切换状态标记
 
     bool useVideoSceneMode_{false};
     bool isCameraFrontFacing_{false};
@@ -97,7 +101,7 @@ private:
 
     VideoCapturer::Observer* observer_{};
     std::mutex obsMutex_;
-    std::atomic<VideoRotation> finalRotation_;
+    std::atomic<VideoRotation> finalRotation_;  // 新增：屏幕旋转最终角度（原子变量）
 };
 
 } // namespace webrtc
