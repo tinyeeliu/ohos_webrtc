@@ -297,15 +297,43 @@ void OhosVideoTrackSource::OnFrameCaptured(
                      .set_rotation(rotation)
                      .set_timestamp_us(alignedTimestampUs)
                      .build();
-    if (ApplyRotation() && frame.rotation() != kVideoRotation_0 && buffer->type() == VideoFrameBuffer::Type::kI420) {
-        /* Apply pending rotation. */
-        VideoFrame rotatedFrame(frame);
-        rotatedFrame.set_video_frame_buffer(I420Buffer::Rotate(*buffer->GetI420(), frame.rotation()));
-        rotatedFrame.set_rotation(kVideoRotation_0);
-        broadcaster_.OnFrame(rotatedFrame);
-    } else {
-        broadcaster_.OnFrame(frame);
-    }
+    // if (ApplyRotation() && frame.rotation() != kVideoRotation_0 && buffer->type() == VideoFrameBuffer::Type::kI420) {
+    //     /* Apply pending rotation. */
+    //     VideoFrame rotatedFrame(frame);
+    //     rotatedFrame.set_video_frame_buffer(I420Buffer::Rotate(*buffer->GetI420(), frame.rotation()));
+    //     rotatedFrame.set_rotation(kVideoRotation_0);
+    //     broadcaster_.OnFrame(rotatedFrame);
+    // } else {
+    //     broadcaster_.OnFrame(frame);
+    // }
+    if (ApplyRotation() && frame.rotation() != kVideoRotation_0) {
+      if (buffer->type() == VideoFrameBuffer::Type::kI420) {
+          /* Apply pending rotation for I420 buffer. */
+          VideoFrame rotatedFrame(frame);
+          rotatedFrame.set_video_frame_buffer(I420Buffer::Rotate(*buffer->GetI420(), frame.rotation()));
+          rotatedFrame.set_rotation(kVideoRotation_0);
+          broadcaster_.OnFrame(rotatedFrame);
+      } else if (buffer->type() == VideoFrameBuffer::Type::kNative) {
+          /* Apply pending rotation for Native buffer (e.g., TextureBuffer). */
+          // Convert to I420 first, then rotate
+          auto i420Buffer = buffer->ToI420();
+          if (i420Buffer) {
+              VideoFrame rotatedFrame(frame);
+              rotatedFrame.set_video_frame_buffer(I420Buffer::Rotate(*i420Buffer, frame.rotation()));
+              rotatedFrame.set_rotation(kVideoRotation_0);
+              broadcaster_.OnFrame(rotatedFrame);
+          } else {
+              // Conversion failed, pass through without rotation
+              RTC_LOG(LS_WARNING) << "Failed to convert Native buffer to I420 for rotation, passing through";
+              broadcaster_.OnFrame(frame);
+          }
+      } else {
+          // Unsupported buffer type, pass through without rotation
+          broadcaster_.OnFrame(frame);
+      }
+  } else {
+      broadcaster_.OnFrame(frame);
+  }
 }
 
 } // namespace webrtc
