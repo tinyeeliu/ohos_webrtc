@@ -307,13 +307,17 @@ void OhosVideoTrackSource::OnFrameCaptured(
     //     broadcaster_.OnFrame(frame);
     // }
     if (ApplyRotation() && frame.rotation() != kVideoRotation_0) {
+      RTC_LOG(LS_INFO) << "Applying rotation: " << frame.rotation() 
+                     << ", width: " << frame.width() << ", height: " << frame.height();
       if (buffer->type() == VideoFrameBuffer::Type::kI420) {
+          RTC_LOG(LS_VERBOSE) << "Processing I420 buffer rotation";
           /* Apply pending rotation for I420 buffer. */
           VideoFrame rotatedFrame(frame);
           rotatedFrame.set_video_frame_buffer(I420Buffer::Rotate(*buffer->GetI420(), frame.rotation()));
           rotatedFrame.set_rotation(kVideoRotation_0);
           broadcaster_.OnFrame(rotatedFrame);
       } else if (buffer->type() == VideoFrameBuffer::Type::kNative) {
+          RTC_LOG(LS_INFO) << "Processing Native (texture) buffer rotation via I420 conversion";
           /* Apply pending rotation for Native buffer (e.g., TextureBuffer). */
           // Convert to I420 first, then rotate
           auto i420Buffer = buffer->ToI420();
@@ -328,6 +332,7 @@ void OhosVideoTrackSource::OnFrameCaptured(
               broadcaster_.OnFrame(frame);
           }
       } else {
+          RTC_LOG(LS_WARNING) << "Unsupported buffer type for rotation: " << static_cast<int>(buffer->type());
           // Unsupported buffer type, pass through without rotation
           broadcaster_.OnFrame(frame);
       }
