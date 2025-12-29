@@ -61,8 +61,9 @@ const char kEventNameOpen[] = "open";
 const char kEventNameMessage[] = "message";
 const char kEventNameError[] = "error";
 
-DataChannelObserverTemp::DataChannelObserverTemp(rtc::scoped_refptr<DataChannelInterface> dataChannel)
-    : dataChannel_(std::move(dataChannel))
+DataChannelObserverTemp::DataChannelObserverTemp(
+    std::shared_ptr<PeerConnectionFactoryWrapper> factory, rtc::scoped_refptr<DataChannelInterface> dataChannel)
+    : factory_(factory), dataChannel_(std::move(dataChannel))
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
@@ -72,8 +73,6 @@ DataChannelObserverTemp::DataChannelObserverTemp(rtc::scoped_refptr<DataChannelI
 DataChannelObserverTemp::~DataChannelObserverTemp()
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
-
-    dataChannel_->UnregisterObserver();
 }
 
 void DataChannelObserverTemp::OnStateChange()
@@ -166,6 +165,7 @@ NapiDataChannel::NapiDataChannel(const CallbackInfo& info)
     }
 
     auto observer = std::unique_ptr<DataChannelObserverTemp>(info[0].As<External<DataChannelObserverTemp>>().Data());
+    factory_ = observer->GetFactory();
     dataChannel_ = observer->Get();
     dataChannel_->RegisterObserver(this);
 
@@ -175,14 +175,12 @@ NapiDataChannel::NapiDataChannel(const CallbackInfo& info)
     while (auto event = observer->Dequeue()) {
         Dispatch(std::move(event));
     }
-
-    // Hold the observer to avoid:
-    // 1. Early 'UnregisterObserver'
-    // 2. The gap of 'UnregisterObserver' and 'RegisterObserver'
-    observerTemp_ = std::move(observer);
 }
 
-NapiDataChannel::~NapiDataChannel() {}
+NapiDataChannel::~NapiDataChannel()
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+}
 
 rtc::scoped_refptr<DataChannelInterface> NapiDataChannel::Get() const
 {
@@ -193,21 +191,21 @@ rtc::scoped_refptr<DataChannelInterface> NapiDataChannel::Get() const
 Napi::Value NapiDataChannel::GetLabel(const CallbackInfo& info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-    return String::New(info.Env(), dataChannel_->label());
+    return String::New(info.Env(), dataChannel_ ? dataChannel_->label() : "");
 }
 
 // readonly ordered : boolean;
 Napi::Value NapiDataChannel::GetOrdered(const Napi::CallbackInfo& info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-    return Boolean::New(info.Env(), dataChannel_->ordered());
+    return Boolean::New(info.Env(), dataChannel_ ? dataChannel_->ordered() : false);
 }
 
 // readonly maxPacketLifeTime ?: number;
 Napi::Value NapiDataChannel::GetMaxPacketLifeTime(const Napi::CallbackInfo& info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-    if (dataChannel_->maxPacketLifeTime()) {
+    if (dataChannel_ && dataChannel_->maxPacketLifeTime()) {
         return Number::New(info.Env(), dataChannel_->maxPacketLifeTime().value());
     }
     return info.Env().Undefined();
@@ -217,7 +215,7 @@ Napi::Value NapiDataChannel::GetMaxPacketLifeTime(const Napi::CallbackInfo& info
 Napi::Value NapiDataChannel::GetMaxRetransmits(const Napi::CallbackInfo& info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-    if (dataChannel_->maxRetransmitsOpt()) {
+    if (dataChannel_ && dataChannel_->maxRetransmitsOpt()) {
         return Number::New(info.Env(), dataChannel_->maxRetransmitsOpt().value());
     }
     return info.Env().Undefined();
@@ -227,21 +225,21 @@ Napi::Value NapiDataChannel::GetMaxRetransmits(const Napi::CallbackInfo& info)
 Napi::Value NapiDataChannel::GetProtocol(const Napi::CallbackInfo& info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-    return String::New(info.Env(), dataChannel_->protocol());
+    return String::New(info.Env(), dataChannel_ ? dataChannel_->protocol(): "");
 }
 
 // readonly negotiated : boolean;
 Napi::Value NapiDataChannel::GetNegotiated(const Napi::CallbackInfo& info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-    return Boolean::New(info.Env(), dataChannel_->negotiated());
+    return Boolean::New(info.Env(), dataChannel_ ? dataChannel_->negotiated(): false);
 }
 
 // readonly id ?: number;
 Napi::Value NapiDataChannel::GetId(const Napi::CallbackInfo& info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-    if (dataChannel_->id() != -1) {
+    if (dataChannel_ && dataChannel_->id() != -1) {
         return Number::New(info.Env(), dataChannel_->id());
     }
     return info.Env().Undefined();
@@ -252,7 +250,8 @@ Napi::Value NapiDataChannel::GetReadyState(const Napi::CallbackInfo& info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    switch (dataChannel_->state()) {
+    auto state = dataChannel_ ? dataChannel_->state() : DataChannelInterface::kClosed;
+    switch (state) {
         case DataChannelInterface::kConnecting:
             return String::New(info.Env(), kEnumDataChannelStateConnecting);
         case DataChannelInterface::kOpen:
@@ -272,7 +271,7 @@ Napi::Value NapiDataChannel::GetReadyState(const Napi::CallbackInfo& info)
 Napi::Value NapiDataChannel::GetBufferedAmount(const Napi::CallbackInfo& info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-    return Number::New(info.Env(), dataChannel_->buffered_amount());
+    return Number::New(info.Env(), dataChannel_ ? dataChannel_->buffered_amount() : 0);
 }
 
 // bufferedAmountLowThreshold : number;
@@ -355,7 +354,9 @@ void NapiDataChannel::SetEventHandler(const Napi::CallbackInfo& info, const Napi
 Napi::Value NapiDataChannel::Close(const Napi::CallbackInfo& info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-    dataChannel_->Close();
+    if (dataChannel_) {
+        dataChannel_->Close();
+    }
     return info.Env().Undefined();
 }
 
@@ -367,7 +368,7 @@ Napi::Value NapiDataChannel::Send(const Napi::CallbackInfo& info)
         NAPI_THROW(Error::New(info.Env(), "Wrong number of arguments"), info.Env().Undefined());
     }
 
-    if (dataChannel_->state() != DataChannelInterface::kOpen) {
+    if (!dataChannel_ || dataChannel_->state() != DataChannelInterface::kOpen) {
         NAPI_THROW(Error::New(info.Env(), "Datachannel state is not open"), info.Env().Undefined());
     }
 
@@ -419,6 +420,11 @@ void NapiDataChannel::OnStateChange()
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
     auto state = dataChannel_->state();
+    if (state == DataChannelInterface::kClosed) {
+        RTC_DLOG(LS_VERBOSE) << "UnregisterObserver";
+        dataChannel_->UnregisterObserver();
+    }
+
     Dispatch(CallbackEvent<NapiDataChannel>::Create(
         [state](NapiDataChannel& channel) { channel.HandleStateChange(state); }));
 }
@@ -483,6 +489,7 @@ void NapiDataChannel::HandleStateChange(DataChannelInterface::DataState state)
     MakeCallback(eventType.data(), {object});
 
     if (state == webrtc::DataChannelInterface::kClosed) {
+        dataChannel_ = nullptr;
         Stop();
     }
 }

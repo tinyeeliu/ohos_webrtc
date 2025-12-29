@@ -29,15 +29,22 @@
 namespace webrtc {
 
 class NapiDataChannel;
+class PeerConnectionFactoryWrapper;
 
 class DataChannelObserverTemp : public EventQueue<NapiDataChannel>, public DataChannelObserver {
 public:
-    explicit DataChannelObserverTemp(rtc::scoped_refptr<DataChannelInterface> dataChannel);
+    explicit DataChannelObserverTemp(
+        std::shared_ptr<PeerConnectionFactoryWrapper> factory, rtc::scoped_refptr<DataChannelInterface> dataChannel);
     ~DataChannelObserverTemp() override;
 
     rtc::scoped_refptr<DataChannelInterface> Get() const
     {
         return dataChannel_;
+    }
+
+    std::shared_ptr<PeerConnectionFactoryWrapper> GetFactory() const
+    {
+        return factory_;
     }
 
 protected:
@@ -46,6 +53,7 @@ protected:
     void OnBufferedAmountChange(uint64_t sentDataSize) override;
 
 private:
+    std::shared_ptr<PeerConnectionFactoryWrapper> factory_;
     rtc::scoped_refptr<DataChannelInterface> dataChannel_{};
 };
 
@@ -95,7 +103,7 @@ protected:
 private:
     static Napi::FunctionReference constructor_;
 
-    std::unique_ptr<DataChannelObserverTemp> observerTemp_;
+    std::shared_ptr<PeerConnectionFactoryWrapper> factory_;
     rtc::scoped_refptr<DataChannelInterface> dataChannel_;
 
     std::string binaryType_;
