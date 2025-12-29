@@ -972,7 +972,7 @@ Napi::Value NapiPeerConnection::CreateDataChannel(const Napi::CallbackInfo& info
                 Error::New(info.Env(), error.message() ? error.message() : "unknown error"), info.Env().Undefined());
         }
 
-        auto observer = std::make_unique<DataChannelObserverTemp>(result.value());
+        auto observer = std::make_unique<DataChannelObserverTemp>(factory_, result.value());
         return NapiDataChannel::NewInstance(info.Env(), std::move(observer));
     }
 
@@ -990,7 +990,7 @@ Napi::Value NapiPeerConnection::CreateDataChannel(const Napi::CallbackInfo& info
         NAPI_THROW(Error::New(info.Env(), error.message() ? error.message() : "unknown error"), info.Env().Undefined());
     }
 
-    auto observer = std::make_unique<DataChannelObserverTemp>(result.value());
+    auto observer = std::make_unique<DataChannelObserverTemp>(factory_, result.value());
     return NapiDataChannel::NewInstance(info.Env(), std::move(observer));
 }
 
@@ -1524,7 +1524,7 @@ void NapiPeerConnection::OnDataChannel(rtc::scoped_refptr<DataChannelInterface> 
         return;
     }
 
-    auto observer = std::make_unique<DataChannelObserverTemp>(channel);
+    auto observer = std::make_unique<DataChannelObserverTemp>(factory_, channel);
     Dispatch(CallbackEvent<NapiPeerConnection>::Create([this, obs = observer.release()](NapiPeerConnection& target) {
         RTC_DCHECK_EQ(this, &target);
 
