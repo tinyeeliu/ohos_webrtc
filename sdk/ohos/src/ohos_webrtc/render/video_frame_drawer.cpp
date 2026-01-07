@@ -17,6 +17,7 @@
 #include "video_frame_drawer.h"
 
 #include "rtc_base/logging.h"
+#include "helper/display_change_listener.h"
 
 #include <GLES3/gl3.h>
 
@@ -38,7 +39,7 @@ void VideoFrameDrawer::DrawFrame(
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
     renderMatrix_.Reset();
-    renderMatrix_.PreRotate(frame.rotation(), 0.5f, 0.5f);
+    renderMatrix_.PreRotate(DISPLAY.GetRealRotation(frame.rotation()), 0.5f, 0.5f);
     renderMatrix_.PreConcat(additionalRenderMatrix);
     RTC_DLOG(LS_VERBOSE) << "Render matrix: " << renderMatrix_;
 
