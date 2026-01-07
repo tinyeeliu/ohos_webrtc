@@ -22,11 +22,13 @@
 #include "api/scoped_refptr.h"
 #include "api/video/video_frame.h"
 #include "rtc_base/thread.h"
+#include "helper/display_manager.h"
 
 namespace webrtc {
 
-class VideoFrameDrawer {
+class VideoFrameDrawer : public ohos::DisplayManager::ChangeObserver {
 public:
+    VideoFrameDrawer();
     void DrawFrame(const VideoFrame& frame, GlDrawer& drawer, const Matrix& additionalRenderMatrix);
     void DrawFrame(
         const VideoFrame& frame, GlDrawer& drawer, const Matrix& additionalRenderMatrix, int viewportX, int viewportY,
@@ -36,9 +38,12 @@ public:
         rtc::scoped_refptr<TextureBuffer> buffer, GlDrawer& drawer, const Matrix& renderMatrix, int frameWidth,
         int frameHeight, int viewportX, int viewportY, int viewportWidth, int viewportHeight);
 
+    virtual void OnDisplayChange(uint64_t displayId) override;
+
 private:
     std::vector<uint32_t> yuvTextures_;
     Matrix renderMatrix_;
+    VideoRotation displayRotation_;
 };
 
 } // namespace webrtc

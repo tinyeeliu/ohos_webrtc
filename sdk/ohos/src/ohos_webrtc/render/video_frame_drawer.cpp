@@ -41,7 +41,7 @@ void VideoFrameDrawer::DrawFrame(
     if (!frame.is_texture()) {
         renderMatrix_.PreScale(1.0f, -1.0f, 0.5f, 0.5f); // I420-frames are upside down
     }
-    renderMatrix_.PreRotate(frame.rotation(), 0.5f, 0.5f);
+    renderMatrix_.PreRotate(displayRotation_, 0.5f, 0.5f);
     renderMatrix_.PreConcat(additionalRenderMatrix);
     RTC_DLOG(LS_VERBOSE) << "Render matrix: " << renderMatrix_;
 
@@ -130,6 +130,39 @@ void VideoFrameDrawer::DrawTexture(
     }
 
     textureData->Unlock();
+}
+
+VideoFrameDrawer::VideoFrameDrawer()
+{
+    ohos::DisplayManager::GetInstance().RegisterChangeCallback(this);
+}
+
+void VideoFrameDrawer::OnDisplayChange(uint64_t displayId)
+{
+    NativeDisplayManager_Rotation displayRotation = ohos::DisplayManager::GetInstance().GetDefaultDisplayRotation();
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " displayRotation: " << displayRotation;
+
+    switch (displayRotation) {
+        case DISPLAY_MANAGER_PORTRAIT: {
+            displayRotation_ = VideoRotation::kVideoRotation_0;
+            break;
+        }
+        case DISPLAY_MANAGER_LANDSCAPE: {
+            displayRotation_ = VideoRotation::kVideoRotation_90;
+            break;
+        }
+        case DISPLAY_MANAGER_PORTRAIT_INVERTED: {
+            displayRotation_ = VideoRotation::kVideoRotation_180;
+            break;
+        }
+        case DISPLAY_MANAGER_LANDSCAPE_INVERTED: {
+            displayRotation_ = VideoRotation::kVideoRotation_270;
+            break;
+        }
+        
+        default:
+            break;
+    }
 }
 
 } // namespace webrtc
