@@ -313,22 +313,24 @@ void CameraCapturer::OnFrameAvailable(
         cameraOrientation = 0;
     }
 
-    // Undo the mirror that the OS "helps" us with.
-    // Also, undo camera orientation, we report it as rotation instead.
-    if (buffer->type() == VideoFrameBuffer::Type::kNative) {
-        auto textureBuffer = static_cast<TextureBuffer*>(buffer.get());
+    // Undo the mirror that the OS "helps" us with. 
+    // Also, undo camera orientation, we report it as rotation instead. 
+    if (buffer->type() == VideoFrameBuffer::Type::kNative) { 
+        auto textureBuffer = static_cast<TextureBuffer*>(buffer.get()); 
 
-        Matrix transformMatrix;
-        // Perform mirror and rotation around (0.5, 0.5) since that is the center of the texture.
-        if (isCameraFrontFacing_) {
-            transformMatrix.PreScale(-1.0f, 1.0f, 0.5f, 0.5f);
-        }
-        transformMatrix.PreRotate(-cameraOrientation, 0.5f, 0.5f);
 
-        Matrix newMatrix = textureBuffer->GetTransformMatrix();
-        newMatrix.PreConcat(transformMatrix);
-        buffer = TextureBuffer::Create(
-            textureBuffer->GetTexture(), textureBuffer->width(), textureBuffer->height(), newMatrix);
+        Matrix transformMatrix; 
+        // Perform mirror and rotation around (0.5, 0.5) since that is the center of the texture. 
+        if (isCameraFrontFacing_) { 
+            transformMatrix.PreScale(-1.0f, 1.0f, 0.5f, 0.5f); 
+        } 
+        transformMatrix.PreRotate(-cameraOrientation, 0.5f, 0.5f); 
+
+
+        Matrix newMatrix = textureBuffer->GetTransformMatrix(); 
+        newMatrix.PreConcat(transformMatrix); 
+        buffer = TextureBuffer::Create( 
+            textureBuffer->GetTexture(), textureBuffer->width(), textureBuffer->height(), newMatrix); 
     }
 
     UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
