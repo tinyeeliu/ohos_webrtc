@@ -323,7 +323,6 @@ void CameraCapturer::OnFrameAvailable(
         if (isCameraFrontFacing_) {
             transformMatrix.PreScale(-1.0f, 1.0f, 0.5f, 0.5f);
         }
-        transformMatrix.PreRotate(-cameraOrientation, 0.5f, 0.5f);
 
         Matrix newMatrix = textureBuffer->GetTransformMatrix();
         newMatrix.PreConcat(transformMatrix);
@@ -333,7 +332,7 @@ void CameraCapturer::OnFrameAvailable(
 
     UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
     if (observer_) {
-        observer_->OnFrameCaptured(buffer, timestampUs, static_cast<VideoRotation>(cameraOrientation));
+        observer_->OnFrameCaptured(buffer, timestampUs, VideoRotation::kVideoRotation_0);
     }
 }
 

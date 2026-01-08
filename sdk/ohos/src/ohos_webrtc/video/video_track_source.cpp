@@ -16,6 +16,7 @@
 #include "video_track_source.h"
 #include "utils/marcos.h"
 #include "video_frame_receiver_gl.h"
+#include <map>
 
 #include "api/video/i420_buffer.h"
 #include "rtc_base/logging.h"
@@ -25,6 +26,44 @@ namespace webrtc {
 namespace {
 
 const int kRequiredResolutionAlignment = 2;
+const std::map<VideoRotation, std::map<NativeDisplayManager_Rotation, VideoRotation>> kRotationTransition = {
+    {
+        VideoRotation::kVideoRotation_0,
+        {
+            {DISPLAY_MANAGER_ROTATION_0, VideoRotation::kVideoRotation_0},
+            {DISPLAY_MANAGER_ROTATION_90, VideoRotation::kVideoRotation_270},
+            {DISPLAY_MANAGER_ROTATION_180, VideoRotation::kVideoRotation_180},
+            {DISPLAY_MANAGER_ROTATION_270, VideoRotation::kVideoRotation_90}
+        }
+    },
+    {
+        VideoRotation::kVideoRotation_90,
+        {
+            {DISPLAY_MANAGER_ROTATION_0, VideoRotation::kVideoRotation_90},
+            {DISPLAY_MANAGER_ROTATION_90, VideoRotation::kVideoRotation_0},
+            {DISPLAY_MANAGER_ROTATION_180, VideoRotation::kVideoRotation_270},
+            {DISPLAY_MANAGER_ROTATION_270, VideoRotation::kVideoRotation_180}
+        }
+    },
+    {
+        VideoRotation::kVideoRotation_180,
+        {
+            {DISPLAY_MANAGER_ROTATION_0, VideoRotation::kVideoRotation_180},
+            {DISPLAY_MANAGER_ROTATION_90, VideoRotation::kVideoRotation_90},
+            {DISPLAY_MANAGER_ROTATION_180, VideoRotation::kVideoRotation_0},
+            {DISPLAY_MANAGER_ROTATION_270, VideoRotation::kVideoRotation_270}
+        }
+    },
+    {
+        VideoRotation::kVideoRotation_270,
+        {
+            {DISPLAY_MANAGER_ROTATION_0, VideoRotation::kVideoRotation_270},
+            {DISPLAY_MANAGER_ROTATION_90, VideoRotation::kVideoRotation_180},
+            {DISPLAY_MANAGER_ROTATION_180, VideoRotation::kVideoRotation_90},
+            {DISPLAY_MANAGER_ROTATION_270, VideoRotation::kVideoRotation_0}
+        }
+    },
+};
 
 } // namespace
 
@@ -52,6 +91,9 @@ OhosVideoTrackSource::OhosVideoTrackSource(
     RTC_LOG(LS_INFO) << "OhosVideoTrackSource ctor: " << this;
 
     SetState(kInitializing);
+    if (!is_screencast()) {
+        ohos::DisplayManager::GetInstance().RegisterChangeCallback(this);
+    }
 
     thread_->SetName("v-track-source", capturer_.get());
     thread_->Start();
@@ -62,7 +104,9 @@ OhosVideoTrackSource::OhosVideoTrackSource(
 OhosVideoTrackSource::~OhosVideoTrackSource()
 {
     RTC_LOG(LS_INFO) << __FUNCTION__;
-
+    if (!is_screencast()) {
+        ohos::DisplayManager::GetInstance().UnregisterChangeCallback(this);
+    }
     thread_->PostTask([this] {
         capturer_->Stop();
         capturer_->Release();
@@ -291,21 +335,35 @@ void OhosVideoTrackSource::OnFrameCaptured(
         // No adaptations needed, just return the frame as is.
     }
 
+    if (!is_screencast() && (cameraRotation_ != rotation)) {
+        cameraRotation_ = rotation;
+        OnDisplayChange(0);
+    }
+
     auto frame = VideoFrame::Builder()
                      .set_id(1)
                      .set_video_frame_buffer(buffer)
-                     .set_rotation(rotation)
+                     .set_rotation(is_screencast() ? rotation : finalRotation_.load())
                      .set_timestamp_us(alignedTimestampUs)
                      .build();
-    if (ApplyRotation() && frame.rotation() != kVideoRotation_0 && buffer->type() == VideoFrameBuffer::Type::kI420) {
-        /* Apply pending rotation. */
-        VideoFrame rotatedFrame(frame);
-        rotatedFrame.set_video_frame_buffer(I420Buffer::Rotate(*buffer->GetI420(), frame.rotation()));
-        rotatedFrame.set_rotation(kVideoRotation_0);
-        broadcaster_.OnFrame(rotatedFrame);
-    } else {
-        broadcaster_.OnFrame(frame);
+    broadcaster_.OnFrame(frame);
+}
+
+void OhosVideoTrackSource::OnDisplayChange(uint64_t displayId)
+{
+    NativeDisplayManager_Rotation displayRotation = ohos::DisplayManager::GetInstance().GetDefaultDisplayRotation();
+    RTC_DLOG(LS_VERBOSE) << "cameraRotation: " << cameraRotation_ << ", displayRotation: " << displayRotation;
+
+    auto cameraRotation = kRotationTransition.find(cameraRotation_);
+    if (cameraRotation == kRotationTransition.end()) {
+        return;
     }
+
+    auto finalRotation = cameraRotation->second.find(displayRotation);
+    if (finalRotation == cameraRotation->second.end()) {
+        return;
+    }
+    finalRotation_ = finalRotation->second;
 }
 
 } // namespace webrtc
