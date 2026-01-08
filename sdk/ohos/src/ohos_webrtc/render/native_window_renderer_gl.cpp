@@ -212,7 +212,7 @@ void NativeWindowRendererGl::RenderFrame(const VideoFrame& frame)
     glClear(GL_COLOR_BUFFER_BIT);
 
     drawMatrix_.Reset();
-    drawMatrix_.PreScale(mirrorHorizontally_ ? -1.0f : 1.0f, mirrorVertically_ ? -1.0f : 1.0f, 0.5f, 0.5f);
+    drawMatrix_.PreScale(mirrorHorizontally_ ? 1.0f : -1.0f, mirrorVertically_ ? -1.0f : 1.0f, 0.5f, 0.5f);
     RTC_DLOG(LS_VERBOSE) << "Draw matrix: " << drawMatrix_;
 
     videoFrameDrawer_->DrawFrame(
