@@ -26,12 +26,14 @@
 #include "rtc_base/synchronization/mutex.h"
 #include "rtc_base/thread.h"
 #include "rtc_base/timestamp_aligner.h"
+#include "helper/display_manager.h"
 
 #include <optional>
 
 namespace webrtc {
 
-class OhosVideoTrackSource : public Notifier<VideoTrackSourceInterface>, VideoCapturer::Observer {
+class OhosVideoTrackSource : public Notifier<VideoTrackSourceInterface>, VideoCapturer::Observer,
+    public ohos::DisplayManager::ChangeObserver {
 public:
     static rtc::scoped_refptr<OhosVideoTrackSource> Create(
         std::unique_ptr<VideoCapturer> capturer, rtc::Thread* signalingThread,
@@ -88,6 +90,8 @@ protected:
     void
     OnFrameCaptured(rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation) override;
 
+    void OnDisplayChange(uint64_t displayId) override;
+
 private:
     std::unique_ptr<rtc::Thread> thread_;
     rtc::Thread* signalingThread_;
@@ -101,6 +105,9 @@ private:
     std::mutex obsMutex_;
     VideoCapturer::Observer* capturerObserver_{};
     rtc::TimestampAligner timestampAligner_;
+    bool cameraRotationInit_ {false};
+    std::atomic<VideoRotation> cameraRotation_;
+    std::atomic<VideoRotation> finalRotation_;
 };
 
 } // namespace webrtc
