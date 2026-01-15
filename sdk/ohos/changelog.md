@@ -1,5 +1,8 @@
 # 更新日志
 
+## 1.0.1-rc1 （2026-01-15）
+- Implement the function that the camera image follows the rotation of the application.
+
 ## 1.0.0 （2025-01-08）
 - Fix datachannel destructor BUG
 
