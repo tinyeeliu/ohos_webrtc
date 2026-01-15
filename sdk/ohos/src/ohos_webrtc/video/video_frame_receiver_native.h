@@ -50,7 +50,7 @@ private:
     static std::map<OH_ImageReceiverNative*, VideoFrameReceiverNative*> receiverMap_;
 
     std::unique_ptr<rtc::Thread> thread_;
-    int32_t width_{};
+    int32_t width_{}; 
     int32_t height_{};
     OH_ImageReceiverNative* imageReceiver_{nullptr};
 };

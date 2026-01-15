@@ -96,6 +96,14 @@ int32_t HardwareVideoDecoder::RegisterDecodeCompleteCallback(DecodedImageCallbac
     return WEBRTC_VIDEO_CODEC_OK;
 }
 
+bool HardwareVideoDecoder::ReinitDecode(int32_t width, int32_t height)
+{
+    Release();
+    RenderResolution resolution {width, height};
+    decoderSettings_.set_max_render_resolution(resolution);
+    return InitDecode();
+}
+
 // `missing_frames`, `fragmentation` and `render_time_ms` are ignored.
 int32_t HardwareVideoDecoder::Decode(const EncodedImage& input_image, bool /*missing_frames*/, int64_t render_time_ms)
 {
@@ -126,14 +134,20 @@ int32_t HardwareVideoDecoder::Decode(const EncodedImage& input_image, bool /*mis
     int32_t ret = OH_AVBuffer_GetBufferAttr(codecBuffer.buf, &attr);
     if (ret != AV_ERR_OK) {
         RTC_LOG(LS_ERROR) << "Failed to get buffer attr: " << ret;
-        QueueInputBuffer(codecBuffer);
         return WEBRTC_VIDEO_CODEC_ERROR;
+    }
+
+    if ((OH_AVBuffer_GetCapacity(codecBuffer.buf) - attr.offset) < input_image.size()) {
+        if (!ReinitDecode(input_image._encodedWidth, input_image._encodedHeight)) {
+            RTC_DLOG(LS_VERBOSE) << "ReinitDecode failed";
+            return WEBRTC_VIDEO_CODEC_ERROR;
+        }
+        return WEBRTC_VIDEO_CODEC_OK;
     }
 
     uint8_t* addr = OH_AVBuffer_GetAddr(codecBuffer.buf);
     if (!addr) {
         RTC_LOG(LS_ERROR) << "Failed to get buffer addr";
-        QueueInputBuffer(codecBuffer);
         return WEBRTC_VIDEO_CODEC_ERROR;
     }
 
@@ -150,7 +164,6 @@ int32_t HardwareVideoDecoder::Decode(const EncodedImage& input_image, bool /*mis
     ret = OH_AVBuffer_SetBufferAttr(codecBuffer.buf, &attr);
     if (ret != AV_ERR_OK) {
         RTC_LOG(LS_ERROR) << "Failed to get buffer attr: " << ret;
-        QueueInputBuffer(codecBuffer);
         return WEBRTC_VIDEO_CODEC_ERROR;
     }
 
@@ -279,6 +292,13 @@ void HardwareVideoDecoder::OnStreamChanged(OH_AVCodec* codec, OH_AVFormat* forma
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
     (void)codec;
     (void)format;
+
+    int32_t width = 0;
+    int32_t height = 0;
+    OH_AVFormat_GetIntValue(format, OH_MD_KEY_VIDEO_PIC_WIDTH, &width);
+    OH_AVFormat_GetIntValue(format, OH_MD_KEY_VIDEO_PIC_HEIGHT, &height);
+    videoFrameReceiver_->SetVideoFrameSize(width, height);
+    RTC_DLOG(LS_VERBOSE) << "OnStreamChanged: " << width << "x" << height;
 }
 
 void HardwareVideoDecoder::OnNeedInputBuffer(OH_AVCodec* codec, uint32_t index, OH_AVBuffer* buffer)
@@ -315,7 +335,7 @@ bool HardwareVideoDecoder::InitDecode()
     int32_t ret = OH_VideoDecoder_RegisterCallback(decoder_.Raw(), callback, this);
     if (ret != AV_ERR_OK) {
         RTC_LOG(LS_ERROR) << "Failed to register callback: " << ret;
-        return ret;
+        return false;
     }
 
     RenderResolution resolution = decoderSettings_.max_render_resolution();
@@ -435,6 +455,7 @@ void HardwareVideoDecoder::DeliverByteFrame(const ohos::CodecBuffer& buffer)
     OH_NativeBuffer_GetConfig(nativeBuffer, &config);
     RTC_DLOG(LS_VERBOSE) << "buffer config: format=" << config.format << ", width=" << config.width
                          << ", height=" << config.height << ", stride=" << config.stride;
+    OH_NativeBuffer_Unreference(nativeBuffer);
 
     const int64_t timestampUs = attr.pts;
 
@@ -469,28 +490,50 @@ void HardwareVideoDecoder::DeliverByteFrame(const ohos::CodecBuffer& buffer)
         return;
     }
 
-    RenderResolution resolution = decoderSettings_.max_render_resolution();
-    int width = resolution.Width();
-    int height = resolution.Height();
+    OH_AVFormat* format = OH_AVBuffer_GetParameter(buffer.buf);
+    int width = 0;
+    int height = 0;
+    int stride = 0;
+    int sliceHeight = 0;
+    OH_AVFormat_GetIntValue(format, OH_MD_KEY_VIDEO_PIC_WIDTH, &width);
+    OH_AVFormat_GetIntValue(format, OH_MD_KEY_VIDEO_PIC_HEIGHT, &height);
+    OH_AVFormat_GetIntValue(format, OH_MD_KEY_VIDEO_STRIDE, &stride);
+    OH_AVFormat_GetIntValue(format, OH_MD_KEY_VIDEO_SLICE_HEIGHT, &sliceHeight);
+    OH_AVFormat_Destroy(format);
+
+    if (stride == 0) {
+        stride = width;
+    }
+
+    if (sliceHeight == 0) {
+        sliceHeight = height;
+    }
 
     auto i420Buffer = I420Buffer::Create(width, height);
     switch (colorFormat_) {
         case AV_PIXEL_FORMAT_YUVI420: {
-            // copy data
-            memcpy(i420Buffer->MutableDataY(), addr, width * height);                              // y planar
-            memcpy(i420Buffer->MutableDataU(), addr + width * height, width * height / 4);         // u planar
-            memcpy(i420Buffer->MutableDataV(), addr + width * height * 5 / 4, width * height / 4); // v planar
+            size_t ySize = stride * sliceHeight;
+            size_t uvSize = ((stride + 1) / 2) * ((sliceHeight + 1) / 2);
+            libyuv::CopyPlane(addr, stride, 
+                            i420Buffer->MutableDataY(), i420Buffer->StrideY(),
+                            width, height);
+            libyuv::CopyPlane(addr + ySize, (stride + 1) / 2,
+                            i420Buffer->MutableDataU(), i420Buffer->StrideU(),
+                            (width + 1) / 2, (height + 1) / 2);
+            libyuv::CopyPlane(addr + ySize + uvSize, (stride + 1) / 2,
+                            i420Buffer->MutableDataV(), i420Buffer->StrideV(),
+                            (width + 1) / 2, (height + 1) / 2);
         } break;
         case AV_PIXEL_FORMAT_NV12: {
             int32_t ret = libyuv::NV12ToI420(
-                (uint8_t*)addr, width, (uint8_t*)addr + width * height, width, i420Buffer->MutableDataY(),
+                (uint8_t*)addr, stride, (uint8_t*)addr + stride * sliceHeight, stride, i420Buffer->MutableDataY(),
                 i420Buffer->StrideY(), i420Buffer->MutableDataU(), i420Buffer->StrideU(), i420Buffer->MutableDataV(),
                 i420Buffer->StrideV(), width, height);
             RTC_DLOG(LS_VERBOSE) << "NV12ToI420 ret = " << ret;
         } break;
         case AV_PIXEL_FORMAT_NV21: {
             int32_t ret = libyuv::NV21ToI420(
-                (uint8_t*)addr, width, (uint8_t*)addr + width * height, width, i420Buffer->MutableDataY(),
+                (uint8_t*)addr, stride, (uint8_t*)addr + stride * sliceHeight, stride, i420Buffer->MutableDataY(),
                 i420Buffer->StrideY(), i420Buffer->MutableDataU(), i420Buffer->StrideU(), i420Buffer->MutableDataV(),
                 i420Buffer->StrideV(), width, height);
             RTC_DLOG(LS_VERBOSE) << "NV21ToI420 ret = " << ret;
