@@ -96,6 +96,40 @@ int32_t HardwareVideoDecoder::RegisterDecodeCompleteCallback(DecodedImageCallbac
     return WEBRTC_VIDEO_CODEC_OK;
 }
 
+bool HardwareVideoDecoder::ReinitDecode(int32_t width, int32_t height)
+{
+    Release();
+    RenderResolution resolution {width, height};
+    decoderSettings_.set_max_render_resolution(resolution);
+    return InitDecode();
+}
+
+bool HardwareVideoDecoder::SetFrameInfo(const EncodedImage& input_image, OH_AVCodecBufferAttr& attr,
+    ohos::CodecBuffer& codecBuffer)
+{
+    attr.pts = input_image.RtpTimestamp() / kNumRtpTicksPerMillisec * rtc::kNumMicrosecsPerMillisec;
+    attr.size = input_image.size();
+    if (input_image.FrameType() == VideoFrameType::kVideoFrameKey) {
+        RTC_DLOG(LS_VERBOSE) << "Key frame occurred";
+        attr.flags |= AVCODEC_BUFFER_FLAGS_SYNC_FRAME;
+    }
+
+    int32_t ret = OH_AVBuffer_SetBufferAttr(codecBuffer.buf, &attr);
+    if (ret != AV_ERR_OK) {
+        RTC_LOG(LS_ERROR) << "Failed to get buffer attr: " << ret;
+        return false;
+    }
+
+    FrameExtraInfo info;
+    info.timestampUs = input_image.RtpTimestamp() / kNumRtpTicksPerMillisec * rtc::kNumMicrosecsPerMillisec;
+    info.timestampRtp = input_image.RtpTimestamp();
+    info.timestampNtp = input_image.NtpTimeMs();
+
+    UNUSED std::lock_guard<std::mutex> lock(extraInfosMutex_);
+    extraInfos_.push_back(info);
+    return true;
+}
+
 // `missing_frames`, `fragmentation` and `render_time_ms` are ignored.
 int32_t HardwareVideoDecoder::Decode(const EncodedImage& input_image, bool /*missing_frames*/, int64_t render_time_ms)
 {
@@ -130,6 +164,15 @@ int32_t HardwareVideoDecoder::Decode(const EncodedImage& input_image, bool /*mis
         return WEBRTC_VIDEO_CODEC_ERROR;
     }
 
+    if ((OH_AVBuffer_GetCapacity(codecBuffer.buf) - attr.offset) < input_image.size() &&
+        input_image._encodedWidth != 0 && input_image._encodedHeight != 0) {
+        if (!ReinitDecode(input_image._encodedWidth, input_image._encodedHeight)) {
+            RTC_DLOG(LS_VERBOSE) << "ReinitDecode failed";
+            return WEBRTC_VIDEO_CODEC_ERROR;
+        }
+        return WEBRTC_VIDEO_CODEC_OK;
+    }
+
     uint8_t* addr = OH_AVBuffer_GetAddr(codecBuffer.buf);
     if (!addr) {
         RTC_LOG(LS_ERROR) << "Failed to get buffer addr";
@@ -137,31 +180,9 @@ int32_t HardwareVideoDecoder::Decode(const EncodedImage& input_image, bool /*mis
         return WEBRTC_VIDEO_CODEC_ERROR;
     }
 
-    // copy data
     memcpy(addr + attr.offset, input_image.data(), input_image.size());
-
-    attr.pts = input_image.RtpTimestamp() / kNumRtpTicksPerMillisec * rtc::kNumMicrosecsPerMillisec;
-    attr.size = input_image.size();
-    if (input_image.FrameType() == VideoFrameType::kVideoFrameKey) {
-        RTC_DLOG(LS_VERBOSE) << "Key frame occurred";
-        attr.flags |= AVCODEC_BUFFER_FLAGS_SYNC_FRAME;
-    }
-
-    ret = OH_AVBuffer_SetBufferAttr(codecBuffer.buf, &attr);
-    if (ret != AV_ERR_OK) {
-        RTC_LOG(LS_ERROR) << "Failed to get buffer attr: " << ret;
-        QueueInputBuffer(codecBuffer);
+    if (!SetFrameInfo(input_image, attr, codecBuffer)) {
         return WEBRTC_VIDEO_CODEC_ERROR;
-    }
-
-    {
-        FrameExtraInfo info;
-        info.timestampUs = input_image.RtpTimestamp() / kNumRtpTicksPerMillisec * rtc::kNumMicrosecsPerMillisec;
-        info.timestampRtp = input_image.RtpTimestamp();
-        info.timestampNtp = input_image.NtpTimeMs();
-
-        UNUSED std::lock_guard<std::mutex> lock(extraInfosMutex_);
-        extraInfos_.push_back(info);
     }
 
     RTC_DLOG(LS_VERBOSE) << "push input buffer, pts=" << attr.pts;
@@ -279,6 +300,15 @@ void HardwareVideoDecoder::OnStreamChanged(OH_AVCodec* codec, OH_AVFormat* forma
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
     (void)codec;
     (void)format;
+
+    int32_t width = 0;
+    int32_t height = 0;
+    OH_AVFormat_GetIntValue(format, OH_MD_KEY_VIDEO_PIC_WIDTH, &width);
+    OH_AVFormat_GetIntValue(format, OH_MD_KEY_VIDEO_PIC_HEIGHT, &height);
+    if (videoFrameReceiver_ != nullptr) {
+        videoFrameReceiver_->SetVideoFrameSize(width, height);
+    }
+    RTC_DLOG(LS_VERBOSE) << "OnStreamChanged: " << width << "x" << height;
 }
 
 void HardwareVideoDecoder::OnNeedInputBuffer(OH_AVCodec* codec, uint32_t index, OH_AVBuffer* buffer)
@@ -315,7 +345,7 @@ bool HardwareVideoDecoder::InitDecode()
     int32_t ret = OH_VideoDecoder_RegisterCallback(decoder_.Raw(), callback, this);
     if (ret != AV_ERR_OK) {
         RTC_LOG(LS_ERROR) << "Failed to register callback: " << ret;
-        return ret;
+        return false;
     }
 
     RenderResolution resolution = decoderSettings_.max_render_resolution();
