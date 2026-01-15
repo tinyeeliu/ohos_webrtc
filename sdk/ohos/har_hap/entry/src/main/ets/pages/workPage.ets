@@ -36,6 +36,20 @@ interface MessageData {
   ice?: webrtc.RTCIceCandidateInit;
 }
 
+interface ResolutionPreset {
+  width: number;
+  height: number;
+  label: string;
+}
+
+interface RtpStats extends webrtc.RTCStats {
+  kind?: string;
+  frameWidth?: number;
+  frameHeight?: number;
+  frame_width?: number;
+  frame_height?: number;
+}
+
 @Entry
 @Component
 struct Index {
@@ -47,6 +61,15 @@ struct Index {
   private muted: boolean = false;
   @State micBtnTitle: string = 'MIC ON';
   private micOFF: boolean = false;
+  @State localResolution: string = '未获取';
+  @State remoteResolution: string = '未获取';
+  @State canChangeResolution: boolean = false;
+  private currentResolutionIndex: number = 1;
+  private resolutionPresets: ResolutionPreset[] = [
+    {width: 640, height: 480, label: '640x480'},
+    {width: 1280, height: 720, label: '1280x720'}
+  ];
+  private statsTimer?: number = undefined;
   private mXComponentController1: VideoRenderController = new VideoRenderController();
   private mXComponentController2: VideoRenderController = new VideoRenderController();
   private ws: webSocket.WebSocket = webSocket.createWebSocket();
@@ -82,156 +105,209 @@ struct Index {
 
   //
   build() {
-    Column() {
-      Row() {
-        Text("状态")
-          .fontSize(32)
-          .fontWeight(FontWeight.Normal)
-          .margin({ right: 24 })
-        Text(this.statusText)
-          .fontSize(32)
-          .fontWeight(FontWeight.Bold)
-      }
-      .alignSelf(ItemAlign.Start)
-
-      Row() {
-        Text("本机ID")
-          .fontSize(32)
-          .fontWeight(FontWeight.Normal)
-          .margin({ right: 24 })
-          .align(Alignment.Start)
-        Text(this.myId)
-          .fontSize(32)
-          .fontWeight(FontWeight.Bold)
-      }
-      .alignSelf(ItemAlign.Start)
-      .padding({ top: 10 })
-
-      Row() {
-        TextInput({ placeholder: '请输入对端ID' })
-          .width(200)
-          .height(54)
-          .fontSize(28)
-          .fontWeight(FontWeight.Normal)
-          .type(InputType.Number)
-          .layoutWeight('20%')
-          .onChange((value: string) => {
-            this.peerId = value;
-          })
-
-        Button(this.buttonTitle)
-          .width(150)
-          .height(54)
-          .fontSize(20)
-          .fontWeight(FontWeight.Bold)
-          .margin({ top: 20 })
-          .onClick(() => {
-            if (this.buttonTitle == 'Disconnect') {
-              this.ws.close();
-              this.buttonTitle = 'Connect';
-              return;
-            }
-
-            if (this.peerId.length < 2 || this.peerId.length > 4) {
-              promptAction.showToast({ message: "请输入2到4位数ID" });
-              return;
-            }
-
-            this.sendMessage('SESSION ' + this.peerId);
-            this.buttonTitle = 'Disconnect';
-          })
-          .margin({ left: 10, right: 20 })
+    Scroll() {
+      Column() {
+        Row() {
+          Text("状态")
+            .fontSize(32)
+            .fontWeight(FontWeight.Normal)
+            .margin({ right: 24 })
+          Text(this.statusText)
+            .fontSize(32)
+            .fontWeight(FontWeight.Bold)
+        }
+        .alignSelf(ItemAlign.Start)
 
         Row() {
-          Checkbox({ name: 'remote_offerer', group: 'checkboxGroup' })
-            .select(false)
-            .selectedColor(0x39a2db)
-            .onChange((value: boolean) => {
-              console.info('remote_offerer change is' + value)
-
-            }).margin({ right: 8 })
-
-          Text("Remote offerer")
-            .fontSize(20)
+          Text("本机ID")
+            .fontSize(32)
             .fontWeight(FontWeight.Normal)
-        }.layoutWeight('20%').visibility(Visibility.Hidden)
+            .margin({ right: 24 })
+            .align(Alignment.Start)
+          Text(this.myId)
+            .fontSize(32)
+            .fontWeight(FontWeight.Bold)
+        }
+        .alignSelf(ItemAlign.Start)
+        .padding({ top: 10 })
+
+        Row() {
+          TextInput({ placeholder: '请输入对端ID' })
+            .width(200)
+            .height(54)
+            .fontSize(28)
+            .fontWeight(FontWeight.Normal)
+            .type(InputType.Number)
+            .layoutWeight('20%')
+            .onChange((value: string) => {
+              this.peerId = value;
+            })
+
+          Button(this.buttonTitle)
+            .width(150)
+            .height(54)
+            .fontSize(20)
+            .fontWeight(FontWeight.Bold)
+            .margin({ top: 20 })
+            .onClick(() => {
+              if (this.buttonTitle == 'Disconnect') {
+                this.ws.close();
+                this.buttonTitle = 'Connect';
+                this.canChangeResolution = false;
+                return;
+              }
+
+              if (this.peerId.length < 2 || this.peerId.length > 4) {
+                promptAction.showToast({ message: "请输入2到4位数ID" });
+                return;
+              }
+
+              this.sendMessage('SESSION ' + this.peerId);
+              this.buttonTitle = 'Disconnect';
+            })
+            .margin({ left: 10, right: 20 })
+
+          Row() {
+            Checkbox({ name: 'remote_offerer', group: 'checkboxGroup' })
+              .select(false)
+              .selectedColor(0x39a2db)
+              .onChange((value: boolean) => {
+                console.info('remote_offerer change is' + value)
+
+              }).margin({ right: 8 })
+
+            Text("Remote offerer")
+              .fontSize(20)
+              .fontWeight(FontWeight.Normal)
+          }.layoutWeight('20%').visibility(Visibility.Hidden)
+
+        }
+        .alignSelf(ItemAlign.Start)
+        .padding({ top: 24 })
+
+        Column() {
+          Row() {
+            Button(this.muteBtnTitle)
+              .layoutWeight(1)
+              .height(54)
+              .fontSize(15)
+              .fontWeight(FontWeight.Bold)
+              .onClick(() => {
+                console.log(TAG, "audio muted: " + this.muted);
+                this.muted = !this.muted;
+                this.muteBtnTitle = this.muted ? 'Unmute' : 'Mute';
+                this.pc?.setAudioPlayout(!this.muted);
+              })
+              .margin({ right: 6 })
+
+            Button(this.micBtnTitle)
+              .layoutWeight(1)
+              .height(54)
+              .fontSize(15)
+              .fontWeight(FontWeight.Bold)
+              .onClick(() => {
+                console.log(TAG, "Microphone : " + this.micOFF);
+                this.micOFF = !this.micOFF;
+                this.micBtnTitle = this.micOFF ? 'MIC OFF' : 'MIC ON';
+                this.pc?.setAudioRecording(!this.micOFF);
+              })
+              .margin({ left: 6, right: 6 })
+          }
+          .width('100%')
+          .justifyContent(FlexAlign.SpaceBetween)
+          .alignSelf(ItemAlign.Start)
+          .padding({ top: 24 })
+
+          Row() {
+            Button('切换分辨率')
+              .layoutWeight(1)
+              .height(54)
+              .fontSize(15)
+              .fontWeight(FontWeight.Bold)
+              .onClick(() => {
+                this.changeResolution();
+              })
+              .margin({ left: 6 })
+              .enabled(this.canChangeResolution)
+
+          }
+          .width('100%')
+          .justifyContent(FlexAlign.SpaceBetween)
+          .alignSelf(ItemAlign.Start)
+          .padding({ top: 24 })
+        }
+
+
+        Row() {
+          Text("本地分辨率: ")
+            .fontSize(24)
+            .fontWeight(FontWeight.Normal)
+            .margin({ right: 12 })
+          Text(this.localResolution)
+            .fontSize(24)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(0x007DFF)
+        }
+        .alignSelf(ItemAlign.Start)
+        .padding({ top: 12 })
+
+        Row() {
+          Text("远端分辨率: ")
+            .fontSize(24)
+            .fontWeight(FontWeight.Normal)
+            .margin({ right: 12 })
+          Text(this.remoteResolution)
+            .fontSize(24)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(0x007DFF)
+        }
+        .alignSelf(ItemAlign.Start)
+        .padding({ top: 12 })
+
+        Row() {
+          XComponent({
+            id: "local-video",
+            type: XComponentType.SURFACE,
+            controller: this.mXComponentController1
+          })
+            .width('480px')
+            .height('480px')
+            .onLoad((context?) => {
+              console.log(TAG, "context: " + context);
+              console.log(TAG, "surfaceId: " + this.mXComponentController1.getXComponentSurfaceId());
+            })
+            .onDestroy(() => {
+              console.log(TAG, "onDestroy");
+            })
+
+          XComponent({
+            id: "remote-video",
+            type: XComponentType.SURFACE,
+            controller: this.mXComponentController2
+          })
+            .width('480px')
+            .height('480px')
+            .onLoad((context?) => {
+              console.log(TAG, "context: " + JSON.stringify(context));
+              console.log(TAG, "surfaceId: " + this.mXComponentController2.getXComponentSurfaceId());
+            })
+            .onDestroy(() => {
+              console.log(TAG, "onDestroy");
+            })
+        }
+        .alignSelf(ItemAlign.Start)
+        .padding({ top: 10 })
 
       }
-      .alignSelf(ItemAlign.Start)
-      .padding({ top: 24 })
-
-      Row() {
-        Button(this.muteBtnTitle)
-          .width(150)
-          .height(54)
-          .fontSize(20)
-          .fontWeight(FontWeight.Bold)
-          .margin({ top: 20 })
-          .onClick(() => {
-            console.log(TAG, "audio muted: " + this.muted);
-            this.muted = !this.muted;
-            this.muteBtnTitle = this.muted ? 'Unmute' : 'Mute';
-            this.pc?.setAudioPlayout(!this.muted);
-          })
-          .margin({ left: 10, right: 20 })
-
-        Button(this.micBtnTitle)
-          .width(150)
-          .height(54)
-          .fontSize(20)
-          .fontWeight(FontWeight.Bold)
-          .margin({ top: 20 })
-          .onClick(() => {
-            console.log(TAG, "Microphone : " + this.micOFF);
-            this.micOFF = !this.micOFF;
-            this.micBtnTitle = this.micOFF ? 'MIC OFF' : 'MIC ON';
-            this.pc?.setAudioRecording(!this.micOFF);
-          })
-          .margin({ left: 10, right: 20 })
-
-      }
-      .alignSelf(ItemAlign.Start)
-      .padding({ top: 24 })
-
-      Row() {
-        XComponent({
-          id: "local-video",
-          type: XComponentType.SURFACE,
-          controller: this.mXComponentController1
-        })
-          .width('480px')
-          .height('480px')
-          .onLoad((context?) => {
-            console.log(TAG, "context: " + context);
-            console.log(TAG, "surfaceId: " + this.mXComponentController1.getXComponentSurfaceId());
-          })
-          .onDestroy(() => {
-            console.log(TAG, "onDestroy");
-          })
-
-        XComponent({
-          id: "remote-video",
-          type: XComponentType.SURFACE,
-          controller: this.mXComponentController2
-        })
-          .width('480px')
-          .height('480px')
-          .onLoad((context?) => {
-            console.log(TAG, "context: " + JSON.stringify(context));
-            console.log(TAG, "surfaceId: " + this.mXComponentController2.getXComponentSurfaceId());
-          })
-          .onDestroy(() => {
-            console.log(TAG, "onDestroy");
-          })
-      }
-      .alignSelf(ItemAlign.Start)
-      .padding({ top: 10 })
-
+      .width('100%')
+      .padding({ left: 16, right: 16, top: 16, bottom: 16 })
+      .justifyContent(FlexAlign.Start)
     }
     .width('100%')
     .height('100%')
-    .margin({ left: 24, right: 24, top: 24, bottom: 24 })
-    .justifyContent(FlexAlign.Start)
+    .scrollBar(BarState.Auto)
+    .scrollable(ScrollDirection.Vertical)
+    .edgeEffect(EdgeEffect.Spring)
   }
 
   aboutToAppear(): void {
@@ -338,6 +414,7 @@ struct Index {
   }
 
   aboutToDisappear(): void {
+    this.stopStatsPolling();
     this.pcf?.stopAecDump();
     Logging.deleteInjectedLoggable();
 
@@ -436,6 +513,7 @@ struct Index {
 
       if (this.localVideoTrack) {
         this.mXComponentController1.setVideoTrack(this.localVideoTrack);
+        this.canChangeResolution = true;
       }
 
       this.mXComponentController1.setMirror(true);
@@ -507,8 +585,11 @@ struct Index {
     this.pc.ontrack = (event: webrtc.RTCTrackEvent) => {
       console.info(TAG, 'ontrack: ' + JSON.stringify(event));
       if (event.track.kind == 'video') {
+        console.info(TAG, 'Received remote video track, setting to renderer');
         this.remoteVideoTrack = event.track;
+        // 确保每次收到远端视频轨道时都设置到渲染器
         this.mXComponentController2.setVideoTrack(event.track);
+        this.mXComponentController2.setScalingMode(ScalingMode.AspectFit);
       } else if (event.track.kind == 'audio') {
         this.remoteAudioTrack = event.track;
       }
@@ -518,19 +599,36 @@ struct Index {
     }
     this.pc.onconnectionstatechange = (event) => {
       console.info(TAG, 'onconnectionstatechange: ' + this.pc?.connectionState);
-      if (this.pc?.connectionState == 'failed') {
+      if (this.pc?.connectionState == 'connected') {
+        // 连接建立后开始获取统计信息
+        this.startStatsPolling();
+        // 确保按钮可用（如果视频轨道已创建）
+        if (this.localVideoTrack) {
+          this.canChangeResolution = true;
+        }
+      } else if (this.pc?.connectionState == 'failed') {
         this.setError("Peer connection failed");
         this.ws.close();
+        this.stopStatsPolling();
+        this.canChangeResolution = false;
+      } else if (this.pc?.connectionState == 'closed' || this.pc?.connectionState == 'disconnected') {
+        this.stopStatsPolling();
+        this.canChangeResolution = false;
       }
     }
     this.pc.onnegotiationneeded = (event) => {
       // this is Index
       console.info(TAG, 'onnegotiationneeded: this=' + JSON.stringify(this.pc));
       console.info(TAG, 'onnegotiationneeded: event=' + JSON.stringify(event));
+      // 当需要重新协商时（如切换分辨率），自动发送 offer
+      // 但只在连接已建立且处于稳定状态时发送
+      if (this.pc && this.pc.signalingState === 'stable' && this.pc.connectionState === 'connected') {
+        console.info(TAG, 'Auto sending offer due to negotiation needed');
+        this.sendOffer();
+      }
     }
 
     this.pc.onicecandidate = (event) => {
-      console.info(TAG, 'onicecandidate: this=' + JSON.stringify(this));
       console.info(TAG, 'onicecandidate: event=' + JSON.stringify(event));
       if (event.candidate) {
         this.sendMessage(JSON.stringify({ ice: event.candidate }));
@@ -561,7 +659,6 @@ struct Index {
       }
     };
     this.pc.ondatachannel = (event) => {
-      console.info(TAG, 'ondatachannel: this=' + JSON.stringify(this));
       console.info(TAG, 'ondatachannel: event=' + JSON.stringify(event));
       this.setStatus("Data channel created");
       this.recvChannel = event.channel;
@@ -590,7 +687,6 @@ struct Index {
     console.info(TAG, 'sendChannel: ' + JSON.stringify(this.sendChannel));
     this.sendChannel.onopen = (event) => {
       // this is Index
-      console.info(TAG, '=dataChannel.OnOpen: this=', JSON.stringify(this));
       console.info(TAG, "=dataChannel.OnOpen: ", event);
 
       this.sendChannel?.send("Hi! (from ArkTS)");
@@ -625,7 +721,6 @@ struct Index {
 
   async onDataChannelClose(event: webrtc.Event) {
     // this is webrtc.RTCDataChannel
-    console.info(TAG, 'dataChannel.OnClose: this=', JSON.stringify(this));
     console.info(TAG, "dataChannel.OnClose", event);
   }
 
@@ -679,6 +774,12 @@ struct Index {
       console.info(TAG, 'receive answer');
       this.pc?.setRemoteDescription(sdp).then(() => {
         this.setStatus("Remote SDP set");
+        // 确保远端视频轨道在重新协商后仍然显示
+        if (this.remoteVideoTrack) {
+          console.info(TAG, 'Re-setting remote video track after answer');
+          this.mXComponentController2.setVideoTrack(this.remoteVideoTrack);
+          this.mXComponentController2.setScalingMode(ScalingMode.AspectFit);
+        }
       }).catch((e: Error) => {
         console.error(TAG, "Set remote description error: " + e);
         this.setError(e.message);
@@ -692,5 +793,158 @@ struct Index {
       console.error(TAG, "add ice candidate error: " + e);
       this.setError(e.message);
     });
+  }
+
+  async changeResolution() {
+    if (!this.pc || !this.localVideoTrack) {
+      console.error(TAG, "Cannot change resolution: peer connection or video track not available");
+      return;
+    }
+
+    // 切换到下一个分辨率预设
+    this.currentResolutionIndex = (this.currentResolutionIndex + 1) % this.resolutionPresets.length;
+    const preset = this.resolutionPresets[this.currentResolutionIndex];
+
+    console.info(TAG, `Changing resolution to ${preset.label}`);
+
+    try {
+      // 获取当前的发送器
+      const senders = this.pc.getSenders();
+      const videoSender = senders.find(sender => sender.track && sender.track.kind === 'video');
+
+      if (!videoSender) {
+        console.error(TAG, "Video sender not found");
+        return;
+      }
+
+      // 注意：VideoSource 没有 stop() 方法，旧的视频源会在创建新轨道时自动处理
+
+      // 创建新的视频源
+      this.localVideoSource = this.pcf?.createVideoSource(
+        {width: preset.width, height: preset.height, facingMode: 'user'},
+        false
+      );
+
+      if (!this.localVideoSource) {
+        console.error(TAG, "Failed to create new video source");
+        return;
+      }
+
+      this.localVideoSource.oncapturerstarted = (event: webrtc.VideoCapturerStartedEvent) => {
+        console.info(TAG, 'oncapturerstarted: event=' + JSON.stringify(event));
+      };
+      this.localVideoSource.oncapturerstopped = (event: webrtc.Event) => {
+        console.info(TAG, 'oncapturerstopped: event=' + JSON.stringify(event));
+      };
+
+      // 创建新的视频轨道
+      const newVideoTrack = this.pcf?.createVideoTrack("video", this.localVideoSource);
+      if (!newVideoTrack) {
+        console.error(TAG, "Failed to create new video track");
+        return;
+      }
+
+      // 替换发送器中的轨道
+      await videoSender.replaceTrack(newVideoTrack);
+
+      // 更新本地视频轨道和渲染
+      this.localVideoTrack = newVideoTrack;
+      this.mXComponentController1.setVideoTrack(newVideoTrack);
+      this.mXComponentController1.setMirror(true);
+      this.mXComponentController1.setScalingMode(ScalingMode.AspectFit);
+
+      // replaceTrack 会自动触发 onnegotiationneeded 事件
+      // onnegotiationneeded 事件处理器会自动发送 offer 进行重新协商
+      // 这样可以确保远端画面不会丢失
+
+      console.info(TAG, `Resolution changed to ${preset.label}`);
+      promptAction.showToast({ message: `分辨率已切换为 ${preset.label}` });
+    } catch (error) {
+      console.error(TAG, "Error changing resolution: " + error);
+      this.setError("Failed to change resolution: " + error);
+    }
+  }
+
+  startStatsPolling() {
+    // 如果已经有定时器在运行，先清除
+    this.stopStatsPolling();
+
+    // 立即获取一次统计信息
+    this.updateStats();
+
+    // 每2秒更新一次统计信息
+    this.statsTimer = setInterval(() => {
+      this.updateStats();
+    }, 2000) as number;
+  }
+
+  stopStatsPolling() {
+    if (this.statsTimer !== undefined) {
+      clearInterval(this.statsTimer);
+      this.statsTimer = undefined;
+    }
+  }
+
+  async updateStats() {
+    if (!this.pc) {
+      return;
+    }
+
+    try {
+      const statsReport = await this.pc.getStats();
+
+      // 获取本地发送的分辨率（outbound-rtp）
+      let localWidth = 0;
+      let localHeight = 0;
+
+      // 获取远端接收的分辨率（inbound-rtp）
+      let remoteWidth = 0;
+      let remoteHeight = 0;
+
+      statsReport.stats.forEach((stats, id) => {
+        // 查找出站RTP流（本地发送的视频）
+        if (stats.type === 'outbound-rtp') {
+          const outboundStats = stats as RtpStats;
+          // 检查是否是视频类型，字段名可能是 frameWidth/frameHeight 或 frame_width/frame_height
+          if (outboundStats.kind === 'video') {
+            const width = outboundStats.frameWidth || outboundStats.frame_width;
+            const height = outboundStats.frameHeight || outboundStats.frame_height;
+            if (width && height && width > 0 && height > 0) {
+              localWidth = width;
+              localHeight = height;
+            }
+          }
+        }
+
+        // 查找入站RTP流（远端接收的视频）
+        if (stats.type === 'inbound-rtp') {
+          const inboundStats = stats as RtpStats;
+          // 检查是否是视频类型
+          if (inboundStats.kind === 'video') {
+            const width = inboundStats.frameWidth || inboundStats.frame_width;
+            const height = inboundStats.frameHeight || inboundStats.frame_height;
+            if (width && height && width > 0 && height > 0) {
+              remoteWidth = width;
+              remoteHeight = height;
+            }
+          }
+        }
+      });
+
+      // 更新UI显示
+      if (localWidth > 0 && localHeight > 0) {
+        this.localResolution = `${localWidth}x${localHeight}`;
+      } else {
+        this.localResolution = '未获取';
+      }
+
+      if (remoteWidth > 0 && remoteHeight > 0) {
+        this.remoteResolution = `${remoteWidth}x${remoteHeight}`;
+      } else {
+        this.remoteResolution = '未获取';
+      }
+    } catch (error) {
+      console.error(TAG, "Error getting stats: " + error);
+    }
   }
 }
