@@ -82,6 +82,8 @@ private:
     bool DequeueInputBuffer(ohos::CodecBuffer& buffer);
     void DeliverTextureFrame(const ohos::CodecBuffer& buffer);
     void DeliverByteFrame(const ohos::CodecBuffer& buffer);
+    bool ReinitDecode(int32_t width, int32_t height);
+    bool SetFrameInfo(const EncodedImage& input_image, OH_AVCodecBufferAttr& attr, ohos::CodecBuffer& codecBuffer);
 
 private:
     struct FrameExtraInfo {
