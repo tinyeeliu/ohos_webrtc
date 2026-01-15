@@ -509,6 +509,7 @@ struct Index {
       if (event.track.kind == 'video') {
         this.remoteVideoTrack = event.track;
         this.mXComponentController2.setVideoTrack(event.track);
+        this.mXComponentController2.setScalingMode(ScalingMode.AspectFit);
       } else if (event.track.kind == 'audio') {
         this.remoteAudioTrack = event.track;
       }
