@@ -53,8 +53,6 @@ protected:
 private:
     std::unique_ptr<rtc::Thread> thread_;
     std::unique_ptr<EglEnv> eglEnv_;
-    uint32_t width_{0};
-    uint32_t height_{0};
     ohos::NativeImage nativeImage_;
     std::shared_ptr<TextureData> textureData_;
     std::unique_ptr<YuvConverter> yuvConverter_;

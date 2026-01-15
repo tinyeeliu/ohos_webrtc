@@ -87,11 +87,23 @@ public:
         timestampConverter_ = std::move(timestampConverter);
     }
 
+    uint32_t GetWidth() const
+    {
+        return width_;
+    }
+    uint32_t GetHeight() const
+    {
+        return height_;
+    }
+
 protected:
     Callback* callback_{};
     // Adapt with different timestamp units from different sources, such as camera and video decoder,
     // do nothing by Default.
     TimestampConverter timestampConverter_;
+
+    uint32_t width_{0};
+    uint32_t height_{0};
 };
 
 } // namespace webrtc
