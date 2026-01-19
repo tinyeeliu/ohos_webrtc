@@ -112,21 +112,8 @@ bool CameraCapturer::IsScreencast()
     return false;
 }
 
-void CameraCapturer::StartInternal()
+Camera_Device* CameraCapturer::SelectCameraDevice()
 {
-    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
-
-    if (!isInitialized_) {
-        RTC_LOG(LS_ERROR) << "Not initialized";
-        NotifyCapturedStart(false);
-        return;
-    }
-
-    if (isStarted_) {
-        RTC_LOG(LS_WARNING) << "Capture session is started";
-        return;
-    }
-
     int32_t deviceIndex = -1;
     Camera_Device* device = nullptr;
     auto devices = CameraManager::GetInstance().GetSupportedCameras();
@@ -140,12 +127,18 @@ void CameraCapturer::StartInternal()
 
     if (deviceIndex == -1) {
         RTC_LOG(LS_ERROR) << "No specific camera device found";
-        return;
+        return nullptr;
     }
 
     RTC_LOG(LS_VERBOSE) << "device: " << deviceIndex << ", " << device->cameraId;
     isCameraFrontFacing_ = device->cameraPosition == CAMERA_POSITION_FRONT;
+    ohos::DisplayManager::GetInstance().RegisterChangeCallback(this);
+    OnDisplayChange(0);
+    return device;
+}
 
+void CameraCapturer::GetCameraOrientationAndSceneMode(Camera_Device* device)
+{
     uint32_t orientation = 0;
     Camera_ErrorCode ret = OH_CameraDevice_GetCameraOrientation(device, &orientation);
     if (ret == CAMERA_OK) {
@@ -162,18 +155,19 @@ void CameraCapturer::StartInternal()
             useVideoSceneMode_ = true;
         }
     }
+}
 
+Camera_Profile* CameraCapturer::FindPreviewProfile(CameraOutputCapability& capability, Camera_Device* device)
+{
     Camera_Profile* previewProfile = nullptr;
     Camera_VideoProfile* videoProfile = nullptr;
-    auto capability = CameraManager::GetInstance().GetSupportedCameraOutputCapability(device);
     for (uint32_t i = 0; i < capability.PreviewProfileSize(); i++) {
         Camera_Profile* p = capability.GetPreviewProfile(i);
         RTC_DLOG(LS_VERBOSE) << "preview format: " << p->format;
         RTC_DLOG(LS_VERBOSE) << "preview size: " << p->size.width << "x" << p->size.height;
 
         if (profile_.format == NativeCameraFormatToPixelFormat(p->format) &&
-            profile_.resolution.width == p->size.width && profile_.resolution.height == p->size.height)
-        {
+            profile_.resolution.width == p->size.width && profile_.resolution.height == p->size.height) {
             previewProfile = p;
             break;
         }
@@ -181,6 +175,73 @@ void CameraCapturer::StartInternal()
 
     if (!videoProfile && !previewProfile) {
         RTC_LOG(LS_ERROR) << "No specific camera device found";
+        return nullptr;
+    }
+    return previewProfile;
+}
+
+bool CameraCapturer::StartCaptureSession(Camera_Profile* previewProfile)
+{
+    auto surfaceId = std::to_string(dataReceiver_->GetSurfaceId());
+
+    previewOutput_ = CameraManager::GetInstance().CreatePreviewOutput(previewProfile, surfaceId);
+    if (previewOutput_.IsEmpty()) {
+        RTC_LOG(LS_ERROR) << "Failed to create camera preview output";
+        return false;
+    }
+    previewOutput_.AddObserver(this);
+
+    captureSession_ = CameraManager::GetInstance().CreateCaptureSession();
+    if (useVideoSceneMode_) {
+        if (OH_CaptureSession_SetSessionMode(captureSession_.Raw(), NORMAL_VIDEO) != CAMERA_OK) {
+            RTC_LOG(LS_ERROR) << "Failed to set scene mode";
+        }
+    }
+
+    if (!captureSession_.BeginConfig()) {
+        RTC_LOG(LS_ERROR) << "Failed to begin capture session config";
+        return false;
+    }
+
+    captureSession_.AddInput(input_);
+    captureSession_.AddPreviewOutput(previewOutput_);
+    if (!captureSession_.CommitConfig()) {
+        RTC_LOG(LS_ERROR) << "Failed to commit capture session config";
+        return false;
+    }
+
+    if (!captureSession_.Start()) {
+        RTC_LOG(LS_ERROR) << "Failed to start capture session";
+        NotifyCapturedStart(false);
+        return false;
+    }
+    return true;
+}
+
+void CameraCapturer::StartInternal()
+{
+    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
+
+    if (!isInitialized_) {
+        RTC_LOG(LS_ERROR) << "Not initialized";
+        NotifyCapturedStart(false);
+        return;
+    }
+
+    if (isStarted_) {
+        RTC_LOG(LS_WARNING) << "Capture session is started";
+        return;
+    }
+
+    Camera_Device* device = SelectCameraDevice();
+    if (device == nullptr) {
+        return;
+    }
+
+    GetCameraOrientationAndSceneMode(device);
+    auto capability = CameraManager::GetInstance().GetSupportedCameraOutputCapability(device);
+    Camera_Profile* previewProfile = FindPreviewProfile(capability, device);
+    if (previewProfile == nullptr) {
         return;
     }
 
@@ -195,39 +256,7 @@ void CameraCapturer::StartInternal()
         return;
     }
 
-    auto surfaceId = std::to_string(dataReceiver_->GetSurfaceId());
-
-    previewOutput_ = CameraManager::GetInstance().CreatePreviewOutput(previewProfile, surfaceId);
-    if (previewOutput_.IsEmpty()) {
-        RTC_LOG(LS_ERROR) << "Failed to create camera preview output";
-        return;
-    }
-    previewOutput_.AddObserver(this);
-
-    captureSession_ = CameraManager::GetInstance().CreateCaptureSession();
-    if (useVideoSceneMode_) {
-        if (OH_CaptureSession_SetSessionMode(captureSession_.Raw(), NORMAL_VIDEO) != CAMERA_OK) {
-            RTC_LOG(LS_ERROR) << "Failed to set scene mode";
-        }
-    }
-
-    if (!captureSession_.BeginConfig()) {
-        RTC_LOG(LS_ERROR) << "Failed to begin capture session config";
-        return;
-    }
-
-    captureSession_.AddInput(input_);
-
-    captureSession_.AddPreviewOutput(previewOutput_);
-
-    if (!captureSession_.CommitConfig()) {
-        RTC_LOG(LS_ERROR) << "Failed to commit capture session config";
-        return;
-    }
-
-    if (!captureSession_.Start()) {
-        RTC_LOG(LS_ERROR) << "Failed to start capture session";
-        NotifyCapturedStart(false);
+    if (!StartCaptureSession(previewProfile)) {
         return;
     }
 
@@ -254,7 +283,7 @@ void CameraCapturer::StopInternal()
     input_.Close();
     input_.Reset();
     captureSession_.Reset();
-
+    ohos::DisplayManager::GetInstance().UnregisterChangeCallback(this);
     isStarted_ = false;
 }
 
@@ -323,6 +352,7 @@ void CameraCapturer::OnFrameAvailable(
         if (isCameraFrontFacing_) {
             transformMatrix.PreScale(-1.0f, 1.0f, 0.5f, 0.5f);
         }
+        transformMatrix.PreRotate(finalRotation_, 0.5f, 0.5f);
         Matrix newMatrix = textureBuffer->GetTransformMatrix();
         newMatrix.PreConcat(transformMatrix);
         buffer = TextureBuffer::Create(
@@ -332,6 +362,22 @@ void CameraCapturer::OnFrameAvailable(
     UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
     if (observer_) {
         observer_->OnFrameCaptured(buffer, timestampUs, VideoRotation::kVideoRotation_0);
+    }
+}
+
+void CameraCapturer::OnDisplayChange(uint64_t displayId)
+{
+    NativeDisplayManager_Rotation displayRotation = ohos::DisplayManager::GetInstance().GetDefaultDisplayRotation();
+    RTC_DLOG(LS_VERBOSE) << "cameraRotation: " << cameraOrientation_ << ", displayRotation: " << displayRotation <<
+        ", isFrontFacing_: " << isCameraFrontFacing_;
+    constexpr int kDegreesPerRotationUnit = 90;
+    constexpr int kFullCircleDegrees = 360;
+    int displayDegrees = displayRotation * kDegreesPerRotationUnit;
+    if (isCameraFrontFacing_) {
+        finalRotation_ =
+            static_cast<VideoRotation>((0 - displayDegrees + kFullCircleDegrees) % kFullCircleDegrees);
+    } else {
+        finalRotation_ = static_cast<VideoRotation>((displayDegrees) % kFullCircleDegrees);
     }
 }
 
