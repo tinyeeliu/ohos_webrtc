@@ -21,6 +21,7 @@
 #include "../video/video_frame_receiver.h"
 #include "../render/egl_context.h"
 #include "../helper/camera.h"
+#include "helper/display_manager.h"
 
 #include <memory>
 #include <cstdint>
@@ -36,7 +37,8 @@ namespace webrtc {
 class CameraCapturer : public VideoCapturer,
                        public VideoFrameReceiver::Callback,
                        public ohos::CameraPreviewOutput::Observer,
-                       public ohos::CameraVideoOutput::Observer {
+                       public ohos::CameraVideoOutput::Observer,
+                       public ohos::DisplayManager::ChangeObserver {
 public:
     static std::unique_ptr<CameraCapturer> Create(std::string deviceId, video::VideoProfile profile);
 
@@ -68,8 +70,14 @@ protected:
 
     void
     OnFrameAvailable(rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation) override;
+    void OnDisplayChange(uint64_t displayId) override;
 
 private:
+    Camera_Device* SelectCameraDevice();
+    void GetCameraOrientationAndSceneMode(Camera_Device* device);
+    Camera_Profile* FindPreviewProfile(ohos::CameraOutputCapability& capability, Camera_Device* device);
+    bool StartCaptureSession(Camera_Profile* previewProfile);
+
     const std::string deviceId_;
     const video::VideoProfile profile_;
 
@@ -89,6 +97,7 @@ private:
 
     VideoCapturer::Observer* observer_{};
     std::mutex obsMutex_;
+    std::atomic<VideoRotation> finalRotation_;
 };
 
 } // namespace webrtc
