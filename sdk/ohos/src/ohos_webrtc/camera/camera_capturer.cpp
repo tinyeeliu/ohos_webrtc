@@ -145,6 +145,8 @@ void CameraCapturer::StartInternal()
 
     RTC_LOG(LS_VERBOSE) << "device: " << deviceIndex << ", " << device->cameraId;
     isCameraFrontFacing_ = device->cameraPosition == CAMERA_POSITION_FRONT;
+    ohos::DisplayManager::GetInstance().RegisterChangeCallback(this);
+    OnDisplayChange(0);
 
     uint32_t orientation = 0;
     Camera_ErrorCode ret = OH_CameraDevice_GetCameraOrientation(device, &orientation);
@@ -254,7 +256,7 @@ void CameraCapturer::StopInternal()
     input_.Close();
     input_.Reset();
     captureSession_.Reset();
-
+    ohos::DisplayManager::GetInstance().UnregisterChangeCallback(this);
     isStarted_ = false;
 }
 
@@ -323,6 +325,7 @@ void CameraCapturer::OnFrameAvailable(
         if (isCameraFrontFacing_) {
             transformMatrix.PreScale(-1.0f, 1.0f, 0.5f, 0.5f);
         }
+        transformMatrix.PreRotate(finalRotation_, 0.5f, 0.5f);
         Matrix newMatrix = textureBuffer->GetTransformMatrix();
         newMatrix.PreConcat(transformMatrix);
         buffer = TextureBuffer::Create(
@@ -332,6 +335,22 @@ void CameraCapturer::OnFrameAvailable(
     UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
     if (observer_) {
         observer_->OnFrameCaptured(buffer, timestampUs, VideoRotation::kVideoRotation_0);
+    }
+}
+
+void CameraCapturer::OnDisplayChange(uint64_t displayId)
+{
+    NativeDisplayManager_Rotation displayRotation = ohos::DisplayManager::GetInstance().GetDefaultDisplayRotation();
+    RTC_DLOG(LS_VERBOSE) << "cameraRotation: " << cameraOrientation_ << ", displayRotation: " << displayRotation <<
+        ", isFrontFacing_: " << isCameraFrontFacing_;
+    constexpr int kDegreesPerRotationUnit = 90;
+    constexpr int kFullCircleDegrees = 360;
+    int displayDegrees = displayRotation * kDegreesPerRotationUnit;
+    if (isCameraFrontFacing_) {
+        finalRotation_ =
+            static_cast<VideoRotation>((0 - displayDegrees + kFullCircleDegrees) % kFullCircleDegrees);
+    } else {
+        finalRotation_ = static_cast<VideoRotation>((displayDegrees) % kFullCircleDegrees);
     }
 }
 
