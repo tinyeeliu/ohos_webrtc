@@ -369,6 +369,7 @@ declare var RTCPeerConnection: {
 export interface RTCRtpReceiver {
   readonly track: MediaStreamTrack;
   readonly transport: RTCDtlsTransport | null;
+  readonly id: string | null;
 
   getParameters(): RTCRtpReceiveParameters;
   getStats(): Promise<RTCStatsReport>;
@@ -435,6 +436,8 @@ export interface RTCRtpSendParameters extends RTCRtpParameters {
 
 // https://www.w3.org/TR/webrtc/#dom-rtcrtpreceiveparameters
 export interface RTCRtpReceiveParameters extends RTCRtpParameters {
+  encodings: RTCRtpEncodingParameters[];
+  transactionId: string;
 }
 
 // https://www.w3.org/TR/webrtc/#dom-rtcrtpcontributingsource
@@ -455,6 +458,7 @@ export interface RTCRtpSender {
   readonly track: MediaStreamTrack | null;
   readonly transport: RTCDtlsTransport | null;
   readonly dtmf: RTCDTMFSender | null;
+  readonly id: string | null;
 
   setParameters(parameters: RTCRtpSendParameters): Promise<void>;
   getParameters(): RTCRtpSendParameters;
@@ -476,6 +480,7 @@ declare var RTCRtpSender: {
 
 // https://www.w3.org/TR/webrtc/#dom-rtcrtpcodec
 export interface RTCRtpCodec {
+  payloadType?: number;
   mimeType: string;
   clockRate: number;
   channels?: number;
@@ -783,7 +788,7 @@ export interface MediaSource {
 }
 
 export interface AudioSource extends MediaSource {
-  setVolume(volume: number);
+  setVolume(volume: number): void;
 }
 
 export interface VideoSource extends MediaSource {
@@ -869,6 +874,8 @@ export interface NativeVideoRenderer {
   setMirrorVertically(mirrorVertically: boolean): void;
   setScalingMode(mode: number): void;
   release(): void;
+
+  onFrameResolutionChanged: ((this: NativeVideoRenderer, ev: Event) => any) | null;
 }
 
 declare var NativeVideoRenderer: {
@@ -1037,10 +1044,18 @@ export interface Loggable {
   logMessage(message: string, severity: number, tag: string): void;
 }
 
+export enum LoggingSeverity {
+  VERBOSE,
+  INFO,
+  WARNING,
+  ERROR,
+  NONE,
+}
+
 export class NativeLogging {
   static injectLoggable(loggable: Loggable, severity: number): void;
   static deleteLoggable(): void;
-  static enableLogToDebugOutput(severity): void;
+  static enableLogToDebugOutput(severity: LoggingSeverity): void;
   static enableLogThreads(): void;
   static enableLogTimeStamps(): void;
   static log(message: string, severity: number, tag: string): void;
