@@ -157,6 +157,23 @@ void NativeWindowRendererGl::OnFrame(const VideoFrame& frame)
         return;
     }
 
+    // 检测帧宽高变化
+    if (frame.width() != lastFrameWidth_ || frame.height() != lastFrameHeight_ || frame.rotation() != lastFrameRotation_) {
+
+        lastFrameWidth_ = frame.width();
+        lastFrameHeight_ = frame.height();
+        lastFrameRotation_ = frame.rotation();
+        RTC_DLOG(LS_VERBOSE) << "[NativeWindowRendererGl] Frame size changed: " << lastFrameWidth_ << "x"
+                             << lastFrameHeight_;
+        // 调用帧大小变化回调
+        RTC_DLOG(LS_VERBOSE) << "[NativeWindowRendererGl] frameSizeChangeCallback_ " << &frameSizeChangeCallback_;
+        if (frameSizeChangeCallback_) {
+            RTC_DLOG(LS_VERBOSE) << "[NativeWindowRendererGl] frameSizeChangeCallback_ " << lastFrameWidth_ << "x"
+                                 << lastFrameHeight_;
+            frameSizeChangeCallback_(lastFrameWidth_, lastFrameHeight_,lastFrameRotation_);
+        }
+    }
+
     thread_->PostTask([this, frame = frame] { RenderFrame(frame); });
 }
 
