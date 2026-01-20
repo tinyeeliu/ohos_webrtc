@@ -16,7 +16,6 @@
 #include "video_track_source.h"
 #include "utils/marcos.h"
 #include "video_frame_receiver_gl.h"
-#include <map>
 
 #include "api/video/i420_buffer.h"
 #include "rtc_base/logging.h"
@@ -53,10 +52,6 @@ OhosVideoTrackSource::OhosVideoTrackSource(
     RTC_LOG(LS_INFO) << "OhosVideoTrackSource ctor: " << this;
 
     SetState(kInitializing);
-    if (!is_screencast()) {
-        ohos::DisplayManager::GetInstance().RegisterChangeCallback(this);
-    }
-
     thread_->SetName("v-track-source", capturer_.get());
     thread_->Start();
     thread_->PostTask(
@@ -66,9 +61,7 @@ OhosVideoTrackSource::OhosVideoTrackSource(
 OhosVideoTrackSource::~OhosVideoTrackSource()
 {
     RTC_LOG(LS_INFO) << __FUNCTION__;
-    if (!is_screencast()) {
-        ohos::DisplayManager::GetInstance().UnregisterChangeCallback(this);
-    }
+
     thread_->PostTask([this] {
         capturer_->Stop();
         capturer_->Release();
@@ -297,30 +290,13 @@ void OhosVideoTrackSource::OnFrameCaptured(
         // No adaptations needed, just return the frame as is.
     }
 
-    if (!is_screencast() && !cameraRotationInit_) {
-        cameraRotation_ = rotation;
-        OnDisplayChange(0);
-        cameraRotationInit_ = true;
-    }
-
     auto frame = VideoFrame::Builder()
                      .set_id(1)
                      .set_video_frame_buffer(buffer)
-                     .set_rotation(is_screencast() ? rotation : finalRotation_.load())
+                     .set_rotation(rotation)
                      .set_timestamp_us(alignedTimestampUs)
                      .build();
     broadcaster_.OnFrame(frame);
-}
-
-void OhosVideoTrackSource::OnDisplayChange(uint64_t displayId)
-{
-    NativeDisplayManager_Rotation displayRotation = ohos::DisplayManager::GetInstance().GetDefaultDisplayRotation();
-    RTC_DLOG(LS_VERBOSE) << "cameraRotation: " << cameraRotation_ << ", displayRotation: " << displayRotation;
-    constexpr int kDegreesPerRotationUnit = 90;
-    constexpr int kFullCircleDegrees = 360;
-    int displayDegrees = displayRotation * kDegreesPerRotationUnit;
-    finalRotation_ =
-        static_cast<VideoRotation>((cameraRotation_ - displayDegrees + kFullCircleDegrees) % kFullCircleDegrees);
 }
 
 } // namespace webrtc
