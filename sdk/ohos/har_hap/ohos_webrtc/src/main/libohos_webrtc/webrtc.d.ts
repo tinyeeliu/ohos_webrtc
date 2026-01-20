@@ -369,6 +369,7 @@ declare var RTCPeerConnection: {
 export interface RTCRtpReceiver {
   readonly track: MediaStreamTrack;
   readonly transport: RTCDtlsTransport | null;
+  readonly id: string | null;
 
   getParameters(): RTCRtpReceiveParameters;
   getStats(): Promise<RTCStatsReport>;
@@ -455,6 +456,7 @@ export interface RTCRtpSender {
   readonly track: MediaStreamTrack | null;
   readonly transport: RTCDtlsTransport | null;
   readonly dtmf: RTCDTMFSender | null;
+  readonly id: string | null;
 
   setParameters(parameters: RTCRtpSendParameters): Promise<void>;
   getParameters(): RTCRtpSendParameters;

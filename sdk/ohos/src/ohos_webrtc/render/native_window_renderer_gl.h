@@ -72,6 +72,11 @@ private:
     bool mirrorHorizontally_{false};
     bool mirrorVertically_{false};
     ScalingMode scaleMode_{ScalingMode::FILL};
+
+    // 添加帧宽高变化检测的变量
+    int lastFrameWidth_ = 0;
+    int lastFrameHeight_ = 0;
+    int lastFrameRotation_ = 0;
 };
 
 } // namespace adapter
