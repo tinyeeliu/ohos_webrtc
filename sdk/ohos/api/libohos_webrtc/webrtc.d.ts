@@ -369,6 +369,7 @@ declare var RTCPeerConnection: {
 export interface RTCRtpReceiver {
   readonly track: MediaStreamTrack;
   readonly transport: RTCDtlsTransport | null;
+  readonly id: string | null;
 
   getParameters(): RTCRtpReceiveParameters;
   getStats(): Promise<RTCStatsReport>;
@@ -435,6 +436,8 @@ export interface RTCRtpSendParameters extends RTCRtpParameters {
 
 // https://www.w3.org/TR/webrtc/#dom-rtcrtpreceiveparameters
 export interface RTCRtpReceiveParameters extends RTCRtpParameters {
+  encodings: RTCRtpEncodingParameters[];
+  transactionId: string;
 }
 
 // https://www.w3.org/TR/webrtc/#dom-rtcrtpcontributingsource
@@ -455,6 +458,7 @@ export interface RTCRtpSender {
   readonly track: MediaStreamTrack | null;
   readonly transport: RTCDtlsTransport | null;
   readonly dtmf: RTCDTMFSender | null;
+  readonly id: string | null;
 
   setParameters(parameters: RTCRtpSendParameters): Promise<void>;
   getParameters(): RTCRtpSendParameters;
@@ -476,6 +480,7 @@ declare var RTCRtpSender: {
 
 // https://www.w3.org/TR/webrtc/#dom-rtcrtpcodec
 export interface RTCRtpCodec {
+  payloadType?: number;
   mimeType: string;
   clockRate: number;
   channels?: number;
@@ -869,6 +874,8 @@ export interface NativeVideoRenderer {
   setMirrorVertically(mirrorVertically: boolean): void;
   setScalingMode(mode: number): void;
   release(): void;
+
+  onFrameResolutionChanged: ((this: NativeVideoRenderer, ev: Event) => any) | null;
 }
 
 declare var NativeVideoRenderer: {
