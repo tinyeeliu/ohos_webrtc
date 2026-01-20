@@ -44,11 +44,20 @@ public:
 
     static void Init(Napi::Env env, Napi::Object exports);
 
+    bool GetEventHandler(const std::string& type, Napi::Function& fn);
+    void SetEventHandler(const Napi::CallbackInfo& info, const Napi::Value& value);
+
+    bool RemoveEventHandler(const std::string& type);
+    void RemoveAllEventHandlers();
+
+    void SetFrameSizeChangeCallback(const Napi::CallbackInfo& info);
+
 protected:
     friend class ObjectWrap;
     explicit NapiNativeVideoRenderer(const Napi::CallbackInfo& info);
     ~NapiNativeVideoRenderer() override;
 
+    Napi::Value GetEventHandler(const Napi::CallbackInfo& info);
     Napi::Value GetSurfaceId(const Napi::CallbackInfo& info);
     Napi::Value GetSharedContext(const Napi::CallbackInfo& info);
     Napi::Value GetVideoTrack(const Napi::CallbackInfo& info);
@@ -59,6 +68,7 @@ protected:
     Napi::Value SetMirrorVertically(const Napi::CallbackInfo& info);
     Napi::Value SetScalingMode(const Napi::CallbackInfo& info);
     Napi::Value ToJson(const Napi::CallbackInfo& info);
+    bool GetEventHandler(const std::string& type, Napi::ThreadSafeFunction& tsfn);
 
     void AddSink();
     void RemoveSink();
@@ -73,6 +83,18 @@ private:
     Napi::ObjectReference jsTrackRef_;
 
     std::unique_ptr<adapter::NativeWindowRenderer> renderer_;
+
+    bool SetEventHandler(const std::string& type, Napi::Function fn, Napi::Value receiver);
+
+    Napi::FunctionReference frameSizeChangeCallback_;
+
+    struct EventHandler {
+        Napi::FunctionReference ref;
+        Napi::ThreadSafeFunction tsfn;
+    };
+
+    mutable std::mutex eventMutex_;
+    std::map<std::string, EventHandler> eventHandlers_;
 };
 
 } // namespace webrtc
