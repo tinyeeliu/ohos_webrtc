@@ -1,5 +1,9 @@
 # 更新日志
 
+## 1.0.1-rc2 （2026-01-22）
+- Fix the issue of incorrect rotation angle of the rear camera
+- Achieve variable resolution
+
 ## 1.0.1-rc1 （2026-01-15）
 - Implement the function that the camera image follows the rotation of the application
 
