@@ -21,10 +21,12 @@
 #include "../video/video_frame_receiver.h"
 #include "../render/egl_context.h"
 #include "../helper/camera.h"
+#include "helper/display_manager.h"
 
 #include <memory>
 #include <cstdint>
 #include <mutex>
+#include <atomic>
 
 #include <ohcamera/camera_manager.h>
 
@@ -36,7 +38,8 @@ namespace webrtc {
 class CameraCapturer : public VideoCapturer,
                        public VideoFrameReceiver::Callback,
                        public ohos::CameraPreviewOutput::Observer,
-                       public ohos::CameraVideoOutput::Observer {
+                       public ohos::CameraVideoOutput::Observer,
+                       public ohos::DisplayManager::ChangeObserver {  // 新增：屏幕旋转回调继承
 public:
     static std::unique_ptr<CameraCapturer> Create(std::string deviceId, video::VideoProfile profile);
 
@@ -50,7 +53,7 @@ public:
     void Stop() override;
     bool IsScreencast() override;
     void SwitchCamera() override;
-    void SwitchCamera(const std::string& cameraId) override;
+    void SwitchCamera(const std::string& cameraId) override;  // 保留：摄像头切换重载函数
 
 protected:
     void NotifyCapturedStart(bool success);
@@ -68,11 +71,11 @@ protected:
     void OnVideoOutputFrameEnd(int32_t frameCount) override;
     void OnVideoOutputError(Camera_ErrorCode errorCode) override;
 
-    void
-    OnFrameAvailable(rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation) override;
+    void OnFrameAvailable(rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation) override;
+    void OnDisplayChange(uint64_t displayId) override;  // 新增：屏幕旋转回调函数
 
 private:
-    std::string deviceId_;
+    const std::string deviceId_;
     const video::VideoProfile profile_;
 
     bool isInitialized_{false};
@@ -92,6 +95,7 @@ private:
 
     VideoCapturer::Observer* observer_{};
     std::mutex obsMutex_;
+    std::atomic<VideoRotation> finalRotation_;
 };
 
 } // namespace webrtc

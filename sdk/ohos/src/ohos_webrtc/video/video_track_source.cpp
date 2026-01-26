@@ -52,7 +52,6 @@ OhosVideoTrackSource::OhosVideoTrackSource(
     RTC_LOG(LS_INFO) << "OhosVideoTrackSource ctor: " << this;
 
     SetState(kInitializing);
-
     thread_->SetName("v-track-source", capturer_.get());
     thread_->Start();
     thread_->PostTask(
@@ -297,14 +296,50 @@ void OhosVideoTrackSource::OnFrameCaptured(
                      .set_rotation(rotation)
                      .set_timestamp_us(alignedTimestampUs)
                      .build();
-    if (ApplyRotation() && frame.rotation() != kVideoRotation_0 && buffer->type() == VideoFrameBuffer::Type::kI420) {
-        /* Apply pending rotation. */
-        VideoFrame rotatedFrame(frame);
-        rotatedFrame.set_video_frame_buffer(I420Buffer::Rotate(*buffer->GetI420(), frame.rotation()));
-        rotatedFrame.set_rotation(kVideoRotation_0);
-        broadcaster_.OnFrame(rotatedFrame);
-    } else {
-        broadcaster_.OnFrame(frame);
+    broadcaster_.OnFrame(frame);
+}
+
+void OhosVideoTrackSource::SwitchCamera()
+{
+    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
+    
+    thread_->PostTask([this] { capturer_->SwitchCamera(); });
+}
+
+void OhosVideoTrackSource::SwitchCamera(const std::string& cameraId)
+{
+    RTC_LOG(LS_VERBOSE) << __FUNCTION__ << ": cameraId=" << cameraId;
+    
+    thread_->PostTask([this, cameraId] { capturer_->SwitchCamera(cameraId); });
+}
+
+void OhosVideoTrackSource::OnCameraSwitchDone(const std::string& newCameraId)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << ": newCameraId=" << newCameraId;
+    
+    VideoCapturer::Observer* observer = nullptr;
+    {
+        UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
+        observer = capturerObserver_;
+    }
+    
+    if (observer) {
+        observer->OnCameraSwitchDone(newCameraId);
+    }
+}
+
+void OhosVideoTrackSource::OnCameraSwitchError(const std::string& errorMessage)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << ": errorMessage=" << errorMessage;
+    
+    VideoCapturer::Observer* observer = nullptr;
+    {
+        UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
+        observer = capturerObserver_;
+    }
+    
+    if (observer) {
+        observer->OnCameraSwitchError(errorMessage);
     }
 }
 

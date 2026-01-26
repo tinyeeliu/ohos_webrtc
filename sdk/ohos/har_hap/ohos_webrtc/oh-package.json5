@@ -1,6 +1,6 @@
 {
   "name": "@ohos/webrtc",
-  "version": "1.0.0-rc3",
+  "version": "1.0.1-rc2",
   "description": "ArkTS interfaces of webrtc for OpenHarmony.",
   "keywords": ["webrtc"],
   "main": "Index.ets",
@@ -11,5 +11,5 @@
   "dependencies": {
     "libohos_webrtc.so": "file:./src/main/libohos_webrtc"
   },
-  "devDependencies": {}
+  "devDependencies": {},
 }

@@ -16,6 +16,7 @@
 #ifndef WEBRTC_RENDER_NATIVE_WINDOW_RENDERER_H
 #define WEBRTC_RENDER_NATIVE_WINDOW_RENDERER_H
 
+#include <functional>
 #include "../helper/native_window.h"
 
 #include "api/video/video_frame.h"
@@ -23,6 +24,8 @@
 
 namespace webrtc {
 namespace adapter {
+
+using FrameSizeChangeCallback = std::function<void(int width, int height, int rotation)>;
 
 class NativeWindowRenderer : public rtc::VideoSinkInterface<VideoFrame> {
 public:
@@ -45,8 +48,14 @@ public:
     virtual void SetMirrorVertically(bool mirror) {}
     virtual void SetScalingMode(ScalingMode scaleMode) {}
 
+    void SetFrameSizeChangeCallback(FrameSizeChangeCallback callback)
+    {
+        frameSizeChangeCallback_ = std::move(callback);
+    }
+
 protected:
     explicit NativeWindowRenderer(ohos::NativeWindow window);
+    FrameSizeChangeCallback frameSizeChangeCallback_;
 
 protected:
     ohos::NativeWindow window_;

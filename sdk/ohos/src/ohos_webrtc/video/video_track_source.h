@@ -26,6 +26,7 @@
 #include "rtc_base/synchronization/mutex.h"
 #include "rtc_base/thread.h"
 #include "rtc_base/timestamp_aligner.h"
+#include "helper/display_manager.h"
 
 #include <optional>
 
