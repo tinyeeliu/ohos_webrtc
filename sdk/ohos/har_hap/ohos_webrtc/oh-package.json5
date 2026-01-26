@@ -11,5 +11,5 @@
   "dependencies": {
     "libohos_webrtc.so": "file:./src/main/libohos_webrtc"
   },
-  "devDependencies": {},
+  "devDependencies": {}
 }
