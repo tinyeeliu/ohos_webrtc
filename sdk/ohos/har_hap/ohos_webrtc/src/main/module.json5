@@ -3,8 +3,7 @@
     "name": "ohos_webrtc",
     "type": "har",
     "deviceTypes": [
-//      "default",
-      "phone",
+      "default",
       "tablet"
     ],
     "requestPermissions": [
