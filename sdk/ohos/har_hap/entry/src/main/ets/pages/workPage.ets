@@ -210,6 +210,18 @@ struct Index {
                 this.pc?.setAudioRecording(!this.micOFF);
               })
               .margin({ left: 6, right: 6 })
+
+            Button('Switch Camera')
+              .layoutWeight(1)
+              .height(54)
+              .fontSize(15)
+              .fontWeight(FontWeight.Bold)
+              .onClick(() => {
+                if(this.localVideoSource){
+                  this.localVideoSource.switchCamera();
+                }
+              })
+              .margin({ left: 6 })
           }
           .width('100%')
           .justifyContent(FlexAlign.SpaceBetween)
