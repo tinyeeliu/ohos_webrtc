@@ -34,12 +34,82 @@ struct Index {
             // TODO jump to workpage
             router.pushUrl({ url: "pages/workPage"})
           })
+      .margin({ left: 10, right: 20 })
+
+    }
+    .alignSelf(ItemAlign.Center)
+    .padding({ top: 24 })
+
+      Row() {
+        Button(this.muteBtnTitle)
+          .width(150)
+          .height(54)
+          .fontSize(20)
+          .fontWeight(FontWeight.Bold)
+          .margin({ top: 20 })
+          .onClick(() => {
+            console.log(TAG, "audio muted: " + this.muted);
+            this.muted = !this.muted;
+            this.muteBtnTitle = this.muted ? 'Unmute' : 'Mute';
+            this.pc?.setAudioPlayout(!this.muted);
+            this.pc?.setAudioRecording(!this.muted);
+          })
           .margin({ left: 10, right: 20 })
 
       }
-      .alignSelf(ItemAlign.Center)
+      .alignSelf(ItemAlign.Start)
       .padding({ top: 24 })
 
+      Row() {
+        Button("switchCamera")
+          .width(150)
+          .height(54)
+          .fontSize(20)
+          .fontWeight(FontWeight.Bold)
+          .margin({ top: 20 })
+          .onClick(() => {
+            if(this.localVideoSource){
+              this.localVideoSource.switchCamera();
+            }
+          })
+          .margin({ left: 10, right: 20 })
+      }
+      .alignSelf(ItemAlign.Start)
+      .padding({ top: 24 })
+
+      Row() {
+        XComponent({
+          id: "local-video",
+          type: XComponentType.SURFACE,
+          controller: this.mXComponentController1
+        })
+          .width('480px')
+          .height('480px')
+          .onLoad((context?) => {
+            console.log(TAG, "context: " + context);
+            console.log(TAG, "surfaceId: " + this.mXComponentController1.getXComponentSurfaceId());
+          })
+          .onDestroy(() => {
+            console.log(TAG, "onDestroy");
+          })
+
+        XComponent({
+          id: "remote-video",
+          type: XComponentType.SURFACE,
+          controller: this.mXComponentController2
+        })
+          .width('480px')
+          .height('480px')
+          .onLoad((context?) => {
+            console.log(TAG, "context: " + JSON.stringify(context));
+            console.log(TAG, "surfaceId: " + this.mXComponentController2.getXComponentSurfaceId());
+          })
+          .onDestroy(() => {
+            console.log(TAG, "onDestroy");
+          })
+      }
+      .alignSelf(ItemAlign.Start)
+      .padding({ top: 10 })
     }
     .width('100%')
     .height('100%')

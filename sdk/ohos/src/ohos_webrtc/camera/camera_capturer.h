@@ -75,7 +75,7 @@ protected:
     void OnDisplayChange(uint64_t displayId) override;  // 新增：屏幕旋转回调函数
 
 private:
-    const std::string deviceId_;
+    std::string deviceId_;
     const video::VideoProfile profile_;
 
     bool isInitialized_{false};

@@ -115,16 +115,16 @@ bool CameraCapturer::IsScreencast()
 void CameraCapturer::SwitchCamera()
 {
     RTC_LOG(LS_INFO) << __FUNCTION__;
-
+    
     if (isSwitching_) {
         RTC_LOG(LS_WARNING) << "Camera switch already in progress";
         return;
     }
-
+    
     auto devices = CameraManager::GetInstance().GetSupportedCameras();
     if (devices.Size() < 2) {
         RTC_LOG(LS_ERROR) << "No camera to switch to";
-        {
+        { 
             UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
             if (observer_) {
                 observer_->OnCameraSwitchError("No camera to switch to");
@@ -132,7 +132,7 @@ void CameraCapturer::SwitchCamera()
         }
         return;
     }
-
+    
     // Find current camera index
     int currentIndex = -1;
     for (std::size_t i = 0; i < devices.Size(); i++) {
@@ -141,10 +141,10 @@ void CameraCapturer::SwitchCamera()
             break;
         }
     }
-
+    
     if (currentIndex == -1) {
         RTC_LOG(LS_ERROR) << "Current camera not found";
-        {
+        { 
             UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
             if (observer_) {
                 observer_->OnCameraSwitchError("Current camera not found");
@@ -152,26 +152,26 @@ void CameraCapturer::SwitchCamera()
         }
         return;
     }
-
+    
     // Get next camera
     std::size_t nextIndex = (currentIndex + 1) % devices.Size();
     std::string nextCameraId = devices[nextIndex]->cameraId;
-
+    
     SwitchCamera(nextCameraId);
 }
 
 void CameraCapturer::SwitchCamera(const std::string& cameraId)
 {
     RTC_LOG(LS_INFO) << __FUNCTION__ << ": Switching to camera " << cameraId;
-
+    
     if (isSwitching_) {
         RTC_LOG(LS_WARNING) << "Camera switch already in progress";
         return;
     }
-
+    
     if (!isStarted_) {
         RTC_LOG(LS_ERROR) << "Camera is not started";
-        {
+        { 
             UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
             if (observer_) {
                 observer_->OnCameraSwitchError("Camera is not started");
@@ -179,7 +179,7 @@ void CameraCapturer::SwitchCamera(const std::string& cameraId)
         }
         return;
     }
-
+    
     // Check if camera exists
     auto devices = CameraManager::GetInstance().GetSupportedCameras();
     bool cameraExists = false;
@@ -189,10 +189,10 @@ void CameraCapturer::SwitchCamera(const std::string& cameraId)
             break;
         }
     }
-
+    
     if (!cameraExists) {
         RTC_LOG(LS_ERROR) << "Camera not found: " << cameraId;
-        {
+        { 
             UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
             if (observer_) {
                 observer_->OnCameraSwitchError("Camera not found: " + cameraId);
@@ -200,27 +200,96 @@ void CameraCapturer::SwitchCamera(const std::string& cameraId)
         }
         return;
     }
-
+    
     isSwitching_ = true;
-
+    
     // Stop current camera
     StopInternal();
-
+    
     // Update device ID
     deviceId_ = cameraId;
-
+    
     // Restart camera
     StartInternal();
-
+    
     isSwitching_ = false;
-
+    
     // Notify success
-    {
+    { 
         UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
         if (observer_) {
             observer_->OnCameraSwitchDone(cameraId);
         }
     }
+}
+
+void CameraCapturer::StartInternal()
+{
+    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
+
+    if (!isInitialized_) {
+        RTC_LOG(LS_ERROR) << "Not initialized";
+        NotifyCapturedStart(false);
+        return;
+    }
+
+    if (isStarted_) {
+        RTC_LOG(LS_WARNING) << "Capture session is started";
+        return;
+    }
+
+    Camera_Device* device = SelectCameraDevice();
+    if (device == nullptr) {
+        return;
+    }
+
+    GetCameraOrientationAndSceneMode(device);
+    auto capability = CameraManager::GetInstance().GetSupportedCameraOutputCapability(device);
+    Camera_Profile* previewProfile = FindPreviewProfile(capability, device);
+    if (previewProfile == nullptr) {
+        return;
+    }
+
+    input_ = CameraManager::GetInstance().CreateCameraInput(device);
+    if (input_.IsEmpty()) {
+        RTC_LOG(LS_ERROR) << "Failed to create camera input";
+        return;
+    }
+
+    if (!input_.Open()) {
+        RTC_LOG(LS_ERROR) << "Failed to open camera input";
+        return;
+    }
+
+    if (!StartCaptureSession(previewProfile)) {
+        return;
+    }
+
+    isStarted_ = true;
+}
+
+void CameraCapturer::StopInternal()
+{
+    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
+
+    if (!isStarted_) {
+        RTC_LOG(LS_ERROR) << "Capture session is not started";
+        return;
+    }
+
+    if (!captureSession_.Stop()) {
+        RTC_LOG(LS_ERROR) << "Failed to stop capture session";
+        return;
+    }
+
+    previewOutput_.RemoveObserver(this);
+    previewOutput_.Reset();
+
+    input_.Close();
+    input_.Reset();
+    captureSession_.Reset();
+    ohos::DisplayManager::GetInstance().UnregisterChangeCallback(this);
+    isStarted_ = false;
 }
 
 Camera_Device* CameraCapturer::SelectCameraDevice()
@@ -327,75 +396,6 @@ bool CameraCapturer::StartCaptureSession(Camera_Profile* previewProfile)
         return false;
     }
     return true;
-}
-
-void CameraCapturer::StartInternal()
-{
-    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
-
-    if (!isInitialized_) {
-        RTC_LOG(LS_ERROR) << "Not initialized";
-        NotifyCapturedStart(false);
-        return;
-    }
-
-    if (isStarted_) {
-        RTC_LOG(LS_WARNING) << "Capture session is started";
-        return;
-    }
-
-    Camera_Device* device = SelectCameraDevice();
-    if (device == nullptr) {
-        return;
-    }
-
-    GetCameraOrientationAndSceneMode(device);
-    auto capability = CameraManager::GetInstance().GetSupportedCameraOutputCapability(device);
-    Camera_Profile* previewProfile = FindPreviewProfile(capability, device);
-    if (previewProfile == nullptr) {
-        return;
-    }
-
-    input_ = CameraManager::GetInstance().CreateCameraInput(device);
-    if (input_.IsEmpty()) {
-        RTC_LOG(LS_ERROR) << "Failed to create camera input";
-        return;
-    }
-
-    if (!input_.Open()) {
-        RTC_LOG(LS_ERROR) << "Failed to open camera input";
-        return;
-    }
-
-    if (!StartCaptureSession(previewProfile)) {
-        return;
-    }
-
-    isStarted_ = true;
-}
-
-void CameraCapturer::StopInternal()
-{
-    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
-
-    if (!isStarted_) {
-        RTC_LOG(LS_ERROR) << "Capture session is not started";
-        return;
-    }
-
-    if (!captureSession_.Stop()) {
-        RTC_LOG(LS_ERROR) << "Failed to stop capture session";
-        return;
-    }
-
-    previewOutput_.RemoveObserver(this);
-    previewOutput_.Reset();
-
-    input_.Close();
-    input_.Reset();
-    captureSession_.Reset();
-    ohos::DisplayManager::GetInstance().UnregisterChangeCallback(this);
-    isStarted_ = false;
 }
 
 void CameraCapturer::OnCameraManagerStatusCallback(Camera_StatusInfo* status)
