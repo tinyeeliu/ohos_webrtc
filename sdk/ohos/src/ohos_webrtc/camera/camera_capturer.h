@@ -52,7 +52,7 @@ public:
     void Start() override;
     void Stop() override;
     bool IsScreencast() override;
-    void SwitchCamera() override;
+    void SwitchCamera() override;  // 保留：摄像头切换函数
     void SwitchCamera(const std::string& cameraId) override;  // 保留：摄像头切换重载函数
 
 protected:
@@ -75,12 +75,18 @@ protected:
     void OnDisplayChange(uint64_t displayId) override;  // 新增：屏幕旋转回调函数
 
 private:
-    std::string deviceId_;
+    // 新增：远程版本的私有辅助函数声明（与cpp文件匹配）
+    Camera_Device* SelectCameraDevice();
+    void GetCameraOrientationAndSceneMode(Camera_Device* device);
+    Camera_Profile* FindPreviewProfile(ohos::CameraOutputCapability& capability, Camera_Device* device);
+    bool StartCaptureSession(Camera_Profile* previewProfile);
+
+    std::string deviceId_;  // 修改：去掉const（摄像头切换需要修改deviceId_）
     const video::VideoProfile profile_;
 
     bool isInitialized_{false};
     bool isStarted_{false};
-    bool isSwitching_{false};
+    bool isSwitching_{false};  // 保留：摄像头切换状态标记
 
     bool useVideoSceneMode_{false};
     bool isCameraFrontFacing_{false};
@@ -95,7 +101,7 @@ private:
 
     VideoCapturer::Observer* observer_{};
     std::mutex obsMutex_;
-    std::atomic<VideoRotation> finalRotation_;
+    std::atomic<VideoRotation> finalRotation_;  // 新增：屏幕旋转最终角度（原子变量）
 };
 
 } // namespace webrtc
