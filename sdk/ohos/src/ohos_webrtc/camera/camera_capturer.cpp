@@ -122,8 +122,8 @@ void CameraCapturer::SwitchCamera()
     }
 
     auto devices = CameraManager::GetInstance().GetSupportedCameras();
-    const int MIN_DEVICE_COUNT = 2;
-    if (devices.Size() < MIN_DEVICE_COUNT) {
+    const int minDeviceCount = 2;
+    if (devices.Size() < minDeviceCount) {
         RTC_LOG(LS_ERROR) << "No camera to switch to";
         {
             UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
