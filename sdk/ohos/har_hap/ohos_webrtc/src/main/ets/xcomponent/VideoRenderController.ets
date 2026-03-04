@@ -21,27 +21,37 @@ const TAG: string = '[XComponentController1]';
 export enum ScalingMode { Fill, AspectFill, AspectFit }
 
 export class VideoRenderController extends XComponentController {
-  private renderer: NativeVideoRenderer = new NativeVideoRenderer();
+  private renderer?: NativeVideoRenderer;
+  private track: MediaStreamTrack | null = null;
+  private mirror: boolean = false;
+  private mirrorVertically: boolean = false;
+  private mode: ScalingMode = ScalingMode.Fill;
 
   setVideoTrack(track: MediaStreamTrack | null): void {
-    this.renderer.setVideoTrack(track);
+    this.track = this.track;
+    this.renderer?.setVideoTrack(track);
   }
 
   setMirror(mirror: boolean) : void {
-    this.renderer.setMirror(mirror);
+    this.renderer?.setMirror(mirror);
   }
   
   setMirrorVertically(mirrorVertically: boolean): void {
-    this.renderer.setMirrorVertically(mirrorVertically);
+    this.renderer?.setMirrorVertically(mirrorVertically);
   }
 
   setScalingMode(mode: ScalingMode) : void {
-    this.renderer.setScalingMode(mode);
+    this.renderer?.setScalingMode(mode);
   }
 
   onSurfaceCreated(surfaceId: string): void {
     Logging.d(TAG, 'onSurfaceCreated surfaceId: ' + surfaceId);
+    this.renderer = new NativeVideoRenderer();
     this.renderer.init(surfaceId);
+    this.renderer?.setVideoTrack(this.track);
+    this.renderer?.setMirror(this.mirror);
+    this.renderer?.setMirrorVertically(this.mirrorVertically);
+    this.renderer?.setScalingMode(this.mode);
   }
 
   onSurfaceChanged(surfaceId: string, rect: SurfaceRect): void
@@ -53,6 +63,7 @@ export class VideoRenderController extends XComponentController {
   onSurfaceDestroyed(surfaceId: string): void
   {
     Logging.d(TAG, 'onSurfaceDestroyed surfaceId: ' + surfaceId);
-    this.renderer.release();
+    this.renderer?.release();
+    this.renderer = undefined;
   }
 }

@@ -345,7 +345,7 @@ bool EglEnv::Init(EGLContext sharedContext, const std::vector<int32_t>& configAt
 
 void EglEnv::Release()
 {
-    eglMakeCurrent(eglDisplay_, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+    ReleaseSurface();
 
     if (eglContext_ != EGL_NO_CONTEXT) {
         if (!eglDestroyContext(eglDisplay_, eglContext_)) {
