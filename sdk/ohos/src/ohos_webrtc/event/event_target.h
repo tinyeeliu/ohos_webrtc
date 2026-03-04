@@ -130,7 +130,10 @@ protected:
 
         if (shouldStop_) {
             this->DidStop();
-            this->Unref();
+            auto refCount = this->Unref();
+            if (refCount > 0) {
+                RTC_LOG(LS_WARNING) << "Reference count of napi object is greater than 0: " << refCount;
+            }
         }
     }
 

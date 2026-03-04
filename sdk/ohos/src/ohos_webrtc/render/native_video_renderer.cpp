@@ -169,7 +169,7 @@ Napi::Value NapiNativeVideoRenderer::Init(const Napi::CallbackInfo& info)
             if (!GetEventHandler(kEventFrameResolutionChanged, tsfn)) {
                 return;
             }
-            Reference<Napi::Value>* context = tsfn.GetContext();
+            NapiNativeVideoRenderer* context = tsfn.GetContext();
             napi_status status =
                 tsfn.BlockingCall([context, width, height, rotation](Napi::Env env, Napi::Function jsCallback) {
                     auto jsEvent = Object::New(env);
@@ -249,15 +249,12 @@ bool NapiNativeVideoRenderer::SetEventHandler(const std::string& type, Napi::Fun
 {
     RTC_DLOG(LS_VERBOSE) << "SetEventHandler type: " << type;
 
-    Reference<Napi::Value>* context = new Reference<Napi::Value>;
-    *context = Persistent(receiver);
-
+    this->Ref();
     EventHandler handler;
     handler.ref = Persistent(fn);
     handler.tsfn =
-        ThreadSafeFunction::New(fn.Env(), fn, type, 0, 1, context, [](Napi::Env, Reference<Napi::Value>* ctx) {
-            ctx->Reset();
-            delete ctx;
+        ThreadSafeFunction::New(fn.Env(), fn, type, 0, 1, this, [] (Napi::Env, NapiNativeVideoRenderer* ctx) {
+            ctx->Unref();
         });
 
     UNUSED std::lock_guard<std::mutex> lock(eventMutex_);
@@ -295,6 +292,7 @@ Napi::Value NapiNativeVideoRenderer::Release(const Napi::CallbackInfo& info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
+    RemoveAllEventHandlers();
     RemoveSink();
 
     surfaceId_.reset();

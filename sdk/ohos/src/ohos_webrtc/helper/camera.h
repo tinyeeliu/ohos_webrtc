@@ -645,7 +645,7 @@ inline CameraPreviewOutput CameraManager::CreatePreviewOutput(Camera_Profile* pr
     Camera_ErrorCode ret = OH_CameraManager_CreatePreviewOutput(Raw(), profile, surfaceId.c_str(), &output);
     NATIVE_THROW_IF_FAILED(
         ret == CAMERA_OK, ret, "OH_Camera", "Failed to create preview output", CameraPreviewOutput());
-    return CameraPreviewOutput(output);
+    return CameraPreviewOutput::TakeOwnership(output);
 }
 
 inline CameraVideoOutput CameraManager::CreateVideoOutput(Camera_VideoProfile* profile, const std::string& surfaceId)
@@ -653,7 +653,7 @@ inline CameraVideoOutput CameraManager::CreateVideoOutput(Camera_VideoProfile* p
     Camera_VideoOutput* output = nullptr;
     Camera_ErrorCode ret = OH_CameraManager_CreateVideoOutput(Raw(), profile, surfaceId.c_str(), &output);
     NATIVE_THROW_IF_FAILED(ret == CAMERA_OK, ret, "OH_Camera", "Failed to create preview output", CameraVideoOutput());
-    return CameraVideoOutput(output);
+    return CameraVideoOutput::TakeOwnership(output);
 }
 
 inline CameraCaptureSession CameraManager::CreateCaptureSession()
@@ -662,7 +662,7 @@ inline CameraCaptureSession CameraManager::CreateCaptureSession()
     Camera_ErrorCode ret = OH_CameraManager_CreateCaptureSession(Raw(), &session);
     NATIVE_THROW_IF_FAILED(
         ret == CAMERA_OK, ret, "OH_Camera", "Failed to create capture session", CameraCaptureSession());
-    return CameraCaptureSession(session);
+    return CameraCaptureSession::TakeOwnership(session);
 }
 
 inline Camera_Manager* CameraManager::Raw() const

@@ -42,6 +42,7 @@ const char kAttributeNameOnRendererStateChange[] = "onrendererstatechange";
 const char kMethodNameSetSpeakerMute[] = "setSpeakerMute";
 const char kMethodNameSetMicrophoneMute[] = "setMicrophoneMute";
 const char kMethodNameSetNoiseSuppressorEnabled[] = "setNoiseSuppressorEnabled";
+const char kMethodNameRelease[] = "release";
 const char kMethodNameIsBuiltInAcousticEchoCancelerSupported[] = "isBuiltInAcousticEchoCancelerSupported";
 const char kMethodNameIsBuiltInNoiseSuppressorSupported[] = "isBuiltInNoiseSuppressorSupported";
 const char kMethodNameToJson[] = "toJSON";
@@ -902,6 +903,7 @@ void NapiAudioDeviceModule::Init(Napi::Env env, Napi::Object exports)
             InstanceMethod<&NapiAudioDeviceModule::SetSpeakerMute>(kMethodNameSetSpeakerMute),
             InstanceMethod<&NapiAudioDeviceModule::SetMicrophoneMute>(kMethodNameSetMicrophoneMute),
             InstanceMethod<&NapiAudioDeviceModule::SetNoiseSuppressorEnabled>(kMethodNameSetNoiseSuppressorEnabled),
+            InstanceMethod<&NapiAudioDeviceModule::Release>(kMethodNameRelease),
             InstanceMethod<&NapiAudioDeviceModule::ToJson>(kMethodNameToJson),
             StaticMethod<&NapiAudioDeviceModule::isBuiltInAcousticEchoCancelerSupported>(
                 kMethodNameIsBuiltInAcousticEchoCancelerSupported),
@@ -990,10 +992,6 @@ NapiAudioDeviceModule::NapiAudioDeviceModule(const Napi::CallbackInfo& info) : O
 NapiAudioDeviceModule::~NapiAudioDeviceModule()
 {
     RTC_DLOG(LS_INFO) << __FUNCTION__;
-
-    for (auto& handler : eventHandlers_) {
-        handler.second.tsfn.Release();
-    }
 }
 
 Napi::Value NapiAudioDeviceModule::GetEventHandler(const Napi::CallbackInfo& info)
@@ -1032,16 +1030,14 @@ void NapiAudioDeviceModule::SetEventHandler(const Napi::CallbackInfo& info, cons
 
     Function cb = value.As<Function>();
 
-    Reference<Napi::Value>* context = new Reference<Napi::Value>;
-    *context = Persistent(info.This());
+    this->Ref();
 
     EventHandler handler;
     handler.ref = Persistent(cb);
     handler.tsfn =
-        ThreadSafeFunction::New(info.Env(), cb, type, 0, 1, context, [](Napi::Env env, Reference<Napi::Value>* ctx) {
+        ThreadSafeFunction::New(info.Env(), cb, type, 0, 1, this, [](Napi::Env env, NapiAudioDeviceModule* ctx) {
             (void)env;
-            ctx->Reset();
-            delete ctx;
+            ctx->Unref();
         });
 
     std::lock_guard<std::mutex> lock(mutex_);
@@ -1070,6 +1066,20 @@ Napi::Value NapiAudioDeviceModule::SetNoiseSuppressorEnabled(const Napi::Callbac
 
     // Noise suppressor is not supported.
     return Boolean::New(info.Env(), false);
+}
+
+Napi::Value NapiAudioDeviceModule::Release(const Napi::CallbackInfo& info)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    std::lock_guard<std::mutex> lock(mutex_);
+    for (auto& handler : eventHandlers_) {
+        RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+        handler.second.tsfn.Release();
+    }
+    eventHandlers_.clear();
+
+    return info.Env().Undefined();
 }
 
 Napi::Value NapiAudioDeviceModule::ToJson(const Napi::CallbackInfo& info)
@@ -1109,7 +1119,7 @@ void NapiAudioDeviceModule::OnAudioInputError(AudioInput* input, AudioErrorType 
     }
 
     auto& tsfn = it->second.tsfn;
-    Reference<Napi::Value>* context = tsfn.GetContext();
+    NapiAudioDeviceModule* context = tsfn.GetContext();
     napi_status status = tsfn.NonBlockingCall([context, type, message](Napi::Env env, Napi::Function jsCallback) {
         RTC_DLOG(LS_VERBOSE) << "error=" << type << ", " << message;
         auto jsError = Object::New(env);
@@ -1136,7 +1146,7 @@ void NapiAudioDeviceModule::OnAudioInputStateChange(AudioInput* input, AudioStat
     }
 
     auto& tsfn = it->second.tsfn;
-    Reference<Napi::Value>* context = tsfn.GetContext();
+    NapiAudioDeviceModule* context = tsfn.GetContext();
     napi_status status = tsfn.NonBlockingCall([context, newState](Napi::Env env, Napi::Function jsCallback) {
         auto jsEvent = Object::New(env);
         jsEvent.Set("state", String::New(env, AudioStateToString(newState)));
@@ -1159,7 +1169,7 @@ void NapiAudioDeviceModule::OnAudioInputDataReady(
     auto data = new rtc::CopyOnWriteBuffer((uint8_t*)buffer, length);
 
     auto& tsfn = it->second.tsfn;
-    Reference<Napi::Value>* context = tsfn.GetContext();
+    NapiAudioDeviceModule* context = tsfn.GetContext();
     napi_status status =
         tsfn.NonBlockingCall([context, sampleRate = input->GetSampleRate(), channelCount = input->GetChannelCount(),
                               data](Napi::Env env, Napi::Function jsCallback) {
@@ -1197,7 +1207,7 @@ void NapiAudioDeviceModule::OnAudioOutputError(AudioOutput* output, AudioErrorTy
     }
 
     auto& tsfn = it->second.tsfn;
-    Reference<Napi::Value>* context = tsfn.GetContext();
+    NapiAudioDeviceModule* context = tsfn.GetContext();
     napi_status status = tsfn.NonBlockingCall([context, type, message](Napi::Env env, Napi::Function jsCallback) {
         auto jsError = Object::New(env);
         jsError.Set("type", String::New(env, AudioErrorTypeToString(type)));
@@ -1223,7 +1233,7 @@ void NapiAudioDeviceModule::OnAudioOutputStateChange(AudioOutput* output, AudioS
     }
 
     auto& tsfn = it->second.tsfn;
-    Reference<Napi::Value>* context = tsfn.GetContext();
+    NapiAudioDeviceModule* context = tsfn.GetContext();
     napi_status status = tsfn.NonBlockingCall([context, newState](Napi::Env env, Napi::Function jsCallback) {
         auto jsEvent = Object::New(env);
         jsEvent.Set("state", String::New(env, AudioStateToString(newState)));
