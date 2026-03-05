@@ -27,6 +27,7 @@
 #include "rtc_base/helpers.h"
 #include "rtc_base/logging.h"
 #include "rtc_base/trace_event.h"
+#include "rtc_base/thread.h"
 
 namespace webrtc {
 

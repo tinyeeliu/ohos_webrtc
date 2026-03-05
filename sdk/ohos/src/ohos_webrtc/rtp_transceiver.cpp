@@ -193,7 +193,11 @@ void NapiRtpTransceiver::SetDirection(const Napi::CallbackInfo& info, const Napi
         newDirection = RtpTransceiverDirection::kStopped;
     }
 
-    auto error = rtpTransceiver_->SetDirectionWithError(newDirection);
+    // SetDirectionWithError must be called on the signaling thread.
+    RTCError error;
+    pc_->signaling_thread()->BlockingCall([this, newDirection, &error] {
+        error = rtpTransceiver_->SetDirectionWithError(newDirection);
+    });
     if (!error.ok()) {
         RTC_LOG(LS_ERROR) << "Failed to set direction: " << error.type() << ", " << error.message();
         NAPI_THROW_VOID(Error::New(info.Env(), "Failed to set direction"));
@@ -231,7 +235,11 @@ Napi::Value NapiRtpTransceiver::Stop(const Napi::CallbackInfo& info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    auto error = rtpTransceiver_->StopStandard();
+    // StopStandard must be called on the signaling thread.
+    RTCError error;
+    pc_->signaling_thread()->BlockingCall([this, &error] {
+        error = rtpTransceiver_->StopStandard();
+    });
     if (!error.ok()) {
         RTC_LOG(LS_ERROR) << "Failed to stop: " << error.type() << ", " << error.message();
         NAPI_THROW(Error::New(info.Env(), "Failed to stop"), info.Env().Undefined());
