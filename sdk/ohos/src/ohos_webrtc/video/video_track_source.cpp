@@ -47,26 +47,33 @@ OhosVideoTrackSource::OhosVideoTrackSource(
       signalingThread_(signalingThread),
       capturer_(std::move(capturer)),
       sharedContext_(sharedContext),
-      videoAdapter_(kRequiredResolutionAlignment)
+      videoAdapter_(kRequiredResolutionAlignment),
+      state_(kInitializing)
 {
     RTC_LOG(LS_INFO) << "OhosVideoTrackSource ctor: " << this;
 
-    SetState(kInitializing);
     thread_->SetName("v-track-source", capturer_.get());
     thread_->Start();
     thread_->PostTask(
-        [this] { capturer_->Init(VideoFrameReceiverGl::Create("v-frame-receiver", sharedContext_), this); });
+        [this,capturer=capturer_,sharedContext=sharedContext_] { capturer->Init(VideoFrameReceiverGl::Create("v-frame-receiver", sharedContext), this); });
 }
+
+
 
 OhosVideoTrackSource::~OhosVideoTrackSource()
 {
     RTC_LOG(LS_INFO) << __FUNCTION__;
-
-    thread_->PostTask([this] {
-        capturer_->Stop();
-        capturer_->Release();
-        capturer_.reset();
+    is_destroying_.store(true, std::memory_order_release);
+    thread_->PostTask([capturer = capturer_] {
+        capturer->Stop();
+        capturer->Release();
+        // capturer.reset();
     });
+    // thread_->blocking_call([this] {
+    //     capturer_->Stop();
+    //     capturer_->Release();
+    //     capturer_.reset();
+    // });
     thread_->Stop();
 }
 
@@ -74,14 +81,14 @@ void OhosVideoTrackSource::Start()
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    thread_->PostTask([this] { capturer_->Start(); });
+    thread_->PostTask([capturer = capturer_] { capturer->Start(); });
 }
 
 void OhosVideoTrackSource::Stop()
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    thread_->PostTask([this] { capturer_->Stop(); });
+    thread_->PostTask([capturer = capturer_] { capturer->Stop(); });
 }
 
 void OhosVideoTrackSource::SetCapturerObserver(VideoCapturer::Observer* observer)
@@ -93,14 +100,23 @@ void OhosVideoTrackSource::SetCapturerObserver(VideoCapturer::Observer* observer
 void OhosVideoTrackSource::SetState(SourceState state)
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__ << " state: " << state;
+    if (is_destroying_.load(std::memory_order_acquire)) {
+        RTC_LOG(LS_WARNING) << "SetState called during destruction, ignoring";
+        return;
+    }
 
     if (state_.exchange(state) != state) {
-        if (rtc::Thread::Current() == signalingThread_) {
-            FireOnChanged();
-        } else {
-            signalingThread_->PostTask([this] { FireOnChanged(); });
-        }
-    }
+          if (rtc::Thread::Current() == signalingThread_) {
+              FireOnChanged();
+          } else {
+              signalingThread_->PostTask(
+                  [self = rtc::scoped_refptr<OhosVideoTrackSource>(this)] {
+                      if (!self->is_destroying_.load(std::memory_order_acquire)) {
+                          self->FireOnChanged();
+                      }
+                  });
+          }
+      }
 }
 
 void OhosVideoTrackSource::SetState(bool isLive)
@@ -151,7 +167,7 @@ void OhosVideoTrackSource::AddOrUpdateSink(rtc::VideoSinkInterface<VideoFrame>* 
     videoAdapter_.OnSinkWants(broadcaster_.wants());
 
     if (broadcaster_.frame_wanted()) {
-        thread_->PostTask([this] { capturer_->Start(); });
+        thread_->PostTask([capturer = capturer_] { capturer->Start(); });
     }
 }
 
@@ -163,7 +179,7 @@ void OhosVideoTrackSource::RemoveSink(rtc::VideoSinkInterface<VideoFrame>* sink)
     videoAdapter_.OnSinkWants(broadcaster_.wants());
 
     if (!broadcaster_.frame_wanted()) {
-        thread_->PostTask([this] { capturer_->Stop(); });
+        thread_->PostTask([capturer=capturer_] { capturer->Stop(); });
     }
 }
 
