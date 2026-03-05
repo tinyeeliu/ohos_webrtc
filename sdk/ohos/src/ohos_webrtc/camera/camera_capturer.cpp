@@ -80,7 +80,7 @@ void CameraCapturer::Init(std::unique_ptr<VideoFrameReceiver> dataReceiver, Vide
 void CameraCapturer::Release()
 {
     RTC_LOG(LS_INFO) << __FUNCTION__;
-
+    ohos::DisplayManager::GetInstance().UnregisterChangeCallback(this);
     Stop();
 
     {
