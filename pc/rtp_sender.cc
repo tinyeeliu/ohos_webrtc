@@ -27,6 +27,7 @@
 #include "rtc_base/helpers.h"
 #include "rtc_base/logging.h"
 #include "rtc_base/trace_event.h"
+#include "rtc_base/thread.h"
 
 namespace webrtc {
 
@@ -796,6 +797,8 @@ VideoRtpSender::~VideoRtpSender() {
 }
 
 void VideoRtpSender::OnChanged() {
+  RTC_LOG(LS_INFO) << "Current thread: " << rtc::Thread::Current()->name() 
+                   << " (" << rtc::Thread::Current() << ")";
   RTC_DCHECK_RUN_ON(signaling_thread_);
   TRACE_EVENT0("webrtc", "VideoRtpSender::OnChanged");
   RTC_DCHECK(!stopped_);

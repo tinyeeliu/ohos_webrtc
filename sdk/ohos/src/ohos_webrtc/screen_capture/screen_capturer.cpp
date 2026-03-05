@@ -45,6 +45,7 @@ ScreenCapturer::ScreenCapturer(ScreenCaptureOptions options, std::shared_ptr<Sys
     : options_(std::move(options)), systemAudioReceiver_(systemAudioReceiver), screenCapture_(AVScreenCapture::Create())
 {
     RTC_DLOG(LS_INFO) << __FUNCTION__;
+    RTC_LOG(LS_INFO) << "ScreenCapturer-ScreenCapturer CREATED, this=" << this;
 
     if (IsAutoRotation()) {
         DisplayManager::GetInstance().RegisterChangeCallback(this);
@@ -54,7 +55,7 @@ ScreenCapturer::ScreenCapturer(ScreenCaptureOptions options, std::shared_ptr<Sys
 ScreenCapturer::~ScreenCapturer()
 {
     RTC_DLOG(LS_INFO) << __FUNCTION__;
-
+    RTC_LOG(LS_INFO) << "ScreenCapturer-ScreenCapturer DESTROYED, this=" << this;
     Release();
 
     if (IsAutoRotation()) {
@@ -122,15 +123,18 @@ void ScreenCapturer::Init(std::unique_ptr<VideoFrameReceiver> dataReceiver, Obse
 
 void ScreenCapturer::Release()
 {
-    RTC_LOG(LS_INFO) << __FUNCTION__;
+     RTC_LOG(LS_INFO) << __FUNCTION__ << " this=" << this;
 
-    screenCapture_.Reset();
-    dataReceiver_.reset();
+      // 添加检查，避免重复释放
+      if (!screenCapture_.IsEmpty()) {
+          screenCapture_.Reset();
+      }
+      dataReceiver_.reset();
 
-    {
-        UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
-        observer_ = nullptr;
-    }
+      {
+          UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
+          observer_ = nullptr;
+      }
 }
 
 void ScreenCapturer::Start()
@@ -179,6 +183,11 @@ void ScreenCapturer::Stop()
     OH_AVSCREEN_CAPTURE_ErrCode ret = OH_AVScreenCapture_StopScreenCapture(screenCapture_.Raw());
     if (ret != AV_SCREEN_CAPTURE_ERR_OK) {
         RTC_LOG(LS_ERROR) << "Failed to stop screen capture: " << ret;
+        return;
+    }
+    ret = OH_AVScreenCapture_Release(screenCapture_.Raw());
+    if (ret != AV_SCREEN_CAPTURE_ERR_OK) {
+        RTC_LOG(LS_ERROR) << "Failed to release screen capture: " << ret;
         return;
     }
 
@@ -370,7 +379,7 @@ void ScreenCapturer::OnError(OH_AVScreenCapture* capture, int32_t errorCode)
 
 void ScreenCapturer::OnStateChange(struct OH_AVScreenCapture* capture, OH_AVScreenCaptureStateCode stateCode)
 {
-    RTC_LOG(LS_INFO) << "State change: " << stateCode;
+    RTC_LOG(LS_INFO) << "ScreenCapturer- State change: " << stateCode << ", this=" << this;
     (void)capture;
 
     switch (stateCode) {
