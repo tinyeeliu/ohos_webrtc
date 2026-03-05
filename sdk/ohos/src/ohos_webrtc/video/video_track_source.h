@@ -86,13 +86,13 @@ protected:
     // VideoCapturer::Observer
     void OnCapturerStarted(bool success) override;
     void OnCapturerStopped() override;
-    void
-    OnFrameCaptured(rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation) override;
+    void OnFrameCaptured(rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation) override;
 
 private:
+    std::atomic<bool> is_destroying_{false};
     std::unique_ptr<rtc::Thread> thread_;
     rtc::Thread* signalingThread_;
-    std::unique_ptr<VideoCapturer> capturer_;
+    std::shared_ptr<VideoCapturer> capturer_;
     std::shared_ptr<EglContext> sharedContext_;
     cricket::VideoAdapter videoAdapter_;
     rtc::VideoBroadcaster broadcaster_;
