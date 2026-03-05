@@ -49,21 +49,24 @@ static constexpr int callbackInfoLen = 3;
 class AsyncWorkerReplaceTrack : public Napi::AsyncWorker {
 public:
     static Napi::Value DoWork(
-        Napi::Env env, rtc::scoped_refptr<RtpSenderInterface> rtpSender,
+        Napi::Env env, rtc::scoped_refptr<PeerConnectionInterface> pc,
+        rtc::scoped_refptr<RtpSenderInterface> rtpSender,
         rtc::scoped_refptr<MediaStreamTrackInterface> track)
     {
-        auto worker = new AsyncWorkerReplaceTrack(env, rtpSender, track);
+        auto worker = new AsyncWorkerReplaceTrack(env, pc, rtpSender, track);
         worker->Queue();
         return worker->deferred_.Promise();
     }
 
 protected:
     AsyncWorkerReplaceTrack(
-        Napi::Env env, rtc::scoped_refptr<RtpSenderInterface> rtpSender,
+        Napi::Env env, rtc::scoped_refptr<PeerConnectionInterface> pc,
+        rtc::scoped_refptr<RtpSenderInterface> rtpSender,
         rtc::scoped_refptr<MediaStreamTrackInterface> track)
         : Napi::AsyncWorker(env, "replaceTrack"),
           env_(env),
           deferred_(Napi::Promise::Deferred::New(env)),
+          pc_(pc),
           rtpSender_(rtpSender),
           track_(track)
     {
@@ -71,7 +74,11 @@ protected:
 
     void Execute() override
     {
-        if (!rtpSender_->SetTrack(track_.get())) {
+        bool success = false;
+        pc_->signaling_thread()->BlockingCall([this, &success] {
+            success = rtpSender_->SetTrack(track_.get());
+        });
+        if (!success) {
             SetError("Unknown error");
         }
     }
@@ -89,6 +96,7 @@ protected:
 private:
     Napi::Env env_;
     Napi::Promise::Deferred deferred_;
+    rtc::scoped_refptr<PeerConnectionInterface> pc_;
     rtc::scoped_refptr<RtpSenderInterface> rtpSender_;
     rtc::scoped_refptr<MediaStreamTrackInterface> track_;
 };
@@ -269,12 +277,14 @@ Napi::Value NapiRtpSender::SetParameters(const Napi::CallbackInfo& info)
             }),
         "SetParametersAsync", 0, 1);
 
-    rtpSender_->SetParametersAsync(parameters, [tsfn](RTCError error) {
-        RTC_DLOG(LS_INFO) << "SetParametersAsync complete: " << error.ok();
-        tsfn.BlockingCall([error = new RTCError(std::move(error))](Napi::Env env, Napi::Function jsCallback) {
-            jsCallback.Call({External<RTCError>::New(env, error, [](Napi::Env, RTCError* e) { delete e; })});
+    pc_->signaling_thread()->PostTask([rtpSender = rtpSender_, parameters, tsfn]() mutable {
+        rtpSender->SetParametersAsync(parameters, [tsfn](RTCError error) {
+            RTC_DLOG(LS_INFO) << "SetParametersAsync complete: " << error.ok();
+            tsfn.BlockingCall([error = new RTCError(std::move(error))](Napi::Env env, Napi::Function jsCallback) {
+                jsCallback.Call({External<RTCError>::New(env, error, [](Napi::Env, RTCError* e) { delete e; })});
+            });
+            tsfn.Release();
         });
-        tsfn.Release();
     });
 
     return deferred.Promise();
@@ -284,8 +294,13 @@ Napi::Value NapiRtpSender::GetParameters(const Napi::CallbackInfo& info)
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
+    RtpParameters parameters;
+    pc_->signaling_thread()->BlockingCall([this, &parameters] {
+        parameters = rtpSender_->GetParameters();
+    });
+
     auto jsParameters = Object::New(info.Env());
-    NapiRtpSendParameters::NativeToJs(rtpSender_->GetParameters(), jsParameters);
+    NapiRtpSendParameters::NativeToJs(parameters, jsParameters);
 
     return jsParameters;
 }
@@ -302,7 +317,7 @@ Napi::Value NapiRtpSender::ReplaceTrack(const Napi::CallbackInfo& info)
         }
     }
 
-    return AsyncWorkerReplaceTrack::DoWork(info.Env(), rtpSender_, track);
+    return AsyncWorkerReplaceTrack::DoWork(info.Env(), pc_, rtpSender_, track);
 }
 
 Napi::Value NapiRtpSender::SetStreams(const Napi::CallbackInfo& info)
@@ -324,7 +339,9 @@ Napi::Value NapiRtpSender::SetStreams(const Napi::CallbackInfo& info)
         streamsIds.push_back(stream->Get()->id());
     }
 
-    rtpSender_->SetStreams(streamsIds);
+    pc_->signaling_thread()->BlockingCall([this, &streamsIds] {
+        rtpSender_->SetStreams(streamsIds);
+    });
 
     return info.Env().Undefined();
 }

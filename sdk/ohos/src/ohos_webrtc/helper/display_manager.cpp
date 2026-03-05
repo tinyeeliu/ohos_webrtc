@@ -54,7 +54,12 @@ void DisplayManager::DisplayChangeCallback(uint64_t displayId)
 
     std::lock_guard<std::mutex> lock(mutex_);
     std::for_each(changeObservers_.begin(), changeObservers_.end(),
-        [displayId](auto* observer) { observer->OnDisplayChange(displayId); });
+        [displayId](auto * observer) {
+            if (observer) {
+                observer->OnDisplayChange(displayId);
+            }
+        }
+    );
 }
 
 bool DisplayManager::RegisterDisplayChangeListener()
