@@ -122,6 +122,7 @@ NativeWindowRendererGl::NativeWindowRendererGl(
 
 NativeWindowRendererGl::~NativeWindowRendererGl()
 {
+    thread_->PostTask([this] { eglEnv_.reset(); });
     thread_->Stop();
 }
 

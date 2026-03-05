@@ -192,6 +192,7 @@ protected:
     Napi::Value SetSpeakerMute(const Napi::CallbackInfo& info);
     Napi::Value SetMicrophoneMute(const Napi::CallbackInfo& info);
     Napi::Value SetNoiseSuppressorEnabled(const Napi::CallbackInfo& info);
+    Napi::Value Release(const Napi::CallbackInfo& info);
     Napi::Value ToJson(const Napi::CallbackInfo& info);
 
     static Napi::Value isBuiltInAcousticEchoCancelerSupported(const Napi::CallbackInfo& info);

@@ -2031,6 +2031,20 @@ getSelectedCandidatePair(): RTCIceCandidatePair | null;
 |-------|------------------|----|----|---------------|
 | state | MediaSourceState | 是  | 否  | 表示了媒体源处于的不同状态 |
 
+### release
+
+release(): void
+
+释放相关资源。MediaSource 或子类实例不再使用后必须调用该方法，否则将导致资源泄漏。
+
+#### 参数
+
+无
+
+#### 返回值
+
+无
+
 ## AudioSource
 
 继承自MediaSource，表示一个音频源。
@@ -2370,6 +2384,20 @@ static isBuiltInNoiseSuppressorSupported(): boolean
 | 类型      | 说明                  |
 |---------|---------------------|
 | boolean | true: 支持，false: 不支持 |
+
+### release
+
+release(): void
+
+释放相关资源。AudioDeviceModule 实例不再使用后必须调用该方法，否则将导致资源泄漏。
+
+#### 参数
+
+无
+
+#### 返回值
+
+无
 
 ## VideoEncoderFactory
 

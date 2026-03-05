@@ -416,6 +416,26 @@ struct Index {
     this.pcf?.stopAecDump();
     Logging.deleteInjectedLoggable();
 
+    this.pcf = undefined;
+
+    this.adm?.release();
+    this.adm = undefined;
+
+    this.pc?.close();
+    this.pc = undefined;
+
+    this.localAudioSource?.release();
+    this.localAudioSource = undefined;
+    this.localVideoSource?.release();
+    this.localVideoSource = undefined;
+
+    this.localAudioTrack?.stop();
+    this.localAudioTrack = undefined;
+    this.localAudioTrack2?.stop();
+    this.localAudioTrack2 = undefined;
+    this.localVideoTrack?.stop();
+    this.localVideoTrack = undefined;
+
     this.ws.close();
 
     this.ws.off('open');

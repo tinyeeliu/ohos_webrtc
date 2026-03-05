@@ -188,10 +188,10 @@ NapiVideoSource::~NapiVideoSource()
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    source_->SetCapturerObserver(nullptr);
-    source_ = nullptr;
-
-    RemoveAllEventHandlers();
+    if (source_) {
+        source_->SetCapturerObserver(nullptr);
+        source_ = nullptr;
+    }
 }
 
 Napi::Value NapiVideoSource::GetState(const Napi::CallbackInfo& info)
@@ -227,8 +227,6 @@ Napi::Value NapiVideoSource::Release(const Napi::CallbackInfo& info)
     if (!source_) {
         NAPI_THROW(Error::New(info.Env(), "Illegal state"), info.Env().Undefined());
     }
-
-    source_->AddRef();
 
     source_->SetCapturerObserver(nullptr);
     source_ = nullptr;
@@ -317,7 +315,7 @@ void NapiVideoSource::OnCapturerStarted(bool success)
         return;
     }
 
-    Reference<Napi::Value>* context = tsfn.GetContext();
+    NapiVideoSource* context = tsfn.GetContext();
     napi_status status = tsfn.BlockingCall([context, success](Napi::Env env, Napi::Function jsCallback) {
         auto jsEvent = Object::New(env);
         jsEvent.Set("type", String::New(env, "VideoCapturerStartedEvent"));
@@ -339,7 +337,7 @@ void NapiVideoSource::OnCapturerStopped()
         return;
     }
 
-    Reference<Napi::Value>* context = tsfn.GetContext();
+    NapiVideoSource* context = tsfn.GetContext();
     napi_status status = tsfn.BlockingCall([context](Napi::Env env, Napi::Function jsCallback) {
         auto jsEvent = Object::New(env);
         jsEvent.Set("type", String::New(env, "Event"));
@@ -387,15 +385,13 @@ bool NapiVideoSource::SetEventHandler(const std::string& type, Napi::Function fn
 {
     RTC_DLOG(LS_VERBOSE) << "SetEventHandler type: " << type;
 
-    Reference<Napi::Value>* context = new Reference<Napi::Value>;
-    *context = Persistent(receiver);
+    this->Ref();
 
     EventHandler handler;
     handler.ref = Persistent(fn);
     handler.tsfn =
-        ThreadSafeFunction::New(fn.Env(), fn, type, 0, 1, context, [](Napi::Env, Reference<Napi::Value>* ctx) {
-            ctx->Reset();
-            delete ctx;
+        ThreadSafeFunction::New(fn.Env(), fn, type, 0, 1, this, [](Napi::Env, NapiVideoSource* ctx) {
+            ctx->Unref();
         });
 
     UNUSED std::lock_guard<std::mutex> lock(eventMutex_);
