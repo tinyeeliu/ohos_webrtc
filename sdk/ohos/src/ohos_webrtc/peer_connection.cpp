@@ -409,8 +409,13 @@ Napi::Value NapiPeerConnection::GetCanTrickleIceCandidates(const Napi::CallbackI
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    if (pc_->can_trickle_ice_candidates()) {
-        return Boolean::New(info.Env(), pc_->can_trickle_ice_candidates().value());
+    // can_trickle_ice_candidates must be called on the signaling thread.
+    absl::optional<bool> canTrickle;
+    pc_->signaling_thread()->BlockingCall([pc = pc_, &canTrickle] {
+        canTrickle = pc->can_trickle_ice_candidates();
+    });
+    if (canTrickle) {
+        return Boolean::New(info.Env(), canTrickle.value());
     }
 
     return info.Env().Undefined();
@@ -420,7 +425,12 @@ Napi::Value NapiPeerConnection::GetSignalingState(const Napi::CallbackInfo& info
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    switch (pc_->signaling_state()) {
+    // signaling_state must be called on the signaling thread.
+    PeerConnectionInterface::SignalingState state;
+    pc_->signaling_thread()->BlockingCall([pc = pc_, &state] {
+        state = pc->signaling_state();
+    });
+    switch (state) {
         case PeerConnectionInterface::kStable:
             return String::New(info.Env(), kEnumSignalingStateStable);
         case PeerConnectionInterface::kHaveLocalOffer:
@@ -445,7 +455,12 @@ Napi::Value NapiPeerConnection::GetIceGatheringState(const Napi::CallbackInfo& i
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    switch (pc_->ice_gathering_state()) {
+    // ice_gathering_state must be called on the signaling thread.
+    PeerConnectionInterface::IceGatheringState gatheringState;
+    pc_->signaling_thread()->BlockingCall([pc = pc_, &gatheringState] {
+        gatheringState = pc->ice_gathering_state();
+    });
+    switch (gatheringState) {
         case PeerConnectionInterface::kIceGatheringNew:
             return String::New(info.Env(), kEnumIceGatheringStateNew);
         case PeerConnectionInterface::kIceGatheringGathering:
@@ -464,7 +479,12 @@ Napi::Value NapiPeerConnection::GetIceConnectionState(const Napi::CallbackInfo& 
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    switch (pc_->ice_connection_state()) {
+    // ice_connection_state must be called on the signaling thread.
+    PeerConnectionInterface::IceConnectionState iceConnState;
+    pc_->signaling_thread()->BlockingCall([pc = pc_, &iceConnState] {
+        iceConnState = pc->ice_connection_state();
+    });
+    switch (iceConnState) {
         case PeerConnectionInterface::kIceConnectionNew:
             return String::New(info.Env(), kEnumIceConnectionStateNew);
         case PeerConnectionInterface::kIceConnectionChecking:
@@ -491,7 +511,12 @@ Napi::Value NapiPeerConnection::GetConnectionState(const Napi::CallbackInfo& inf
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    switch (pc_->peer_connection_state()) {
+    // peer_connection_state must be called on the signaling thread.
+    PeerConnectionInterface::PeerConnectionState pcState;
+    pc_->signaling_thread()->BlockingCall([pc = pc_, &pcState] {
+        pcState = pc->peer_connection_state();
+    });
+    switch (pcState) {
         case PeerConnectionInterface::PeerConnectionState::kNew:
             return String::New(info.Env(), kEnumPeerConnectionStateNew);
         case PeerConnectionInterface::PeerConnectionState::kConnecting:
@@ -773,7 +798,14 @@ Napi::Value NapiPeerConnection::AddTrack(const Napi::CallbackInfo& info)
 
     auto napiTrack = NapiMediaStreamTrack::Unwrap(jsTrack);
     auto track = napiTrack->Get();
-    auto result = pc_->AddTrack(track, streamIds);
+
+    // AddTrack must be called on the signaling thread to ensure RtpSender's
+    // signaling_thread_ is correctly initialized (it uses rtc::Thread::Current())
+    RTCErrorOr<rtc::scoped_refptr<RtpSenderInterface>> result;
+    pc_->signaling_thread()->BlockingCall([pc = pc_, track, &streamIds, &result] {
+        result = pc->AddTrack(track, streamIds);
+    });
+
     if (!result.ok()) {
         RTC_LOG(LS_ERROR) << "Failed to add audio track to PeerConnection: " << result.error().message();
         NAPI_THROW(Error::New(info.Env(), result.error().message()), info.Env().Undefined());
@@ -806,7 +838,16 @@ Napi::Value NapiPeerConnection::RemoveTrack(const Napi::CallbackInfo& info)
     auto jsSender = info[0].As<Object>();
     auto sender = NapiRtpSender::Unwrap(jsSender);
 
-    auto error = pc_->RemoveTrackOrError(sender->Get());
+    auto rtpSender = sender->Get();
+
+    // Get the track before removing, as sender->track() may return null after removal
+    auto track = rtpSender->track();
+
+    // RemoveTrackOrError must be called on the signaling thread to avoid thread safety issues
+    RTCError error;
+    pc_->signaling_thread()->BlockingCall([pc = pc_, rtpSender, &error] {
+        error = pc->RemoveTrackOrError(rtpSender);
+    });
     if (!error.ok()) {
         RTC_LOG(LS_ERROR) << "Failed to remove track: " << error.message();
         std::string message;
@@ -823,8 +864,6 @@ Napi::Value NapiPeerConnection::RemoveTrack(const Napi::CallbackInfo& info)
         }
         NAPI_THROW(Error::New(info.Env(), message), info.Env().Undefined());
     }
-
-    auto track = sender->Get()->track();
     if (track && track->kind() == MediaStreamTrackInterface::kAudioKind) {
         // Remove audio input from adm
         auto source = factory_->GetAudioSource(track);
