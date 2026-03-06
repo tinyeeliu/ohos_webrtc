@@ -159,7 +159,6 @@ void OhosAudioDeviceModule::RemoveAudioInput(std::shared_ptr<AudioInput> input)
     RTC_LOG(LS_INFO) << __FUNCTION__;
 
     RTC_DCHECK(input);
-    RTC_DCHECK(!Recording());
     if (Recording()) {
         RTC_LOG(LS_WARNING) << "Can not add input while recording";
         return;
