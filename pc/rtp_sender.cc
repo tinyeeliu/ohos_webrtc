@@ -683,6 +683,13 @@ bool AudioRtpSender::InsertDtmf(int code, int duration) {
 }
 
 void AudioRtpSender::OnChanged() {
+    if (!signaling_thread_->IsCurrent()) {
+        signaling_thread_->PostTask(
+            [self = rtc::scoped_refptr<AudioRtpSender>(this)]() {
+                if (!self->stopped_)
+                    self->OnChanged();
+            });
+    }
   RTC_DCHECK_RUN_ON(signaling_thread_);
   TRACE_EVENT0("webrtc", "AudioRtpSender::OnChanged");
   RTC_DCHECK(!stopped_);
@@ -796,6 +803,13 @@ VideoRtpSender::~VideoRtpSender() {
 }
 
 void VideoRtpSender::OnChanged() {
+    if (!signaling_thread_->IsCurrent()) {
+        signaling_thread_->PostTask(
+            [self = rtc::scoped_refptr<VideoRtpSender>(this)]() {
+                if (!self->stopped_)
+                    self->OnChanged();
+            });
+    }
   RTC_DCHECK_RUN_ON(signaling_thread_);
   TRACE_EVENT0("webrtc", "VideoRtpSender::OnChanged");
   RTC_DCHECK(!stopped_);
