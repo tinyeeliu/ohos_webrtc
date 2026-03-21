@@ -50,9 +50,9 @@
 
 | 名称        | 类型     | 说明                 |
 |-----------|--------|--------------------|
-| complete  | string | ICE 收集器处于初始状态      |
+| new       | string | ICE 收集器处于初始状态      |
 | gathering | string | ICE 收集器正在收集候选者     |
-| new       | string | ICE 收集器已经完成了候选者的收集 |
+| complete  | string | ICE 收集器已经完成了候选者的收集 |
 
 ## RTCIceTransportState
 
@@ -60,13 +60,13 @@
 
 | 名称           | 类型     | 说明              |
 |--------------|--------|-----------------|
-| checking     | string | ICE 传输处于初始状态    |
-| closed       | string | ICE 传输正在检查连接    |
-| completed    | string | ICE 传输已连接但还没有完成 |
-| connected    | string | ICE 传输已完成所有连接检查 |
+| new          | string | ICE 传输处于初始状态    |
+| checking     | string | ICE 传输正在检查连接    |
+| connected    | string | ICE 传输已连接但还没有完成 |
+| completed    | string | ICE 传输已完成所有连接检查 |
 | disconnected | string | ICE 传输已断开连接     |
 | failed       | string | ICE 传输连接失败      |
-| new          | string | ICE 传输已关闭       |
+| closed       | string | ICE 传输已关闭       |
 
 ## RTCIceRole
 
@@ -161,7 +161,7 @@
 | 名称                   | 类型     | 说明                                             |
 |----------------------|--------|------------------------------------------------|
 | stable               | string | 没有正在进行的 offer/answer 的交换                       |
-| have-local-offer     | string | 成功应用了类型为 offer 的远程描述                           |
+| have-local-offer     | string | 成功应用了类型为 offer 的本地描述                           |
 | have-remote-offer    | string | 成功应用了类型为 offer 的远程描述                           |
 | have-local-pranswer  | string | 成功应用了类型为 offer 的远程描述，并且成功应用了类型为 pranswer 的本地描述 |
 | have-remote-pranswer | string | 成功应用了类型为 offer 的本地描述，并且成功应用了类型为 pranswer 的远程描述 |
@@ -261,7 +261,6 @@ ICE 候选策略，WebRTC 使用该策略向应用程序显示允许的候选者
 | failed      | string | ICE 候选对连接失败    |
 | frozen      | string | ICE 候选对连接被冻结   |
 | in-progress | string | ICE 候选对连接正在进行中 |
-| inprogress  | string | ICE 候选对连接正在进行中 |
 | succeeded   | string | ICE 候选对连接成功建立  |
 | waiting     | string | ICE 候选对处于等待状态  |
 
@@ -281,7 +280,7 @@ ICE 候选策略，WebRTC 使用该策略向应用程序显示允许的候选者
 | 名称          | 类型     | 说明           |
 |-------------|--------|--------------|
 | audioinput  | string | 音频输入设备，如麦克风。 |
-| audiooutput | string | 音频输出设备，如麦克风。 |
+| audiooutput | string | 音频输出设备，如扬声器。 |
 | videoinput  | string | 视频输入设备，如相机。  |
 
 ## HighResTimeStamp
@@ -882,9 +881,9 @@ setAudioRecording(recording: boolean): void
 
 #### 参数
 
-| 参数名   | 类型             | 必填 | 说明                                 |
-| -------- | ---------------- | ---- | ------------------------------------ |
-| recording | boolean | 是   | 略 |
+| 参数名    | 类型    | 必填 | 说明                                       |
+| --------- | ------- | ---- | ------------------------------------------ |
+| recording | boolean | 是   | true：启用音频录制；false：禁用音频录制。  |
 
 #### 返回值
 
@@ -1050,7 +1049,7 @@ setAudioPlayout(playout: boolean): void
 
 | 名称         | 类型                                              | 可读  | 可写  | 说明                             |
 |------------|-------------------------------------------------|-----|-----|--------------------------------|
-| kind       | string                                          | 是   | 否   | 表示媒体流轨道的类型，取值为"source"或"video" |
+| kind       | string                                          | 是   | 否   | 表示媒体流轨道的类型，取值为 "audio" 或 "video" |
 | id         | string                                          | 是   | 否   | 表示媒体流轨道的唯一标识符                  |
 | enabled    | boolean                                         | 是   | 是   | 表示媒体流轨道是否启用                    |
 | readyState | [MediaStreamTrackState](#mediastreamtrackstate) | 是   | 否   | 表示媒体流轨道的就绪状态                   |
@@ -1519,7 +1518,7 @@ static getCapabilities(kind: string): RTCRtpCapabilities | null
 
 ## RTCRtcpParameters
 
-述 RTCP（实时传输控制协议）的参数。
+描述 RTCP（实时传输控制协议）的参数。
 
 ### 属性
 
@@ -2249,7 +2248,7 @@ createVideoTrack(id: string, source: VideoSource): VideoTrack;
 
 | 类型       | 说明                                                   |
 | ---------- | ------------------------------------------------------ |
-| AudioTrack | 表示一个音频轨道对象，用于管理和处理音频流的发送或接收 |
+| VideoTrack | 表示一个视频轨道对象，用于管理和处理视频流的发送或接收 |
 
 ### startAecDump
 
@@ -2280,8 +2279,8 @@ startAecDump(fd: number, max_size_bytes: number): boolean;
 |------------------------|---------------------|-----|----------|
 | adm                    | AudioDeviceModule   | 否   | 音频设备管理模块 |
 | videoEncoderFactory    | VideoEncoderFactory | 否   | 视频编码器工厂  |
-| videoDecoderFactory    | AudioDeviceModule   | 否   | 视频解码器工厂  |
-| audioProcessingFactory | AudioDeviceModule   | 否   | 音频处理工厂   |
+| videoDecoderFactory    | VideoDecoderFactory | 否   | 视频解码器工厂  |
+| audioProcessingFactory | AudioProcessingFactory | 否   | 音频处理工厂   |
 
 ## AudioDeviceModule
 
@@ -2932,8 +2931,8 @@ let mediaStream = await mediaDevices.getDisplayMedia({video: {width: 720, height
 
 | 名称       | 类型                                              | 可读 | 可写  | 说明                                    |
 |----------|-------------------------------------------------|---|-----|---------------------------------------|
-| surfaceId | string                                          | 是 | 否   | 窗口对应的Surface Id，由 init 接口设置。          |
-| videoTrack     | [MediaDeviceKind](#mediadevicekind)\| undefined | 是   | 否   | 关联的视频轨道，由 setVideoTrack 接口设置。         |
+| surfaceId  | string                                   | 是 | 否   | 窗口对应的 Surface Id，由 init 接口设置。       |
+| videoTrack | [VideoTrack](#videotrack) \| undefined   | 是 | 否   | 关联的视频轨道，由 setVideoTrack 接口设置。     |
 
 ### init
 
@@ -2971,7 +2970,7 @@ setVideoTrack(videoTrack: MediaStreamTrack | null): void
 
 | 参数名       | 类型     | 必填 | 说明                                                                                           |
 |-----------|--------|----|----------------------------------------------------------------------------------------------|
-| videoTrack | [MediaDeviceKind](#mediadevicekind)\| null | 是  | 当 videoTrack 不为 null 且 kind 为 video 时，关联该视频轨道，并接收其视频流；当 videoTrack 为 null 时，解除与当前视频轨道的关联，停止接收视频流。 |
+| videoTrack | [MediaStreamTrack](#mediastreamtrack) \| null | 是  | 当 videoTrack 不为 null 且 kind 为 "video" 时，关联该视频轨道，并接收其视频流；当 videoTrack 为 null 时，解除与当前视频轨道的关联，停止接收视频流。 |
 
 #### 返回值
 
@@ -2982,7 +2981,7 @@ setVideoTrack(videoTrack: MediaStreamTrack | null): void
 ```typescript
 // 创建视频轨道
 this.localVideoSource = this.peerConnectionFactory.createVideoSource({width: 320, height: 240});
-this.localVideoTrack = this.peerConnectionFactory.createVideoTrack("video", this.localVideoSource);
+this.localVideoTrack = this.peerConnectionFactory.createVideoTrack('video', this.localVideoSource);
 
 let nativeVideoRenderer = new webrtc.NativeVideoRenderer();
 nativeVideoRenderer.setVideoTrack(this.localVideoTrack);
@@ -3085,7 +3084,7 @@ setVideoTrack(track: MediaStreamTrack | null): void
 
 | 参数名       | 类型     | 必填 | 说明                                                                                           |
 |-----------|--------|----|----------------------------------------------------------------------------------------------|
-| videoTrack | [MediaDeviceKind](#mediadevicekind)\| null | 是  | 当 videoTrack 不为 null 且 kind 为 video 时，关联该视频轨道，并接收其视频流；当 videoTrack 为 null 时，解除与当前视频轨道的关联，停止接收视频流。 |
+| videoTrack | [MediaStreamTrack](#mediastreamtrack) \| null | 是  | 当 videoTrack 不为 null 且 kind 为 "video" 时，关联该视频轨道，并接收其视频流；当 videoTrack 为 null 时，解除与当前视频轨道的关联，停止接收视频流。 |
 
 #### 返回值
 
