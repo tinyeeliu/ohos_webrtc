@@ -48,7 +48,7 @@ void VideoFrameDrawer::DrawFrame(
     if (frame.is_texture()) {
         auto buffer = static_cast<TextureBuffer*>(frame.video_frame_buffer().get());
         DrawTexture(
-            rtc::scoped_refptr<TextureBuffer>(buffer), drawer, renderMatrix_, frame.width(), frame.width(), viewportX,
+            rtc::scoped_refptr<TextureBuffer>(buffer), drawer, renderMatrix_, frame.width(), frame.height(), viewportX,
             viewportY, viewportWidth, viewportHeight);
     } else {
         if (yuvTextures_.size() == 0) {
