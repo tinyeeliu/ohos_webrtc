@@ -784,6 +784,8 @@ export interface DisplayMediaStreamOptions {
 
 export interface MediaSource {
   readonly state: MediaSourceState;
+
+  release(): void;
 }
 
 export interface AudioSource extends MediaSource {
@@ -957,6 +959,8 @@ export interface AudioDeviceModule {
   setSpeakerMute(mute: boolean): void;
   setMicrophoneMute(mute: boolean): void;
   setNoiseSuppressorEnabled(enabled: boolean): boolean;
+
+  release(): void;
 }
 
 declare var AudioDeviceModule: {
