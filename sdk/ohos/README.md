@@ -1,35 +1,37 @@
 # <center>ohos_webrtc</center>
 
-## 简介
+This project is based on [WebRTC](https://webrtc.googlesource.com/src).
 
-本目录下提供 WebRTC 的 ArkTS 接口封装，并在 C++ 层适配了视频的采集、渲染及编解码等模块。其中大部分接口的设计遵循 [WebRTC 规范](https://www.w3.org/TR/webrtc/)，另外也根据实际需要，额外提供了 PeerConnectionFactory 和 AudioDeviceModule 等接口。
+## Introduction
 
-**图1** SDK 架构图
+ohos_webrtc is a real-time communication library for OpenHarmony/HarmonyOS. It provides ArkTS interface bindings and adapts video capture, rendering, and codec modules at the C++ layer. Most interfaces follow the [WebRTC specification](https://www.w3.org/TR/webrtc/), and additional interfaces such as PeerConnectionFactory and AudioDeviceModule are also provided.
+
+**Figure 1** SDK Architecture
 
 ![architecture](./img/webrtc-arch.png)
 
 
-## 下载安装
+## Installation
 
 ```bash
 ohpm install @ohos/webrtc
 ```
 
-OpenHarmony ohpm 环境配置等更多内容，请参考[如何安装 OpenHarmony ohpm 包](https://gitcode.com/openharmony-tpc/docs/blob/master/OpenHarmony_har_usage.md)。
+For more information on configuring the OpenHarmony ohpm environment, see [How to Install OpenHarmony ohpm Packages](https://gitcode.com/openharmony-tpc/docs/blob/master/OpenHarmony_har_usage.md).
 
-## 约束与限制
+## Constraints
 
-### 兼容性
+### Compatibility
 
-在下述版本验证通过：
+Verified on the following versions:
 
-- DevEco Studio: NEXT Beta2(5.0.3.900)，SDK: API12 Release(5.0.0.71)，ROM：5.0.0.71；
+- DevEco Studio: NEXT Beta2(5.0.3.900), SDK: API12 Release(5.0.0.71), ROM: 5.0.0.71
 
-**OHOS SDK 要求 12 及以上**。
+> **OHOS SDK API 12 or above is required.**
 
-### 权限要求
+### Permissions
 
-打开 `entry/src/main/module.json5`，根据实际功能需求添加以下权限：
+Open `entry/src/main/module.json5` and add the following permissions as needed:
 
 ```json
 "requestPermissions": [
@@ -60,21 +62,21 @@ OpenHarmony ohpm 环境配置等更多内容，请参考[如何安装 OpenHarmon
 ]
 ```
 
-## 使用示例
+## Usage Example
 
-以下示例展示了基本的音视频通话建立流程：
+The following example demonstrates a basic audio/video call setup flow:
 
 ```typescript
 import webrtc from '@ohos/webrtc';
 
-// 创建 PeerConnectionFactory 实例
+// Create a PeerConnectionFactory instance
 let peerConnectionFactory = new webrtc.PeerConnectionFactory();
 
-// 创建本地音频源和音频轨道
+// Create a local audio source and audio track
 let audioSource = peerConnectionFactory.createAudioSource();
 let audioTrack = peerConnectionFactory.createAudioTrack('audio', audioSource);
 
-// 创建本地视频源和视频轨道（分辨率 640×480，帧率 15~30fps）
+// Create a local video source and video track (resolution 640×480, frame rate 15~30fps)
 let videoSource = peerConnectionFactory.createVideoSource({
   width: 640,
   height: 480,
@@ -82,88 +84,183 @@ let videoSource = peerConnectionFactory.createVideoSource({
 });
 let videoTrack = peerConnectionFactory.createVideoTrack('video', videoSource);
 
-// 创建 RTCPeerConnection
+// Create an RTCPeerConnection
 let peerConnection = peerConnectionFactory.createPeerConnection({
   iceServers: [{ urls: 'stun:stun.example.com' }]
 });
 
-// 添加媒体轨道到连接
+// Add media tracks to the connection
 peerConnection.addTrack(audioTrack);
 peerConnection.addTrack(videoTrack);
 
-// 监听 ICE 候选者
+// Listen for ICE candidates
 peerConnection.onicecandidate = (event) => {
   if (event.candidate) {
-    // 通过信令通道将候选者发送给对端
+    // Send the candidate to the remote peer via the signaling channel
   }
 };
 
-// 创建并设置本地 Offer 描述
+// Create and set the local Offer description
 let offer = await peerConnection.createOffer();
 await peerConnection.setLocalDescription(offer);
-// 通过信令通道将 SDP offer 发送给远程端点
+// Send the SDP offer to the remote peer via the signaling channel
 ```
 
-更多使用示例请查看 `har_hap` 目录下的示例工程，动态库的编译方法请参阅[编译文档](../../docs/ohos/webrtc_build.md)。
+For more examples, see the demo project in the `har_hap` directory. For instructions on compiling the dynamic library, see the [Build Documentation](../../docs/ohos/webrtc_build.md).
 
-实现代码在 `src/ohos_webrtc` 目录下，其中 NAPI 接口的使用借助了开源项目 [node-addon-api](https://github.com/nodejs/node-addon-api)。
+The implementation code is in the `src/ohos_webrtc` directory. NAPI interface bindings are built with the open-source project [node-addon-api](https://github.com/nodejs/node-addon-api).
 
-## 接口说明
+## API Reference
 
-完整接口说明请参阅[接口文档](./api/libwebrtc.md)，接口定义见 `api/libohos_webrtc/webrtc.d.ts`。
+Full type definitions are in `api/libohos_webrtc/webrtc.d.ts`. For detailed documentation, see the [API Documentation](./api/libwebrtc.md).
 
-## 关于混淆
+### PeerConnectionFactory
 
-有关代码混淆技术的详细信息 ，请查看[代码混淆简介](https://developer.huawei.com/consumer/cn/doc/harmonyos-guides/source-obfuscation)。
+| Name | Description | Parameters | Return Value |
+|------|-------------|------------|--------------|
+| new | Constructs a factory instance | options?: PeerConnectionFactoryOptions | PeerConnectionFactory |
+| getDefault | Returns the default factory instance (static) | - | PeerConnectionFactory |
+| setDefault | Sets the default factory instance (static) | factory: PeerConnectionFactory | void |
+| createPeerConnection | Creates an RTCPeerConnection instance | config: RTCConfiguration | RTCPeerConnection |
+| createAudioSource | Creates an audio source | constraints?: MediaTrackConstraints | AudioSource |
+| createAudioTrack | Creates an audio track | id: string, source: AudioSource | AudioTrack |
+| createVideoSource | Creates a video source | constraints?: MediaTrackConstraints, isScreencast?: boolean | VideoSource |
+| createVideoTrack | Creates a video track | id: string, source: VideoSource | VideoTrack |
+| startAecDump | Starts recording an AEC debug dump | fd: number, max_size_bytes: number | boolean |
+| stopAecDump | Stops recording the AEC debug dump | - | void |
 
-如果希望在代码混淆过程中不会被混淆，需要在混淆规则配置文件 `obfuscation-rules.txt` 中添加相应的排除规则：
+#### PeerConnectionFactoryOptions
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| adm | AudioDeviceModule | No | Custom audio device module |
+| videoEncoderFactory | VideoEncoderFactory | No | Custom video encoder factory |
+| videoDecoderFactory | VideoDecoderFactory | No | Custom video decoder factory |
+| audioProcessing | AudioProcessing | No | Custom audio processing instance |
+
+### RTCPeerConnection
+
+| Name | Description | Parameters | Return Value |
+|------|-------------|------------|--------------|
+| new | Creates a connection instance | configuration?: RTCConfiguration | RTCPeerConnection |
+| createOffer | Creates an SDP Offer | options?: RTCOfferOptions | Promise\<RTCSessionDescriptionInit\> |
+| createAnswer | Creates an SDP Answer | options?: RTCAnswerOptions | Promise\<RTCSessionDescriptionInit\> |
+| setLocalDescription | Sets the local SDP description | description?: RTCSessionDescriptionInit | Promise\<void\> |
+| setRemoteDescription | Sets the remote SDP description | description: RTCSessionDescriptionInit | Promise\<void\> |
+| addIceCandidate | Adds an ICE candidate | candidate?: RTCIceCandidateInit | Promise\<void\> |
+| addTrack | Adds a media track | track: MediaStreamTrack, ...streams: MediaStream[] | RTCRtpSender |
+| removeTrack | Removes a media track | sender: RTCRtpSender | void |
+| addTransceiver | Adds a transceiver | trackOrKind: MediaStreamTrack \| string, init?: RTCRtpTransceiverInit | RTCRtpTransceiver |
+| createDataChannel | Creates a data channel | label: string, dataChannelDict?: RTCDataChannelInit | RTCDataChannel |
+| getSenders | Returns all senders | - | RTCRtpSender[] |
+| getReceivers | Returns all receivers | - | RTCRtpReceiver[] |
+| getTransceivers | Returns all transceivers | - | RTCRtpTransceiver[] |
+| getConfiguration | Returns the current connection configuration | - | RTCConfiguration |
+| setConfiguration | Updates the connection configuration | configuration?: RTCConfiguration | void |
+| restartIce | Restarts ICE negotiation | - | void |
+| getStats | Returns call statistics | selector?: MediaStreamTrack | Promise\<RTCStatsReport\> |
+| setAudioRecording | Enables/disables audio capture | recording: boolean | void |
+| setAudioPlayout | Enables/disables audio playback | playout: boolean | void |
+| close | Closes the connection and releases resources | - | void |
+
+### MediaDevices
+
+| Name | Description | Parameters | Return Value |
+|------|-------------|------------|--------------|
+| getUserMedia | Obtains a camera/microphone media stream | constraints?: MediaStreamConstraints | Promise\<MediaStream\> |
+| getDisplayMedia | Obtains a screen capture media stream | options?: DisplayMediaStreamOptions | Promise\<MediaStream\> |
+| enumerateDevices | Enumerates available media devices | - | Promise\<MediaDeviceInfo[]\> |
+| getSupportedConstraints | Returns supported media constraints | - | MediaTrackSupportedConstraints |
+
+### VideoRenderController
+
+`VideoRenderController` extends `XComponentController` and wraps `NativeVideoRenderer` for rendering video with the XComponent.
+
+| Name | Description | Parameters | Return Value |
+|------|-------------|------------|--------------|
+| setVideoTrack | Sets the video track to render | track: MediaStreamTrack \| null | void |
+| setMirror | Sets horizontal mirror flip | mirror: boolean | void |
+| setMirrorVertically | Sets vertical mirror flip | mirrorVertically: boolean | void |
+| setScalingMode | Sets the scaling mode | mode: ScalingMode | void |
+
+`ScalingMode` enum: `Fill` (0), `AspectFill` (1), `AspectFit` (2).
+
+### AudioDeviceModule
+
+| Name | Description | Parameters | Return Value |
+|------|-------------|------------|--------------|
+| new | Constructs an audio device module | options?: AudioDeviceModuleOptions | AudioDeviceModule |
+| isBuiltInAcousticEchoCancelerSupported | Queries hardware AEC support (static) | - | boolean |
+| isBuiltInNoiseSuppressorSupported | Queries hardware noise suppressor support (static) | - | boolean |
+| setSpeakerMute | Mutes/unmutes the speaker | mute: boolean | void |
+| setMicrophoneMute | Mutes/unmutes the microphone | mute: boolean | void |
+| setNoiseSuppressorEnabled | Enables/disables noise suppression | enabled: boolean | boolean |
+| release | Releases resources | - | void |
+
+#### AudioDeviceModuleOptions
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| audioSource | number | No | SOURCE_TYPE_VOICE_COMMUNICATION | Input audio source type. See ohos.multimedia.audio.SourceType |
+| audioFormat | number | No | SAMPLE_FORMAT_S16LE | Sample format. See ohos.multimedia.audio.AudioSampleFormat |
+| inputSampleRate | number | No | 48000 | Input sample rate (Hz) |
+| useStereoInput | boolean | No | false | Whether to use stereo input; defaults to mono |
+| outputSampleRate | number | No | 48000 | Output sample rate (Hz) |
+| useStereoOutput | boolean | No | false | Whether to use stereo output; defaults to mono |
+| rendererUsage | number | No | STREAM_USAGE_VOICE_COMMUNICATION | Output audio usage. See ohos.multimedia.audio.StreamUsage |
+| useLowLatency | boolean | No | false | Whether to enable low-latency capture and playback |
+| useHardwareAcousticEchoCanceler | boolean | No | false | Whether to use hardware AEC (call isBuiltInAcousticEchoCancelerSupported() first) |
+| useHardwareNoiseSuppressor | boolean | No | false | Whether to use hardware noise suppressor (call isBuiltInNoiseSuppressorSupported() first) |
+
+## Code Obfuscation
+
+For details on code obfuscation, see [Code Obfuscation](https://developer.huawei.com/consumer/cn/doc/harmonyos-guides/source-obfuscation).
+
+To prevent `@ohos/webrtc` from being obfuscated, add the following exclusion rule to `obfuscation-rules.txt`:
 
 ```
 -keep
 ./oh_modules/@ohos/webrtc
 ```
 
-## 目录结构
-
-SDK 目录结构及说明如下：
+## Directory Structure
 
 ```shell
 sdk/ohos/
-├── BUILD.gn            # src 编译脚本
-├── api                 # 存放接口文件
+├── BUILD.gn            # Build script for src/
+├── api                 # Interface files
 │   ├── ets
 │   │   ├── log
-│   │   │   └── Logging.ets             # 日志
+│   │   │   └── Logging.ets             # Logging utility
 │   │   └── xcomponent
-│   │       └── VideoRenderController.ets # 视频渲染
+│   │       └── VideoRenderController.ets # Video render controller (wraps NativeVideoRenderer)
 │   ├── libohos_webrtc
-│   │   ├── index.d.ts
-│   │   └── webrtc.d.ts                 # 接口定义
-│   └── libwebrtc.md                    # 接口文档
-├── har_hap             # DevEco Studio 工程目录，包含一个 HAR 模块和一个示例 HAP 模块
+│   │   ├── index.d.ts                  # Entry point (re-exports webrtc.d.ts)
+│   │   └── webrtc.d.ts                 # Full type definitions
+│   └── libwebrtc.md                    # API documentation
+├── har_hap             # DevEco Studio demo project (HAR module + demo HAP module)
 └── src
-    ├── node-addon-api  # 三方库，辅助 NAPI 开发
-    └── ohos_webrtc     # 实现源码
-        ├── async_work      # 用于处理异步任务的辅助类
-        ├── audio_device    # 音频相关模块
-        ├── camera          # 相机相关模块
-        ├── desktop_capture # 桌面采集
-        ├── helper          # NDK 接口辅助类
-        ├── logging         # 日志接口适配
-        ├── render          # 视频渲染相关模块
-        ├── user_media      # 媒体约束相关的辅助类
-        ├── utils           # 工具
-        ├── video           # 视频相关模块
-        ├── video_codec     # 视频编解码相关模块
-        ├── peer_connection.cpp  # RTCPeerConnection 实现
-        ├── peer_connection.h    # RTCPeerConnection 头文件
-        └── other_interfaces     # 其他接口实现
+    ├── node-addon-api  # Third-party library for NAPI development
+    └── ohos_webrtc     # C++ implementation
+        ├── async_work      # Async task helpers
+        ├── audio_device    # Audio module
+        ├── camera          # Camera module
+        ├── desktop_capture # Desktop/screen capture
+        ├── helper          # NDK interface helpers
+        ├── logging         # Logging adapter
+        ├── render          # Video rendering module
+        ├── user_media      # Media constraints helpers
+        ├── utils           # Utilities
+        ├── video           # Video module
+        ├── video_codec     # Video codec module
+        ├── peer_connection.cpp  # RTCPeerConnection implementation
+        └── peer_connection.h    # RTCPeerConnection header
 ```
 
-## 贡献代码
+## Contributing
 
-使用过程中发现任何问题都可以提 [Issue](https://gitcode.com/openharmony-tpc/ohos_webrtc/issues) ，当然，也非常欢迎发 [PR](https://gitcode.com/openharmony-tpc/ohos_webrtc/pulls) 共建。
+Feel free to open an [Issue](https://gitcode.com/openharmony-sig/ohos_webrtc/issues) if you encounter any problems, or submit a [PR](https://gitcode.com/openharmony-sig/ohos_webrtc/pulls) to contribute.
 
-## 开源协议
+## License
 
-本项目基于 [BSD License](../../LICENSE)，请自由地享受和参与开源。
+This project is licensed under the [BSD License](../../LICENSE).
