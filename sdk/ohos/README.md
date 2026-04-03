@@ -2,11 +2,12 @@
 
 ## 简介
 
-本目录下提供 WebRTC 的 ArkTS 接口封装，并在 C++ 层适配了视频的采集、渲染及编解码等模块。其中大部分接口的设计遵循 [WebRTC 规范](https://www.w3.org/TR/webrtc/)，另外也根据实际需要，额外提供了 PeerConnectionFactory 和 AudioDeviceModule 等接口。
+webrtc 是适用于 OpenHarmony/HarmonyOS 的实时通信库，提供 ArkTS 接口封装，并在 C++ 层适配了视频采集、渲染及编解码等模块。大部分接口遵循 [WebRTC 规范](https://www.w3.org/TR/webrtc/)，同时额外提供 PeerConnectionFactory 和 AudioDeviceModule 等接口。
 
 **图1** SDK 架构图
 
 ![architecture](./img/webrtc-arch.png)
+
 
 
 ## 下载安装
@@ -23,9 +24,9 @@ OpenHarmony ohpm 环境配置等更多内容，请参考[如何安装 OpenHarmon
 
 在下述版本验证通过：
 
-- DevEco Studio: NEXT Beta2(5.0.3.900)，SDK: API12 Release(5.0.0.71)，ROM：5.0.0.71；
+- DevEco Studio: NEXT Beta2(5.0.3.900)，SDK: API12 Release(5.0.0.71)，ROM：5.0.0.71
 
-**OHOS SDK 要求 12 及以上**。
+> **OHOS SDK 要求 API 12 及以上。**
 
 ### 权限要求
 
@@ -114,9 +115,9 @@ await peerConnection.setLocalDescription(offer);
 
 ## 关于混淆
 
-有关代码混淆技术的详细信息 ，请查看[代码混淆简介](https://developer.huawei.com/consumer/cn/doc/harmonyos-guides/source-obfuscation)。
+有关代码混淆的详细信息，请查看[代码混淆简介](https://developer.huawei.com/consumer/cn/doc/harmonyos-guides/source-obfuscation)。
 
-如果希望在代码混淆过程中不会被混淆，需要在混淆规则配置文件 `obfuscation-rules.txt` 中添加相应的排除规则：
+若希望 `@ohos/webrtc` 在代码混淆过程中不被混淆，需在混淆规则配置文件 `obfuscation-rules.txt` 中添加以下排除规则：
 
 ```
 -keep
@@ -130,39 +131,38 @@ SDK 目录结构及说明如下：
 ```shell
 sdk/ohos/
 ├── BUILD.gn            # src 编译脚本
-├── api                 # 存放接口文件
+├── api                 # 接口文件
 │   ├── ets
 │   │   ├── log
-│   │   │   └── Logging.ets             # 日志
+│   │   │   └── Logging.ets             # 日志工具
 │   │   └── xcomponent
-│   │       └── VideoRenderController.ets # 视频渲染
+│   │       └── VideoRenderController.ets # 视频渲染控制器（封装 NativeVideoRenderer）
 │   ├── libohos_webrtc
-│   │   ├── index.d.ts
-│   │   └── webrtc.d.ts                 # 接口定义
-│   └── libwebrtc.md                    # 接口文档
-├── har_hap             # DevEco Studio 工程目录，包含一个 HAR 模块和一个示例 HAP 模块
+│   │   ├── index.d.ts                  # 接口入口（re-export webrtc.d.ts）
+│   │   └── webrtc.d.ts                 # 完整接口类型定义
+│   └── libwebrtc.md                    # 接口说明文档
+├── har_hap             # DevEco Studio 示例工程（含 HAR 模块和示例 HAP 模块）
 └── src
-    ├── node-addon-api  # 三方库，辅助 NAPI 开发
-    └── ohos_webrtc     # 实现源码
-        ├── async_work      # 用于处理异步任务的辅助类
+    ├── node-addon-api  # 辅助 NAPI 开发的三方库（node-addon-api）
+    └── ohos_webrtc     # C++ 实现源码
+        ├── async_work      # 异步任务辅助类
         ├── audio_device    # 音频相关模块
         ├── camera          # 相机相关模块
         ├── desktop_capture # 桌面采集
         ├── helper          # NDK 接口辅助类
         ├── logging         # 日志接口适配
         ├── render          # 视频渲染相关模块
-        ├── user_media      # 媒体约束相关的辅助类
-        ├── utils           # 工具
+        ├── user_media      # 媒体约束辅助类
+        ├── utils           # 工具类
         ├── video           # 视频相关模块
         ├── video_codec     # 视频编解码相关模块
         ├── peer_connection.cpp  # RTCPeerConnection 实现
-        ├── peer_connection.h    # RTCPeerConnection 头文件
-        └── other_interfaces     # 其他接口实现
+        └── peer_connection.h    # RTCPeerConnection 头文件
 ```
 
 ## 贡献代码
 
-使用过程中发现任何问题都可以提 [Issue](https://gitcode.com/openharmony-tpc/ohos_webrtc/issues) ，当然，也非常欢迎发 [PR](https://gitcode.com/openharmony-tpc/ohos_webrtc/pulls) 共建。
+使用过程中发现任何问题都可以提 [Issue](https://gitcode.com/openharmony-sig/ohos_webrtc/issues)，也非常欢迎发 [PR](https://gitcode.com/openharmony-sig/ohos_webrtc/pulls) 共建。
 
 ## 开源协议
 
