@@ -28,7 +28,7 @@ export class VideoRenderController extends XComponentController {
   private mode: ScalingMode = ScalingMode.Fill;
 
   setVideoTrack(track: MediaStreamTrack | null): void {
-    this.track = this.track;
+    this.track = track;
     this.renderer?.setVideoTrack(track);
   }
 
