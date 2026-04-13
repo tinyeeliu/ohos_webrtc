@@ -62,10 +62,12 @@ struct Index {
   @State localResolution: string = '未获取';
   @State remoteResolution: string = '未获取';
   @State canChangeResolution: boolean = false;
-  private currentResolutionIndex: number = 1;
+  @State private currentResolutionIndex: number = 1;
   private resolutionPresets: ResolutionPreset[] = [
-    {width: 640, height: 480, label: '640x480'},
-    {width: 1280, height: 720, label: '1280x720'}
+    { width: 640, height: 480, label: '640 x 480' },
+    { width: 1280, height: 720, label: '1280 x 720' },
+    { width: 0, height: 0, label: '0 x 0' },
+    { width: Infinity, height: Infinity, label: 'Infinity x Infinity' },
   ];
   private statsTimer?: number = undefined;
   private mXComponentController1: VideoRenderController = new VideoRenderController();
@@ -90,7 +92,8 @@ struct Index {
     // this is Index
     console.info(TAG, "dataChannel.OnMessage: ", event);
     console.info(TAG, "dataChannel.OnMessage: (typeof event.data) = ", typeof event.data);
-    console.info(TAG, "dataChannel.OnMessage: (event.data instanceof ArrayBuffer) = ", event.data instanceof ArrayBuffer);
+    console.info(TAG, "dataChannel.OnMessage: (event.data instanceof ArrayBuffer) = ",
+      event.data instanceof ArrayBuffer);
 
     this.setStatus("Received data channel message");
 
@@ -107,23 +110,29 @@ struct Index {
       Column() {
         Row() {
           Text("状态")
-            .fontSize(32)
+            .fontSize(20)
             .fontWeight(FontWeight.Normal)
             .margin({ right: 24 })
+            .flexShrink(0)
           Text(this.statusText)
-            .fontSize(32)
+            .fontSize(20)
             .fontWeight(FontWeight.Bold)
+            .layoutWeight(1)
+            .maxLines(20)
+            .textOverflow({ overflow: TextOverflow.Clip })
+            .textAlign(TextAlign.Start)
         }
+        .width('100%')
         .alignSelf(ItemAlign.Start)
 
         Row() {
           Text("本机ID")
-            .fontSize(32)
+            .fontSize(20)
             .fontWeight(FontWeight.Normal)
             .margin({ right: 24 })
             .align(Alignment.Start)
           Text(this.myId)
-            .fontSize(32)
+            .fontSize(20)
             .fontWeight(FontWeight.Bold)
         }
         .alignSelf(ItemAlign.Start)
@@ -217,20 +226,21 @@ struct Index {
           .padding({ top: 24 })
 
           Row() {
-            Button('切换分辨率')
-              .layoutWeight(1)
-              .height(54)
-              .fontSize(15)
-              .fontWeight(FontWeight.Bold)
-              .onClick(() => {
+            Text('本地分辨率预设列表:')
+              .fontSize(20)
+              .fontWeight(FontWeight.Normal)
+              .margin({ right: 12 })
+
+            Select(this.resolutionPresets.map(item => ({
+              value: item.label,
+            } as SelectOption)))
+              .value(this.resolutionPresets[this.currentResolutionIndex].label)
+              .onSelect((index: number) => {
+                this.currentResolutionIndex = index
                 this.changeResolution();
               })
-              .margin({ left: 6 })
-              .enabled(this.canChangeResolution)
-
           }
           .width('100%')
-          .justifyContent(FlexAlign.SpaceBetween)
           .alignSelf(ItemAlign.Start)
           .padding({ top: 24 })
         }
@@ -238,11 +248,11 @@ struct Index {
 
         Row() {
           Text("本地分辨率: ")
-            .fontSize(24)
+            .fontSize(20)
             .fontWeight(FontWeight.Normal)
             .margin({ right: 12 })
           Text(this.localResolution)
-            .fontSize(24)
+            .fontSize(20)
             .fontWeight(FontWeight.Bold)
             .fontColor(0x007DFF)
         }
@@ -251,11 +261,11 @@ struct Index {
 
         Row() {
           Text("远端分辨率: ")
-            .fontSize(24)
+            .fontSize(20)
             .fontWeight(FontWeight.Normal)
             .margin({ right: 12 })
           Text(this.remoteResolution)
-            .fontSize(24)
+            .fontSize(20)
             .fontWeight(FontWeight.Bold)
             .fontColor(0x007DFF)
         }
@@ -298,7 +308,12 @@ struct Index {
 
       }
       .width('100%')
-      .padding({ left: 16, right: 16, top: 16, bottom: 16 })
+      .padding({
+        left: 16,
+        right: 16,
+        top: 16,
+        bottom: 16
+      })
       .justifyContent(FlexAlign.Start)
     }
     .width('100%')
@@ -331,7 +346,8 @@ struct Index {
       .then(async (result: PermissionRequestResult) => {
         let granted = true;
         for (let index = 0; index < result.permissions.length; index++) {
-          console.info(TAG, "request permission [" + result.permissions[index] + "] with result: " + result.authResults[index]);
+          console.info(TAG,
+            "request permission [" + result.permissions[index] + "] with result: " + result.authResults[index]);
           if (result.authResults[index] != abilityAccessCtrl.GrantStatus.PERMISSION_GRANTED) {
             granted = false;
           }
@@ -517,7 +533,7 @@ struct Index {
     }
 
     if (!this.localVideoTrack) {
-      this.localVideoSource = this.pcf?.createVideoSource({width: 1280, height: 720, facingMode: 'user'}, false);
+      this.localVideoSource = this.pcf?.createVideoSource({ width: 1280, height: 720, facingMode: 'user' }, false);
       console.info(TAG, 'videoSource: ' + JSON.stringify(this.localVideoSource));
       this.localVideoSource!.oncapturerstarted = (event: webrtc.VideoCapturerStartedEvent) => {
         console.info(TAG, 'oncapturerstarted: event=' + JSON.stringify(event));
@@ -547,11 +563,12 @@ struct Index {
           height: 1280,
           ohosScreenCaptureAudioFilter: 'current-app', // 过滤当前应用播放的音频
         },
-        audio: false,   // 系统声音不捕获
+        audio: false, // 系统声音不捕获
         ohosSystemAudio: true
       });
 
-      this.displayMediaStream.getTracks().forEach((track) => console.info(TAG, 'display media Stream track: ' + JSON.stringify(track)));
+      this.displayMediaStream.getTracks()
+        .forEach((track) => console.info(TAG, 'display media Stream track: ' + JSON.stringify(track)));
 
       this.localVideoTrack = this.displayMediaStream.getVideoTracks()[0];
       console.info(TAG, 'videoTrack: ' + JSON.stringify(this.localVideoTrack));
@@ -773,8 +790,12 @@ struct Index {
   async sendMessage(message: string) {
     console.info(TAG, 'websocket send: ' + message);
     this.ws.send(message, (error, success) => {
-      if (success) console.info(TAG, 'websocket send success: ' + message);
-      else console.error(TAG, 'websocket send error: ' + error);
+      if (success) {
+        console.info(TAG, 'websocket send success: ' + message);
+      } else {
+        console.error(TAG,
+          'websocket send error: ' + error);
+      }
     });
   }
 
@@ -819,7 +840,6 @@ struct Index {
       return;
     }
 
-    this.currentResolutionIndex = (this.currentResolutionIndex + 1) % this.resolutionPresets.length;
     const preset = this.resolutionPresets[this.currentResolutionIndex];
 
     console.info(TAG, `Changing resolution to ${preset.label}`);
@@ -834,7 +854,7 @@ struct Index {
       }
 
       this.localVideoSource = this.pcf?.createVideoSource(
-        {width: preset.width, height: preset.height, facingMode: 'user'},
+        { width: preset.width, height: preset.height, facingMode: 'user' },
         false
       );
 
