@@ -36,12 +36,6 @@ interface MessageData {
   ice?: webrtc.RTCIceCandidateInit;
 }
 
-interface ResolutionPreset {
-  width: number;
-  height: number;
-  label: string;
-}
-
 interface RtpStats extends webrtc.RTCStats {
   kind?: string;
   frameWidth?: number;
@@ -62,13 +56,8 @@ struct Index {
   @State localResolution: string = '未获取';
   @State remoteResolution: string = '未获取';
   @State canChangeResolution: boolean = false;
-  @State private currentResolutionIndex: number = 1;
-  private resolutionPresets: ResolutionPreset[] = [
-    { width: 640, height: 480, label: '640 x 480' },
-    { width: 1280, height: 720, label: '1280 x 720' },
-    { width: 0, height: 0, label: '0 x 0' },
-    { width: Infinity, height: Infinity, label: 'Infinity x Infinity' },
-  ];
+  @State private customResWidth: string = '1280';
+  @State private customResHeight: string = '720';
   private statsTimer?: number = undefined;
   private mXComponentController1: VideoRenderController = new VideoRenderController();
   private mXComponentController2: VideoRenderController = new VideoRenderController();
@@ -225,20 +214,57 @@ struct Index {
           .alignSelf(ItemAlign.Start)
           .padding({ top: 24 })
 
-          Row() {
-            Text('本地分辨率预设列表:')
-              .fontSize(20)
+          Column() {
+            Text('自定义本地分辨率')
+              .fontSize(18)
               .fontWeight(FontWeight.Normal)
-              .margin({ right: 12 })
+              .alignSelf(ItemAlign.Start)
 
-            Select(this.resolutionPresets.map(item => ({
-              value: item.label,
-            } as SelectOption)))
-              .value(this.resolutionPresets[this.currentResolutionIndex].label)
-              .onSelect((index: number) => {
-                this.currentResolutionIndex = index
-                this.changeResolution();
-              })
+            Row() {
+              Text('宽')
+                .fontSize(16)
+                .margin({ right: 6 })
+                .flexShrink(0)
+              TextInput({ text: this.customResWidth, placeholder: '宽' })
+                .layoutWeight(1)
+                .height(44)
+                .fontSize(16)
+                .type(InputType.Number)
+                .onChange((value: string) => {
+                  this.customResWidth = value.replace(/[^0-9]/g, '');
+                })
+
+              Text('高')
+                .fontSize(16)
+                .margin({ left: 10, right: 6 })
+                .flexShrink(0)
+              TextInput({ text: this.customResHeight, placeholder: '高' })
+                .layoutWeight(1)
+                .height(44)
+                .fontSize(16)
+                .type(InputType.Number)
+                .onChange((value: string) => {
+                  this.customResHeight = value.replace(/[^0-9]/g, '');
+                })
+
+              Button('设置')
+                .height(44)
+                .fontSize(15)
+                .fontWeight(FontWeight.Medium)
+                .margin({ left: 8 })
+                .flexShrink(0)
+                .onClick(() => {
+                  const w = parseInt(this.customResWidth, 10);
+                  const h = parseInt(this.customResHeight, 10);
+                  if (isNaN(w) || isNaN(h) || w < 1 || h < 1) {
+                    promptAction.showToast({ message: '请输入有效的正整数宽高（≥1）' });
+                    return;
+                  }
+                  this.changeResolution(w, h);
+                })
+            }
+            .width('100%')
+            .margin({ top: 8 })
           }
           .width('100%')
           .alignSelf(ItemAlign.Start)
@@ -278,8 +304,8 @@ struct Index {
             type: XComponentType.SURFACE,
             controller: this.mXComponentController1
           })
-            .width('480px')
-            .height('480px')
+            .layoutWeight(1)
+            .height(220)
             .onLoad((context?) => {
               console.log(TAG, "context: " + context);
               console.log(TAG, "surfaceId: " + this.mXComponentController1.getXComponentSurfaceId());
@@ -293,8 +319,9 @@ struct Index {
             type: XComponentType.SURFACE,
             controller: this.mXComponentController2
           })
-            .width('480px')
-            .height('480px')
+            .layoutWeight(1)
+            .height(220)
+            .margin({ left: 8 })
             .onLoad((context?) => {
               console.log(TAG, "context: " + JSON.stringify(context));
               console.log(TAG, "surfaceId: " + this.mXComponentController2.getXComponentSurfaceId());
@@ -303,6 +330,7 @@ struct Index {
               console.log(TAG, "onDestroy");
             })
         }
+        .width('100%')
         .alignSelf(ItemAlign.Start)
         .padding({ top: 10 })
 
@@ -533,7 +561,7 @@ struct Index {
     }
 
     if (!this.localVideoTrack) {
-      this.localVideoSource = this.pcf?.createVideoSource({ width: 1280, height: 720, facingMode: 'user' }, false);
+      this.localVideoSource = this.pcf?.createVideoSource({ width: 1280, height: 720, facingMode: 'environment' }, false);
       console.info(TAG, 'videoSource: ' + JSON.stringify(this.localVideoSource));
       this.localVideoSource!.oncapturerstarted = (event: webrtc.VideoCapturerStartedEvent) => {
         console.info(TAG, 'oncapturerstarted: event=' + JSON.stringify(event));
@@ -550,7 +578,7 @@ struct Index {
         this.canChangeResolution = true;
       }
 
-      this.mXComponentController1.setMirror(true);
+      this.mXComponentController1.setMirror(false);
       this.mXComponentController1.setScalingMode(ScalingMode.AspectFit);
     }
   }
@@ -834,15 +862,20 @@ struct Index {
     });
   }
 
-  async changeResolution() {
+  async changeResolution(width: number, height: number): Promise<void> {
     if (!this.pc || !this.localVideoTrack) {
       console.error(TAG, "Cannot change resolution: peer connection or video track not available");
       return;
     }
 
-    const preset = this.resolutionPresets[this.currentResolutionIndex];
+    const label = `${width} x ${height}`;
+    console.info(TAG, `Changing resolution to ${label}`);
 
-    console.info(TAG, `Changing resolution to ${preset.label}`);
+    const prevVideoTrack = this.localVideoTrack;
+    const prevVideoSource = this.localVideoSource;
+    let newVideoSource: webrtc.VideoSource | undefined = undefined;
+    let newVideoTrack: webrtc.VideoTrack | undefined = undefined;
+    let senderSwappedToNew = false;
 
     try {
       const senders = this.pc.getSenders();
@@ -853,42 +886,72 @@ struct Index {
         return;
       }
 
-      this.localVideoSource = this.pcf?.createVideoSource(
-        { width: preset.width, height: preset.height, facingMode: 'user' },
+      newVideoSource = this.pcf?.createVideoSource(
+        { width: width, height: height, facingMode: 'environment' },
         false
       );
 
-      if (!this.localVideoSource) {
+      if (!newVideoSource) {
         console.error(TAG, "Failed to create new video source");
         return;
       }
 
-      this.localVideoSource.oncapturerstarted = (event: webrtc.VideoCapturerStartedEvent) => {
+      newVideoSource.oncapturerstarted = (event: webrtc.VideoCapturerStartedEvent) => {
         console.info(TAG, 'oncapturerstarted: event=' + JSON.stringify(event));
       };
-      this.localVideoSource.oncapturerstopped = (event: webrtc.Event) => {
+      newVideoSource.oncapturerstopped = (event: webrtc.Event) => {
         console.info(TAG, 'oncapturerstopped: event=' + JSON.stringify(event));
       };
 
-      const newVideoTrack = this.pcf?.createVideoTrack("video", this.localVideoSource);
+      newVideoTrack = this.pcf?.createVideoTrack("video", newVideoSource);
       if (!newVideoTrack) {
         console.error(TAG, "Failed to create new video track");
+        newVideoSource.release();
         return;
       }
 
       await videoSender.replaceTrack(newVideoTrack);
+      senderSwappedToNew = true;
 
-      this.localVideoTrack = newVideoTrack;
       this.mXComponentController1.setVideoTrack(newVideoTrack);
-      this.mXComponentController1.setMirror(true);
+      this.mXComponentController1.setMirror(false);
       this.mXComponentController1.setScalingMode(ScalingMode.AspectFit);
 
-      console.info(TAG, `Resolution changed to ${preset.label}`);
-      promptAction.showToast({ message: `分辨率已切换为 ${preset.label}` });
+      this.localVideoSource = newVideoSource;
+      this.localVideoTrack = newVideoTrack;
     } catch (error) {
+      newVideoTrack?.stop();
+      newVideoSource?.release();
+      if (senderSwappedToNew && this.pc) {
+        try {
+          const senders = this.pc.getSenders();
+          const rollbackSender = senders.find(sender => sender.track && sender.track.kind === 'video');
+          if (rollbackSender) {
+            await rollbackSender.replaceTrack(prevVideoTrack);
+          }
+        } catch (rollbackErr) {
+          console.error(TAG, "replaceTrack rollback failed: " + rollbackErr);
+        }
+      }
       console.error(TAG, "Error changing resolution: " + error);
       this.setError("Failed to change resolution: " + error);
+      return;
     }
+
+    try {
+      prevVideoTrack.stop();
+    } catch (stopErr) {
+      console.error(TAG, "stop previous video track failed: " + stopErr);
+    }
+    if (prevVideoSource !== undefined) {
+      try {
+        prevVideoSource.release();
+      } catch (relErr) {
+        console.error(TAG, "release previous video source failed: " + relErr);
+      }
+    }
+
+    console.info(TAG, `Resolution changed to ${label}`);
   }
 
   startStatsPolling() {
