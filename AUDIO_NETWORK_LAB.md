@@ -6,6 +6,8 @@ Primary document:
 
 - [modules/audio_coding/neteq/tools/audio_network_lab.md](./modules/audio_coding/neteq/tools/audio_network_lab.md)
 
+TESS 与 `emotion2vec` 模型体积大，不在 Git 中；跑情感评估前在本机执行 `bash modules/audio_coding/neteq/tools/audio_network_lab_setup_python_envs.sh --emotion --download-emotion-assets`（详见主文档「本仓库 Python 环境」）。
+
 ## Fast path (3 steps)
 
 1. Build:

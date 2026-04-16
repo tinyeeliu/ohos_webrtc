@@ -28,7 +28,7 @@
 - 输入 PCM 固定为 `16-bit signed little-endian`
 - 输入采样率固定为 `48000 Hz`
 - `--redundancy_mode=dred` 明确 fail-fast，当前 checkout 未接入 DRED
-- 情感评估默认使用仓库内的 TESS 数据集副本和本地模型缓存
+- 情感评估依赖本机 `.cache/` 下的 TESS 与 `emotion2vec` 模型（体积大，不在 Git 中；用环境脚本下载，见「本仓库 Python 环境」）
 
 ## 目录内容
 
@@ -54,8 +54,10 @@ Host 侧实验可执行文件。
 选择本仓库情感评估 Python 环境并运行基线脚本。
 - [audio_network_lab_run_tess_emotion_eval.sh](/Users/leyang/Projects/ohos_webrtc/modules/audio_coding/neteq/tools/audio_network_lab_run_tess_emotion_eval.sh)
 选择本仓库情感评估 Python 环境并运行弱网评估脚本。
-- [audio_network_lab_setup_python_envs.sh](/Users/leyang/Projects/ohos_webrtc/modules/audio_coding/neteq/tools/audio_network_lab_setup_python_envs.sh)
-在本仓库根目录创建 `.venv_asr` / `.venv_emotion` 并安装依赖。
+- [audio_network_lab_setup_python_envs.sh](./audio_network_lab_setup_python_envs.sh)
+在本仓库根目录创建 `.venv_asr` / `.venv_emotion` 并安装依赖；可选 `--download-emotion-assets` 拉取 TESS 与 emotion2vec。
+- [audio_network_lab_download_emotion_assets.py](./audio_network_lab_download_emotion_assets.py)
+将 TESS 与 `emotion2vec_plus_large` 下载到 `.cache/`（不提交 Git）。
 - [audio_network_lab_check_python_envs.sh](/Users/leyang/Projects/ohos_webrtc/modules/audio_coding/neteq/tools/audio_network_lab_check_python_envs.sh)
 检查本仓库 Python 环境是否完整。
 - [audio_network_lab_requirements_asr.txt](/Users/leyang/Projects/ohos_webrtc/modules/audio_coding/neteq/tools/audio_network_lab_requirements_asr.txt)
@@ -69,26 +71,39 @@ ASR / WER 依赖。
 - [audio_network_lab_gen_report.py](/Users/leyang/Projects/ohos_webrtc/modules/audio_coding/neteq/tools/audio_network_lab_gen_report.py)
 - [audio_network_lab_run_and_analyze.sh](/Users/leyang/Projects/ohos_webrtc/modules/audio_coding/neteq/tools/audio_network_lab_run_and_analyze.sh)
 
-## 仓库内数据与模型
+## 仓库内样本与本机缓存（TESS / 模型）
 
-这个项目现在按“独立仓库”组织，运行链路所需的语音样本、情感数据集和模型缓存都保留在当前仓库内。
+- **随仓库提供**：代表语音样本在
+  [`audio_network_lab_assets/representative_audio`](./audio_network_lab_assets/representative_audio)（体积小，可提交）。
+- **不在 Git 中（需本机下载）**：TESS 情感语料与 `iic/emotion2vec_plus_large` 体积大（合计约 **2G** 量级），默认放在仓库根目录下 **`.cache/`**（已在 `.gitignore`），避免污染远端仓库。
 
-默认使用的路径：
+下载方式（需联网，且先具备 `.venv_emotion`）：
 
-- 代表语音样本：
-[representative_audio](/Users/leyang/Projects/ohos_webrtc/modules/audio_coding/neteq/tools/audio_network_lab_assets/representative_audio)
-- TESS 数据集：
-[.cache/datasets/tess/tess](/Users/leyang/Projects/ohos_webrtc/.cache/datasets/tess/tess)
-- emotion2vec 模型缓存：
-[.cache/modelscope/models/iic/emotion2vec_plus_large](/Users/leyang/Projects/ohos_webrtc/.cache/modelscope/models/iic/emotion2vec_plus_large)
+```sh
+# 推荐：创建情感环境并拉取 TESS + emotion2vec
+bash modules/audio_coding/neteq/tools/audio_network_lab_setup_python_envs.sh \
+  --emotion --download-emotion-assets
 
-单机占用大致为：
+# 若环境已建好，仅补充数据与模型：
+bash modules/audio_coding/neteq/tools/audio_network_lab_setup_python_envs.sh \
+  --download-emotion-assets
+```
 
-- `representative_audio`：约 `32M`
-- `TESS`：约 `274M`
-- `emotion2vec_plus_large`：约 `1.8G`
+等价地，也可直接用情感环境里的 Python 调用：
 
-如果你要替换成自己的资产，保持目录结构一致即可；文档里的示例命令都不依赖外部仓库路径。
+```sh
+.venv_emotion/bin/python \
+  modules/audio_coding/neteq/tools/audio_network_lab_download_emotion_assets.py
+```
+
+下载完成后，评估脚本使用的默认路径为：
+
+- TESS（扁平 `*.wav`）：`.cache/datasets/tess/tess`
+- emotion2vec（ModelScope 快照）：`.cache/modelscope/models/iic/emotion2vec_plus_large`
+
+TESS 来源：Hugging Face 数据集 [`myleslinder/tess`](https://huggingface.co/datasets/myleslinder/tess) 中的 `data/tess.zip`（与官方 TESS 内容一致，CC BY-NC 4.0）。模型来源：ModelScope [`iic/emotion2vec_plus_large`](https://www.modelscope.cn/models/iic/emotion2vec_plus_large)。
+
+若改用自有语料或模型，保持与 [`audio_network_lab_tess_emotion_baseline.py`](./audio_network_lab_tess_emotion_baseline.py) 中 `--tess-dir` / `--model` 约定一致即可。
 
 ## 推荐结果目录
 
@@ -300,6 +315,20 @@ bash modules/audio_coding/neteq/tools/audio_network_lab_setup_python_envs.sh --a
 bash modules/audio_coding/neteq/tools/audio_network_lab_setup_python_envs.sh --emotion
 ```
 
+创建情感环境并下载 TESS + emotion2vec（首次跑情感评估推荐）：
+
+```sh
+bash modules/audio_coding/neteq/tools/audio_network_lab_setup_python_envs.sh \
+  --emotion --download-emotion-assets
+```
+
+仅下载情感资产（已有 `.venv_emotion` 时）：
+
+```sh
+bash modules/audio_coding/neteq/tools/audio_network_lab_setup_python_envs.sh \
+  --download-emotion-assets
+```
+
 如果你想显式指定 Python：
 
 ```sh
@@ -502,7 +531,7 @@ modules/audio_coding/neteq/tools/audio_network_lab_run_and_eval_speech.sh \
 - `.cache/modelscope`
 - `.cache/huggingface`
 
-如果模型缓存已在仓库内存在，脚本会优先复用本地模型，不需要重新下载。
+模型与 TESS 需按上文放入 `.cache/`；`audio_network_lab_download_emotion_assets.py` 在目标目录已有内容时会跳过下载，可用 `--force` 强制重新拉取。
 
 ### 1. 跑干净语音基线
 

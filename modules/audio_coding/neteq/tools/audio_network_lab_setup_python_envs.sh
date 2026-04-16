@@ -16,14 +16,22 @@ REPO_ROOT=$(cd "$SCRIPT_DIR/../../../.." && pwd)
 PYTHON_BIN=${PYTHON_BIN:-python3}
 SETUP_ASR=false
 SETUP_EMOTION=false
+DOWNLOAD_EMOTION_ASSETS=false
 
 usage() {
   cat <<EOF
-Usage: $0 [--asr] [--emotion] [--all] [--python /path/to/python3]
+Usage: $0 [--asr] [--emotion] [--all] [--download-emotion-assets] [--python /path/to/python3]
 
 Creates local virtual environments under:
   $REPO_ROOT/.venv_asr
   $REPO_ROOT/.venv_emotion
+
+Large TESS + emotion2vec files are not stored in git. After the emotion venv exists,
+use --download-emotion-assets to fetch them into $REPO_ROOT/.cache/ (requires network).
+
+You can also run ONLY the download step (no venv recreate) with:
+  $0 --download-emotion-assets
+(requires an existing $REPO_ROOT/.venv_emotion from a prior --emotion run)
 EOF
 }
 
@@ -40,6 +48,10 @@ while [ "$#" -gt 0 ]; do
     --all)
       SETUP_ASR=true
       SETUP_EMOTION=true
+      shift
+      ;;
+    --download-emotion-assets)
+      DOWNLOAD_EMOTION_ASSETS=true
       shift
       ;;
     --python)
@@ -59,8 +71,10 @@ while [ "$#" -gt 0 ]; do
 done
 
 if [ "$SETUP_ASR" = false ] && [ "$SETUP_EMOTION" = false ]; then
-  SETUP_ASR=true
-  SETUP_EMOTION=true
+  if [ "$DOWNLOAD_EMOTION_ASSETS" = false ]; then
+    SETUP_ASR=true
+    SETUP_EMOTION=true
+  fi
 fi
 
 create_env() {
@@ -86,4 +100,12 @@ if [ "$SETUP_EMOTION" = true ]; then
     "$SCRIPT_DIR/audio_network_lab_requirements_emotion.txt"
   "$REPO_ROOT/.venv_emotion/bin/python" -c \
     "import funasr, librosa, soundfile, soxr, sklearn; print('audio_network_lab emotion env ok')"
+fi
+
+if [ "$DOWNLOAD_EMOTION_ASSETS" = true ]; then
+  if [ ! -x "$REPO_ROOT/.venv_emotion/bin/python" ]; then
+    echo "Missing $REPO_ROOT/.venv_emotion (run: $0 --emotion)"
+    exit 1
+  fi
+  "$REPO_ROOT/.venv_emotion/bin/python" "$SCRIPT_DIR/audio_network_lab_download_emotion_assets.py"
 fi

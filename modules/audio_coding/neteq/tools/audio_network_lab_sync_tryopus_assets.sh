@@ -63,3 +63,6 @@ echo "Ready:"
 echo "  representative_audio -> $ASSET_ROOT/representative_audio"
 echo "  TESS dataset         -> $REPO_ROOT/.cache/datasets/tess/tess"
 echo "  emotion2vec model    -> $REPO_ROOT/.cache/modelscope/models/iic/emotion2vec_plus_large"
+echo
+echo "Tip: without a local tryOpus tree, download from the network instead:"
+echo "  bash $TOOLS_ROOT/audio_network_lab_setup_python_envs.sh --emotion --download-emotion-assets"
