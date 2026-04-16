@@ -1,0 +1,12 @@
+read_ls_001|librispeech/read_ls_001.wav
+read_ls_002|librispeech/read_ls_002.wav
+read_ls_003|librispeech/read_ls_003.wav
+read_ls_004|librispeech/read_ls_004.wav
+read_ls_005|librispeech/read_ls_005.wav
+read_ls_006|librispeech/read_ls_006.wav
+read_ls_007|librispeech/read_ls_007.wav
+read_ls_008|librispeech/read_ls_008.wav
+read_ls_009|librispeech/read_ls_009.wav
+read_ls_010|librispeech/read_ls_010.wav
+read_ls_011|librispeech/read_ls_011.wav
+read_ls_012|librispeech/read_ls_012.wav
