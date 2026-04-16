@@ -23,6 +23,11 @@ native API header files.
 2. OHOS Audio adapter code: [ohos audio](./modules/audio_device/ohos).
 3. How to use OHOS Video for webrtc followed [this project](https://gitee.com/han_jin_fei/oh_web-rtc).
 
+### Audio Network Lab
+
+- Main entry (quick start + experiment guide): [AUDIO_NETWORK_LAB.md](./AUDIO_NETWORK_LAB.md)
+- Full document (tools details, WER/emotion eval, scenarios): [modules/audio_coding/neteq/tools/audio_network_lab.md](./modules/audio_coding/neteq/tools/audio_network_lab.md)
+
 ### More info
 
  * Official web site: http://www.webrtc.org.

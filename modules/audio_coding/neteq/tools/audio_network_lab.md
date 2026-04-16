@@ -618,3 +618,59 @@ modules/audio_coding/neteq/tools/audio_network_lab_run_tess_emotion_eval.sh \
 - 输出 `wav`
 
 这样后续做参数 sweep 或写实验结论时，不需要先听全量音频，也能先从语义可懂度和情绪保真两个维度筛选 case。
+
+## 常见问题与排障清单
+
+### 1) `gn gen` 报 `google_benchmark` 或第三方目录缺失
+
+常见原因是仓库仅做了 `git clone`，未同步完整依赖。先在仓库根目录执行：
+
+```sh
+gclient sync
+```
+
+如果你只想最小化构建 `audio_network_lab`，请沿用本文给出的 `gn args`，确保关闭不必要组件（例如 benchmark、examples、tools）。
+
+### 2) `audio_network_lab` 运行时报 burst loss 参数非法
+
+当 `--avg_burst_loss_length > 1` 时，启用 Gilbert-Elliot 模型，必须满足：
+
+- `0 < --loss_pct < 100`
+- `avg_burst_loss_length > ceil(p/(1-p))`, `p=loss_pct/100`
+
+不满足时工具会直接返回错误（这是预期行为，用来避免内部网络模型断言崩溃）。
+
+### 3) 输出 WER 明显升高，但 `concealed_samples` 不高
+
+先检查：
+
+- 编码侧参数是否改动（`bitrate_bps`、`frame_ms`、`channels`）
+- 是否有较高 `accelerate_rate` / `preemptive_expand_rate`
+- 是否存在长时延和高抖动引发转写稳定性下降
+
+这类情况不一定是“硬丢包”问题，也可能是时域拉伸和编码失真叠加。
+
+### 4) 情感评估结果波动较大
+
+优先确认：
+
+- `clean` 基线是否稳定
+- `--network_random_seed` 是否固定
+- 样本量是否过小（smoke 样本通常只用于冒烟，不用于结论）
+
+### 5) 结果目录越来越大
+
+建议按阶段清理：
+
+- 临时冒烟：只保留 `summary.json` / `summary_report.json` / `wer_report.json`
+- 正式对比：保留完整 `wav` 和 `textlog`
+- 使用 `.gitignore` 保持 `results/` 不进入版本库
+
+## 结果解读速查
+
+- **链路是否正常**：`decoded_duration_ms == input_duration_ms`
+- **是否发生明显恢复压力**：`concealment_events`, `concealed_samples`
+- **FEC/RED 是否生效**：`fec_packets_received`, `max_secondary_decoded_rate`
+- **缓冲是否频繁调整**：`accelerate_rate`, `preemptive_expand_rate`, `jitter_buffer_target_delay_ms`
+- **用户感知风险**：`interruption_count`, `total_interruption_duration_ms`, `wer`
+
