@@ -325,12 +325,11 @@ AudioEncoderOpus::Config CreateOpusConfig(
       config.redundancy_mode == AudioNetworkLabRedundancyMode::kOpusFec;
   if (config.redundancy_mode == AudioNetworkLabRedundancyMode::kDred) {
     opus_config.dred = dred_selection.duration_frames;
-    // In the lab we have a known target loss rate and the caller already
-    // picked the intended DRED duration via SelectDredDuration(). Disable the
-    // encoder's runtime self-adaptation so experiments measure exactly the
-    // requested duration instead of the value the encoder would pick from
-    // `OnReceivedUplinkPacketLossFraction` (which the lab does not feed).
-    opus_config.adaptive_dred = false;
+    // Default lab behavior pins DRED depth so results are deterministic. Set
+    // `use_encoder_adaptive_dred=true` to switch to the production-like mode
+    // where the Opus encoder adapts DRED depth from runtime packet-loss
+    // feedback.
+    opus_config.adaptive_dred = config.use_encoder_adaptive_dred;
   }
   opus_config.dtx_enabled = config.enable_dtx;
   opus_config.cbr_enabled = config.cbr_enabled;
@@ -540,7 +539,9 @@ std::string AudioNetworkLabSummary::ToJson() const {
       << "    \"dred_duration_frames\": " << encoder.dred_duration_frames
       << ",\n"
       << "    \"dred_duration_source\": \""
-      << EscapeJsonString(encoder.dred_duration_source) << "\"\n"
+      << EscapeJsonString(encoder.dred_duration_source) << "\",\n"
+      << "    \"use_encoder_adaptive_dred\": "
+      << (encoder.use_encoder_adaptive_dred ? "true" : "false") << "\n"
       << "  },\n"
       << "  \"network\": {\n"
       << "    \"bandwidth_kbps\": " << network.bandwidth_kbps << ",\n"
@@ -669,6 +670,8 @@ AudioNetworkLabRunResult AudioNetworkLabRunner::Run(
   result.summary.encoder.redundancy_mode = std::string(
       AudioNetworkLabRedundancyModeToString(config.encoder.redundancy_mode));
   result.summary.encoder.expected_loss_pct = config.encoder.expected_loss_pct;
+  result.summary.encoder.use_encoder_adaptive_dred =
+      config.encoder.use_encoder_adaptive_dred;
   result.summary.encoder.cbr_enabled = config.encoder.cbr_enabled;
   result.summary.encoder.cvbr_enabled = config.encoder.cvbr_enabled;
   result.summary.network.bandwidth_kbps = config.network.bandwidth_kbps;

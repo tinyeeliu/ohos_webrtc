@@ -60,6 +60,7 @@
 数据来源：
 
 - 对比总表：`results/dred_burst_wer_codec_compare_20260416.md`
+- 库内调控（VBR burst 复核）：`results/dred_burst_wer_vbr_libadaptive_20260417/report.md`
 - 原始结果目录：
   - `results/dred_burst_wer_20260416/` (VBR)
   - `results/dred_burst_wer_cbr_20260416/` (CBR)
@@ -74,6 +75,10 @@
    - heavy: PLC `0.118702` / DRED+PLC `0.050576` / LBRR+PLC `0.106295` (CBR)
    - extreme: PLC `0.238967` / DRED+PLC `0.099135` / LBRR+PLC `0.211638` (CBR)
 4. **CVBR 在本批语料下与 VBR 结果一致**（WER/码率几乎重合），后续若要拉开差异，建议使用更长或更复杂语料再测。
+5. 新增复核：在 `manifest_quick` 的 VBR burst 矩阵中，开启
+   `--use_encoder_adaptive_dred=true`（库内 runtime 调控）得到的 WER 与
+   既有 VBR 报告一致；原因是这组 loss 桶下，库内自适应最终落到同一组
+   DRED 深度（50/80/100 帧）。
 
 ## 四、最小复现实验命令
 

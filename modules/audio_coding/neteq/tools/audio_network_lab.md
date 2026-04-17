@@ -38,11 +38,15 @@ Opus 1.5+ Deep REDundancy，需要先执行
 （`N∈[1,100]`，单位 10 ms）。`summary.json` 的
 `encoder.dred_duration_frames` / `encoder.dred_duration_source`
 会如实记录最终取值和来源（`auto` 或 `flag`）。
-- lab 运行时会把 `AudioEncoderOpusConfig::adaptive_dred` 显式关掉，
+- lab 默认会把 `AudioEncoderOpusConfig::adaptive_dred` 关掉，
 让 DRED 深度严格等于 `summary.encoder.dred_duration_frames`；
 生产路径（非 lab）默认开启自适应，由编码器基于
 `OnReceivedUplinkPacketLossFraction` 的平滑丢包率调整深度，参见
 `DRED_AUDIO_LAB.md` 的「生产路径 DRED 控制链路」章节。
+- 若要在 lab 中切到“库内调控”模式，可加
+`--use_encoder_adaptive_dred=true`。该模式下 `summary.json` 会额外记录
+`encoder.use_encoder_adaptive_dred=true`，用于区分“lab 固定深度”与
+“库内 runtime 自适应”。
 - 情感评估依赖本机 `.cache/` 下的 TESS 与 `emotion2vec` 模型（体积大，不在 Git 中；用环境脚本下载，见「本仓库 Python 环境」）
 
 ## 目录内容
@@ -471,6 +475,26 @@ python3 -c 'import math,struct; p="/tmp/lab_input.pcm"; open(p,"wb").write(b"".j
   --expected_loss_pct=10 \
   --loss_pct=10
 ```
+
+如果你要验证“**库内 runtime 调控**”而不是 lab 的固定深度策略，可开启：
+
+```sh
+./out/AudioLab/audio_network_lab \
+  --input_pcm=/tmp/lab_input.pcm \
+  --output_audio=/tmp/lab_dred_encoder_adapt.wav \
+  --summary_json=/tmp/lab_dred_encoder_adapt.json \
+  --redundancy_mode=dred \
+  --expected_loss_pct=20 \
+  --loss_pct=20 \
+  --avg_burst_loss_length=5 \
+  --use_encoder_adaptive_dred=true
+```
+
+此时：
+
+- `encoder.use_encoder_adaptive_dred=true`
+- `encoder.dred_duration_source` 仍记录为 `auto/flag`（lab 选出来的上限）
+- 实际编码期间 DRED 深度由库内 `AudioEncoderOpusImpl` 按 runtime 丢包反馈动态更新
 
 ## 单次语音 WER 评估
 

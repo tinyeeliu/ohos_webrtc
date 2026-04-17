@@ -65,6 +65,11 @@ struct AudioEncoderExperimentConfig {
   // kDred. -1 means "derive from `expected_loss_pct` (or the simulated network
   // loss, whichever is larger) at runtime".
   int dred_duration_frames = -1;
+  // When true and redundancy_mode is kDred, keep Opus encoder-side runtime
+  // DRED adaptation enabled (i.e. let the library adjust DRED depth from
+  // packet-loss feedback). When false (default), lab pins the depth chosen by
+  // `dred_duration_frames`/auto-selection to keep experiments deterministic.
+  bool use_encoder_adaptive_dred = false;
   // When true, maps to WebRtcOpus_EnableCbr (SDP `cbr=1`). Default is VBR.
   bool cbr_enabled = false;
   // When true (and cbr_enabled is false), maps to Opus constrained VBR (CVBR).
@@ -104,6 +109,7 @@ struct AudioNetworkLabSummary {
     int expected_loss_pct = 0;
     int dred_duration_frames = 0;
     std::string dred_duration_source = "none";
+    bool use_encoder_adaptive_dred = false;
     bool cbr_enabled = false;
     bool cvbr_enabled = false;
   } encoder;

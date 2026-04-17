@@ -66,6 +66,12 @@ ABSL_FLAG(int,
           "--redundancy_mode=dred. -1 (default) derives the value from "
           "--expected_loss_pct or the simulated network loss, whichever is "
           "larger.");
+ABSL_FLAG(
+    bool,
+    use_encoder_adaptive_dred,
+    false,
+    "When true and --redundancy_mode=dred, keep Opus encoder-side runtime DRED "
+    "adaptation enabled instead of pinning the depth selected by lab.");
 
 ABSL_FLAG(int,
           bandwidth_kbps,
@@ -180,6 +186,8 @@ int main(int argc, char* argv[]) {
     return 1;
   }
   config.encoder.dred_duration_frames = dred_duration_flag;
+  config.encoder.use_encoder_adaptive_dred =
+      absl::GetFlag(FLAGS_use_encoder_adaptive_dred);
   config.network.bandwidth_kbps = absl::GetFlag(FLAGS_bandwidth_kbps);
   config.network.delay_ms = absl::GetFlag(FLAGS_delay_ms);
   config.network.jitter_stddev_ms = absl::GetFlag(FLAGS_jitter_stddev_ms);
