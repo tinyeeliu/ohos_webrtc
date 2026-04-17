@@ -413,6 +413,13 @@ int16_t WebRtcOpus_DisableCbr(OpusEncInst* inst) {
   }
 }
 
+int16_t WebRtcOpus_SetVbrConstraint(OpusEncInst* inst, int32_t enabled) {
+  if (inst) {
+    return ENCODER_CTL(inst, OPUS_SET_VBR_CONSTRAINT(enabled));
+  }
+  return -1;
+}
+
 int16_t WebRtcOpus_SetComplexity(OpusEncInst* inst, int32_t complexity) {
   if (inst) {
     return ENCODER_CTL(inst, OPUS_SET_COMPLEXITY(complexity));

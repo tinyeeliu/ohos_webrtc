@@ -2,6 +2,10 @@
 
 `audio_network_lab` is a host-side, reproducible experiment loop for packet loss, jitter, reorder, and NetEq behavior analysis.
 
+Unified DRED + audio lab entry (recommended first stop):
+
+- [DRED_AUDIO_LAB.md](./DRED_AUDIO_LAB.md)
+
 Primary document:
 
 - [modules/audio_coding/neteq/tools/audio_network_lab.md](./modules/audio_coding/neteq/tools/audio_network_lab.md)

@@ -48,6 +48,9 @@ struct RTC_EXPORT AudioEncoderOpusConfig {
   bool fec_enabled;
   int dred;
   bool cbr_enabled;
+  // When true and `cbr_enabled` is false, use Opus constrained VBR (CVBR).
+  // Ignored when CBR is enabled.
+  bool cvbr_enabled;
   int max_playback_rate_hz;
 
   // `complexity` is used when the bitrate goes above

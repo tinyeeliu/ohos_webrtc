@@ -712,6 +712,8 @@ bool AudioEncoderOpusImpl::RecreateEncoderInstance(
     RTC_CHECK_EQ(0, WebRtcOpus_EnableCbr(inst_));
   } else {
     RTC_CHECK_EQ(0, WebRtcOpus_DisableCbr(inst_));
+    RTC_CHECK_EQ(
+        0, WebRtcOpus_SetVbrConstraint(inst_, config.cvbr_enabled ? 1 : 0));
   }
   if (config.dred > 0) {
     RTC_CHECK_EQ(0, WebRtcOpus_SetDredDuration(inst_, config.dred));

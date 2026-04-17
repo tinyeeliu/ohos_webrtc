@@ -43,6 +43,14 @@ ABSL_FLAG(int, bitrate_bps, 32000, "Opus target bitrate.");
 ABSL_FLAG(int, frame_ms, 20, "Opus packetization frame length in ms.");
 ABSL_FLAG(int, channels, 1, "Input/output channel count: 1 or 2.");
 ABSL_FLAG(bool, enable_dtx, false, "Enable Opus DTX.");
+ABSL_FLAG(bool,
+          cbr,
+          false,
+          "Enable Opus CBR (maps to SDP cbr=1). Default false is VBR.");
+ABSL_FLAG(bool,
+          cvbr,
+          false,
+          "Enable Opus constrained VBR (CVBR). Ignored when --cbr is true.");
 ABSL_FLAG(std::string,
           redundancy_mode,
           "none",
@@ -160,6 +168,8 @@ int main(int argc, char* argv[]) {
   config.encoder.frame_ms = absl::GetFlag(FLAGS_frame_ms);
   config.encoder.channels = absl::GetFlag(FLAGS_channels);
   config.encoder.enable_dtx = absl::GetFlag(FLAGS_enable_dtx);
+  config.encoder.cbr_enabled = absl::GetFlag(FLAGS_cbr);
+  config.encoder.cvbr_enabled = absl::GetFlag(FLAGS_cvbr);
   config.encoder.expected_loss_pct = absl::GetFlag(FLAGS_expected_loss_pct);
   const int dred_duration_flag = absl::GetFlag(FLAGS_dred_duration_frames);
   if (dred_duration_flag != -1 &&

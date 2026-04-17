@@ -1,5 +1,8 @@
 # Opus DRED integration helper
 
+> Unified doc/results entry for DRED + audio lab:
+> [`DRED_AUDIO_LAB.md`](../../DRED_AUDIO_LAB.md)
+
 This directory contains the artefacts required to reproduce the Opus 1.5+
 **Deep REDundancy (DRED)** and **Deep PLC** build on a fresh checkout.
 
@@ -100,6 +103,6 @@ i.e. DRED cuts PLC concealment volume by ~95 % at a +4.7 kbps bitrate cost.
 
 ## See also
 
-- `docs/opus_dred_integration_plan.md` – full design/integration plan,
-source-file-by-source-file.
+- `DRED_AUDIO_LAB.md` – consolidated entry for setup, experiments, and latest
+  WER/bitrate outcomes.
 

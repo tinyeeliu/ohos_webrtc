@@ -65,6 +65,10 @@ struct AudioEncoderExperimentConfig {
   // kDred. -1 means "derive from `expected_loss_pct` (or the simulated network
   // loss, whichever is larger) at runtime".
   int dred_duration_frames = -1;
+  // When true, maps to WebRtcOpus_EnableCbr (SDP `cbr=1`). Default is VBR.
+  bool cbr_enabled = false;
+  // When true (and cbr_enabled is false), maps to Opus constrained VBR (CVBR).
+  bool cvbr_enabled = false;
 };
 
 struct NetEqExperimentConfig {
@@ -100,6 +104,8 @@ struct AudioNetworkLabSummary {
     int expected_loss_pct = 0;
     int dred_duration_frames = 0;
     std::string dred_duration_source = "none";
+    bool cbr_enabled = false;
+    bool cvbr_enabled = false;
   } encoder;
 
   struct NetworkConfig {

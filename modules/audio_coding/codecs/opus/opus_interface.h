@@ -271,6 +271,22 @@ int16_t WebRtcOpus_EnableCbr(OpusEncInst* inst);
  */
 int16_t WebRtcOpus_DisableCbr(OpusEncInst* inst);
 
+/****************************************************************************
+ * WebRtcOpus_SetVbrConstraint()
+ *
+ * Enables or disables constrained VBR (CVBR). Only meaningful when VBR is
+ * enabled (i.e. CBR is off); maps to libopus OPUS_SET_VBR_CONSTRAINT.
+ *
+ * Input:
+ *      - inst               : Encoder context
+ *      - enabled            : 1 to constrain VBR around the target bitrate,
+ *                             0 for unconstrained VBR.
+ *
+ * Return value              :  0 - Success
+ *                             -1 - Error
+ */
+int16_t WebRtcOpus_SetVbrConstraint(OpusEncInst* inst, int32_t enabled);
+
 /*
  * WebRtcOpus_SetComplexity(...)
  *

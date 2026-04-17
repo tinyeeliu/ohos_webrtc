@@ -327,6 +327,8 @@ AudioEncoderOpus::Config CreateOpusConfig(
     opus_config.dred = dred_selection.duration_frames;
   }
   opus_config.dtx_enabled = config.enable_dtx;
+  opus_config.cbr_enabled = config.cbr_enabled;
+  opus_config.cvbr_enabled = config.cvbr_enabled;
   return opus_config;
 }
 
@@ -522,6 +524,10 @@ std::string AudioNetworkLabSummary::ToJson() const {
       << "    \"frame_ms\": " << encoder.frame_ms << ",\n"
       << "    \"enable_dtx\": " << (encoder.enable_dtx ? "true" : "false")
       << ",\n"
+      << "    \"cbr_enabled\": " << (encoder.cbr_enabled ? "true" : "false")
+      << ",\n"
+      << "    \"cvbr_enabled\": " << (encoder.cvbr_enabled ? "true" : "false")
+      << ",\n"
       << "    \"redundancy_mode\": \""
       << EscapeJsonString(encoder.redundancy_mode) << "\",\n"
       << "    \"expected_loss_pct\": " << encoder.expected_loss_pct << ",\n"
@@ -657,6 +663,8 @@ AudioNetworkLabRunResult AudioNetworkLabRunner::Run(
   result.summary.encoder.redundancy_mode = std::string(
       AudioNetworkLabRedundancyModeToString(config.encoder.redundancy_mode));
   result.summary.encoder.expected_loss_pct = config.encoder.expected_loss_pct;
+  result.summary.encoder.cbr_enabled = config.encoder.cbr_enabled;
+  result.summary.encoder.cvbr_enabled = config.encoder.cvbr_enabled;
   result.summary.network.bandwidth_kbps = config.network.bandwidth_kbps;
   result.summary.network.delay_ms = config.network.delay_ms;
   result.summary.network.jitter_stddev_ms = config.network.jitter_stddev_ms;
@@ -696,6 +704,11 @@ AudioNetworkLabRunResult AudioNetworkLabRunner::Run(
   if (config.encoder.expected_loss_pct < 0 ||
       config.encoder.expected_loss_pct > 100) {
     result.error = "--expected_loss_pct must be between 0 and 100.";
+    return result;
+  }
+  if (config.encoder.cbr_enabled && config.encoder.cvbr_enabled) {
+    result.error =
+        "--cbr and --cvbr cannot both be true (CVBR applies only in VBR mode).";
     return result;
   }
   if (config.network.bandwidth_kbps < 0) {

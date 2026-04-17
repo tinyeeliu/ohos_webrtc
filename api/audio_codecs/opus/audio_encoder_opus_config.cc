@@ -38,6 +38,7 @@ AudioEncoderOpusConfig::AudioEncoderOpusConfig()
       fec_enabled(false),
       dred(0),
       cbr_enabled(false),
+      cvbr_enabled(false),
       max_playback_rate_hz(48000),
       complexity(kDefaultComplexity),
       low_rate_complexity(kDefaultLowRateComplexity),
