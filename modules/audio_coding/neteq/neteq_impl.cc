@@ -647,9 +647,22 @@ int NetEqImpl::InsertPacketInternal(const RTPHeader& rtp_header,
         return new_packet;
       };
 
+      // Compute the timestamp gap between expected playout position and this
+      // packet so DRED can attempt recovery over that interval.
+      uint32_t expected_ts = sync_buffer_->end_timestamp();
+      uint32_t current_gap = 0;
+      if (packet.timestamp > expected_ts &&
+          (packet.timestamp - expected_ts) < 0x7FFFFFFF) {
+        current_gap = packet.timestamp - expected_ts;
+      }
+
       std::vector<AudioDecoder::ParseResult> results =
-          info->GetDecoder()->ParsePayload(std::move(packet.payload),
-                                           packet.timestamp);
+          info->GetDecoder()->ParsePayloadRedundancy(
+              std::move(packet.payload), packet.timestamp, current_gap);
+      if (!results.empty()) {
+        main_timestamp = results.front().timestamp;
+      }
+
       if (results.empty()) {
         packet_list.pop_front();
       } else {

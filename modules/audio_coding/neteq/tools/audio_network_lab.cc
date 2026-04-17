@@ -277,6 +277,11 @@ AudioEncoderOpus::Config CreateOpusConfig(
                                       kAudio;
   opus_config.fec_enabled =
       config.redundancy_mode == AudioNetworkLabRedundancyMode::kOpusFec;
+  if (config.redundancy_mode == AudioNetworkLabRedundancyMode::kDred) {
+    // Enable Opus 1.5+ Deep Redundancy with up to 1 s of recovery data (100
+    // frames of 10 ms) which matches the upper bound advertised by libopus.
+    opus_config.dred = 100;
+  }
   opus_config.dtx_enabled = config.enable_dtx;
   return opus_config;
 }
@@ -286,12 +291,6 @@ std::unique_ptr<AudioEncoder> CreateEncoderStack(
     std::string* error) {
   if (!absl::EqualsIgnoreCase(config.codec, "opus")) {
     *error = "Only codec=opus is supported in audio_network_lab.";
-    return nullptr;
-  }
-
-  if (config.redundancy_mode == AudioNetworkLabRedundancyMode::kDred) {
-    *error =
-        "DRED is not supported by this checkout. Use none, opus_fec, or red.";
     return nullptr;
   }
 

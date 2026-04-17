@@ -121,6 +121,30 @@ int AudioDecoder::DecodeRedundantInternal(const uint8_t* encoded,
                         speech_type);
 }
 
+std::vector<AudioDecoder::ParseResult> AudioDecoder::ParsePayloadRedundancy(
+    rtc::Buffer&& payload,
+    uint32_t timestamp,
+    uint32_t recovery_timestamp_offset) {
+  return ParsePayload(std::move(payload), timestamp);
+}
+
+int AudioDecoder::DecodeDred(const uint8_t* encoded,
+                             size_t encoded_len,
+                             uint32_t primary_timestamp,
+                             int16_t* decoded,
+                             int index) {
+  return DecodeDredInternal(encoded, encoded_len, primary_timestamp, decoded,
+                            index);
+}
+
+int AudioDecoder::DecodeDredInternal(const uint8_t* /*encoded*/,
+                                     size_t /*encoded_len*/,
+                                     uint32_t /*primary_timestamp*/,
+                                     int16_t* /*decoded*/,
+                                     int /*index*/) {
+  return -1;
+}
+
 bool AudioDecoder::HasDecodePlc() const {
   return false;
 }

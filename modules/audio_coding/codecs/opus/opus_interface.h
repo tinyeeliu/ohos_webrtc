@@ -321,6 +321,34 @@ int32_t WebRtcOpus_GetBandwidth(OpusEncInst* inst);
 int16_t WebRtcOpus_SetBandwidth(OpusEncInst* inst, int32_t bandwidth);
 
 /*
+ * WebRtcOpus_SetDredDuration(...)
+ *
+ * Enable Deep Redundancy (DRED) and use the specified maximum number of 10 ms
+ * redundant frames.
+ *
+ * Input:
+ *      - inst               : Encoder context
+ *      - duration           : Number of 10 ms redundant frames (0 to disable)
+ *
+ * Return value              :  0 - Success
+ *                             -1 - Error
+ */
+int16_t WebRtcOpus_SetDredDuration(OpusEncInst* inst, int32_t duration);
+
+/*
+ * WebRtcOpus_GetDredDuration(...)
+ *
+ * Get the current encoder Deep Redundancy (DRED) configuration.
+ *
+ * Input:
+ *      - inst               : Encoder context
+ *
+ * Return value              : >=0 - Number of 10 ms redundant frames
+ *                              -1 - Error
+ */
+int32_t WebRtcOpus_GetDredDuration(OpusEncInst* inst);
+
+/*
  * WebRtcOpus_GetInDtx(...)
  *
  * Gets the DTX state of the encoder.
@@ -457,6 +485,52 @@ int WebRtcOpus_DecodeFec(OpusDecInst* inst,
                          size_t encoded_bytes,
                          int16_t* decoded,
                          int16_t* audio_type);
+
+/****************************************************************************
+ * WebRtcOpus_DecodeDred(...)
+ *
+ * This function decodes DRED data into a 10 ms slice of audio.
+ *
+ * Input:
+ *      - inst               : Decoder context
+ *      - dred_data          : Parsed DRED state data
+ *      - offset             : Which DRED segment to decode, in units of 10 ms
+ *
+ * Output:
+ *      - decoded            : The decoded audio
+ *
+ * Return value              : >0 - Samples per channel in decoded vector
+ *                             -1 - Error
+ */
+int WebRtcOpus_DecodeDred(OpusDecInst* inst,
+                          const uint8_t* dred_data,
+                          int16_t* decoded,
+                          int offset);
+
+/****************************************************************************
+ * WebRtcOpus_DredParse(...)
+ *
+ * This function parses DRED data from an Opus packet.
+ *
+ * Input:
+ *      - inst               : Decoder context
+ *      - encoded            : Encoded Opus packet data
+ *      - length_bytes       : Length of encoded data
+ *      - max_samples        : Maximum number of DRED samples to parse
+ *
+ * Output:
+ *      - dred_data          : Buffer for parsed DRED state
+ *      - dred_end           : End offset of DRED data in samples
+ *
+ * Return value              : >0 - Number of DRED samples parsed
+ *                              0 - No DRED data found
+ */
+int WebRtcOpus_DredParse(OpusDecInst* inst,
+                         uint8_t* dred_data,
+                         const uint8_t* encoded,
+                         size_t length_bytes,
+                         int max_samples,
+                         int32_t* dred_end);
 
 /****************************************************************************
  * WebRtcOpus_DurationEst(...)

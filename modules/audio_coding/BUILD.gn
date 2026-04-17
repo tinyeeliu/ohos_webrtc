@@ -451,6 +451,7 @@ rtc_library("audio_coding_opus_common") {
     "../../api:array_view",
     "../../api/audio_codecs:audio_codecs_api",
     "../../rtc_base:checks",
+    "../../rtc_base:copy_on_write_buffer",
     "../../rtc_base:stringutils",
   ]
   absl_deps = [
@@ -478,6 +479,7 @@ rtc_library("webrtc_opus") {
     "../../common_audio",
     "../../rtc_base:buffer",
     "../../rtc_base:checks",
+    "../../rtc_base:copy_on_write_buffer",
     "../../rtc_base:logging",
     "../../rtc_base:macromagic",
     "../../rtc_base:protobuf_utils",
@@ -516,6 +518,7 @@ rtc_library("webrtc_multiopus") {
     "../../api/units:time_delta",
     "../../rtc_base:buffer",
     "../../rtc_base:checks",
+    "../../rtc_base:copy_on_write_buffer",
     "../../rtc_base:logging",
     "../../rtc_base:macromagic",
     "../../rtc_base:safe_minmax",

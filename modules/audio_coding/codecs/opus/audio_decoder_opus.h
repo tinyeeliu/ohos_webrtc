@@ -19,6 +19,7 @@
 #include "api/audio_codecs/audio_decoder.h"
 #include "modules/audio_coding/codecs/opus/opus_interface.h"
 #include "rtc_base/buffer.h"
+#include "rtc_base/copy_on_write_buffer.h"
 
 namespace webrtc {
 
@@ -33,6 +34,14 @@ class AudioDecoderOpusImpl final : public AudioDecoder {
 
   std::vector<ParseResult> ParsePayload(rtc::Buffer&& payload,
                                         uint32_t timestamp) override;
+  std::vector<ParseResult> ParsePayloadRedundancy(
+      rtc::Buffer&& payload,
+      uint32_t timestamp,
+      uint32_t recovery_timestamp_offset) override;
+
+  void GeneratePlc(size_t requested_samples_per_channel,
+                   rtc::BufferT<int16_t>* concealment_audio) override;
+
   void Reset() override;
   int PacketDuration(const uint8_t* encoded, size_t encoded_len) const override;
   int PacketDurationRedundant(const uint8_t* encoded,
@@ -52,6 +61,12 @@ class AudioDecoderOpusImpl final : public AudioDecoder {
                               int sample_rate_hz,
                               int16_t* decoded,
                               SpeechType* speech_type) override;
+
+  int DecodeDredInternal(const uint8_t* encoded,
+                         size_t encoded_len,
+                         uint32_t primary_timestamp,
+                         int16_t* decoded,
+                         int index) override;
 
  private:
   OpusDecInst* dec_state_;

@@ -701,6 +701,9 @@ bool AudioEncoderOpusImpl::RecreateEncoderInstance(
   } else {
     RTC_CHECK_EQ(0, WebRtcOpus_DisableCbr(inst_));
   }
+  if (config.dred > 0) {
+    RTC_CHECK_EQ(0, WebRtcOpus_SetDredDuration(inst_, config.dred));
+  }
   num_channels_to_encode_ = NumChannels();
   next_frame_length_ms_ = config_.frame_size_ms;
   return true;

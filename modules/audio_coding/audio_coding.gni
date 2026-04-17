@@ -20,6 +20,12 @@ if (rtc_opus_support_120ms_ptime) {
 } else {
   audio_codec_defines += [ "WEBRTC_OPUS_SUPPORT_120MS_PTIME=0" ]
 }
+if (rtc_include_opus) {
+  audio_codec_defines += [
+    "WEBRTC_OPUS_SUPPORT_DRED=1",
+    "WEBRTC_OPUS_USE_CODEC_PLC=1",
+  ]
+}
 
 audio_coding_defines = audio_codec_defines
 neteq_defines = audio_codec_defines

@@ -129,17 +129,19 @@ TEST(AudioNetworkLabTest, InvalidBurstLossParametersFailGracefully) {
   EXPECT_NE(result.error.find("avg_burst_loss_length"), std::string::npos);
 }
 
-TEST(AudioNetworkLabTest, DredFailsFast) {
-  const std::string input_pcm = WriteMonoPcm("audio_network_lab_dred", 200);
+TEST(AudioNetworkLabTest, DredModeProducesOutput) {
+  const std::string input_pcm = WriteMonoPcm("audio_network_lab_dred", 500);
   AudioNetworkLabConfig config = CreateBaseConfig(input_pcm);
   config.encoder.redundancy_mode = AudioNetworkLabRedundancyMode::kDred;
+  // Inject moderate loss so DRED has a chance to recover frames.
+  config.network.loss_pct = 20.0;
 
   AudioNetworkLabRunner runner;
   AudioNetworkLabRunResult result = runner.Run(config);
 
-  EXPECT_FALSE(result.ok);
-  EXPECT_NE(result.error.find("DRED"), std::string::npos);
-  EXPECT_FALSE(FileExists(config.summary_json));
+  EXPECT_TRUE(result.ok) << result.error;
+  EXPECT_TRUE(FileExists(config.summary_json));
+  EXPECT_TRUE(FileExists(config.output_audio));
 }
 
 }  // namespace

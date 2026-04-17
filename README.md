@@ -28,6 +28,11 @@ native API header files.
 - Main entry (quick start + experiment guide): [AUDIO_NETWORK_LAB.md](./AUDIO_NETWORK_LAB.md)
 - Full document (tools details, WER/emotion eval, scenarios): [modules/audio_coding/neteq/tools/audio_network_lab.md](./modules/audio_coding/neteq/tools/audio_network_lab.md)
 
+### Opus 1.5+ Deep REDundancy (DRED)
+
+- Integration plan & design notes: [docs/opus_dred_integration_plan.md](./docs/opus_dred_integration_plan.md)
+- One-command local setup (`gclient sync` followed by the bootstrap script): [tools_webrtc/opus_dred/README.md](./tools_webrtc/opus_dred/README.md)
+
 ### More info
 
  * Official web site: http://www.webrtc.org.

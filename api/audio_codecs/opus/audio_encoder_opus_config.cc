@@ -36,6 +36,7 @@ AudioEncoderOpusConfig::AudioEncoderOpusConfig()
       application(ApplicationMode::kVoip),
       bitrate_bps(32000),
       fec_enabled(false),
+      dred(0),
       cbr_enabled(false),
       max_playback_rate_hz(48000),
       complexity(kDefaultComplexity),

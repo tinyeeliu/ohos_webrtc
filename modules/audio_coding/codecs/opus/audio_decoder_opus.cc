@@ -17,6 +17,8 @@
 #include "api/array_view.h"
 #include "modules/audio_coding/codecs/opus/audio_coder_opus_common.h"
 #include "rtc_base/checks.h"
+#include "rtc_base/copy_on_write_buffer.h"
+#include "third_party/opus/src/include/opus.h"
 
 namespace webrtc {
 
@@ -123,6 +125,89 @@ int AudioDecoderOpusImpl::SampleRateHz() const {
 
 size_t AudioDecoderOpusImpl::Channels() const {
   return channels_;
+}
+
+std::vector<AudioDecoder::ParseResult>
+AudioDecoderOpusImpl::ParsePayloadRedundancy(
+    rtc::Buffer&& payload,
+    uint32_t timestamp,
+    uint32_t recovery_timestamp_offset) {
+  std::vector<ParseResult> results;
+  uint32_t begin_timestamp = timestamp;
+
+  if (PacketHasFec(payload.data(), payload.size())) {
+    const int duration =
+        PacketDurationRedundant(payload.data(), payload.size());
+    RTC_DCHECK_GE(duration, 0);
+    rtc::Buffer payload_copy(payload.data(), payload.size());
+    std::unique_ptr<EncodedAudioFrame> fec_frame(
+        new OpusFrame(this, std::move(payload_copy), false));
+    results.emplace_back(timestamp - duration, 1, std::move(fec_frame));
+    begin_timestamp -= duration;
+  }
+
+  if (recovery_timestamp_offset > 0) {
+    int32_t dred_end;
+    rtc::CopyOnWriteBuffer dred_data(opus_dred_get_size());
+    int samps = WebRtcOpus_DredParse(
+        dec_state_, dred_data.MutableData(), payload.data(), payload.size(),
+        recovery_timestamp_offset, &dred_end);
+    if (samps > 0) {
+      if (dred_end < samps)
+        samps -= dred_end;
+      int dred_count = 100 * samps / sample_rate_hz_;
+      int desired_dred_count =
+          100 * recovery_timestamp_offset / sample_rate_hz_;
+      if (dred_count > 0 && desired_dred_count > 0) {
+        if (dred_count > desired_dred_count)
+          dred_count = desired_dred_count;
+        uint32_t recovery_timestamp =
+            timestamp - dred_count * sample_rate_hz_ / 100;
+        for (int i = 0; i < dred_count; ++i) {
+          if ((begin_timestamp == recovery_timestamp) ||
+              (begin_timestamp - recovery_timestamp) >= 0xFFFFFFFF / 2)
+            break;
+          auto p =
+              new OpusFrame(this, dred_data, dred_count - i, timestamp);
+          std::unique_ptr<EncodedAudioFrame> frame(p);
+          results.emplace_back(recovery_timestamp, 2, std::move(frame));
+          recovery_timestamp += sample_rate_hz_ / 100;
+        }
+      }
+    }
+  }
+
+  std::unique_ptr<EncodedAudioFrame> frame(
+      new OpusFrame(this, std::move(payload), true));
+  results.emplace_back(timestamp, 0, std::move(frame));
+  return results;
+}
+
+void AudioDecoderOpusImpl::GeneratePlc(
+    size_t requested_samples_per_channel,
+    rtc::BufferT<int16_t>* concealment_audio) {
+  concealment_audio->SetSize(PacketDuration(NULL, 0) * channels_);
+  int16_t temp_type = 1;
+  int ret =
+      WebRtcOpus_Decode(dec_state_, NULL, 0, concealment_audio->data(),
+                        &temp_type);
+  if (ret > 0) {
+    ret *= static_cast<int>(channels_);
+    concealment_audio->SetSize(ret);
+  } else {
+    concealment_audio->SetSize(0);
+  }
+}
+
+int AudioDecoderOpusImpl::DecodeDredInternal(const uint8_t* encoded,
+                                             size_t encoded_len,
+                                             uint32_t primary_timestamp,
+                                             int16_t* decoded,
+                                             int index) {
+  int ret = WebRtcOpus_DecodeDred(dec_state_, encoded, decoded, index);
+  if (ret > 0)
+    ret *= static_cast<int>(channels_);
+  return ret;
 }
 
 }  // namespace webrtc

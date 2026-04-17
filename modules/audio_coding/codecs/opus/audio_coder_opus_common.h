@@ -19,6 +19,7 @@
 #include "absl/types/optional.h"
 #include "api/audio_codecs/audio_decoder.h"
 #include "api/audio_codecs/audio_format.h"
+#include "rtc_base/copy_on_write_buffer.h"
 #include "rtc_base/string_to_number.h"
 
 namespace webrtc {
@@ -44,9 +45,25 @@ class OpusFrame : public AudioDecoder::EncodedAudioFrame {
             bool is_primary_payload)
       : decoder_(decoder),
         payload_(std::move(payload)),
-        is_primary_payload_(is_primary_payload) {}
+        is_primary_payload_(is_primary_payload),
+        dred_index_(-1),
+        primary_timestamp_(0) {}
+
+  // DRED frame constructor: carries parsed DRED state and an offset index.
+  OpusFrame(AudioDecoder* decoder,
+            rtc::CopyOnWriteBuffer dred_data,
+            int dred_index,
+            uint32_t primary_timestamp)
+      : decoder_(decoder),
+        is_primary_payload_(false),
+        dred_data_(std::move(dred_data)),
+        dred_index_(dred_index),
+        primary_timestamp_(primary_timestamp) {}
 
   size_t Duration() const override {
+    if (dred_index_ >= 0) {
+      return static_cast<size_t>(decoder_->SampleRateHz() / 100);
+    }
     int ret;
     if (is_primary_payload_) {
       ret = decoder_->PacketDuration(payload_.data(), payload_.size());
@@ -56,13 +73,21 @@ class OpusFrame : public AudioDecoder::EncodedAudioFrame {
     return (ret < 0) ? 0 : static_cast<size_t>(ret);
   }
 
-  bool IsDtxPacket() const override { return payload_.size() <= 2; }
+  bool IsDtxPacket() const override {
+    if (dred_index_ >= 0)
+      return false;
+    return payload_.size() <= 2;
+  }
 
   absl::optional<DecodeResult> Decode(
       rtc::ArrayView<int16_t> decoded) const override {
     AudioDecoder::SpeechType speech_type = AudioDecoder::kSpeech;
     int ret;
-    if (is_primary_payload_) {
+    if (dred_index_ >= 0) {
+      ret = decoder_->DecodeDred(dred_data_.data(), dred_data_.size(),
+                                 primary_timestamp_, decoded.data(),
+                                 dred_index_);
+    } else if (is_primary_payload_) {
       ret = decoder_->Decode(
           payload_.data(), payload_.size(), decoder_->SampleRateHz(),
           decoded.size() * sizeof(int16_t), decoded.data(), &speech_type);
@@ -82,6 +107,9 @@ class OpusFrame : public AudioDecoder::EncodedAudioFrame {
   AudioDecoder* const decoder_;
   const rtc::Buffer payload_;
   const bool is_primary_payload_;
+  const rtc::CopyOnWriteBuffer dred_data_;
+  const int dred_index_;
+  const uint32_t primary_timestamp_;
 };
 
 }  // namespace webrtc

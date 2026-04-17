@@ -46,6 +46,7 @@ struct RTC_EXPORT AudioEncoderOpusConfig {
   absl::optional<int> bitrate_bps;
 
   bool fec_enabled;
+  int dred;
   bool cbr_enabled;
   int max_playback_rate_hz;
 

@@ -27,7 +27,11 @@
 - 仅支持 `--codec=opus`
 - 输入 PCM 固定为 `16-bit signed little-endian`
 - 输入采样率固定为 `48000 Hz`
-- `--redundancy_mode=dred` 明确 fail-fast，当前 checkout 未接入 DRED
+- `--redundancy_mode={none,opus_fec,red,dred}` 全部可用。`dred` 依赖
+  Opus 1.5+ Deep REDundancy，需要先执行
+  `python3 tools_webrtc/opus_dred/setup_opus_dred.py` 完成本地初始化；
+  详见 [`tools_webrtc/opus_dred/README.md`](../../../../tools_webrtc/opus_dred/README.md)
+  与 [`docs/opus_dred_integration_plan.md`](../../../../docs/opus_dred_integration_plan.md)。
 - 情感评估依赖本机 `.cache/` 下的 TESS 与 `emotion2vec` 模型（体积大，不在 Git 中；用环境脚本下载，见「本仓库 Python 环境」）
 
 ## 目录内容
