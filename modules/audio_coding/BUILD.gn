@@ -1422,8 +1422,12 @@ if (rtc_include_tests) {
 
       sources = [ "neteq/tools/audio_network_lab_unittest.cc" ]
 
+      defines = audio_codec_defines
+
       deps = [
         ":audio_network_lab_runner",
+        ":webrtc_opus",
+        "../../api/audio_codecs/opus:audio_encoder_opus",
         "../../rtc_base:checks",
         "../../test:fileutils",
         "../../test:test_main",
@@ -1887,8 +1891,12 @@ if (!build_with_chromium && !rtc_include_tests) {
 
     sources = [ "neteq/tools/audio_network_lab_unittest.cc" ]
 
+    defines = audio_codec_defines
+
     deps = [
       ":audio_network_lab_runner",
+      ":webrtc_opus",
+      "../../api/audio_codecs/opus:audio_encoder_opus",
       "../../rtc_base:checks",
       "../../test:fileutils",
       "//third_party/abseil-cpp/absl/strings",

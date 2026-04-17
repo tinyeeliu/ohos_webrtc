@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "absl/strings/match.h"
+#include "modules/audio_coding/codecs/opus/audio_coder_opus_common.h"
 #include "modules/audio_coding/codecs/opus/audio_decoder_opus.h"
 
 namespace webrtc {
@@ -66,8 +67,15 @@ void AudioDecoderOpus::AppendSupportedDecoders(
   AudioCodecInfo opus_info{48000, 1, 64000, 6000, 510000};
   opus_info.allow_comfort_noise = false;
   opus_info.supports_network_adaption = true;
-  SdpAudioFormat opus_format(
-      {"opus", 48000, 2, {{"minptime", "10"}, {"useinbandfec", "1"}}});
+  SdpAudioFormat::Parameters params = {{"minptime", "10"},
+                                       {"useinbandfec", "1"}};
+#if defined(WEBRTC_OPUS_SUPPORT_DRED) && WEBRTC_OPUS_SUPPORT_DRED
+  // Symmetrically advertise DRED capability + local DRED model version on the
+  // decoder side so the full offer exposes DRED in both directions.
+  params["usedred"] = "1";
+  params["opusdredver"] = kOpusDredLocalVersionStr;
+#endif
+  SdpAudioFormat opus_format({"opus", 48000, 2, std::move(params)});
   specs->push_back({std::move(opus_format), opus_info});
 }
 

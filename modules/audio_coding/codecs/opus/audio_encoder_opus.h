@@ -45,6 +45,13 @@ class AudioEncoderOpusImpl final : public AudioEncoder {
       const AudioEncoderOpusConfig& config,
       OpusEncInst* inst);
 
+  // Maps a smoothed packet-loss fraction to a desired DRED duration (10 ms
+  // frames), clamped by the per-config upper bound `max_frames`. Returns 0
+  // when DRED is disabled (`max_frames <= 0`). Public to support direct unit
+  // tests of the adaptive schedule.
+  static int AdaptiveDredDurationFrames(float packet_loss_fraction,
+                                        int max_frames);
+
   using AudioNetworkAdaptorCreator =
       std::function<std::unique_ptr<AudioNetworkAdaptor>(absl::string_view,
                                                          RtcEventLog*)>;
@@ -136,6 +143,13 @@ class AudioEncoderOpusImpl final : public AudioEncoder {
   void SetNumChannelsToEncode(size_t num_channels_to_encode);
   void SetProjectedPacketLossRate(float fraction);
 
+  // Applies a new DRED duration to libopus, respecting a small dead-zone to
+  // avoid thrashing libopus state machines (and to keep log noise down). Does
+  // nothing when DRED support was not compiled in, when `config_.dred == 0`,
+  // or when the requested change is below the dead-zone threshold unless
+  // `force` is true.
+  void MaybeUpdateDredDuration(int desired_frames, bool force);
+
   void OnReceivedUplinkBandwidth(
       int target_audio_bitrate_bps,
       absl::optional<int64_t> bwe_period_ms,
@@ -175,6 +189,12 @@ class AudioEncoderOpusImpl final : public AudioEncoder {
   const std::unique_ptr<SmoothingFilter> bitrate_smoother_;
   absl::optional<int64_t> bitrate_smoother_last_update_time_;
   int consecutive_dtx_frames_;
+  // Currently applied DRED duration (10 ms frames); -1 means "not yet synced
+  // with libopus". Only meaningful when `config_.dred > 0`.
+  int current_dred_duration_frames_ = -1;
+  // Set by ANA (via AudioEncoderRuntimeConfig::dred_duration_frames). When
+  // present, overrides the built-in adaptive mapping from packet-loss rate.
+  absl::optional<int> ana_dred_duration_frames_;
 
   friend struct AudioEncoderOpus;
 };

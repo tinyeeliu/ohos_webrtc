@@ -46,7 +46,22 @@ struct RTC_EXPORT AudioEncoderOpusConfig {
   absl::optional<int> bitrate_bps;
 
   bool fec_enabled;
+  // Opus Deep REDundancy (DRED) configuration, expressed in 10 ms redundant
+  // frames. Semantics:
+  //   `dred == 0`  -> DRED disabled.
+  //   `dred >  0`  -> DRED enabled; this is treated as the UPPER BOUND for the
+  //                  duration the encoder will request at run-time. If
+  //                  `adaptive_dred` is true, the encoder maps the smoothed
+  //                  uplink packet-loss fraction to a duration in
+  //                  [0, dred], and updates libopus via OPUS_SET_DRED_DURATION
+  //                  as the loss rate changes (with a small dead-zone to
+  //                  avoid thrashing). If `adaptive_dred` is false, the
+  //                  encoder keeps DRED duration pinned at `dred`.
   int dred;
+  // When true, adapt DRED duration at run-time based on the projected uplink
+  // packet-loss fraction (respecting `dred` as an upper bound). When false,
+  // DRED duration stays pinned at `dred`. Only takes effect when `dred > 0`.
+  bool adaptive_dred;
   bool cbr_enabled;
   // When true and `cbr_enabled` is false, use Opus constrained VBR (CVBR).
   // Ignored when CBR is enabled.

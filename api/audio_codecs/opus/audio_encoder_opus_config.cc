@@ -37,6 +37,7 @@ AudioEncoderOpusConfig::AudioEncoderOpusConfig()
       bitrate_bps(32000),
       fec_enabled(false),
       dred(0),
+      adaptive_dred(true),
       cbr_enabled(false),
       cvbr_enabled(false),
       max_playback_rate_hz(48000),

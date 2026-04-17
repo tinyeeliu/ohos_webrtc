@@ -31,6 +31,14 @@ struct AudioEncoderRuntimeConfig {
   absl::optional<bool> enable_fec;
   absl::optional<bool> enable_dtx;
 
+  // Opus Deep REDundancy (DRED) duration in 10 ms units. When set, overrides
+  // the encoder's internal adaptive DRED control (which is based solely on the
+  // projected packet loss rate). A value of 0 disables DRED emission, a
+  // positive value instructs the encoder to embed up to that many 10 ms
+  // redundant frames in each packet. Ignored by encoders that were not
+  // configured to support DRED or built without DRED support.
+  absl::optional<int> dred_duration_frames;
+
   // Some encoders can encode fewer channels than the actual input to make
   // better use of the bandwidth. `num_channels` sets the number of channels
   // to encode.

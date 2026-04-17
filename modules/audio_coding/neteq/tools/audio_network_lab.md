@@ -31,13 +31,18 @@
 Opus 1.5+ Deep REDundancy，需要先执行
 `python3 tools_webrtc/opus_dred/setup_opus_dred.py` 完成本地初始化；
 详见 `[tools_webrtc/opus_dred/README.md](../../../../tools_webrtc/opus_dred/README.md)`
-与 `[docs/opus_dred_integration_plan.md](../../../../docs/opus_dred_integration_plan.md)`。
+与统一入口 `[DRED_AUDIO_LAB.md](../../../../DRED_AUDIO_LAB.md)`。
 - 选择 `--redundancy_mode=dred` 时，recovery 深度默认按
 `max(--expected_loss_pct, --loss_pct)` 做自适应映射（20/30/50/80/100
 帧，单帧 10 ms）。若想手动钉死，可加 `--dred_duration_frames=N`
 （`N∈[1,100]`，单位 10 ms）。`summary.json` 的
 `encoder.dred_duration_frames` / `encoder.dred_duration_source`
 会如实记录最终取值和来源（`auto` 或 `flag`）。
+- lab 运行时会把 `AudioEncoderOpusConfig::adaptive_dred` 显式关掉，
+让 DRED 深度严格等于 `summary.encoder.dred_duration_frames`；
+生产路径（非 lab）默认开启自适应，由编码器基于
+`OnReceivedUplinkPacketLossFraction` 的平滑丢包率调整深度，参见
+`DRED_AUDIO_LAB.md` 的「生产路径 DRED 控制链路」章节。
 - 情感评估依赖本机 `.cache/` 下的 TESS 与 `emotion2vec` 模型（体积大，不在 Git 中；用环境脚本下载，见「本仓库 Python 环境」）
 
 ## 目录内容

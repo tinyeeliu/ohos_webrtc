@@ -69,6 +69,15 @@ constexpr int kOpusSupportedFrameLengths[] = {10, 20, 40, 60};
 constexpr float kAlphaForPacketLossFractionSmoother = 0.9999f;
 constexpr float kMaxPacketLossFraction = 0.2f;
 
+// Minimum DRED duration we ever ask libopus for once DRED is enabled. Chosen
+// to give NetEq at least ~200 ms of recovery headroom, which matches the
+// safety floor used by xiph/webrtc-opus-ng and our audio_network_lab tool.
+constexpr int kMinAdaptiveDredFrames = 20;
+// Require a change of at least this many 10 ms frames before re-arming libopus
+// via OPUS_SET_DRED_DURATION. Acts as a hysteresis window on top of the
+// packet-loss smoothing filter.
+constexpr int kDredDurationDeadZoneFrames = 10;
+
 int CalculateDefaultBitrate(int max_playback_rate, size_t num_channels) {
   const int bitrate = [&] {
     if (max_playback_rate <= 8000) {
@@ -207,10 +216,17 @@ int GetMultipliedBitrate(int bitrate, const std::vector<float>& multipliers) {
 
 void AudioEncoderOpusImpl::AppendSupportedEncoders(
     std::vector<AudioCodecSpec>* specs) {
-  const SdpAudioFormat fmt = {"opus",
-                              kRtpTimestampRateHz,
-                              2,
-                              {{"minptime", "10"}, {"useinbandfec", "1"}}};
+  SdpAudioFormat::Parameters params = {{"minptime", "10"},
+                                       {"useinbandfec", "1"}};
+#if defined(WEBRTC_OPUS_SUPPORT_DRED) && WEBRTC_OPUS_SUPPORT_DRED
+  // Advertise DRED capability plus the local DRED model/ABI version so that
+  // peers running a different DRED vintage (e.g. the Opus 1.6 model, which is
+  // wire-incompatible with the 1.5.2 model we currently ship) negotiate DRED
+  // off instead of producing silently mis-decoded packets.
+  params["usedred"] = "1";
+  params["opusdredver"] = kOpusDredLocalVersionStr;
+#endif
+  const SdpAudioFormat fmt = {"opus", kRtpTimestampRateHz, 2, std::move(params)};
   const AudioCodecInfo info = QueryAudioEncoder(*SdpToConfig(fmt));
   specs->push_back({fmt, info});
 }
@@ -254,6 +270,31 @@ absl::optional<AudioEncoderOpusConfig> AudioEncoderOpusImpl::SdpToConfig(
   config.bitrate_bps =
       CalculateBitrate(config.max_playback_rate_hz, config.num_channels,
                        GetFormatParameter(format, "maxaveragebitrate"));
+#if defined(WEBRTC_OPUS_SUPPORT_DRED) && WEBRTC_OPUS_SUPPORT_DRED
+  // Strict DRED capability + version gating. DRED is only enabled if the peer
+  // explicitly opts in (`usedred=1`) AND the DRED model/ABI versions match.
+  // Missing `opusdredver` is treated as peer version 1 (the only published
+  // model at the time this gating was added), so legacy peers advertising
+  // bare `usedred=1` remain compatible.
+  if (GetFormatParameter(format, "usedred") == "1") {
+    const absl::optional<int> peer_dred_version =
+        GetFormatParameter<int>(format, "opusdredver");
+    const int effective_peer_version =
+        peer_dred_version.value_or(kOpusDredLocalVersion);
+    if (effective_peer_version == kOpusDredLocalVersion) {
+      // Treat `dred` as the upper bound; the encoder will adapt within
+      // [0, dred] based on packet-loss rate. 1 s matches libopus's maximum.
+      config.dred = 100;
+      config.adaptive_dred = true;
+    } else {
+      RTC_LOG(LS_WARNING)
+          << "Opus DRED disabled: peer advertises opusdredver="
+          << effective_peer_version << " but local version is "
+          << kOpusDredLocalVersion;
+      config.dred = 0;
+    }
+  }
+#endif
   config.application = config.num_channels == 1
                            ? AudioEncoderOpusConfig::ApplicationMode::kVoip
                            : AudioEncoderOpusConfig::ApplicationMode::kAudio;
@@ -316,6 +357,66 @@ absl::optional<int> AudioEncoderOpusImpl::GetNewBandwidth(
     return absl::optional<int>(OPUS_BANDWIDTH_NARROWBAND);
   }
   return absl::optional<int>();
+}
+
+// static
+int AudioEncoderOpusImpl::AdaptiveDredDurationFrames(
+    float packet_loss_fraction,
+    int max_frames) {
+  if (max_frames <= 0) {
+    return 0;
+  }
+  const int loss_pct = static_cast<int>(
+      std::clamp(packet_loss_fraction, 0.0f, 1.0f) * 100.0f + 0.5f);
+  int desired;
+  if (loss_pct <= 2) {
+    desired = 20;  // 200 ms safety net.
+  } else if (loss_pct <= 5) {
+    desired = 30;  // 300 ms.
+  } else if (loss_pct <= 10) {
+    desired = 50;  // 500 ms.
+  } else if (loss_pct <= 20) {
+    desired = 80;  // 800 ms.
+  } else {
+    desired = 100;  // 1 s (libopus maximum).
+  }
+  desired = std::max(desired, kMinAdaptiveDredFrames);
+  return std::min(desired, max_frames);
+}
+
+void AudioEncoderOpusImpl::MaybeUpdateDredDuration(int desired_frames,
+                                                   bool force) {
+#if defined(WEBRTC_OPUS_SUPPORT_DRED) && WEBRTC_OPUS_SUPPORT_DRED
+  if (config_.dred <= 0 || inst_ == nullptr) {
+    return;
+  }
+  desired_frames = std::clamp(desired_frames, 0, config_.dred);
+  if (!force && current_dred_duration_frames_ >= 0) {
+    const int delta =
+        std::abs(desired_frames - current_dred_duration_frames_);
+    if (delta < kDredDurationDeadZoneFrames) {
+      return;
+    }
+  }
+  if (current_dred_duration_frames_ == desired_frames) {
+    return;
+  }
+  const int16_t status = WebRtcOpus_SetDredDuration(inst_, desired_frames);
+  if (status != 0) {
+    RTC_LOG(LS_WARNING) << "Failed to set Opus DRED duration to "
+                        << desired_frames
+                        << " frames; libopus returned " << status;
+    return;
+  }
+  RTC_LOG(LS_VERBOSE) << "Opus DRED duration updated: "
+                      << current_dred_duration_frames_ << " -> "
+                      << desired_frames << " frames (cap="
+                      << config_.dred << ")";
+  current_dred_duration_frames_ = desired_frames;
+#else
+  (void)desired_frames;
+  (void)force;
+#endif
 }
 
 class AudioEncoderOpusImpl::PacketLossFractionSmoother {
@@ -716,8 +817,19 @@ bool AudioEncoderOpusImpl::RecreateEncoderInstance(
         0, WebRtcOpus_SetVbrConstraint(inst_, config.cvbr_enabled ? 1 : 0));
   }
   if (config.dred > 0) {
-    RTC_CHECK_EQ(0, WebRtcOpus_SetDredDuration(inst_, config.dred));
+    // When adaptive DRED is on we start at the minimum safety floor and let
+    // `SetProjectedPacketLossRate` grow the duration based on the smoothed
+    // packet-loss fraction. When off we pin libopus to the configured value.
+    int initial_dred = config.dred;
+    if (config.adaptive_dred) {
+      initial_dred = std::min(kMinAdaptiveDredFrames, config.dred);
+    }
+    RTC_CHECK_EQ(0, WebRtcOpus_SetDredDuration(inst_, initial_dred));
+    current_dred_duration_frames_ = initial_dred;
+  } else {
+    current_dred_duration_frames_ = -1;
   }
+  ana_dred_duration_frames_.reset();
   num_channels_to_encode_ = NumChannels();
   next_frame_length_ms_ = config_.frame_size_ms;
   return true;
@@ -751,6 +863,15 @@ void AudioEncoderOpusImpl::SetProjectedPacketLossRate(float fraction) {
     RTC_CHECK_EQ(
         0, WebRtcOpus_SetPacketLossRate(
                inst_, static_cast<int32_t>(packet_loss_rate_ * 100 + .5)));
+  }
+  // DRED duration auto-adaptation: only kicks in when DRED is enabled on this
+  // stream and ANA has not explicitly requested a DRED duration. This mirrors
+  // the mapping used by audio_network_lab / xiph/webrtc-opus-ng so that the
+  // production path reacts to projected loss without a custom ANA config.
+  if (config_.dred > 0 && config_.adaptive_dred &&
+      !ana_dred_duration_frames_.has_value()) {
+    const int desired = AdaptiveDredDurationFrames(fraction, config_.dred);
+    MaybeUpdateDredDuration(desired, /*force=*/false);
   }
 }
 
@@ -787,6 +908,22 @@ void AudioEncoderOpusImpl::ApplyAudioNetworkAdaptor() {
     SetDtx(*config.enable_dtx);
   if (config.num_channels)
     SetNumChannelsToEncode(*config.num_channels);
+
+  // Finer-grained feedback loop: let DRED-aware controllers override the
+  // encoder's built-in adaptive duration. A negative value releases the ANA
+  // override and hands control back to the loss-rate-driven auto mapping.
+  if (config_.dred > 0 && config.dred_duration_frames.has_value()) {
+    const int requested = *config.dred_duration_frames;
+    if (requested < 0) {
+      ana_dred_duration_frames_.reset();
+      const int desired =
+          AdaptiveDredDurationFrames(packet_loss_rate_, config_.dred);
+      MaybeUpdateDredDuration(desired, /*force=*/true);
+    } else {
+      ana_dred_duration_frames_ = requested;
+      MaybeUpdateDredDuration(requested, /*force=*/true);
+    }
+  }
 }
 
 std::unique_ptr<AudioNetworkAdaptor>

@@ -16,7 +16,46 @@
 3. **DRED 本地 bootstrap（第三方 Opus + DNN 数据）**  
    [`tools_webrtc/opus_dred/README.md`](./tools_webrtc/opus_dred/README.md)
 
-## 二、当前测试结论（代表语音 + burst 丢包）
+## 二、生产路径 DRED 控制链路
+
+为了让生产代码（非 lab）也能享受 `webrtc-opus-ng` 级别的自适应能力，当前分支补齐了三条控制链：
+
+1. **编码器内实时自适应**（新增，默认开启）  
+   `AudioEncoderOpusImpl::SetProjectedPacketLossRate` 基于 `PacketLossFractionSmoother` 给出的平滑丢包率，把 `OPUS_SET_DRED_DURATION` 按下表钳到 `[200 ms, config.dred]`：
+
+   | 平滑丢包率 | DRED 深度 |
+   | --- | --- |
+   | ≤ 2% | 200 ms |
+   | ≤ 5% | 300 ms |
+   | ≤ 10% | 500 ms |
+   | ≤ 20% | 800 ms |
+   | > 20% | 1000 ms（libopus 上限）|
+
+   更新带 **100 ms 死区**，避免逐帧抖动。相关代码：`modules/audio_coding/codecs/opus/audio_encoder_opus.{h,cc}` 里的
+   `AdaptiveDredDurationFrames` / `MaybeUpdateDredDuration`。
+
+2. **ANA 覆盖通道**  
+   `AudioEncoderRuntimeConfig` 新增 `dred_duration_frames`；DRED-aware controller 可显式下发 0/正数深度，覆盖内部自动映射。负值释放 override，自动映射重新接管。只要 `config.dred > 0` 且 SDP 协商成功，任何 ANA controller 都可以直接参与 DRED 控制。
+
+3. **SDP 版本门控（严格）**  
+   编解码器会在 `AppendSupportedEncoders/Decoders` 里上报：
+
+   ```
+   usedred=1; opusdredver=1
+   ```
+
+   `kOpusDredLocalVersion = 1` 与当前仓库使用的 Opus 1.5.2 DRED 模型绑定，升级 DRED 模型（例如将来切到 Opus 1.6 DRED，模型不兼容）时必须同步 +1。`SdpToConfig` 只有在 `usedred=1` 且 `opusdredver` 与本地匹配时才会开启 DRED；版本不匹配会记录 `LS_WARNING` 并保持 DRED 关闭，避免与跨版本对端静默产生无效冗余包。
+
+> lab 场景（`audio_network_lab`）沿用“注入丢包率 → 固定深度”语义：`CreateOpusConfig` 会显式关掉 `adaptive_dred`，保证实验结果严格对应传入参数；需要 A/B 验证自适应链路时可把该开关打开。
+
+相关单测（`modules/audio_coding/neteq/tools/audio_network_lab_unittest.cc`）：
+
+- `AudioEncoderOpusDredTest.AdaptiveMappingMatchesLossBuckets`
+- `AudioEncoderOpusDredTest.SdpUsedredWithMatchingVersionEnablesAdaptiveDred`
+- `AudioEncoderOpusDredTest.SdpUsedredWithMismatchedVersionKeepsDredOff`
+- `AudioEncoderOpusDredTest.SdpWithoutUsedredKeepsDredOff`
+
+## 三、当前测试结论（代表语音 + burst 丢包）
 
 数据来源：
 
@@ -36,7 +75,7 @@
    - extreme: PLC `0.238967` / DRED+PLC `0.099135` / LBRR+PLC `0.211638` (CBR)
 4. **CVBR 在本批语料下与 VBR 结果一致**（WER/码率几乎重合），后续若要拉开差异，建议使用更长或更复杂语料再测。
 
-## 三、最小复现实验命令
+## 四、最小复现实验命令
 
 ```sh
 # 1) 准备 DRED 依赖（只需首次）
@@ -58,11 +97,12 @@ ninja -C out/AudioLab audio_network_lab audio_network_lab_unittests
   --expected_loss_pct=20
 ```
 
-## 四、文档维护建议
+## 五、文档维护建议
 
 - 有新的大规模评测结果时，优先更新：
   - 本文档（统一入口中的“当前测试结论”）
   - `results/dred_burst_wer_codec_compare_*.md`（详细数据）
-- 如果 DRED 策略（如 CVBR、自适应深度）有变更，同步更新：
-  - `docs/opus_dred_integration_plan.md`
+- 如果 DRED 策略（如自适应深度曲线、ANA 覆盖规则、SDP 版本号）有变更，同步更新：
+  - 本文件“生产路径 DRED 控制链路”章节
   - `modules/audio_coding/neteq/tools/audio_network_lab.md`
+  - 如果改动涉及 DRED 模型/ABI（Opus 1.5 → 1.6 等），记得同步 `kOpusDredLocalVersion` 并在此处说明

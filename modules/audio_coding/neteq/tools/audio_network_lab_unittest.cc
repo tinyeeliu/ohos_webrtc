@@ -16,6 +16,8 @@
 #include <string>
 #include <vector>
 
+#include "api/audio_codecs/opus/audio_encoder_opus.h"
+#include "modules/audio_coding/codecs/opus/audio_encoder_opus.h"
 #include "rtc_base/checks.h"
 #include "test/gtest.h"
 #include "test/testsupport/file_utils.h"
@@ -162,6 +164,59 @@ TEST(AudioNetworkLabTest, DredDurationFlagOverridesAuto) {
   EXPECT_EQ(result.summary.encoder.dred_duration_source, "flag");
   EXPECT_EQ(result.summary.encoder.dred_duration_frames, 40);
 }
+
+TEST(AudioEncoderOpusDredTest, AdaptiveMappingMatchesLossBuckets) {
+  // Matches the mapping used by audio_network_lab (also the historical opus-ng
+  // reference). Cap of 100 lets every bucket surface its natural value; the
+  // 200 ms floor applies only to very low loss rates.
+  EXPECT_EQ(AudioEncoderOpusImpl::AdaptiveDredDurationFrames(0.00f, 100), 20);
+  EXPECT_EQ(AudioEncoderOpusImpl::AdaptiveDredDurationFrames(0.02f, 100), 20);
+  EXPECT_EQ(AudioEncoderOpusImpl::AdaptiveDredDurationFrames(0.05f, 100), 30);
+  EXPECT_EQ(AudioEncoderOpusImpl::AdaptiveDredDurationFrames(0.10f, 100), 50);
+  EXPECT_EQ(AudioEncoderOpusImpl::AdaptiveDredDurationFrames(0.20f, 100), 80);
+  EXPECT_EQ(AudioEncoderOpusImpl::AdaptiveDredDurationFrames(0.40f, 100), 100);
+
+  // When the config cap is tighter than the natural value, the cap wins.
+  EXPECT_EQ(AudioEncoderOpusImpl::AdaptiveDredDurationFrames(0.40f, 40), 40);
+  EXPECT_EQ(AudioEncoderOpusImpl::AdaptiveDredDurationFrames(0.02f, 15), 15);
+
+  // Disabled cap short-circuits to zero regardless of loss.
+  EXPECT_EQ(AudioEncoderOpusImpl::AdaptiveDredDurationFrames(0.50f, 0), 0);
+}
+
+#if defined(WEBRTC_OPUS_SUPPORT_DRED) && WEBRTC_OPUS_SUPPORT_DRED
+TEST(AudioEncoderOpusDredTest, SdpUsedredWithMatchingVersionEnablesAdaptiveDred) {
+  SdpAudioFormat fmt("opus", 48000, 2,
+                     {{"minptime", "10"},
+                      {"useinbandfec", "1"},
+                      {"usedred", "1"},
+                      {"opusdredver", "1"}});
+  const auto config = AudioEncoderOpus::SdpToConfig(fmt);
+  ASSERT_TRUE(config.has_value());
+  EXPECT_GT(config->dred, 0);
+  EXPECT_TRUE(config->adaptive_dred);
+}
+
+TEST(AudioEncoderOpusDredTest, SdpUsedredWithMismatchedVersionKeepsDredOff) {
+  SdpAudioFormat fmt("opus", 48000, 2,
+                     {{"minptime", "10"},
+                      {"useinbandfec", "1"},
+                      {"usedred", "1"},
+                      {"opusdredver", "999"}});
+  const auto config = AudioEncoderOpus::SdpToConfig(fmt);
+  ASSERT_TRUE(config.has_value());
+  EXPECT_EQ(config->dred, 0);
+}
+
+TEST(AudioEncoderOpusDredTest, SdpWithoutUsedredKeepsDredOff) {
+  SdpAudioFormat fmt(
+      "opus", 48000, 2,
+      {{"minptime", "10"}, {"useinbandfec", "1"}, {"opusdredver", "1"}});
+  const auto config = AudioEncoderOpus::SdpToConfig(fmt);
+  ASSERT_TRUE(config.has_value());
+  EXPECT_EQ(config->dred, 0);
+}
+#endif  // WEBRTC_OPUS_SUPPORT_DRED
 
 }  // namespace
 }  // namespace test

@@ -28,6 +28,7 @@ bool AudioEncoderRuntimeConfig::operator==(
          frame_length_ms == other.frame_length_ms &&
          uplink_packet_loss_fraction == other.uplink_packet_loss_fraction &&
          enable_fec == other.enable_fec && enable_dtx == other.enable_dtx &&
+         dred_duration_frames == other.dred_duration_frames &&
          num_channels == other.num_channels;
 }
 

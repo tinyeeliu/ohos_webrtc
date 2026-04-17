@@ -325,6 +325,12 @@ AudioEncoderOpus::Config CreateOpusConfig(
       config.redundancy_mode == AudioNetworkLabRedundancyMode::kOpusFec;
   if (config.redundancy_mode == AudioNetworkLabRedundancyMode::kDred) {
     opus_config.dred = dred_selection.duration_frames;
+    // In the lab we have a known target loss rate and the caller already
+    // picked the intended DRED duration via SelectDredDuration(). Disable the
+    // encoder's runtime self-adaptation so experiments measure exactly the
+    // requested duration instead of the value the encoder would pick from
+    // `OnReceivedUplinkPacketLossFraction` (which the lab does not feed).
+    opus_config.adaptive_dred = false;
   }
   opus_config.dtx_enabled = config.enable_dtx;
   opus_config.cbr_enabled = config.cbr_enabled;
