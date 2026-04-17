@@ -1,0 +1,7 @@
+# Stub for missing chromecast_build.gni to satisfy third_party/libaom/options.gni
+# during standalone WebRTC builds.
+
+is_castos = false
+is_cast_android = false
+is_cast_desktop_build = false
+enable_cast_receiver = false
