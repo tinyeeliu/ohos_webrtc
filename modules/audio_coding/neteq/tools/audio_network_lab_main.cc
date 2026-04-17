@@ -51,6 +51,13 @@ ABSL_FLAG(int,
           expected_loss_pct,
           0,
           "Packet loss hint passed to encoder, in percent.");
+ABSL_FLAG(int,
+          dred_duration_frames,
+          -1,
+          "DRED recovery depth in 10 ms frames (1..100). Only used when "
+          "--redundancy_mode=dred. -1 (default) derives the value from "
+          "--expected_loss_pct or the simulated network loss, whichever is "
+          "larger.");
 
 ABSL_FLAG(int,
           bandwidth_kbps,
@@ -154,6 +161,15 @@ int main(int argc, char* argv[]) {
   config.encoder.channels = absl::GetFlag(FLAGS_channels);
   config.encoder.enable_dtx = absl::GetFlag(FLAGS_enable_dtx);
   config.encoder.expected_loss_pct = absl::GetFlag(FLAGS_expected_loss_pct);
+  const int dred_duration_flag = absl::GetFlag(FLAGS_dred_duration_frames);
+  if (dred_duration_flag != -1 &&
+      (dred_duration_flag < 1 || dred_duration_flag > 100)) {
+    fprintf(stderr,
+            "--dred_duration_frames must be -1 or in [1, 100]; got %d.\n",
+            dred_duration_flag);
+    return 1;
+  }
+  config.encoder.dred_duration_frames = dred_duration_flag;
   config.network.bandwidth_kbps = absl::GetFlag(FLAGS_bandwidth_kbps);
   config.network.delay_ms = absl::GetFlag(FLAGS_delay_ms);
   config.network.jitter_stddev_ms = absl::GetFlag(FLAGS_jitter_stddev_ms);

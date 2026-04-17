@@ -651,7 +651,19 @@ size_t AudioEncoderOpusImpl::SufficientOutputBufferSize() const {
       static_cast<size_t>(GetBitrateBps(config_) / (1000 * 8) + 1);
   const size_t approx_encoded_bytes =
       Num10msFramesPerPacket() * 10 * bytes_per_millisecond;
-  return 2 * approx_encoded_bytes;
+  // Reserve extra room for DRED side-data that libopus may append to each
+  // packet. libopus caps DRED at ~64 kbps, so for a 20 ms packet that works
+  // out to at most 160 bytes. Mirroring the opus-ng reference keeps
+  // `WebRtcOpus_Encode` from truncating DRED payloads when bitrate and DRED
+  // duration are both large. Only applied when DRED is actually enabled at
+  // runtime so conservative (no-DRED) configs keep the historical sizing.
+  size_t dred_bytes_per_packet = 0;
+#if defined(WEBRTC_OPUS_SUPPORT_DRED) && WEBRTC_OPUS_SUPPORT_DRED
+  if (config_.dred > 0) {
+    dred_bytes_per_packet = 160;
+  }
+#endif
+  return 2 * approx_encoded_bytes + dred_bytes_per_packet;
 }
 
 // If the given config is OK, recreate the Opus encoder instance with those

@@ -647,13 +647,38 @@ int NetEqImpl::InsertPacketInternal(const RTPHeader& rtp_header,
         return new_packet;
       };
 
-      // Compute the timestamp gap between expected playout position and this
-      // packet so DRED can attempt recovery over that interval.
-      uint32_t expected_ts = sync_buffer_->end_timestamp();
+      // Determine the timestamp of the latest already-known audio sample so
+      // DRED can recover the interval between it and this packet. Mirrors the
+      // xiph/webrtc-opus-ng reference:
+      //  * Prefer the immediate older packet still sitting in the jitter
+      //    buffer (via `NextLowerTimestamp`) and walk forward by its duration.
+      //  * Otherwise, if we detect forward sequence-number loss compared to
+      //    the newest packet ever seen, anchor on the SyncBuffer end (i.e. the
+      //    latest already-played audio), forcing DRED to fill the gap.
+      //  * Fall back to the packet's own timestamp (no recovery needed) when
+      //    there is no evidence of loss.
+      uint32_t previous_timestamp = packet.timestamp;
+      uint32_t duration = static_cast<uint32_t>(decoder_frame_length_);
+      const int lower_result = packet_buffer_->NextLowerTimestamp(
+          static_cast<int16_t>(packet.sequence_number), packet.timestamp,
+          &previous_timestamp, &duration);
+      if (lower_result == PacketBuffer::kOK) {
+        previous_timestamp += duration;
+      } else {
+        uint16_t newest_sequence_number = 0;
+        bool have_loss = false;
+        if (packet_buffer_->NewestSequenceNumber(&newest_sequence_number)) {
+          const uint16_t seq_gap =
+              packet.sequence_number - newest_sequence_number;
+          have_loss = seq_gap > 1 && seq_gap <= 0xFFFF / 2;
+        }
+        previous_timestamp =
+            have_loss ? sync_buffer_->end_timestamp() : packet.timestamp;
+      }
       uint32_t current_gap = 0;
-      if (packet.timestamp > expected_ts &&
-          (packet.timestamp - expected_ts) < 0x7FFFFFFF) {
-        current_gap = packet.timestamp - expected_ts;
+      if (packet.timestamp != previous_timestamp &&
+          (packet.timestamp - previous_timestamp) < 0x7FFFFFFF) {
+        current_gap = packet.timestamp - previous_timestamp;
       }
 
       std::vector<AudioDecoder::ParseResult> results =

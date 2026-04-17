@@ -28,10 +28,16 @@
 - 输入 PCM 固定为 `16-bit signed little-endian`
 - 输入采样率固定为 `48000 Hz`
 - `--redundancy_mode={none,opus_fec,red,dred}` 全部可用。`dred` 依赖
-  Opus 1.5+ Deep REDundancy，需要先执行
-  `python3 tools_webrtc/opus_dred/setup_opus_dred.py` 完成本地初始化；
-  详见 [`tools_webrtc/opus_dred/README.md`](../../../../tools_webrtc/opus_dred/README.md)
-  与 [`docs/opus_dred_integration_plan.md`](../../../../docs/opus_dred_integration_plan.md)。
+Opus 1.5+ Deep REDundancy，需要先执行
+`python3 tools_webrtc/opus_dred/setup_opus_dred.py` 完成本地初始化；
+详见 `[tools_webrtc/opus_dred/README.md](../../../../tools_webrtc/opus_dred/README.md)`
+与 `[docs/opus_dred_integration_plan.md](../../../../docs/opus_dred_integration_plan.md)`。
+- 选择 `--redundancy_mode=dred` 时，recovery 深度默认按
+`max(--expected_loss_pct, --loss_pct)` 做自适应映射（20/30/50/80/100
+帧，单帧 10 ms）。若想手动钉死，可加 `--dred_duration_frames=N`
+（`N∈[1,100]`，单位 10 ms）。`summary.json` 的
+`encoder.dred_duration_frames` / `encoder.dred_duration_source`
+会如实记录最终取值和来源（`auto` 或 `flag`）。
 - 情感评估依赖本机 `.cache/` 下的 TESS 与 `emotion2vec` 模型（体积大，不在 Git 中；用环境脚本下载，见「本仓库 Python 环境」）
 
 ## 目录内容
@@ -78,8 +84,8 @@ ASR / WER 依赖。
 ## 仓库内样本与本机缓存（TESS / 模型）
 
 - **随仓库提供**：代表语音样本在
-  [`audio_network_lab_assets/representative_audio`](./audio_network_lab_assets/representative_audio)（体积小，可提交）。
-- **不在 Git 中（需本机下载）**：TESS 情感语料与 `iic/emotion2vec_plus_large` 体积大（合计约 **2G** 量级），默认放在仓库根目录下 **`.cache/`**（已在 `.gitignore`），避免污染远端仓库。
+`[audio_network_lab_assets/representative_audio](./audio_network_lab_assets/representative_audio)`（体积小，可提交）。
+- **不在 Git 中（需本机下载）**：TESS 情感语料与 `iic/emotion2vec_plus_large` 体积大（合计约 **2G** 量级），默认放在仓库根目录下 `**.cache/`**（已在 `.gitignore`），避免污染远端仓库。
 
 下载方式（需联网，且先具备 `.venv_emotion`）：
 
@@ -105,9 +111,9 @@ bash modules/audio_coding/neteq/tools/audio_network_lab_setup_python_envs.sh \
 - TESS（扁平 `*.wav`）：`.cache/datasets/tess/tess`
 - emotion2vec（ModelScope 快照）：`.cache/modelscope/models/iic/emotion2vec_plus_large`
 
-TESS 来源：Hugging Face 数据集 [`myleslinder/tess`](https://huggingface.co/datasets/myleslinder/tess) 中的 `data/tess.zip`（与官方 TESS 内容一致，CC BY-NC 4.0）。模型来源：ModelScope [`iic/emotion2vec_plus_large`](https://www.modelscope.cn/models/iic/emotion2vec_plus_large)。
+TESS 来源：Hugging Face 数据集 `[myleslinder/tess](https://huggingface.co/datasets/myleslinder/tess)` 中的 `data/tess.zip`（与官方 TESS 内容一致，CC BY-NC 4.0）。模型来源：ModelScope `[iic/emotion2vec_plus_large](https://www.modelscope.cn/models/iic/emotion2vec_plus_large)`。
 
-若改用自有语料或模型，保持与 [`audio_network_lab_tess_emotion_baseline.py`](./audio_network_lab_tess_emotion_baseline.py) 中 `--tess-dir` / `--model` 约定一致即可。
+若改用自有语料或模型，保持与 `[audio_network_lab_tess_emotion_baseline.py](./audio_network_lab_tess_emotion_baseline.py)` 中 `--tess-dir` / `--model` 约定一致即可。
 
 ## 推荐结果目录
 
@@ -290,7 +296,8 @@ ninja -C out/AudioLab modules/audio_coding:audio_network_lab_unittests
 - RED
 - 固定 outage
 - 非法 burst loss 参数
-- DRED fail-fast
+- DRED 自适应（`auto`）
+- DRED `--dred_duration_frames` 覆盖
 
 ## 本仓库 Python 环境
 
@@ -430,6 +437,34 @@ python3 -c 'import math,struct; p="/tmp/lab_input.pcm"; open(p,"wb").write(b"".j
   --output_audio=/tmp/lab_outage.wav \
   --summary_json=/tmp/lab_outage.json \
   --fixed_loss_events_ms=300:200,1200:150
+```
+
+### Opus DRED（自适应）
+
+```sh
+./out/AudioLab/audio_network_lab \
+  --input_pcm=/tmp/lab_input.pcm \
+  --output_audio=/tmp/lab_dred.wav \
+  --summary_json=/tmp/lab_dred.json \
+  --redundancy_mode=dred \
+  --expected_loss_pct=20 \
+  --loss_pct=20 \
+  --avg_burst_loss_length=5
+```
+
+结果里的 `encoder.dred_duration_frames` 应显示自适应挑选到的 recovery 深度（上例 20% loss 会得到 80 帧 = 800 ms），`encoder.dred_duration_source=auto`。
+
+如果想钉住具体值：
+
+```sh
+./out/AudioLab/audio_network_lab \
+  --input_pcm=/tmp/lab_input.pcm \
+  --output_audio=/tmp/lab_dred_500ms.wav \
+  --summary_json=/tmp/lab_dred_500ms.json \
+  --redundancy_mode=dred \
+  --dred_duration_frames=50 \
+  --expected_loss_pct=10 \
+  --loss_pct=10
 ```
 
 ## 单次语音 WER 评估

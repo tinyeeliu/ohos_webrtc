@@ -50,6 +50,28 @@ isProject: false
 > 新人跑完 `gclient sync` 后执行
 > `python3 tools_webrtc/opus_dred/setup_opus_dred.py`
 > 即可获得可编译的 DRED 环境。
+>
+> **后续对齐 `xiph/webrtc-opus-ng` 的改动**（已合入）：
+>
+> 1. `modules/audio_coding/neteq/packet_buffer.{h,cc}` 新增
+>    `NextLowerTimestamp` 与 `NewestSequenceNumber`，为 DRED 提供
+>    更精确的“前一帧时间戳 + 丢包检测”输入。
+> 2. `modules/audio_coding/neteq/neteq_impl.cc` 中 DRED 的
+>    `current_gap` 推断不再只依赖 `sync_buffer_->end_timestamp()`，
+>    改为 jitter-buffer 内邻居优先、其次按序号判断是否发生丢包，
+>    与 opus-ng 逻辑一致。
+> 3. `modules/audio_coding/codecs/opus/audio_encoder_opus.cc`
+>    `SufficientOutputBufferSize()` 在启用 DRED 时额外预留 160 字节，
+>    避免高码率 + 长 recovery 下 DRED side-data 被截断。
+> 4. `modules/audio_coding/neteq/tools/audio_network_lab` 新增
+>    `--dred_duration_frames` CLI（默认 `auto`）与按丢包率分档的
+>    自适应映射（20/30/50/80/100 帧），并把最终值写回
+>    `summary.json` 的 `encoder.dred_duration_frames` 与
+>    `encoder.dred_duration_source`。
+>
+> 在 `representative_audio/read_ls_001.wav` 的验证中，20% 随机
+> 丢包下 `concealed_samples` 从 FEC 的 93k 降到 DRED 的 72k；
+> 20%+5 平均 burst 下从 FEC 的 177k 降到 DRED 的 48k。
 
 ## 背景
 

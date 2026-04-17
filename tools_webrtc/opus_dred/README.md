@@ -28,15 +28,15 @@ ninja -C out/AudioLab audio_network_lab audio_network_lab_unittests
 ## What the script does
 
 1. Downloads `opus-1.5.2.tar.gz` from the official Xiph mirror and replaces
-   `third_party/opus/src` with it. The previous `src/` is moved aside to
+  `third_party/opus/src` with it. The previous `src/` is moved aside to
    `third_party/opus/src.pre-dred/` for safety.
 2. Downloads the matching DNN weight bundle
-   (`opus_data-735117b.tar.gz`, ~156 MiB compressed) and extracts only the
+  (`opus_data-735117b.tar.gz`, ~156 MiB compressed) and extracts only the
    `*_data.c` / `*_data.h` files into `third_party/opus/src/dnn/`. The
    ~2 GiB of PyTorch training checkpoints bundled in the tarball are
    discarded because the compiled C library does not need them.
 3. Copies `opus.BUILD.gn.patched` into `third_party/opus/BUILD.gn`,
-   preserving any pre-existing file as `BUILD.gn.pre-dred`.
+  preserving any pre-existing file as `BUILD.gn.pre-dred`.
 
 The script is idempotent: re-running it is a no-op when the tree already
 matches the expected state.
@@ -45,9 +45,9 @@ matches the expected state.
 
 - `setup_opus_dred.py` – the bootstrap script described above.
 - `opus.BUILD.gn.patched` – snapshot of the GN target definitions
-  that enable `ENABLE_DEEP_PLC`, `ENABLE_DRED`, `ENABLE_OSCE`, include the
-  `src/dnn/` sources, and split x86/ARM SIMD into dedicated source sets
-  (`opus_sse2`, `opus_sse41`, `opus_avx2`, plus NEON / DotProd under ARM).
+that enable `ENABLE_DEEP_PLC`, `ENABLE_DRED`, `ENABLE_OSCE`, include the
+`src/dnn/` sources, and split x86/ARM SIMD into dedicated source sets
+(`opus_sse2`, `opus_sse41`, `opus_avx2`, plus NEON / DotProd under ARM).
 
 ## Required network hosts
 
@@ -88,15 +88,18 @@ done
 
 On a reference run (20 % loss, seed 42, 10 s sine):
 
-| mode     | bitrate    | concealed_samples | concealment_events |
-| -------- | ---------- | ----------------: | -----------------: |
-| none     | 24.2 kbps  |            98 400 |                 87 |
-| opus_fec | 24.2 kbps  |            95 520 |                 86 |
-| **dred** | 28.9 kbps  |             4 800 |                  7 |
+
+| mode     | bitrate   | concealed_samples | concealment_events |
+| -------- | --------- | ----------------- | ------------------ |
+| none     | 24.2 kbps | 98 400            | 87                 |
+| opus_fec | 24.2 kbps | 95 520            | 86                 |
+| **dred** | 28.9 kbps | 4 800             | 7                  |
+
 
 i.e. DRED cuts PLC concealment volume by ~95 % at a +4.7 kbps bitrate cost.
 
 ## See also
 
 - `docs/opus_dred_integration_plan.md` – full design/integration plan,
-  source-file-by-source-file.
+source-file-by-source-file.
+

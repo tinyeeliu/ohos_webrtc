@@ -145,6 +145,18 @@ int PacketBuffer::InsertPacket(Packet&& packet,
   RTC_DCHECK_GE(packet.priority.codec_level, 0);
   RTC_DCHECK_GE(packet.priority.red_level, 0);
 
+  // Track the newest sequence number we have ever seen, surviving flushes so
+  // that DRED can detect forward loss after a buffer flush too.
+  if (insert_count_ == 0) {
+    newest_sequence_number_ = packet.sequence_number;
+  } else {
+    const uint16_t delta = packet.sequence_number - newest_sequence_number_;
+    if (delta > 0 && delta <= 0xFFFF / 2) {
+      newest_sequence_number_ = packet.sequence_number;
+    }
+  }
+  ++insert_count_;
+
   int return_val = kOK;
 
   packet.waiting_time = tick_timer_->GetNewStopwatch();
@@ -283,6 +295,47 @@ int PacketBuffer::NextHigherTimestamp(uint32_t timestamp,
     }
   }
   return kNotFound;
+}
+
+int PacketBuffer::NextLowerTimestamp(int16_t sequence_number,
+                                     uint32_t timestamp,
+                                     uint32_t* next_timestamp,
+                                     uint32_t* duration) const {
+  if (Empty()) {
+    return kBufferEmpty;
+  }
+  if (!next_timestamp) {
+    return kInvalidPointer;
+  }
+  // Walk backwards so we find the closest older packet first.
+  for (auto rit = buffer_.rbegin(); rit != buffer_.rend(); ++rit) {
+    const uint32_t ts_diff = timestamp - rit->timestamp;
+    if (timestamp == rit->timestamp || ts_diff >= 0x7FFFFFFF) {
+      continue;  // Skip same-timestamp or future packets.
+    }
+    const uint16_t sequence_diff =
+        static_cast<uint16_t>(sequence_number) - rit->sequence_number;
+    if (sequence_diff > 1 && sequence_diff < 0xFFFF / 2) {
+      *next_timestamp = rit->timestamp;
+      if (duration != nullptr && rit->frame != nullptr &&
+          rit->frame->Duration() > 0) {
+        *duration = rit->frame->Duration();
+      }
+      return kOK;
+    }
+    return kNotFound;
+  }
+  return kNotFound;
+}
+
+bool PacketBuffer::NewestSequenceNumber(uint16_t* sequence_number) const {
+  if (insert_count_ == 0) {
+    return false;
+  }
+  if (sequence_number != nullptr) {
+    *sequence_number = newest_sequence_number_;
+  }
+  return true;
 }
 
 const Packet* PacketBuffer::PeekNextPacket() const {

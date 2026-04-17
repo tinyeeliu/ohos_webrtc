@@ -263,8 +263,54 @@ absl::optional<int64_t> MinOptionalUs(absl::optional<int64_t> a,
   return std::min(*a, *b);
 }
 
+// Maps a packet-loss hint (percent) to a DRED recovery depth in 10 ms frames.
+// Mirrors the spirit of the xiph/webrtc-opus-ng adaptive control: keep a
+// short safety net at low loss, extend it monotonically as loss grows, and
+// cap at libopus' documented 1 s upper bound. Guaranteed non-zero whenever
+// DRED is enabled so the recovery path remains active even at ~0% loss.
+int AutoDredDurationFramesFromLoss(int loss_pct) {
+  if (loss_pct <= 2) {
+    return 20;  // 200 ms safety net.
+  }
+  if (loss_pct <= 5) {
+    return 30;  // 300 ms.
+  }
+  if (loss_pct <= 10) {
+    return 50;  // 500 ms.
+  }
+  if (loss_pct <= 20) {
+    return 80;  // 800 ms.
+  }
+  return 100;  // 1 s (libopus maximum).
+}
+
+struct DredSelection {
+  int duration_frames = 0;
+  std::string source = "disabled";
+};
+
+DredSelection SelectDredDuration(const AudioEncoderExperimentConfig& encoder,
+                                 double network_loss_pct) {
+  DredSelection selection;
+  if (encoder.redundancy_mode != AudioNetworkLabRedundancyMode::kDred) {
+    return selection;
+  }
+  if (encoder.dred_duration_frames > 0) {
+    selection.duration_frames = std::min(encoder.dred_duration_frames, 100);
+    selection.source = "flag";
+    return selection;
+  }
+  const int loss_hint = std::max(
+      encoder.expected_loss_pct,
+      static_cast<int>(std::ceil(network_loss_pct)));
+  selection.duration_frames = AutoDredDurationFramesFromLoss(loss_hint);
+  selection.source = "auto";
+  return selection;
+}
+
 AudioEncoderOpus::Config CreateOpusConfig(
-    const AudioEncoderExperimentConfig& config) {
+    const AudioEncoderExperimentConfig& config,
+    const DredSelection& dred_selection) {
   AudioEncoderOpus::Config opus_config;
   opus_config.sample_rate_hz = kInputSampleRateHz;
   opus_config.num_channels = config.channels;
@@ -278,9 +324,7 @@ AudioEncoderOpus::Config CreateOpusConfig(
   opus_config.fec_enabled =
       config.redundancy_mode == AudioNetworkLabRedundancyMode::kOpusFec;
   if (config.redundancy_mode == AudioNetworkLabRedundancyMode::kDred) {
-    // Enable Opus 1.5+ Deep Redundancy with up to 1 s of recovery data (100
-    // frames of 10 ms) which matches the upper bound advertised by libopus.
-    opus_config.dred = 100;
+    opus_config.dred = dred_selection.duration_frames;
   }
   opus_config.dtx_enabled = config.enable_dtx;
   return opus_config;
@@ -288,13 +332,14 @@ AudioEncoderOpus::Config CreateOpusConfig(
 
 std::unique_ptr<AudioEncoder> CreateEncoderStack(
     const AudioEncoderExperimentConfig& config,
+    const DredSelection& dred_selection,
     std::string* error) {
   if (!absl::EqualsIgnoreCase(config.codec, "opus")) {
     *error = "Only codec=opus is supported in audio_network_lab.";
     return nullptr;
   }
 
-  AudioEncoderOpus::Config opus_config = CreateOpusConfig(config);
+  AudioEncoderOpus::Config opus_config = CreateOpusConfig(config, dred_selection);
   if (!opus_config.IsOk()) {
     *error = "Invalid Opus encoder configuration.";
     return nullptr;
@@ -479,7 +524,11 @@ std::string AudioNetworkLabSummary::ToJson() const {
       << ",\n"
       << "    \"redundancy_mode\": \""
       << EscapeJsonString(encoder.redundancy_mode) << "\",\n"
-      << "    \"expected_loss_pct\": " << encoder.expected_loss_pct << "\n"
+      << "    \"expected_loss_pct\": " << encoder.expected_loss_pct << ",\n"
+      << "    \"dred_duration_frames\": " << encoder.dred_duration_frames
+      << ",\n"
+      << "    \"dred_duration_source\": \""
+      << EscapeJsonString(encoder.dred_duration_source) << "\"\n"
       << "  },\n"
       << "  \"network\": {\n"
       << "    \"bandwidth_kbps\": " << network.bandwidth_kbps << ",\n"
@@ -705,9 +754,14 @@ AudioNetworkLabRunResult AudioNetworkLabRunner::Run(
     return result;
   }
 
+  const DredSelection dred_selection =
+      SelectDredDuration(config.encoder, config.network.loss_pct);
+  result.summary.encoder.dred_duration_frames = dred_selection.duration_frames;
+  result.summary.encoder.dred_duration_source = dred_selection.source;
+
   std::string encoder_error;
   std::unique_ptr<AudioEncoder> encoder =
-      CreateEncoderStack(config.encoder, &encoder_error);
+      CreateEncoderStack(config.encoder, dred_selection, &encoder_error);
   if (!encoder) {
     result.error = encoder_error;
     return result;

@@ -142,6 +142,25 @@ TEST(AudioNetworkLabTest, DredModeProducesOutput) {
   EXPECT_TRUE(result.ok) << result.error;
   EXPECT_TRUE(FileExists(config.summary_json));
   EXPECT_TRUE(FileExists(config.output_audio));
+  // Adaptive selection should pick a non-trivial recovery window for 20% loss.
+  EXPECT_EQ(result.summary.encoder.dred_duration_source, "auto");
+  EXPECT_GT(result.summary.encoder.dred_duration_frames, 0);
+}
+
+TEST(AudioNetworkLabTest, DredDurationFlagOverridesAuto) {
+  const std::string input_pcm =
+      WriteMonoPcm("audio_network_lab_dred_flag", 500);
+  AudioNetworkLabConfig config = CreateBaseConfig(input_pcm);
+  config.encoder.redundancy_mode = AudioNetworkLabRedundancyMode::kDred;
+  config.encoder.dred_duration_frames = 40;
+  config.network.loss_pct = 20.0;
+
+  AudioNetworkLabRunner runner;
+  AudioNetworkLabRunResult result = runner.Run(config);
+
+  EXPECT_TRUE(result.ok) << result.error;
+  EXPECT_EQ(result.summary.encoder.dred_duration_source, "flag");
+  EXPECT_EQ(result.summary.encoder.dred_duration_frames, 40);
 }
 
 }  // namespace

@@ -108,6 +108,24 @@ class PacketBuffer {
   virtual int NextHigherTimestamp(uint32_t timestamp,
                                   uint32_t* next_timestamp) const;
 
+  // Looks for the packet that is the immediate predecessor (older neighbour)
+  // of the caller-provided (`sequence_number`, `timestamp`) tuple. On match
+  // `*next_timestamp` is set to that packet's RTP timestamp and `*duration`
+  // (when non-null) to the frame duration (in samples) of that packet. Used
+  // by the DRED recovery path to learn the precise recovery window. Returns
+  // kOK on match, kNotFound when there is no suitable predecessor, or
+  // kBufferEmpty / kInvalidPointer otherwise.
+  virtual int NextLowerTimestamp(int16_t sequence_number,
+                                 uint32_t timestamp,
+                                 uint32_t* next_timestamp,
+                                 uint32_t* duration) const;
+
+  // Writes the sequence number of the newest packet ever observed by the
+  // buffer (even if that packet has since been consumed or flushed) into
+  // `*sequence_number` and returns true. Returns false when no packet has
+  // ever been inserted.
+  virtual bool NewestSequenceNumber(uint16_t* sequence_number) const;
+
   // Returns a (constant) pointer to the first packet in the buffer. Returns
   // NULL if the buffer is empty.
   virtual const Packet* PeekNextPacket() const;
@@ -175,6 +193,10 @@ class PacketBuffer {
   size_t max_number_of_packets_;
   PacketList buffer_;
   const TickTimer* tick_timer_;
+  // Tracks the largest RTP sequence number ever seen by InsertPacket, used by
+  // the DRED recovery path to detect forward loss across packet boundaries.
+  uint16_t newest_sequence_number_ = 0;
+  uint64_t insert_count_ = 0;
 };
 
 }  // namespace webrtc

@@ -61,6 +61,10 @@ struct AudioEncoderExperimentConfig {
   AudioNetworkLabRedundancyMode redundancy_mode =
       AudioNetworkLabRedundancyMode::kNone;
   int expected_loss_pct = 0;
+  // DRED recovery depth in 10 ms frames. Only used when redundancy_mode is
+  // kDred. -1 means "derive from `expected_loss_pct` (or the simulated network
+  // loss, whichever is larger) at runtime".
+  int dred_duration_frames = -1;
 };
 
 struct NetEqExperimentConfig {
@@ -94,6 +98,8 @@ struct AudioNetworkLabSummary {
     bool enable_dtx = false;
     std::string redundancy_mode = "none";
     int expected_loss_pct = 0;
+    int dred_duration_frames = 0;
+    std::string dred_duration_source = "none";
   } encoder;
 
   struct NetworkConfig {
