@@ -35,6 +35,19 @@ absl::optional<AudioNetworkLabRedundancyMode> ParseAudioNetworkLabRedundancyMode
 absl::string_view AudioNetworkLabRedundancyModeToString(
     AudioNetworkLabRedundancyMode mode);
 
+// Packet-loss model used by the simulated network.
+//   kGilbertElliot – WebRTC's built-in two-state Markov model (default).
+//   kDnnLossGen     – Opus DNN loss generator (dnn/lossgen.c), trained on
+//                    real-world network traces; produces more realistic burst
+//                    patterns than the analytic Gilbert-Elliot model.
+enum class LossModel {
+  kGilbertElliot,
+  kDnnLossGen,
+};
+
+absl::optional<LossModel> ParseLossModel(absl::string_view name);
+absl::string_view LossModelToString(LossModel model);
+
 struct FixedLossEvent {
   int start_ms = 0;
   int duration_ms = 0;
@@ -50,6 +63,11 @@ struct NetworkImpairmentConfig {
   int avg_burst_loss_length = 0;
   uint64_t random_seed = 1;
   std::vector<FixedLossEvent> fixed_loss_events;
+  // Selects the packet-loss generation model. kGilbertElliot (default) uses
+  // WebRTC's SimulatedNetwork; kDnnLossGen uses the Opus DNN loss generator.
+  // avg_burst_loss_length is ignored when kDnnLossGen is selected (the DNN
+  // model produces burst patterns implicitly from its hidden state).
+  LossModel loss_model = LossModel::kGilbertElliot;
 };
 
 struct AudioEncoderExperimentConfig {
@@ -124,6 +142,7 @@ struct AudioNetworkLabSummary {
     int avg_burst_loss_length = 0;
     uint64_t random_seed = 1;
     std::vector<FixedLossEvent> fixed_loss_events;
+    std::string loss_model = "gilbert_elliot";
   } network;
 
   struct NetEqConfig {
@@ -143,6 +162,7 @@ struct AudioNetworkLabSummary {
     int lost_packets = 0;
     int queue_dropped_packets = 0;
     int fixed_loss_dropped_packets = 0;
+    int dnn_lossgen_dropped_packets = 0;
     int reordered_packets = 0;
   } network_stats;
 

@@ -97,6 +97,15 @@ ABSL_FLAG(uint64_t,
           network_random_seed,
           1,
           "RNG seed for SimulatedNetwork (loss/jitter/reorder).");
+ABSL_FLAG(
+    std::string,
+    loss_model,
+    "gilbert_elliot",
+    "Packet-loss model: 'gilbert_elliot' (default, WebRTC built-in two-state "
+    "Markov) or 'dnn_lossgen' (Opus DNN loss generator trained on real-world "
+    "network traces). --avg_burst_loss_length is ignored when dnn_lossgen is "
+    "selected; the DNN model produces realistic bursts from its internal "
+    "state.");
 
 ABSL_FLAG(int,
           neteq_max_packets,
@@ -213,6 +222,16 @@ int main(int argc, char* argv[]) {
     return 1;
   }
   config.encoder.redundancy_mode = *redundancy_mode;
+
+  auto loss_model = webrtc::test::ParseLossModel(absl::GetFlag(FLAGS_loss_model));
+  if (!loss_model.has_value()) {
+    fprintf(stderr,
+            "Invalid --loss_model '%s'. Valid values: gilbert_elliot, "
+            "dnn_lossgen.\n",
+            absl::GetFlag(FLAGS_loss_model).c_str());
+    return 1;
+  }
+  config.network.loss_model = *loss_model;
 
   std::string parse_error;
   if (!ParseFixedLossEvents(absl::GetFlag(FLAGS_fixed_loss_events_ms),

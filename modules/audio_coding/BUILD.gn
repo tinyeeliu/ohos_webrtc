@@ -1370,6 +1370,18 @@ if (rtc_include_tests) {
   }
 
   if (!build_with_chromium) {
+    # Expose Opus private DNN headers (lossgen.h and its transitive includes)
+    # so that audio_network_lab.cc can call the DNN loss generator directly.
+    # The compiled lossgen symbols live in //third_party/opus:opus which is
+    # already pulled in transitively via :audio_coding -> :webrtc_opus.
+    config("audio_network_lab_runner_opus_dnn_config") {
+      include_dirs = [
+        "//third_party/opus/src",
+        "//third_party/opus/src/dnn",
+        "//third_party/opus/src/include",
+      ]
+    }
+
     rtc_library("audio_network_lab_runner") {
       testonly = true
 
@@ -1377,6 +1389,8 @@ if (rtc_include_tests) {
         "neteq/tools/audio_network_lab.cc",
         "neteq/tools/audio_network_lab.h",
       ]
+
+      configs += [ ":audio_network_lab_runner_opus_dnn_config" ]
 
       deps = [
         ":audio_coding",
@@ -1839,6 +1853,18 @@ if (rtc_include_tests) {
 }
 
 if (!build_with_chromium && !rtc_include_tests) {
+  # Expose Opus private DNN headers (lossgen.h and its transitive includes)
+  # so that audio_network_lab.cc can call the DNN loss generator directly.
+  # The compiled lossgen symbols live in //third_party/opus:opus which is
+  # already pulled in transitively via :audio_coding -> :webrtc_opus.
+  config("audio_network_lab_runner_opus_dnn_config") {
+    include_dirs = [
+      "//third_party/opus/src",
+      "//third_party/opus/src/dnn",
+      "//third_party/opus/src/include",
+    ]
+  }
+
   rtc_library("audio_network_lab_runner") {
     testonly = true
 
@@ -1846,6 +1872,8 @@ if (!build_with_chromium && !rtc_include_tests) {
       "neteq/tools/audio_network_lab.cc",
       "neteq/tools/audio_network_lab.h",
     ]
+
+    configs += [ ":audio_network_lab_runner_opus_dnn_config" ]
 
     deps = [
       ":audio_coding",

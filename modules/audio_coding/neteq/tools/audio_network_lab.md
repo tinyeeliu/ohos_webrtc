@@ -378,6 +378,7 @@ bash modules/audio_coding/neteq/tools/audio_network_lab_check_python_envs.sh
 
 - 均匀随机丢包
 - Gilbert-Elliot 突发随机丢包
+- **Opus DNN 丢包生成器**（`dnn/lossgen.c`，基于真实网络 trace 训练）
 - 固定断连事件
 - 可选乱序
 - 可选有限队列
@@ -388,8 +389,9 @@ bash modules/audio_coding/neteq/tools/audio_network_lab_check_python_envs.sh
 | `--bandwidth_kbps`        | 链路容量（kbps）；`0` 表示不限速                          |
 | `--delay_ms`              | 单向基础时延（ms）                                    |
 | `--jitter_stddev_ms`      | 时延抖动标准差（高斯，ms）                                |
-| `--loss_pct`              | 随机丢包率（%）                                      |
-| `--avg_burst_loss_length` | Gilbert-Elliot 平均 burst 长度；仅当 `> 1` 时启用突发模型   |
+| `--loss_pct`              | 目标丢包率（%）                                      |
+| `--loss_model`            | 丢包模型：`gilbert_elliot`（默认）或 `dnn_lossgen`      |
+| `--avg_burst_loss_length` | Gilbert-Elliot 平均 burst 长度；仅当 `> 1` 时启用突发模型；`dnn_lossgen` 模式下忽略 |
 | `--allow_reorder`         | 允许乱序                                          |
 | `--queue_len_packets`     | 最大链路排队包数；`0` 表示不限制                            |
 | `--fixed_loss_events_ms`  | 固定断连，格式 `start:duration,start:duration`，单位 ms |
@@ -399,7 +401,13 @@ bash modules/audio_coding/neteq/tools/audio_network_lab_check_python_envs.sh
 注意：
 
 - 对给定 `loss_pct`，`avg_burst_loss_length` 必须大于 `ceil(p/(1-p))`
-- 可复现实验时要固定：输入 PCM、编码参数、网络参数、`network_random_seed`
+- `dnn_lossgen` 不接受 `avg_burst_loss_length`；burst 模式由神经网络的隐状态决定
+- `dnn_lossgen` 相比 Gilbert-Elliot 更接近真实互联网 trace 的"多数短 burst + 偶发长 burst"长尾分布，适合做 DRED/FEC/PLC 在"更真实"网络下的复算；而 GE 因参数可控、可重复性好，适合做"控制变量"基准测试
+- 可复现实验时要固定：输入 PCM、编码参数、网络参数、`network_random_seed`。`dnn_lossgen` 内部调用 libc `rand()`，lab 启动时会用 `network_random_seed` 对其 `srand()`，因此同一 seed 两次运行得到完全相同的 burst 序列（已实测 WAV bit-for-bit 一致）
+
+### DNN 丢包模型说明
+
+`--loss_model=dnn_lossgen` 激活 Opus 官方的 `dnn/lossgen.c` 预过滤器，在包进入 `SimulatedNetwork` 之前按神经网络给出的条件概率决定丢弃与否；此时 `SimulatedNetwork` 只负责带宽/时延/抖动，自身的丢包率被置 0。模型权重一次性内嵌在 libopus 二进制中，无需额外资源。摘要 JSON 会额外输出 `network.loss_model` 和 `network_stats.dnn_lossgen_dropped_packets`。
 
 ## 最小跑通示例
 
@@ -495,6 +503,28 @@ python3 -c 'import math,struct; p="/tmp/lab_input.pcm"; open(p,"wb").write(b"".j
 - `encoder.use_encoder_adaptive_dred=true`
 - `encoder.dred_duration_source` 仍记录为 `auto/flag`（lab 选出来的上限）
 - 实际编码期间 DRED 深度由库内 `AudioEncoderOpusImpl` 按 runtime 丢包反馈动态更新
+
+### DNN 丢包模型（真实网络拟真）
+
+```sh
+./out/AudioLab/audio_network_lab \
+  --input_pcm=/tmp/lab_input.pcm \
+  --output_audio=/tmp/lab_dnn.wav \
+  --summary_json=/tmp/lab_dnn.json \
+  --textlog=/tmp/lab_dnn.txt \
+  --redundancy_mode=dred \
+  --expected_loss_pct=10 \
+  --loss_pct=10 \
+  --loss_model=dnn_lossgen
+```
+
+结果中：
+
+- `network.loss_model="dnn_lossgen"`
+- `network_stats.dnn_lossgen_dropped_packets` 记录 DNN 决策丢弃的包数
+- `network_stats.lost_packets`（来自 `SimulatedNetwork`）在此模式下通常为 0
+
+同一 `--loss_pct` 下，`dnn_lossgen` 产生的 burst 分布形态与 `--avg_burst_loss_length=3..5` 的 GE 模型差别较大：前者平均 burst 长度更短（~1.3），但偶有 5~10 包的长 burst；后者平均 burst 长度更接近设定值且分布更均匀。做 DRED/FEC 效果对比时两者可同时跑，以覆盖"可控基准"与"真实网络拟真"两种视角。
 
 ## 单次语音 WER 评估
 

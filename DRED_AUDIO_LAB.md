@@ -90,7 +90,7 @@ python3 tools_webrtc/opus_dred/setup_opus_dred.py
 gn gen out/AudioLab
 ninja -C out/AudioLab audio_network_lab audio_network_lab_unittests
 
-# 3) 跑一个 burst + CBR + DRED 的示例
+# 3) 跑一个 burst + CBR + DRED 的示例（Gilbert-Elliot 可控基准）
 ./out/AudioLab/audio_network_lab \
   --input_pcm=/tmp/input.pcm \
   --output_audio=/tmp/out_dred.wav \
@@ -100,7 +100,23 @@ ninja -C out/AudioLab audio_network_lab audio_network_lab_unittests
   --loss_pct=20 \
   --avg_burst_loss_length=5 \
   --expected_loss_pct=20
+
+# 4) 跑同样配置，但换成 Opus DNN 丢包生成器（真实网络拟真）
+./out/AudioLab/audio_network_lab \
+  --input_pcm=/tmp/input.pcm \
+  --output_audio=/tmp/out_dred_dnn.wav \
+  --summary_json=/tmp/out_dred_dnn.json \
+  --redundancy_mode=dred \
+  --cbr=true \
+  --loss_pct=20 \
+  --loss_model=dnn_lossgen \
+  --expected_loss_pct=20
 ```
+
+`--loss_model` 选项：
+
+- `gilbert_elliot`（默认）：两状态 Markov 模型，参数完全可控，可复现性强，适合做"控制变量"基准
+- `dnn_lossgen`：直接调用 `third_party/opus/src/dnn/lossgen.c`，基于 Xiph 团队从真实网络 trace 训练的小型 RNN 逐包决策是否丢包；产生的 burst 更接近真实互联网的长尾分布（绝大多数为短 burst，偶发 5~10 包长 burst），适合验证 DRED/FEC/PLC 在"更真实网络"下的效果。摘要 JSON 会输出 `network.loss_model` 与 `network_stats.dnn_lossgen_dropped_packets`。
 
 ## 五、文档维护建议
 
@@ -111,3 +127,4 @@ ninja -C out/AudioLab audio_network_lab audio_network_lab_unittests
   - 本文件“生产路径 DRED 控制链路”章节
   - `modules/audio_coding/neteq/tools/audio_network_lab.md`
   - 如果改动涉及 DRED 模型/ABI（Opus 1.5 → 1.6 等），记得同步 `kOpusDredLocalVersion` 并在此处说明
+- 如果 Opus 上游对 `dnn/lossgen.c`/`lossgen_data.c` 的权重或 API 做了更新，`third_party/opus` roll 之后需要在这里记录一次，并抽查 `--loss_model=dnn_lossgen` 下的 burst 分布是否仍符合预期

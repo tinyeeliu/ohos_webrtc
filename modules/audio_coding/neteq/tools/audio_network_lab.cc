@@ -12,6 +12,13 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
+
+// Opus DNN loss generator (lossgen.c / lossgen_data.c).
+// These are C headers; wrap in extern "C" to avoid name-mangling.
+extern "C" {
+#include "lossgen.h"
+}
 
 #include <algorithm>
 #include <cmath>
@@ -204,6 +211,15 @@ std::string EscapeJsonString(absl::string_view input) {
 
 bool ValidateNetworkImpairmentConfig(const NetworkImpairmentConfig& config,
                                      std::string* error) {
+  if (config.loss_model == LossModel::kDnnLossGen) {
+    if (config.loss_pct <= 0.0 || config.loss_pct >= 100.0) {
+      *error =
+          "DNN loss generator (--loss_model=dnn_lossgen) requires "
+          "0 < loss_pct < 100.";
+      return false;
+    }
+    return true;
+  }
   if (config.avg_burst_loss_length > 1) {
     if (config.loss_pct <= 0.0 || config.loss_pct >= 100.0) {
       *error =
@@ -499,6 +515,28 @@ ParseAudioNetworkLabRedundancyMode(absl::string_view mode) {
   return absl::nullopt;
 }
 
+absl::optional<LossModel> ParseLossModel(absl::string_view name) {
+  std::string lowered = std::string(name);
+  absl::AsciiStrToLower(&lowered);
+  if (lowered == "gilbert_elliot") {
+    return LossModel::kGilbertElliot;
+  }
+  if (lowered == "dnn_lossgen") {
+    return LossModel::kDnnLossGen;
+  }
+  return absl::nullopt;
+}
+
+absl::string_view LossModelToString(LossModel model) {
+  switch (model) {
+    case LossModel::kGilbertElliot:
+      return "gilbert_elliot";
+    case LossModel::kDnnLossGen:
+      return "dnn_lossgen";
+  }
+  return "unknown";
+}
+
 absl::string_view AudioNetworkLabRedundancyModeToString(
     AudioNetworkLabRedundancyMode mode) {
   switch (mode) {
@@ -555,7 +593,9 @@ std::string AudioNetworkLabSummary::ToJson() const {
       << ",\n"
       << "    \"random_seed\": " << network.random_seed << ",\n"
       << "    \"fixed_loss_events_ms\": "
-      << BuildFixedLossEventsJson(network.fixed_loss_events) << "\n"
+      << BuildFixedLossEventsJson(network.fixed_loss_events) << ",\n"
+      << "    \"loss_model\": \"" << EscapeJsonString(network.loss_model)
+      << "\"\n"
       << "  },\n"
       << "  \"neteq\": {\n"
       << "    \"max_packets\": " << neteq.max_packets << ",\n"
@@ -577,6 +617,8 @@ std::string AudioNetworkLabSummary::ToJson() const {
       << network_stats.queue_dropped_packets << ",\n"
       << "    \"fixed_loss_dropped_packets\": "
       << network_stats.fixed_loss_dropped_packets << ",\n"
+      << "    \"dnn_lossgen_dropped_packets\": "
+      << network_stats.dnn_lossgen_dropped_packets << ",\n"
       << "    \"reordered_packets\": " << network_stats.reordered_packets
       << "\n"
       << "  },\n"
@@ -684,6 +726,8 @@ AudioNetworkLabRunResult AudioNetworkLabRunner::Run(
       config.network.avg_burst_loss_length;
   result.summary.network.random_seed = config.network.random_seed;
   result.summary.network.fixed_loss_events = config.network.fixed_loss_events;
+  result.summary.network.loss_model =
+      std::string(LossModelToString(config.network.loss_model));
   result.summary.neteq.max_packets = config.neteq.max_packets;
   result.summary.neteq.fast_accelerate = config.neteq.fast_accelerate;
   result.summary.neteq.min_delay_ms = config.neteq.min_delay_ms;
@@ -832,22 +876,40 @@ AudioNetworkLabRunResult AudioNetworkLabRunner::Run(
                                                                    1)));
   }
 
+  const bool use_dnn_lossgen =
+      config.network.loss_model == LossModel::kDnnLossGen;
+
+  // When the DNN loss generator is active, SimulatedNetwork handles only
+  // delay/jitter/bandwidth; packet drops are handled per-packet below.
   SimulatedNetwork::Config network_config;
   network_config.link_capacity_kbps = config.network.bandwidth_kbps;
   network_config.queue_delay_ms = config.network.delay_ms;
   network_config.delay_standard_deviation_ms = config.network.jitter_stddev_ms;
   network_config.loss_percent =
-      static_cast<int>(std::round(config.network.loss_pct));
+      use_dnn_lossgen ? 0
+                      : static_cast<int>(std::round(config.network.loss_pct));
   network_config.allow_reordering = config.network.allow_reorder;
   network_config.queue_length_packets =
       config.network.queue_len_packets > 0
           ? static_cast<size_t>(config.network.queue_len_packets)
           : 0;
   network_config.avg_burst_loss_length =
-      config.network.avg_burst_loss_length > 1
+      (!use_dnn_lossgen && config.network.avg_burst_loss_length > 1)
           ? config.network.avg_burst_loss_length
           : -1;
   SimulatedNetwork network(network_config, config.network.random_seed);
+
+  // DNN loss generator state — initialised once and reused for the full run.
+  // Note: upstream `sample_loss()` uses libc `rand()` to Bernoulli-draw the
+  // per-packet decision from the GRU output; seed it explicitly from the same
+  // random_seed we feed SimulatedNetwork so `--network_random_seed` makes lab
+  // runs bit-reproducible. Scoping: we only srand() when this mode is active to
+  // avoid perturbing any other rand() user in the process.
+  LossGenState lossgen_state;
+  if (use_dnn_lossgen) {
+    std::srand(static_cast<unsigned>(config.network.random_seed));
+    lossgen_init(&lossgen_state);
+  }
 
   InputAudioFile input_file(config.input_pcm, /*loop_at_end=*/false);
 
@@ -961,6 +1023,18 @@ AudioNetworkLabRunResult AudioNetworkLabRunner::Run(
                                          packet.send_time_us)) {
             ++result.summary.network_stats.fixed_loss_dropped_packets;
             textlog.WriteLine("FIXED_LOSS packet_id=" +
+                              std::to_string(packet.packet_id));
+            continue;
+          }
+
+          // DNN loss generator pre-filter: decide per-packet drop before
+          // handing off to SimulatedNetwork (which has loss_percent=0 in this
+          // mode so it handles only delay/jitter/bandwidth).
+          if (use_dnn_lossgen &&
+              sample_loss(&lossgen_state,
+                          static_cast<float>(config.network.loss_pct * 0.01))) {
+            ++result.summary.network_stats.dnn_lossgen_dropped_packets;
+            textlog.WriteLine("DNN_LOSS packet_id=" +
                               std::to_string(packet.packet_id));
             continue;
           }
