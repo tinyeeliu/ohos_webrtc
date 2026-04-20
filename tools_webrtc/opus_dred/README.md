@@ -1,92 +1,79 @@
-# Opus DRED integration helper
+# Opus DRED 本地构建辅助
 
-> Unified doc/results entry for DRED + audio lab:
-> [`DRED_AUDIO_LAB.md`](../../DRED_AUDIO_LAB.md)
+> 顶层入口：[`DRED_AUDIO_LAB.md`](../../DRED_AUDIO_LAB.md)
 
-This directory contains the artefacts required to reproduce the Opus 1.6
-**Deep REDundancy (DRED)** / **Deep PLC** / **OSCE (LACE/NoLACE/BWE)** build
-on a fresh checkout.
+这个目录提供在全新 checkout 上重建 Opus 1.6 DRED / Deep PLC / OSCE 构建
+环境所需的脚手架。`third_party/` 在本仓库 `.gitignore` 中，所以实际的
+Opus 源码、DNN 权重和补丁版 `third_party/opus/BUILD.gn` 不能直接纳入
+版本库；`setup_opus_dred.py` 会一次性把这三样本地化。
 
-`/third_party` is git-ignored in this repo, so the upgraded Opus source tree
-and the patched `third_party/opus/BUILD.gn` cannot be versioned directly.
-The `setup_opus_dred.py` script reconstructs that local state in a single
-command.
+## 一键使用
 
-> **1.5 → 1.6 note** — 1.6 now ships the DNN weight arrays directly
-> inside the release tarball (each `dnn/*_data.c` is a multi-MB blob).
-> The separate `opus_data-*.tar.gz` bundle that 1.5.x required is no
-> longer downloaded. Because the new DRED model is NOT wire-compatible
-> with 1.5.x, `kOpusDredLocalVersion` has been bumped to `2`; SDP
-> negotiation with legacy peers automatically falls back to PLC/LBRR.
+```sh
+# 1. 确保 third_party/opus 目录存在（通过 build.sh 或 gclient sync 创建）。
+bash build.sh   # 或者项目既定的同步步骤
 
-## Quick start
-
-```bash
-# 1. Make sure third_party/opus exists (via the project's usual sync step).
-gclient sync   # or your project's equivalent
-
-# 2. Install Opus 1.5.2 sources, DNN weights and the patched BUILD.gn.
+# 2. 拉 Opus 1.6 源码 + 内置 DNN 权重，并安装补丁 BUILD.gn。
 python3 tools_webrtc/opus_dred/setup_opus_dred.py
 
-# 3. Regenerate the build files and compile the audio_network_lab harness.
+# 3. 生成构建目录，编译 audio_network_lab。
 gn gen out/AudioLab
-ninja -C out/AudioLab audio_network_lab audio_network_lab_unittests
-
-# 4. Run the unit tests (should include DredModeProducesOutput).
-./out/AudioLab/audio_network_lab_unittests
+ninja -C out/AudioLab modules/audio_coding:audio_network_lab
 ```
 
-## What the script does
+脚本幂等：本地已是 1.6 且 BUILD.gn 无差异时再次运行为 no-op。
 
-1. Downloads `opus-1.6.tar.gz` from the official Xiph mirror (SHA-256 pinned
-   against `b7637334...`) and replaces `third_party/opus/src` with it. The
-   previous `src/` is moved aside to `third_party/opus/src.pre-opus-1.5/`
-   for safety.
-2. Sanity-checks that the expected inline weight files
-   (`bbwenet_data.c`, `dred_rdovae_*_data.c`, `fargan_data.c`,
-   `lace_data.c`, `nolace_data.c`, `plc_data.c`, …) are present. 1.6
-   embeds these directly in the source tarball, so no secondary download
-   is performed.
-3. Copies `opus.BUILD.gn.patched` into `third_party/opus/BUILD.gn`,
-   preserving any pre-existing file as `BUILD.gn.pre-opus-1.6`.
+## 脚本做了什么
 
-The script is idempotent: re-running it is a no-op when the tree already
-matches the expected state.
+1. 从官方 `downloads.xiph.org` 下载 `opus-1.6.tar.gz`（SHA-256 固定为
+   `b7637334...`），覆盖 `third_party/opus/src/`；旧的 `src/` 会被
+   移到 `third_party/opus/src.pre-opus-1.5/` 保底。
+2. 校验 Opus 1.6 自带的权重文件是否就位（`bbwenet_data.c`、
+   `dred_rdovae_*_data.c`、`fargan_data.c`、`lace_data.c`、
+   `nolace_data.c`、`plc_data.c` 等）。与 1.5.x 不同，1.6 已经把这些
+   多 MB 的 `*_data.c` 直接打包进源码 tarball，不再需要额外下载权重包。
+3. 把 `opus.BUILD.gn.patched` 复制到 `third_party/opus/BUILD.gn`，
+   原文件会备份为 `BUILD.gn.pre-opus-1.6`。
 
-## Files
+## 从 1.5.x 升级的语义差异
 
-- `setup_opus_dred.py` – the bootstrap script described above.
-- `opus.BUILD.gn.patched` – snapshot of the GN target definitions
-that enable `ENABLE_DEEP_PLC`, `ENABLE_DRED`, `ENABLE_OSCE`, include the
-Opus 1.6 `src/dnn/` sources (including the new `bbwenet_data.c` BWE
-weights), and split x86/ARM SIMD into dedicated source sets
-(`opus_sse2`, `opus_sse41`, `opus_avx2` with the new `pitch_avx`,
-`inner_product_FLP_avx2` and `NSQ_del_dec_avx2` sources, plus NEON under
-ARM).
+- DRED 模型重训、权重体积缩到约 600 kB，但码流**不向后兼容**。
+- 配套的 `kOpusDredLocalVersion` 已从 1 升到 2，SDP `opusdredver` 随之
+  广播；遇到 1.5.x 旧对端会自动落到 mismatch 分支，保持 DRED 关闭。
+  详见 [`DRED_AUDIO_LAB.md`](../../DRED_AUDIO_LAB.md) 第二节。
 
-## Required network hosts
+## 文件
 
-- `downloads.xiph.org` – Opus 1.6 source tarball. That is the only
-  external download required; 1.6 no longer needs `media.xiph.org`.
+- `setup_opus_dred.py` — 上面描述的 bootstrap 脚本。
+- `opus.BUILD.gn.patched` — 带 `ENABLE_DEEP_PLC` / `ENABLE_DRED` /
+  `ENABLE_OSCE` 的 GN 目标定义，包含 Opus 1.6 的 `src/dnn/`
+  （含新增的 BWE 权重 `bbwenet_data.c`）和 x86 / ARM SIMD 子集
+  （`opus_sse2` / `opus_sse41` / `opus_avx2` 包含 1.6 新增的
+  `pitch_avx` / `inner_product_FLP_avx2` / `NSQ_del_dec_avx2`，
+  ARM 下启用 NEON）。
 
-If the host is blocked by your network, download the tarball manually
-with the URL baked into the script, drop it into a temporary directory,
-and point `urllib.request.urlopen` at a local mirror (or extract the
-archive by hand).
+## 需要访问的外部主机
 
-## Verifying DRED is actually active
+- `downloads.xiph.org` — Opus 1.6 源码 tarball；1.6 不再需要
+  `media.xiph.org`。
 
-After building, run the three redundancy modes on the same loss trace to
-confirm that DRED produces the expected recovery gain:
+如果这台机器不能直达 `downloads.xiph.org`，手动把 tarball 放到临时目录
+后，改 `setup_opus_dred.py` 里 `urllib.request.urlopen` 的 URL 指向
+本地镜像即可，校验逻辑会继续生效。
 
-```bash
+## 验证 DRED 已生效
+
+构建完成后跑一组基线/FEC/DRED 三选一，对照 `concealed_samples`
+判断 DRED 是否在恢复：
+
+```sh
 python3 -c "
 import math, struct
 with open('/tmp/sine10s.pcm','wb') as f:
     for i in range(48000*10):
         t = i/48000.0
         v = int(10000 * (0.6*math.sin(2*math.pi*440*t) +
-                          0.3*math.sin(2*math.pi*660*t)))
+                         0.3*math.sin(2*math.pi*660*t)))
         f.write(struct.pack('<h', v))
 "
 
@@ -101,20 +88,18 @@ for mode in none opus_fec dred; do
 done
 ```
 
-On a reference run (20 % loss, seed 42, 10 s sine):
+正常结果示例（20% 丢包，seed 42，10 s 正弦）：
 
+| 方案 | 码率 | concealed_samples | concealment_events |
+|------|-----:|------------------:|-------------------:|
+| none | 24.2 kbps | 98 400 | 87 |
+| opus_fec | 24.2 kbps | 95 520 | 86 |
+| **dred** | 28.9 kbps | 约 4 800 | 7 |
 
-| mode     | bitrate   | concealed_samples | concealment_events |
-| -------- | --------- | ----------------- | ------------------ |
-| none     | 24.2 kbps | 98 400            | 87                 |
-| opus_fec | 24.2 kbps | 95 520            | 86                 |
-| **dred** | 28.9 kbps | 4 800             | 7                  |
+DRED 把 PLC 的 concealment 量压低约 95%，代价约 +4.7 kb/s。
 
+## 参考
 
-i.e. DRED cuts PLC concealment volume by ~95 % at a +4.7 kbps bitrate cost.
-
-## See also
-
-- `DRED_AUDIO_LAB.md` – consolidated entry for setup, experiments, and latest
-  WER/bitrate outcomes.
-
+- [`DRED_AUDIO_LAB.md`](../../DRED_AUDIO_LAB.md) — 集成/实验/结论统一入口。
+- [`../../DRED_OPUS_1_6_COMPARISON.md`](../../DRED_OPUS_1_6_COMPARISON.md)
+  — 1.5.2 → 1.6 的 burst 丢包对照报告。

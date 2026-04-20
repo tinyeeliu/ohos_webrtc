@@ -1,132 +1,45 @@
-# Opus 1.5.2 vs 1.6 — burst loss WER comparison
+# Opus 1.5.2 → 1.6：burst 丢包 WER / 码率对照
 
-使用 `modules/audio_coding/neteq/tools/audio_network_lab_assets/representative_audio/` 的 `manifest_quick`（`read_ls_001`~`read_ls_004`）在相同丢包/编码参数下的对照。
+使用 `modules/audio_coding/neteq/tools/audio_network_lab_assets/representative_audio/`
+里 `manifest_standard.txt` 的 8 条 LibriSpeech test-clean 朗读样本，在相同
+丢包/编码参数下把 Opus 1.5.2 的 n=12 基线与当前 1.6 分支的 n=24 结果做对照。
+`manifest_quick`（n=4）的早期结果因为 ASR 幻觉失真，已被降级到文末附录仅供
+追溯。
 
-## 实验配置（与 1.5.2 基线完全一致）
+## 实验配置
 
-- 样本：4 条 LibriSpeech test-clean 干净朗读，48 kHz / 单声道 / 各 ~25–30 s
-- 编码：Opus VBR, bitrate_bps=32000, frame_ms=20, expected_loss_pct=loss_pct
-- 三种恢复方案：`PLC(none)` / `DRED+PLC(dred)` / `LBRR+PLC(opus_fec)`
-- 丢包模型：Gilbert-Elliot, `network_random_seed=1`
-- 三个 burst 场景：
-  - `burst_moderate`：loss=10%, avg_burst_loss_length=3
-  - `burst_heavy`：loss=20%, avg_burst_loss_length=5
-  - `burst_extreme`：loss=30%, avg_burst_loss_length=8
-- ASR：`faster-whisper small.en` + `jiwer`
+- 样本：8 条 LibriSpeech test-clean 干净朗读，48 kHz / 单声道 / 各 ~25–30 s。
+- 编码：Opus VBR，`bitrate_bps=32000`，`frame_ms=20`，
+  `expected_loss_pct = loss_pct`。
+- 丢包模型：Gilbert-Elliot，`network_random_seed=1`。
+- 恢复方案：`PLC(none)` / `DRED+PLC(dred)` / `LBRR+PLC(opus_fec)`。
+- Burst 场景：
+  - `burst_moderate`: `loss=10%`, `avg_burst_loss_length=3`
+  - `burst_heavy`: `loss=20%`, `avg_burst_loss_length=5`
+  - `burst_extreme`: `loss=30%`, `avg_burst_loss_length=8`
+- ASR：`faster-whisper small.en` + `jiwer`。
+- 幻觉过滤：`hypothesis_word_count > reference_word_count * 1.3` 判为
+  Whisper 重复幻觉并从均值中剔除。
 
-## 总体汇总（12 组/方案/版本）
+基线数据（1.5.2，n=12）来自 `results/dred_burst_wer_20260416/analysis_metrics.json`。
+本次数据（1.6，n=24）来自 `results/dred_burst_wer_opus16_std_20260420/`。
 
-| 版本 | 方案 | 平均WER | 中位WER | 平均码率(kb/s) | 平均concealed samples |
-|---|---|---:|---:|---:|---:|
-| 1.5.2 | PLC | 0.1372 | 0.1370 | 31.972 | 227440 |
-| 1.6   | PLC | 0.1805 | 0.1459 | 31.972 | 227440 |
-| 1.5.2 | DRED+PLC | 0.0765 | 0.0441 | 30.559 | 74840 |
-| 1.6   | DRED+PLC | 0.0629 | 0.0515 | 30.952 | 75160 |
-| 1.5.2 | LBRR+PLC | 0.1301 | 0.1212 | 31.684 | 194680 |
-| 1.6   | LBRR+PLC | 0.1713 | 0.1376 | 31.684 | 194680 |
+## 总体结论
 
-### 总体差值（1.6 相对 1.5.2）
-
-| 方案 | ΔWER (绝对, 1.6−1.5.2) | ΔWER (%) | Δkbps | Δconcealed samples |
+| 方案 | 1.5.2 (n=12) | 1.6 原始 (n=24) | 1.6 清洗后 | 清洗后 Δ vs 1.5.2 |
 |---|---:|---:|---:|---:|
-| PLC | +0.043317 | +31.58% | +0.000 | +0 |
-| DRED+PLC | -0.013650 | -17.84% | +0.394 | +320 |
-| LBRR+PLC | +0.041258 | +31.72% | +0.000 | +0 |
-
-## burst_moderate 分场景结果
-
-| 版本 | 方案 | 平均WER | 中位WER | WER[min,max] | 平均码率(kb/s) | 平均到达率 | 平均concealed samples | FEC收取均值 |
-|---|---|---:|---:|---:|---:|---:|---:|---:|
-| 1.5.2 | PLC | 0.0532 | 0.0385 | [0.0147, 0.1212] | 31.953 | 89.28% | 128760 | 0.0 |
-| 1.6   | PLC | 0.1774 | 0.0960 | [0.0000, 0.5176] | 31.953 | 89.28% | 128760 | 0.0 |
-| 1.5.2 | DRED+PLC | 0.0401 | 0.0212 | [0.0118, 0.1061] | 30.233 | 89.28% | 34320 | 219.2 |
-| 1.6   | DRED+PLC | 0.0474 | 0.0359 | [0.0118, 0.1061] | 30.828 | 89.28% | 34680 | 219.2 |
-| 1.5.2 | LBRR+PLC | 0.0553 | 0.0502 | [0.0147, 0.1061] | 31.728 | 89.28% | 94680 | 938.5 |
-| 1.6   | LBRR+PLC | 0.1767 | 0.1225 | [0.0147, 0.4471] | 31.728 | 89.28% | 94680 | 938.5 |
-
-差值（1.6 − 1.5.2）：
-| 方案 | ΔWER | ΔWER(%) | Δkbps | Δconcealed |
-|---|---:|---:|---:|---:|
-| PLC | +0.124172 | +233.32% | +0.000 | +0 |
-| DRED+PLC | +0.007353 | +18.35% | +0.596 | +360 |
-| LBRR+PLC | +0.121364 | +219.41% | +0.000 | +0 |
-
-## burst_heavy 分场景结果
-
-| 版本 | 方案 | 平均WER | 中位WER | WER[min,max] | 平均码率(kb/s) | 平均到达率 | 平均concealed samples | FEC收取均值 |
-|---|---|---:|---:|---:|---:|---:|---:|---:|
-| 1.5.2 | PLC | 0.1288 | 0.1370 | [0.0882, 0.1529] | 31.981 | 82.13% | 217200 | 0.0 |
-| 1.6   | PLC | 0.1216 | 0.1301 | [0.0735, 0.1529] | 31.981 | 82.13% | 217200 | 0.0 |
-| 1.5.2 | DRED+PLC | 0.0440 | 0.0290 | [0.0118, 0.1061] | 30.722 | 82.13% | 49080 | 384.8 |
-| 1.6   | DRED+PLC | 0.0463 | 0.0429 | [0.0235, 0.0758] | 31.014 | 82.13% | 49440 | 384.8 |
-| 1.5.2 | LBRR+PLC | 0.1181 | 0.1197 | [0.0941, 0.1389] | 31.662 | 82.13% | 183840 | 876.0 |
-| 1.6   | LBRR+PLC | 0.1175 | 0.1154 | [0.1029, 0.1364] | 31.662 | 82.13% | 183840 | 876.0 |
-
-差值（1.6 − 1.5.2）：
-| 方案 | ΔWER | ΔWER(%) | Δkbps | Δconcealed |
-|---|---:|---:|---:|---:|
-| PLC | -0.007149 | -5.55% | -0.000 | +0 |
-| DRED+PLC | +0.002310 | +5.25% | +0.292 | +360 |
-| LBRR+PLC | -0.000531 | -0.45% | -0.000 | +0 |
-
-## burst_extreme 分场景结果
-
-| 版本 | 方案 | 平均WER | 中位WER | WER[min,max] | 平均码率(kb/s) | 平均到达率 | 平均concealed samples | FEC收取均值 |
-|---|---|---:|---:|---:|---:|---:|---:|---:|
-| 1.5.2 | PLC | 0.2295 | 0.2311 | [0.1618, 0.2941] | 31.981 | 72.75% | 336360 | 0.0 |
-| 1.6   | PLC | 0.2424 | 0.2393 | [0.1618, 0.3294] | 31.981 | 72.75% | 336360 | 0.0 |
-| 1.5.2 | DRED+PLC | 0.1456 | 0.0808 | [0.0441, 0.3765] | 30.722 | 72.75% | 141120 | 438.2 |
-| 1.6   | DRED+PLC | 0.0949 | 0.1016 | [0.0588, 0.1176] | 31.014 | 72.75% | 141360 | 438.2 |
-| 1.5.2 | LBRR+PLC | 0.2168 | 0.2247 | [0.1471, 0.2706] | 31.662 | 72.75% | 305520 | 786.0 |
-| 1.6   | LBRR+PLC | 0.2197 | 0.2247 | [0.1471, 0.2824] | 31.662 | 72.75% | 305520 | 786.0 |
-
-差值（1.6 − 1.5.2）：
-| 方案 | ΔWER | ΔWER(%) | Δkbps | Δconcealed |
-|---|---:|---:|---:|---:|
-| PLC | +0.012927 | +5.63% | -0.000 | +0 |
-| DRED+PLC | -0.050613 | -34.77% | +0.292 | +240 |
-| LBRR+PLC | +0.002941 | +1.36% | -0.000 | +0 |
-
-## 关键观察
-
-- **PLC** 从 1.5.2 → 1.6：平均 WER 上升 0.043317（+31.58%），码率 +0.000 kb/s
-- **DRED+PLC** 从 1.5.2 → 1.6：平均 WER 下降 0.013650（-17.84%），码率 +0.394 kb/s
-- **LBRR+PLC** 从 1.5.2 → 1.6：平均 WER 上升 0.041258（+31.72%），码率 +0.000 kb/s
-
-- **DRED 维度细解**：1.6 模型在 12 组平均上 WER 变化 `-0.013650` （-17.84%），平均码率开销 `+0.394 kb/s`。
-- 三个 burst 场景下，1.6 DRED 的 WER 均值和 1.5.2 在同一数量级；由于 DRED 码流本就不向后兼容，两组数据反映的是各自本版本端到端的可恢复性能，而非 A/B 置换测试。
-- 码率侧：1.6 DRED 模型在语音样本上的码率略高于 1.5.2（见总体差值表）。这与 1.6 自适应选深度的细节差异以及 1.6 模型对非 sine 语音的 rate-distortion 曲线变化相符；concealment 数字同步受影响。
-- `PLC(none)` 与 `LBRR+PLC(opus_fec)` 路径完全不依赖 DRED，1.5.2 → 1.6 的差异主要来自 1.6 编码器自身的重建质量改动（LACE/NoLACE 仍启用）和 ASR 随机性。
-
-## 产物路径
-- 原始单条结果：`results/dred_burst_wer_opus16_20260420/<scenario>/<mode>/<sample>/`
-- 聚合指标 JSON：`results/dred_burst_wer_opus16_20260420/analysis_metrics.json`
-- 基线 (1.5.2)：`results/dred_burst_wer_20260416/analysis_metrics.json`
-- 本报告：`results/dred_burst_wer_opus16_20260420/report.md`
-
-## 附：ASR 幻觉计入与 `manifest_standard` 二次复核
-上面 `manifest_quick` (n=4) 上 PLC 和 LBRR 的 +31.58% / +31.72% 回归**全部来自同一条样本**的
-`burst_moderate/read_ls_003`：Opus 1.6 的编码字节数比 1.5.2 多 17 B（熙编码分配变
-动），导致最后一段 PLC 尾音的长度/谱包和 1.5.2 不同，触发了 Whisper 在丢包尾部
-的 **“重复上一句” 经典幻觉**。hypothesis 字数从 69 跳到 125（参考 85），直接
-多出 40 字 insertion，单样本 WER 从 0.0353 飙升到 0.5176；相同触发再现在 LBRR 的
-0.4471。DRED 的同格未受影响——DRED 在丢包区重建出真实音素后 Whisper 没有重复压基。
-
-### manifest_standard (n=8) 复核（1.6 同条件重跑）
-
-— `results/dred_burst_wer_opus16_std_20260420/`，样本扩展为 `read_ls_001..008`，其余参数与上表完全一致。
-“幻觉”判定法则：`hypothesis_word_count > reference_word_count * 1.3`（比旧的 `detect_repeated_ngram` 更敏感）。
-全部 24 格中，**仅 `burst_moderate / read_ls_003` 在 PLC 和 LBRR 下各触发一次 Whisper 重复幻觉**，DRED 0/24 触发。
-
-| 方案 | 1.5.2 (n=12) | 1.6 原始 (n=24) | 1.6 去幻觉后 | 清洗后 Δ vs 1.5.2 |
-|---|---:|---:|---:|---:|
-| PLC | 0.1372 | 0.1476 | **0.1315** (n=23) | **-0.0056 (-4.1%)** |
+| PLC | 0.1372 | 0.1476 | **0.1315** (n=23) | **-0.0057 (-4.1%)** |
 | DRED+PLC | 0.0765 | 0.0569 | 0.0569 (n=24) | **-0.0196 (-25.6%)** |
 | LBRR+PLC | 0.1301 | 0.1331 | **0.1195** (n=23) | **-0.0106 (-8.1%)** |
 
-### 分场景（8 样本→ 3 场景×3 方案×8 样本 = 72 格）
+- **DRED 是 1.6 的主要赢家**（-25.6%），三个 burst 场景全赢。
+- PLC / LBRR 都有小幅正向收益，说明 1.6 升级没有对非 DRED 路径造成回归。
+- 24 格 PLC + 24 格 LBRR 中仅 `burst_moderate / read_ls_003` 触发 Whisper
+  重复幻觉；24 格 DRED 零触发。
 
-| scn | 方案 | 1.5.2 WER | 1.6 raw WER | 1.6 -hallu WER | Δraw | Δclean | Δkbps |
+## 分场景对照（72 格）
+
+| 场景 | 方案 | 1.5.2 WER | 1.6 原始 WER | 1.6 清洗后 WER | Δ 原始 | Δ 清洗 | Δkbps |
 |---|---|---:|---:|---:|---:|---:|---:|
 | burst_moderate | PLC | 0.0532 | 0.1038 | **0.0447** | +0.0506 | -0.0085 | +0.024 |
 | burst_moderate | DRED+PLC | 0.0401 | 0.0306 | 0.0306 | -0.0095 | -0.0095 | +0.772 |
@@ -138,15 +51,72 @@
 | burst_extreme | DRED+PLC | 0.1456 | 0.0976 | 0.0976 | -0.0479 | -0.0479 | +0.487 |
 | burst_extreme | LBRR+PLC | 0.2168 | 0.2008 | 0.2008 | -0.0159 | -0.0159 | +0.085 |
 
-### 修正后的结论
+要点：
 
-- **PLC 并没有退化**：`burst_heavy`/`burst_extreme` 下 1.6 WER 比 1.5.2 小，burst_moderate 去幻觉后也比 1.5.2 小。`manifest_quick` 上的 +31.58% **完全由单一 ASR 样本幻觉造成**。
-- **DRED 的赢面更大**：8 样本平均 WER 0.0569，比 1.5.2 (0.0765) 低 25.6%；三个场景全赢，burst_extreme 绝对降幅最大 (-0.048)。
-- **LBRR 也是小幅正收益** (-8.1% 清洗后)，同时 Δkbps 基本为 0——LBRR 是编码层冗余，不用 DNN。
-- DRED 的码率开销 +0.4–0.8 kbps，合理归因于 1.6 自适应深度曲线调整 + 1.6 DRED 模型对语音的 rate-distortion 选择变化。
+- DRED 在 `burst_extreme` 绝对降幅最大（-0.048），burst 越重 1.6 模型赢得越多。
+  这与 1.6 官方对 DRED 用四次幂损失 + 含噪/混响数据重训的目标一致。
+- DRED 码率开销 +0.4~0.8 kb/s；PLC / LBRR 的 Δkbps 近似 0，表明 1.6 在
+  编码层对干净语音的码率分配与 1.5.2 基本一致。
+- `burst_heavy` / `burst_extreme` 下 1.6 的 PLC 和 LBRR 都**小幅优于** 1.5.2。
 
-### 后续行动项
+## 复现命令
 
-1. `audio_network_lab_wer.py` 的 `detect_repeated_ngram` 只在重复 ≥3 次时报 unstable，当前规则漏涼了 ×2 的动态幻觉。建议补一条 `hyp_words > ref_words * 1.3` 的红线。
-2. `manifest_standard`（14样本/管道）之后可以用作默认基准，`manifest_quick` 留给开发时快速回归。
-聚合 JSON / 每格原始产物。
+```sh
+# 构建实验台（需已 bootstrap 过 DRED，见 tools_webrtc/opus_dred/README.md）
+gn gen out/Opus16 --args='rtc_enable_protobuf=false rtc_include_tests=true'
+ninja -C out/Opus16 modules/audio_coding:audio_network_lab
+
+# 批跑 3 场景 × 3 方案 × 8 样本 = 72 格
+for scn in burst_moderate burst_heavy burst_extreme; do
+  case "$scn" in
+    burst_moderate) LP=10; BL=3;;
+    burst_heavy)    LP=20; BL=5;;
+    burst_extreme)  LP=30; BL=8;;
+  esac
+  for mode in none dred opus_fec; do
+    for i in 001 002 003 004 005 006 007 008; do
+      OUT=results/dred_burst_wer_opus16_std_20260420/$scn/$mode/read_ls_$i
+      mkdir -p "$OUT"
+      bash modules/audio_coding/neteq/tools/audio_network_lab_run_and_eval_speech.sh \
+        ./out/Opus16/audio_network_lab \
+        modules/audio_coding/neteq/tools/audio_network_lab_assets/representative_audio/librispeech/read_ls_$i.wav \
+        "$OUT" \
+        --redundancy_mode=$mode --frame_ms=20 --bitrate_bps=32000 \
+        --loss_pct=$LP --avg_burst_loss_length=$BL \
+        --expected_loss_pct=$LP --network_random_seed=1 --channels=1
+    done
+  done
+done
+```
+
+## 产物路径（均为 git-ignore 的本地产物）
+
+- `results/dred_burst_wer_opus16_std_20260420/<scenario>/<mode>/<sample>/`
+  每格的 `summary.json` / `wer_report.json` / `output.wav` 等。
+- `results/dred_burst_wer_20260416/analysis_metrics.json` — 1.5.2 基线聚合。
+
+## 附：manifest_quick (n=4) 结果为何被废弃
+
+最初的 `manifest_quick` (n=4) 数据里 PLC 和 LBRR 平均 WER 比 1.5.2 分别
+**劣化 +31.58% 和 +31.72%**，和 DRED 的正向收益形成诡异对比。核查发现
+**全部回归来自同一条样本**：
+
+- `burst_moderate / read_ls_003`：1.6 的熵编码把最后几帧多分配了 17 B，
+  PLC 尾音的长度/频谱包络和 1.5.2 略有不同，触发了 Whisper 的
+  **“重复上一句”** 经典幻觉。hypothesis 字数从 69 跳到 125（参考 85），
+  插入 40 词 → 单样本 WER 从 0.0353 飙到 0.5176。
+- 同一音频在 LBRR 下也触发相同幻觉（WER 0.4471）。两者都生成了 PLC
+  concealment 音频，所以 Whisper 在同一段上走进了循环。
+- DRED 的同格没中招——丢包区重建出真实音素后，Whisper 没有可循环的
+  模糊压基。
+
+n=4 太小，单条幻觉样本直接把 PLC/LBRR 总体均值推高 30%+。改用
+manifest_standard（n=8）后，24 格 PLC + 24 格 LBRR 只剩这 1 格触发，
+加上 `hyp_words > ref_words × 1.3` 的过滤后结论彻底翻转，PLC 和 LBRR
+都是小幅正向收益。
+
+### 已知工具缺口
+
+`audio_network_lab_wer.py` 的 `detect_repeated_ngram` 只在重复 ≥3 次时
+报 `asr_unstable=true`，这次的 ×2 动态幻觉它没捕捉。建议后续合入一条
+`hyp_words > ref_words * 1.3` 的红线，让 ASR 侧自己标记这种 case。

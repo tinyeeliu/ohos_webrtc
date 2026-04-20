@@ -1,56 +1,91 @@
-# DRED & Audio Network Lab Unified Entry
+# DRED & audio_network_lab 统一入口
 
-这个文档是当前仓库里 **Opus DRED** 与 **audio_network_lab** 的统一入口，方便新人和评审快速定位：
+本文档是仓库里 **Opus DRED** 与 **audio_network_lab** 相关工作的唯一入口，
+回答四个问题：集成、环境、跑实验、当前结论。
 
-- 设计与集成：DRED 在 WebRTC 中如何接入
-- 本地环境：如何一键准备 Opus DRED 编译环境
-- 实验评测：如何跑 PLC / DRED / LBRR 的随机与 burst 丢包对比
-- 最新结果：当前分支上的关键 WER 与码率结论
-- **版本升级对比（2026-04-20）**：Opus 1.5.2 → 1.6 的 burst WER/码率对照见
-  [`DRED_OPUS_1_6_COMPARISON.md`](./DRED_OPUS_1_6_COMPARISON.md)。
+## 相关文档
 
-## 一、先看这里（按顺序）
+- [`tools_webrtc/opus_dred/README.md`](./tools_webrtc/opus_dred/README.md) —
+  本地 Opus 1.6 + DRED 构建环境的 bootstrap（`third_party/opus` 被
+  git-ignore，必须用这个脚本拉）。
+- [`modules/audio_coding/neteq/tools/audio_network_lab.md`](./modules/audio_coding/neteq/tools/audio_network_lab.md) —
+  `audio_network_lab` 完整手册：所有 flag、脚本、WER/情感评估链路。
+- [`DRED_OPUS_1_6_COMPARISON.md`](./DRED_OPUS_1_6_COMPARISON.md) —
+  Opus 1.5.2 → 1.6 升级后的 WER/码率对照报告（2026-04 跑的 manifest_standard）。
 
-1. **总体实验入口（快速上手）**  
-   [`AUDIO_NETWORK_LAB.md`](./AUDIO_NETWORK_LAB.md)
-2. **完整实验手册（参数、脚本、WER/情感评估）**  
-   [`modules/audio_coding/neteq/tools/audio_network_lab.md`](./modules/audio_coding/neteq/tools/audio_network_lab.md)
-3. **DRED 本地 bootstrap（第三方 Opus + DNN 数据）**  
-   [`tools_webrtc/opus_dred/README.md`](./tools_webrtc/opus_dred/README.md)
+## 一、快速路径（三步跑通）
+
+```sh
+# 1) 本地拉 Opus 1.6 + DRED 权重 + 补丁 BUILD.gn（首次运行）
+python3 tools_webrtc/opus_dred/setup_opus_dred.py
+
+# 2) 生成构建目录并编译实验台
+gn gen out/AudioLab --args='rtc_enable_protobuf=false rtc_include_tests=false'
+ninja -C out/AudioLab modules/audio_coding:audio_network_lab
+
+# 3) 跑一次基线
+./out/AudioLab/audio_network_lab \
+  --input_pcm=/tmp/input.pcm \
+  --output_audio=/tmp/baseline.wav \
+  --summary_json=/tmp/baseline.json \
+  --redundancy_mode=none
+```
+
+更完整的 flag / WER / 情感评估链路见
+`modules/audio_coding/neteq/tools/audio_network_lab.md`。
 
 ## 二、生产路径 DRED 控制链路
 
-为了让生产代码（非 lab）也能享受 `webrtc-opus-ng` 级别的自适应能力，当前分支补齐了三条控制链：
+为了让生产代码（非 lab）享受 `webrtc-opus-ng` 级别的自适应能力，当前分支
+补齐了三条控制链：
 
-1. **编码器内实时自适应**（新增，默认开启）  
-   `AudioEncoderOpusImpl::SetProjectedPacketLossRate` 基于 `PacketLossFractionSmoother` 给出的平滑丢包率，把 `OPUS_SET_DRED_DURATION` 按下表钳到 `[200 ms, config.dred]`：
+### 1. 编码器内实时自适应（默认开启）
 
-   | 平滑丢包率 | DRED 深度 |
-   | --- | --- |
-   | ≤ 2% | 200 ms |
-   | ≤ 5% | 300 ms |
-   | ≤ 10% | 500 ms |
-   | ≤ 20% | 800 ms |
-   | > 20% | 1000 ms（libopus 上限）|
+`AudioEncoderOpusImpl::SetProjectedPacketLossRate` 基于
+`PacketLossFractionSmoother` 平滑后的丢包率，把 `OPUS_SET_DRED_DURATION`
+按下表钳到 `[200 ms, config.dred]`：
 
-   更新带 **100 ms 死区**，避免逐帧抖动。相关代码：`modules/audio_coding/codecs/opus/audio_encoder_opus.{h,cc}` 里的
-   `AdaptiveDredDurationFrames` / `MaybeUpdateDredDuration`。
+| 平滑丢包率 | DRED 深度 |
+| --- | --- |
+| ≤ 2% | 200 ms |
+| ≤ 5% | 300 ms |
+| ≤ 10% | 500 ms |
+| ≤ 20% | 800 ms |
+| > 20% | 1000 ms（libopus 上限）|
 
-2. **ANA 覆盖通道**  
-   `AudioEncoderRuntimeConfig` 新增 `dred_duration_frames`；DRED-aware controller 可显式下发 0/正数深度，覆盖内部自动映射。负值释放 override，自动映射重新接管。只要 `config.dred > 0` 且 SDP 协商成功，任何 ANA controller 都可以直接参与 DRED 控制。
+更新带 **100 ms 死区**，避免逐帧抖动。相关代码：
+`modules/audio_coding/codecs/opus/audio_encoder_opus.{h,cc}` 中的
+`AdaptiveDredDurationFrames` / `MaybeUpdateDredDuration`。
 
-3. **SDP 版本门控（严格）**  
-   编解码器会在 `AppendSupportedEncoders/Decoders` 里上报：
+### 2. ANA 覆盖通道
 
-   ```
-   usedred=1; opusdredver=2
-   ```
+`AudioEncoderRuntimeConfig` 新增 `dred_duration_frames`；DRED-aware
+controller 可显式下发 0 或正数深度覆盖内部自动映射，负值释放 override。
+只要 `config.dred > 0` 且 SDP 协商成功，任何 ANA controller 都可以直接
+参与 DRED 控制。
 
-   当前分支已升级到 **Opus 1.6**，`kOpusDredLocalVersion = 2` 绑定 1.6 DRED 模型（权重 ~600 kB，使用四次幂训练损失，与 1.5.x 模型码流不兼容）。`SdpToConfig` 只有在 `usedred=1` 且 `opusdredver` 与本地匹配时才会开启 DRED；版本不匹配会记录 `LS_WARNING` 并保持 DRED 关闭；缺省 `opusdredver` 会被视为版本 1（1.5.x 旧对端），同样落到 mismatch 分支，避免向无法解码的对端推送冗余数据。
+### 3. SDP 版本门控（严格）
 
-> lab 场景（`audio_network_lab`）沿用“注入丢包率 → 固定深度”语义：`CreateOpusConfig` 会显式关掉 `adaptive_dred`，保证实验结果严格对应传入参数；需要 A/B 验证自适应链路时可把该开关打开。
+编解码器会在 `AppendSupportedEncoders/Decoders` 里上报：
 
-相关单测（`modules/audio_coding/neteq/tools/audio_network_lab_unittest.cc`）：
+```
+usedred=1; opusdredver=2
+```
+
+- `kOpusDredLocalVersion = 2` 绑定 **Opus 1.6 DRED 模型**
+  （权重 ~600 kB，四次幂训练损失；与 1.5.x 模型码流不兼容）。
+- `SdpToConfig` 只在 `usedred=1` 且 `opusdredver` 与本地匹配时开启 DRED。
+- 版本不匹配会记录 `LS_WARNING` 并保持 DRED 关闭。
+- 缺省 `opusdredver` 被视为版本 1（1.5.x 旧对端），同样落到 mismatch
+  分支，避免向无法解码的对端推送冗余数据。
+
+> lab 场景（`audio_network_lab`）会显式关掉 `adaptive_dred`，保证实验
+> 结果严格等于传入参数。需要验证自适应链路时可加
+> `--use_encoder_adaptive_dred=true`。
+
+### 相关单测
+
+`modules/audio_coding/neteq/tools/audio_network_lab_unittest.cc`：
 
 - `AudioEncoderOpusDredTest.AdaptiveMappingMatchesLossBuckets`
 - `AudioEncoderOpusDredTest.SdpUsedredWithMatchingVersionEnablesAdaptiveDred`
@@ -58,76 +93,76 @@
 - `AudioEncoderOpusDredTest.SdpUsedredWithoutVersionAssumesLegacyPeerAndKeepsDredOff`
 - `AudioEncoderOpusDredTest.SdpWithoutUsedredKeepsDredOff`
 
-## 三、当前测试结论（代表语音 + burst 丢包）
+## 三、当前结论（2026-04，Opus 1.6）
 
-数据来源：
+基准样本：`modules/audio_coding/neteq/tools/audio_network_lab_assets/representative_audio/manifest_standard.txt`
+（8 条 LibriSpeech test-clean 干净朗读）。
 
-- 对比总表：`results/dred_burst_wer_codec_compare_20260416.md`
-- 库内调控（VBR burst 复核）：`results/dred_burst_wer_vbr_libadaptive_20260417/report.md`
-- 原始结果目录：
-  - `results/dred_burst_wer_20260416/` (VBR)
-  - `results/dred_burst_wer_cbr_20260416/` (CBR)
-  - `results/dred_burst_wer_cvbr_20260416/` (CVBR)
+编码：Opus VBR, `bitrate_bps=32000`, `frame_ms=20`。
+网络：Gilbert-Elliot, `network_random_seed=1`，三档 burst。
+ASR：`faster-whisper small.en` + `jiwer`，并按
+`hypothesis_word_count > reference_word_count * 1.3` 剔除 Whisper 重复幻觉。
 
-关键结论（`manifest_quick`，4 条样本均值）：
+**12 组 / 方案 / 版本平均 WER**（清洗后）：
 
-1. **WebRTC Opus 默认是 VBR，不是 CBR**。CBR 需显式开启（`cbr=1` / `--cbr=true`）。
-2. **CBR 下三种方案码率基本锁定在 31.99 kb/s**（目标 32 kb/s）。
-3. 在本批样本里，**DRED+PLC 在 burst 场景的 WER 最优**：
-   - moderate: PLC `0.050279` / DRED+PLC `0.047653` / LBRR+PLC `0.055314` (CBR)
-   - heavy: PLC `0.118702` / DRED+PLC `0.050576` / LBRR+PLC `0.106295` (CBR)
-   - extreme: PLC `0.238967` / DRED+PLC `0.099135` / LBRR+PLC `0.211638` (CBR)
-4. **CVBR 在本批语料下与 VBR 结果一致**（WER/码率几乎重合），后续若要拉开差异，建议使用更长或更复杂语料再测。
-5. 新增复核：在 `manifest_quick` 的 VBR burst 矩阵中，开启
-   `--use_encoder_adaptive_dred=true`（库内 runtime 调控）得到的 WER 与
-   既有 VBR 报告一致；原因是这组 loss 桶下，库内自适应最终落到同一组
-   DRED 深度（50/80/100 帧）。
+| 方案 | 1.5.2 (n=12) | 1.6 (n=24, 清洗后) | Δ vs 1.5.2 |
+|---|---:|---:|---:|
+| PLC | 0.1372 | **0.1315** | -4.1% |
+| DRED+PLC | 0.0765 | **0.0569** | **-25.6%** |
+| LBRR+PLC | 0.1301 | **0.1195** | -8.1% |
 
-## 四、最小复现实验命令
+**要点**：
+
+1. **DRED 是 1.6 改动的赢家**，三个 burst 场景全赢（`burst_extreme`
+   绝对降幅 -0.048），码率仅 +0.4~0.8 kb/s。
+2. PLC / LBRR 也有小幅正收益，说明 1.6 升级没有对非 DRED 路径造成回归。
+3. 完整矩阵、ASR 幻觉分析、`manifest_quick` 的失效修正过程见
+   [`DRED_OPUS_1_6_COMPARISON.md`](./DRED_OPUS_1_6_COMPARISON.md)。
+
+## 四、常用复现命令
+
+本节只列和 DRED 直接相关的命令；更多 flag（带宽、抖动、固定断连、情感
+评估）见 `modules/audio_coding/neteq/tools/audio_network_lab.md`。
 
 ```sh
-# 1) 准备 DRED 依赖（只需首次）
-python3 tools_webrtc/opus_dred/setup_opus_dred.py
-
-# 2) 编译实验工具
-gn gen out/AudioLab
-ninja -C out/AudioLab audio_network_lab audio_network_lab_unittests
-
-# 3) 跑一个 burst + CBR + DRED 的示例（Gilbert-Elliot 可控基准）
+# burst + DRED 自适应
 ./out/AudioLab/audio_network_lab \
   --input_pcm=/tmp/input.pcm \
   --output_audio=/tmp/out_dred.wav \
   --summary_json=/tmp/out_dred.json \
   --redundancy_mode=dred \
-  --cbr=true \
-  --loss_pct=20 \
-  --avg_burst_loss_length=5 \
-  --expected_loss_pct=20
+  --loss_pct=20 --avg_burst_loss_length=5 --expected_loss_pct=20 \
+  --network_random_seed=1
 
-# 4) 跑同样配置，但换成 Opus DNN 丢包生成器（真实网络拟真）
+# 手动钉住 DRED 深度（50 帧 = 500 ms）
 ./out/AudioLab/audio_network_lab \
   --input_pcm=/tmp/input.pcm \
-  --output_audio=/tmp/out_dred_dnn.wav \
-  --summary_json=/tmp/out_dred_dnn.json \
-  --redundancy_mode=dred \
-  --cbr=true \
-  --loss_pct=20 \
-  --loss_model=dnn_lossgen \
-  --expected_loss_pct=20
+  --output_audio=/tmp/out_dred_500ms.wav \
+  --summary_json=/tmp/out_dred_500ms.json \
+  --redundancy_mode=dred --dred_duration_frames=50 \
+  --loss_pct=10 --expected_loss_pct=10
+
+# 用 Opus DNN 丢包生成器（更贴近真实网络的 burst 长尾）
+./out/AudioLab/audio_network_lab \
+  --input_pcm=/tmp/input.pcm \
+  --output_audio=/tmp/out_dnn.wav \
+  --summary_json=/tmp/out_dnn.json \
+  --redundancy_mode=dred --loss_model=dnn_lossgen \
+  --loss_pct=20 --expected_loss_pct=20
 ```
 
-`--loss_model` 选项：
+`--loss_model=gilbert_elliot`（默认）参数可控、重复性强，适合做控制变量
+基准；`dnn_lossgen` 使用 `third_party/opus/src/dnn/lossgen.c` 的 RNN
+逐包决策，更接近真实网络的 burst 长尾分布。
 
-- `gilbert_elliot`（默认）：两状态 Markov 模型，参数完全可控，可复现性强，适合做"控制变量"基准
-- `dnn_lossgen`：直接调用 `third_party/opus/src/dnn/lossgen.c`，基于 Xiph 团队从真实网络 trace 训练的小型 RNN 逐包决策是否丢包；产生的 burst 更接近真实互联网的长尾分布（绝大多数为短 burst，偶发 5~10 包长 burst），适合验证 DRED/FEC/PLC 在"更真实网络"下的效果。摘要 JSON 会输出 `network.loss_model` 与 `network_stats.dnn_lossgen_dropped_packets`。
+## 五、文档维护约定
 
-## 五、文档维护建议
-
-- 有新的大规模评测结果时，优先更新：
-  - 本文档（统一入口中的“当前测试结论”）
-  - `results/dred_burst_wer_codec_compare_*.md`（详细数据）
-- 如果 DRED 策略（如自适应深度曲线、ANA 覆盖规则、SDP 版本号）有变更，同步更新：
-  - 本文件“生产路径 DRED 控制链路”章节
-  - `modules/audio_coding/neteq/tools/audio_network_lab.md`
-  - 如果改动涉及 DRED 模型/ABI（Opus 1.5 → 1.6 等），记得同步 `kOpusDredLocalVersion` 并在此处说明。历史迁移：1 = 1.5.x 模型（已退役），2 = 1.6 模型（当前）。下一次 roll 时直接 +1 并更新 `tools_webrtc/opus_dred/setup_opus_dred.py` 的 URL/sha256。
-- 如果 Opus 上游对 `dnn/lossgen.c`/`lossgen_data.c` 的权重或 API 做了更新，`third_party/opus` roll 之后需要在这里记录一次，并抽查 `--loss_model=dnn_lossgen` 下的 burst 分布是否仍符合预期
+- 新的大规模评测结果优先更新本文件第三节（结论摘要）和
+  `DRED_OPUS_1_6_COMPARISON.md`（详细数据）。
+- 调整 DRED 自适应曲线 / ANA 规则 / SDP 版本号时同步更新本文件
+  第二节。Opus 版本每次 roll：
+  1. 改 `tools_webrtc/opus_dred/setup_opus_dred.py` 的 URL/SHA-256；
+  2. 如果 DRED 模型/码流变，把 `kOpusDredLocalVersion` +1，并在本节
+     说明映射（当前：1 = 1.5.x 已退役，2 = 1.6）。
+- `third_party/opus` roll 后如果 `dnn/lossgen.c` 的权重或 API 变动，
+  抽查一次 `--loss_model=dnn_lossgen` 的 burst 分布是否仍符合预期。

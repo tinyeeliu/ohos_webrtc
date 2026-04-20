@@ -23,17 +23,12 @@ native API header files.
 2. OHOS Audio adapter code: [ohos audio](./modules/audio_device/ohos).
 3. How to use OHOS Video for webrtc followed [this project](https://gitee.com/han_jin_fei/oh_web-rtc).
 
-### Audio Network Lab
+### Audio Network Lab & Opus DRED
 
-- Unified entry for DRED + audio lab docs/results: [DRED_AUDIO_LAB.md](./DRED_AUDIO_LAB.md)
-- Main entry (quick start + experiment guide): [AUDIO_NETWORK_LAB.md](./AUDIO_NETWORK_LAB.md)
-- Full document (tools details, WER/emotion eval, scenarios): [modules/audio_coding/neteq/tools/audio_network_lab.md](./modules/audio_coding/neteq/tools/audio_network_lab.md)
-
-### Opus 1.5+ Deep REDundancy (DRED)
-
-- Unified entry for DRED + audio lab docs/results: [DRED_AUDIO_LAB.md](./DRED_AUDIO_LAB.md)
-- One-command local setup (`gclient sync` followed by the bootstrap script): [tools_webrtc/opus_dred/README.md](./tools_webrtc/opus_dred/README.md)
-- Detailed experiment handbook: [modules/audio_coding/neteq/tools/audio_network_lab.md](./modules/audio_coding/neteq/tools/audio_network_lab.md)
+- 统一入口（集成 + 实验 + 当前结论）：[DRED_AUDIO_LAB.md](./DRED_AUDIO_LAB.md)
+- 1.5.2 → 1.6 升级对照报告：[DRED_OPUS_1_6_COMPARISON.md](./DRED_OPUS_1_6_COMPARISON.md)
+- 实验台完整手册：[modules/audio_coding/neteq/tools/audio_network_lab.md](./modules/audio_coding/neteq/tools/audio_network_lab.md)
+- Opus DRED 本地构建 bootstrap：[tools_webrtc/opus_dred/README.md](./tools_webrtc/opus_dred/README.md)
 
 ### More info
 
