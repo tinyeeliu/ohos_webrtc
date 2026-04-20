@@ -103,3 +103,50 @@
 - 聚合指标 JSON：`results/dred_burst_wer_opus16_20260420/analysis_metrics.json`
 - 基线 (1.5.2)：`results/dred_burst_wer_20260416/analysis_metrics.json`
 - 本报告：`results/dred_burst_wer_opus16_20260420/report.md`
+
+## 附：ASR 幻觉计入与 `manifest_standard` 二次复核
+上面 `manifest_quick` (n=4) 上 PLC 和 LBRR 的 +31.58% / +31.72% 回归**全部来自同一条样本**的
+`burst_moderate/read_ls_003`：Opus 1.6 的编码字节数比 1.5.2 多 17 B（熙编码分配变
+动），导致最后一段 PLC 尾音的长度/谱包和 1.5.2 不同，触发了 Whisper 在丢包尾部
+的 **“重复上一句” 经典幻觉**。hypothesis 字数从 69 跳到 125（参考 85），直接
+多出 40 字 insertion，单样本 WER 从 0.0353 飙升到 0.5176；相同触发再现在 LBRR 的
+0.4471。DRED 的同格未受影响——DRED 在丢包区重建出真实音素后 Whisper 没有重复压基。
+
+### manifest_standard (n=8) 复核（1.6 同条件重跑）
+
+— `results/dred_burst_wer_opus16_std_20260420/`，样本扩展为 `read_ls_001..008`，其余参数与上表完全一致。
+“幻觉”判定法则：`hypothesis_word_count > reference_word_count * 1.3`（比旧的 `detect_repeated_ngram` 更敏感）。
+全部 24 格中，**仅 `burst_moderate / read_ls_003` 在 PLC 和 LBRR 下各触发一次 Whisper 重复幻觉**，DRED 0/24 触发。
+
+| 方案 | 1.5.2 (n=12) | 1.6 原始 (n=24) | 1.6 去幻觉后 | 清洗后 Δ vs 1.5.2 |
+|---|---:|---:|---:|---:|
+| PLC | 0.1372 | 0.1476 | **0.1315** (n=23) | **-0.0056 (-4.1%)** |
+| DRED+PLC | 0.0765 | 0.0569 | 0.0569 (n=24) | **-0.0196 (-25.6%)** |
+| LBRR+PLC | 0.1301 | 0.1331 | **0.1195** (n=23) | **-0.0106 (-8.1%)** |
+
+### 分场景（8 样本→ 3 场景×3 方案×8 样本 = 72 格）
+
+| scn | 方案 | 1.5.2 WER | 1.6 raw WER | 1.6 -hallu WER | Δraw | Δclean | Δkbps |
+|---|---|---:|---:|---:|---:|---:|---:|
+| burst_moderate | PLC | 0.0532 | 0.1038 | **0.0447** | +0.0506 | -0.0085 | +0.024 |
+| burst_moderate | DRED+PLC | 0.0401 | 0.0306 | 0.0306 | -0.0095 | -0.0095 | +0.772 |
+| burst_moderate | LBRR+PLC | 0.0553 | 0.1007 | **0.0512** | +0.0454 | -0.0041 | +0.049 |
+| burst_heavy | PLC | 0.1288 | 0.1126 | 0.1126 | -0.0162 | -0.0162 | +0.026 |
+| burst_heavy | DRED+PLC | 0.0440 | 0.0426 | 0.0426 | -0.0013 | -0.0013 | +0.487 |
+| burst_heavy | LBRR+PLC | 0.1181 | 0.0978 | 0.0978 | -0.0203 | -0.0203 | +0.085 |
+| burst_extreme | PLC | 0.2295 | 0.2264 | 0.2264 | -0.0031 | -0.0031 | +0.026 |
+| burst_extreme | DRED+PLC | 0.1456 | 0.0976 | 0.0976 | -0.0479 | -0.0479 | +0.487 |
+| burst_extreme | LBRR+PLC | 0.2168 | 0.2008 | 0.2008 | -0.0159 | -0.0159 | +0.085 |
+
+### 修正后的结论
+
+- **PLC 并没有退化**：`burst_heavy`/`burst_extreme` 下 1.6 WER 比 1.5.2 小，burst_moderate 去幻觉后也比 1.5.2 小。`manifest_quick` 上的 +31.58% **完全由单一 ASR 样本幻觉造成**。
+- **DRED 的赢面更大**：8 样本平均 WER 0.0569，比 1.5.2 (0.0765) 低 25.6%；三个场景全赢，burst_extreme 绝对降幅最大 (-0.048)。
+- **LBRR 也是小幅正收益** (-8.1% 清洗后)，同时 Δkbps 基本为 0——LBRR 是编码层冗余，不用 DNN。
+- DRED 的码率开销 +0.4–0.8 kbps，合理归因于 1.6 自适应深度曲线调整 + 1.6 DRED 模型对语音的 rate-distortion 选择变化。
+
+### 后续行动项
+
+1. `audio_network_lab_wer.py` 的 `detect_repeated_ngram` 只在重复 ≥3 次时报 unstable，当前规则漏涼了 ×2 的动态幻觉。建议补一条 `hyp_words > ref_words * 1.3` 的红线。
+2. `manifest_standard`（14样本/管道）之后可以用作默认基准，`manifest_quick` 留给开发时快速回归。
+聚合 JSON / 每格原始产物。
