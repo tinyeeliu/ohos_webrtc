@@ -24,11 +24,21 @@
 
 namespace webrtc {
 
-// Local DRED model/ABI version. Bumped in lockstep with any DRED model upgrade
-// (e.g. the eventual switch from the Opus 1.5.2 DRED model to the Opus 1.6
-// one, which is not wire-compatible). Advertised via SDP as `opusdredver`.
-constexpr int kOpusDredLocalVersion = 1;
-constexpr char kOpusDredLocalVersionStr[] = "1";
+// Local DRED model/ABI version. Bumped in lockstep with any DRED model
+// upgrade. Advertised via SDP as `opusdredver`.
+//
+//   1  -> Opus 1.5.x DRED model (rdovae_sparse5m_32, ~1800 kB weights).
+//   2  -> Opus 1.6 DRED model (retrained with a fourth-power loss,
+//         smaller ~600 kB weights, different bitstream layout).
+//
+// The 1.6 DRED bitstream is NOT wire-compatible with the 1.5.x model:
+// libopus tags the DRED payload with an internal version byte, so a
+// mismatched peer will drop the DRED data instead of producing mis-decoded
+// audio. We still negotiate `opusdredver` in SDP so that we *know* to keep
+// DRED off and fall back to LBRR/PLC instead of wasting bitrate on
+// redundancy the peer cannot consume.
+constexpr int kOpusDredLocalVersion = 2;
+constexpr char kOpusDredLocalVersionStr[] = "2";
 
 absl::optional<std::string> GetFormatParameter(const SdpAudioFormat& format,
                                                absl::string_view param);

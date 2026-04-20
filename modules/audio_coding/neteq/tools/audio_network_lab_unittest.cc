@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "api/audio_codecs/opus/audio_encoder_opus.h"
+#include "modules/audio_coding/codecs/opus/audio_coder_opus_common.h"
 #include "modules/audio_coding/codecs/opus/audio_encoder_opus.h"
 #include "rtc_base/checks.h"
 #include "test/gtest.h"
@@ -185,12 +186,14 @@ TEST(AudioEncoderOpusDredTest, AdaptiveMappingMatchesLossBuckets) {
 }
 
 #if defined(WEBRTC_OPUS_SUPPORT_DRED) && WEBRTC_OPUS_SUPPORT_DRED
-TEST(AudioEncoderOpusDredTest, SdpUsedredWithMatchingVersionEnablesAdaptiveDred) {
-  SdpAudioFormat fmt("opus", 48000, 2,
-                     {{"minptime", "10"},
-                      {"useinbandfec", "1"},
-                      {"usedred", "1"},
-                      {"opusdredver", "1"}});
+TEST(AudioEncoderOpusDredTest,
+     SdpUsedredWithMatchingVersionEnablesAdaptiveDred) {
+  SdpAudioFormat fmt(
+      "opus", 48000, 2,
+      {{"minptime", "10"},
+       {"useinbandfec", "1"},
+       {"usedred", "1"},
+       {"opusdredver", kOpusDredLocalVersionStr}});
   const auto config = AudioEncoderOpus::SdpToConfig(fmt);
   ASSERT_TRUE(config.has_value());
   EXPECT_GT(config->dred, 0);
@@ -203,6 +206,20 @@ TEST(AudioEncoderOpusDredTest, SdpUsedredWithMismatchedVersionKeepsDredOff) {
                       {"useinbandfec", "1"},
                       {"usedred", "1"},
                       {"opusdredver", "999"}});
+  const auto config = AudioEncoderOpus::SdpToConfig(fmt);
+  ASSERT_TRUE(config.has_value());
+  EXPECT_EQ(config->dred, 0);
+}
+
+TEST(AudioEncoderOpusDredTest,
+     SdpUsedredWithoutVersionAssumesLegacyPeerAndKeepsDredOff) {
+  // Pre-versioning (Opus 1.5.x) peers advertise bare `usedred=1`. With the
+  // local DRED model upgraded to 1.6 (version 2), we treat that as a
+  // legacy peer and refuse to enable DRED since the bitstream would not be
+  // decodable on the far side.
+  SdpAudioFormat fmt(
+      "opus", 48000, 2,
+      {{"minptime", "10"}, {"useinbandfec", "1"}, {"usedred", "1"}});
   const auto config = AudioEncoderOpus::SdpToConfig(fmt);
   ASSERT_TRUE(config.has_value());
   EXPECT_EQ(config->dred, 0);

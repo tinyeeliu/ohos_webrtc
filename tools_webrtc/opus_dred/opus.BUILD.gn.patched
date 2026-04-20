@@ -214,7 +214,14 @@ if (use_opus_x86_optimization) {
   }
 
   source_set("opus_avx2") {
-    sources = [ "src/dnn/x86/nnet_avx2.c" ]
+    # Opus 1.6 added a few AVX2 fast paths in CELT and SILK alongside the
+    # existing DNN intrinsics file.
+    sources = [
+      "src/celt/x86/pitch_avx.c",
+      "src/dnn/x86/nnet_avx2.c",
+      "src/silk/float/x86/inner_product_FLP_avx2.c",
+      "src/silk/x86/NSQ_del_dec_avx2.c",
+    ]
     configs -= [ "//build/config/compiler:chromium_code" ]
     configs += [ "//build/config/compiler:no_chromium_code" ]
     configs += [
@@ -402,9 +409,12 @@ static_library("opus") {
     "src/src/opus_projection_decoder.c",
     "src/src/opus_projection_encoder.c",
     "src/src/repacketizer.c",
-    "src/src/tansig_table.h",
 
-    # Opus 1.5+ Deep Redundancy (DRED) / Deep PLC / OSCE DNN sources.
+    # Opus 1.6 Deep Redundancy (DRED) / Deep PLC / OSCE DNN sources.
+    # Notable deltas vs. the 1.5.x layout: kiss99.{c,h} and tansig_table.h
+    # are gone, and bbwenet_data.{c,h} was added for the new BWE model.
+    "src/dnn/bbwenet_data.c",
+    "src/dnn/bbwenet_data.h",
     "src/dnn/burg.c",
     "src/dnn/burg.h",
     "src/dnn/common.h",
@@ -433,8 +443,6 @@ static_library("opus") {
     "src/dnn/fargan_data.h",
     "src/dnn/freq.c",
     "src/dnn/freq.h",
-    "src/dnn/kiss99.c",
-    "src/dnn/kiss99.h",
     "src/dnn/lace_data.c",
     "src/dnn/lace_data.h",
     "src/dnn/lossgen.c",
@@ -467,7 +475,6 @@ static_library("opus") {
     "src/dnn/pitchdnn_data.h",
     "src/dnn/plc_data.c",
     "src/dnn/plc_data.h",
-    "src/dnn/tansig_table.h",
     "src/dnn/vec.h",
     "src/dnn/vec_avx.h",
     "src/dnn/vec_neon.h",
@@ -534,6 +541,7 @@ static_library("opus") {
       "src/celt/x86/pitch_sse2.c",
       "src/celt/x86/vq_sse.h",
       "src/celt/x86/vq_sse2.c",
+      "src/celt/x86/x86_arch_macros.h",
       "src/celt/x86/x86_celt_map.c",
       "src/celt/x86/x86cpu.c",
       "src/celt/x86/x86cpu.h",
@@ -557,6 +565,7 @@ static_library("opus") {
       "src/celt/arm/fixed_armv5e.h",
       "src/celt/arm/kiss_fft_armv4.h",
       "src/celt/arm/kiss_fft_armv5e.h",
+      "src/celt/arm/mathops_arm.h",
       "src/celt/arm/pitch_arm.h",
       "src/silk/arm/SigProc_FIX_armv4.h",
       "src/silk/arm/SigProc_FIX_armv5e.h",

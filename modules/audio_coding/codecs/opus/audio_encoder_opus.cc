@@ -220,9 +220,10 @@ void AudioEncoderOpusImpl::AppendSupportedEncoders(
                                        {"useinbandfec", "1"}};
 #if defined(WEBRTC_OPUS_SUPPORT_DRED) && WEBRTC_OPUS_SUPPORT_DRED
   // Advertise DRED capability plus the local DRED model/ABI version so that
-  // peers running a different DRED vintage (e.g. the Opus 1.6 model, which is
-  // wire-incompatible with the 1.5.2 model we currently ship) negotiate DRED
-  // off instead of producing silently mis-decoded packets.
+  // peers running a different DRED vintage (e.g. legacy Opus 1.5.x peers
+  // still on `opusdredver=1`, whose model is wire-incompatible with the
+  // 1.6 model we now ship) negotiate DRED off instead of producing
+  // silently mis-decoded packets.
   params["usedred"] = "1";
   params["opusdredver"] = kOpusDredLocalVersionStr;
 #endif
@@ -271,16 +272,25 @@ absl::optional<AudioEncoderOpusConfig> AudioEncoderOpusImpl::SdpToConfig(
       CalculateBitrate(config.max_playback_rate_hz, config.num_channels,
                        GetFormatParameter(format, "maxaveragebitrate"));
 #if defined(WEBRTC_OPUS_SUPPORT_DRED) && WEBRTC_OPUS_SUPPORT_DRED
-  // Strict DRED capability + version gating. DRED is only enabled if the peer
-  // explicitly opts in (`usedred=1`) AND the DRED model/ABI versions match.
-  // Missing `opusdredver` is treated as peer version 1 (the only published
-  // model at the time this gating was added), so legacy peers advertising
-  // bare `usedred=1` remain compatible.
+  // Strict DRED capability + version gating. DRED is only enabled if the
+  // peer explicitly opts in (`usedred=1`) AND the DRED model/ABI versions
+  // match. Missing `opusdredver` is treated as peer version 1 (the only
+  // published model at the time this gating was added, which corresponds
+  // to Opus 1.5.x). Since we now ship the 1.6 model (local version 2),
+  // peers without `opusdredver` will fall through to the mismatch branch
+  // and DRED will be disabled, which is the desired behaviour.
   if (GetFormatParameter(format, "usedred") == "1") {
     const absl::optional<int> peer_dred_version =
         GetFormatParameter<int>(format, "opusdredver");
+    // A peer that speaks the 1.6 DRED dialect MUST advertise
+    // `opusdredver=2`. Treat a missing parameter as version 1 (the 1.5.x
+    // DRED model), which was the only vintage in the wild when DRED
+    // shipped and the SDP version negotiation was still optional. That
+    // keeps 1.6-only deployments from shipping DRED to a peer that is
+    // very likely unable to decode it.
+    constexpr int kLegacyPeerDredVersion = 1;
     const int effective_peer_version =
-        peer_dred_version.value_or(kOpusDredLocalVersion);
+        peer_dred_version.value_or(kLegacyPeerDredVersion);
     if (effective_peer_version == kOpusDredLocalVersion) {
       // Treat `dred` as the upper bound; the encoder will adapt within
       // [0, dred] based on packet-loss rate. 1 s matches libopus's maximum.

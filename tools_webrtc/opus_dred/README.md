@@ -3,13 +3,21 @@
 > Unified doc/results entry for DRED + audio lab:
 > [`DRED_AUDIO_LAB.md`](../../DRED_AUDIO_LAB.md)
 
-This directory contains the artefacts required to reproduce the Opus 1.5+
-**Deep REDundancy (DRED)** and **Deep PLC** build on a fresh checkout.
+This directory contains the artefacts required to reproduce the Opus 1.6
+**Deep REDundancy (DRED)** / **Deep PLC** / **OSCE (LACE/NoLACE/BWE)** build
+on a fresh checkout.
 
-`/third_party` is git-ignored in this repo, so the upgraded Opus source tree,
-the pre-generated DNN weight arrays, and the patched `third_party/opus/BUILD.gn`
-cannot be versioned directly. The `setup_opus_dred.py` script reconstructs
-that local state in a single command.
+`/third_party` is git-ignored in this repo, so the upgraded Opus source tree
+and the patched `third_party/opus/BUILD.gn` cannot be versioned directly.
+The `setup_opus_dred.py` script reconstructs that local state in a single
+command.
+
+> **1.5 → 1.6 note** — 1.6 now ships the DNN weight arrays directly
+> inside the release tarball (each `dnn/*_data.c` is a multi-MB blob).
+> The separate `opus_data-*.tar.gz` bundle that 1.5.x required is no
+> longer downloaded. Because the new DRED model is NOT wire-compatible
+> with 1.5.x, `kOpusDredLocalVersion` has been bumped to `2`; SDP
+> negotiation with legacy peers automatically falls back to PLC/LBRR.
 
 ## Quick start
 
@@ -30,16 +38,17 @@ ninja -C out/AudioLab audio_network_lab audio_network_lab_unittests
 
 ## What the script does
 
-1. Downloads `opus-1.5.2.tar.gz` from the official Xiph mirror and replaces
-  `third_party/opus/src` with it. The previous `src/` is moved aside to
-   `third_party/opus/src.pre-dred/` for safety.
-2. Downloads the matching DNN weight bundle
-  (`opus_data-735117b.tar.gz`, ~156 MiB compressed) and extracts only the
-   `*_data.c` / `*_data.h` files into `third_party/opus/src/dnn/`. The
-   ~2 GiB of PyTorch training checkpoints bundled in the tarball are
-   discarded because the compiled C library does not need them.
+1. Downloads `opus-1.6.tar.gz` from the official Xiph mirror (SHA-256 pinned
+   against `b7637334...`) and replaces `third_party/opus/src` with it. The
+   previous `src/` is moved aside to `third_party/opus/src.pre-opus-1.5/`
+   for safety.
+2. Sanity-checks that the expected inline weight files
+   (`bbwenet_data.c`, `dred_rdovae_*_data.c`, `fargan_data.c`,
+   `lace_data.c`, `nolace_data.c`, `plc_data.c`, …) are present. 1.6
+   embeds these directly in the source tarball, so no secondary download
+   is performed.
 3. Copies `opus.BUILD.gn.patched` into `third_party/opus/BUILD.gn`,
-  preserving any pre-existing file as `BUILD.gn.pre-dred`.
+   preserving any pre-existing file as `BUILD.gn.pre-opus-1.6`.
 
 The script is idempotent: re-running it is a no-op when the tree already
 matches the expected state.
@@ -49,18 +58,21 @@ matches the expected state.
 - `setup_opus_dred.py` – the bootstrap script described above.
 - `opus.BUILD.gn.patched` – snapshot of the GN target definitions
 that enable `ENABLE_DEEP_PLC`, `ENABLE_DRED`, `ENABLE_OSCE`, include the
-`src/dnn/` sources, and split x86/ARM SIMD into dedicated source sets
-(`opus_sse2`, `opus_sse41`, `opus_avx2`, plus NEON / DotProd under ARM).
+Opus 1.6 `src/dnn/` sources (including the new `bbwenet_data.c` BWE
+weights), and split x86/ARM SIMD into dedicated source sets
+(`opus_sse2`, `opus_sse41`, `opus_avx2` with the new `pitch_avx`,
+`inner_product_FLP_avx2` and `NSQ_del_dec_avx2` sources, plus NEON under
+ARM).
 
 ## Required network hosts
 
-- `downloads.xiph.org` – Opus source tarball.
-- `media.xiph.org` – DNN weight data bundle.
+- `downloads.xiph.org` – Opus 1.6 source tarball. That is the only
+  external download required; 1.6 no longer needs `media.xiph.org`.
 
-If those hosts are blocked by your network, download the tarballs manually
-with the URLs baked into the script, drop them into a temporary directory,
+If the host is blocked by your network, download the tarball manually
+with the URL baked into the script, drop it into a temporary directory,
 and point `urllib.request.urlopen` at a local mirror (or extract the
-archives by hand).
+archive by hand).
 
 ## Verifying DRED is actually active
 

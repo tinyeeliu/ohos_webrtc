@@ -41,10 +41,10 @@
    编解码器会在 `AppendSupportedEncoders/Decoders` 里上报：
 
    ```
-   usedred=1; opusdredver=1
+   usedred=1; opusdredver=2
    ```
 
-   `kOpusDredLocalVersion = 1` 与当前仓库使用的 Opus 1.5.2 DRED 模型绑定，升级 DRED 模型（例如将来切到 Opus 1.6 DRED，模型不兼容）时必须同步 +1。`SdpToConfig` 只有在 `usedred=1` 且 `opusdredver` 与本地匹配时才会开启 DRED；版本不匹配会记录 `LS_WARNING` 并保持 DRED 关闭，避免与跨版本对端静默产生无效冗余包。
+   当前分支已升级到 **Opus 1.6**，`kOpusDredLocalVersion = 2` 绑定 1.6 DRED 模型（权重 ~600 kB，使用四次幂训练损失，与 1.5.x 模型码流不兼容）。`SdpToConfig` 只有在 `usedred=1` 且 `opusdredver` 与本地匹配时才会开启 DRED；版本不匹配会记录 `LS_WARNING` 并保持 DRED 关闭；缺省 `opusdredver` 会被视为版本 1（1.5.x 旧对端），同样落到 mismatch 分支，避免向无法解码的对端推送冗余数据。
 
 > lab 场景（`audio_network_lab`）沿用“注入丢包率 → 固定深度”语义：`CreateOpusConfig` 会显式关掉 `adaptive_dred`，保证实验结果严格对应传入参数；需要 A/B 验证自适应链路时可把该开关打开。
 
@@ -53,6 +53,7 @@
 - `AudioEncoderOpusDredTest.AdaptiveMappingMatchesLossBuckets`
 - `AudioEncoderOpusDredTest.SdpUsedredWithMatchingVersionEnablesAdaptiveDred`
 - `AudioEncoderOpusDredTest.SdpUsedredWithMismatchedVersionKeepsDredOff`
+- `AudioEncoderOpusDredTest.SdpUsedredWithoutVersionAssumesLegacyPeerAndKeepsDredOff`
 - `AudioEncoderOpusDredTest.SdpWithoutUsedredKeepsDredOff`
 
 ## 三、当前测试结论（代表语音 + burst 丢包）
@@ -126,5 +127,5 @@ ninja -C out/AudioLab audio_network_lab audio_network_lab_unittests
 - 如果 DRED 策略（如自适应深度曲线、ANA 覆盖规则、SDP 版本号）有变更，同步更新：
   - 本文件“生产路径 DRED 控制链路”章节
   - `modules/audio_coding/neteq/tools/audio_network_lab.md`
-  - 如果改动涉及 DRED 模型/ABI（Opus 1.5 → 1.6 等），记得同步 `kOpusDredLocalVersion` 并在此处说明
+  - 如果改动涉及 DRED 模型/ABI（Opus 1.5 → 1.6 等），记得同步 `kOpusDredLocalVersion` 并在此处说明。历史迁移：1 = 1.5.x 模型（已退役），2 = 1.6 模型（当前）。下一次 roll 时直接 +1 并更新 `tools_webrtc/opus_dred/setup_opus_dred.py` 的 URL/sha256。
 - 如果 Opus 上游对 `dnn/lossgen.c`/`lossgen_data.c` 的权重或 API 做了更新，`third_party/opus` roll 之后需要在这里记录一次，并抽查 `--loss_model=dnn_lossgen` 下的 burst 分布是否仍符合预期
