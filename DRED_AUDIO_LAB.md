@@ -6,6 +6,8 @@
 - 本地环境：如何一键准备 Opus DRED 编译环境
 - 实验评测：如何跑 PLC / DRED / LBRR 的随机与 burst 丢包对比
 - 最新结果：当前分支上的关键 WER 与码率结论
+- **版本升级对比（2026-04-20）**：Opus 1.5.2 → 1.6 的 burst WER/码率对照见
+  [`DRED_OPUS_1_6_COMPARISON.md`](./DRED_OPUS_1_6_COMPARISON.md)。
 
 ## 一、先看这里（按顺序）
 
