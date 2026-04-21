@@ -1,4 +1,9 @@
 # 更新日志
+## 1.0.1 （2026-04-21）
+- Fix memory leak issues
+- Fix crash issues
+- Update documentation
+- Add custom resolution feature and abnormal resolution options in demo
 
 ## 1.0.1-rc2 （2026-01-22）
 - Fix the issue of incorrect rotation angle of the rear camera
