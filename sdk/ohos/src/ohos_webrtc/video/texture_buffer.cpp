@@ -42,6 +42,10 @@ rtc::scoped_refptr<I420BufferInterface> TextureBuffer::ToI420()
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
     auto texture = texture_.lock();
+    if (!texture) {
+        RTC_LOG(LS_ERROR) << __FUNCTION__ << " failed: texture expired";
+        return nullptr;
+    }
 
     rtc::Thread* toI420Handler = texture->getToI420Handler();
     YuvConverter* yuvConverter = texture->getYuvConverter();
@@ -58,9 +62,29 @@ rtc::scoped_refptr<VideoFrameBuffer> TextureBuffer::CropAndScale(
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    // crop and scale by transformMatrix_
-    // for now, just return self without crop and scale.
-    return rtc::scoped_refptr<VideoFrameBuffer>(this);
+    if (crop_width <= 0 || crop_height <= 0 || scaled_width <= 0 || scaled_height <= 0) {
+        RTC_LOG(LS_ERROR) << "Invalid crop/scale size.";
+        return nullptr;
+    }
+    if (offset_x < 0 || offset_y < 0 || offset_x + crop_width > width_ || offset_y + crop_height > height_) {
+        RTC_LOG(LS_ERROR) << "Crop rect out of bounds.";
+        return nullptr;
+    }
+
+    if (offset_x == 0 && offset_y == 0 && crop_width == width_ && crop_height == height_ && scaled_width == width_ &&
+        scaled_height == height_) {
+        return rtc::scoped_refptr<VideoFrameBuffer>(this);
+    }
+
+    const int cropYFromBottom = height_ - (offset_y + crop_height);
+    Matrix cropMatrix;
+    cropMatrix.PreTranslate(offset_x / static_cast<float>(width_), cropYFromBottom / static_cast<float>(height_));
+    cropMatrix.PreScale(
+        crop_width / static_cast<float>(width_), crop_height / static_cast<float>(height_), 0.0f, 0.0f);
+
+    Matrix newMatrix = transformMatrix_;
+    newMatrix.PreConcat(cropMatrix);
+    return TextureBuffer::Create(texture_, scaled_width, scaled_height, newMatrix);
 }
 
 } // namespace webrtc
