@@ -55,33 +55,33 @@
                 <filteritem type="filepath" name="sdk/ohos/src/node-addon-api/LICENSE.md" desc="三方库文件，不作修改"/>
                 <filteritem type="filepath" name="sdk/ohos/src/node-addon-api/napi.h" desc="三方库文件，不作修改"/>
                 <filteritem type="filepath" name="sdk/ohos/src/node-addon-api/napi-inl.h" desc="三方库文件，不作修改"/>
-                <filteritem type="filepath" name="PRESUBMIT.py" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name="presubmit_test.py" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name="presubmit_test_mocks.py" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name="pylintrc" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name="pylintrc_old_style" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name="license_template.txt" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name="webrtc.gni" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name="webrtc_lib_link_test.cc" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name="BUILD.gn" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name="PRESUBMIT.py" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name="presubmit_test.py" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name="presubmit_test_mocks.py" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name="pylintrc" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name="pylintrc_old_style" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name="license_template.txt" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name="webrtc.gni" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name="webrtc_lib_link_test.cc" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name="BUILD.gn" desc="上游WebRTC工程配置文件，保持原样"/>
                 <filteritem type="filepath" name="sdk/BUILD.gn" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name=".gn" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name=".style.yapf" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name=".vpython" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name=".vpython3" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name=".mailmap" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name=".git-blame-ignore-revs" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name="OWNERS" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name=".gn" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name=".style.yapf" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name=".vpython" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name=".vpython3" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name=".mailmap" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name=".git-blame-ignore-revs" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name="OWNERS" desc="上游WebRTC工程配置文件，保持原样"/>
                 <filteritem type="filepath" name="docs/OWNERS" desc="上游WebRTC工程配置文件，保持原样"/>
                 <filteritem type="filepath" name="sdk/OWNERS" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name="OWNERS_INFRA" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name="ENG_REVIEW_OWNERS" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name="WATCHLISTS" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name="DEPS" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name="DIR_METADATA" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name="PATENTS" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name="README.chromium" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name="codereview.settings" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name="OWNERS_INFRA" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name="ENG_REVIEW_OWNERS" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name="WATCHLISTS" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name="DEPS" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name="DIR_METADATA" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name="PATENTS" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name="README.chromium" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name="codereview.settings" desc="上游WebRTC工程配置文件，保持原样"/>
                 <filteritem type="filepath" name="sdk/media_constraints.h" desc="上游WebRTC源码文件，保持原样"/>
                 <filteritem type="filepath" name="sdk/media_constraints.cc" desc="上游WebRTC源码文件，保持原样"/>
                 <filteritem type="filepath" name="sdk/media_constraints_unittest.cc" desc="上游WebRTC源码文件，保持原样"/>
@@ -110,35 +110,35 @@
                 <filteritem type="filepath" name="sdk/ohos/src/node-addon-api/LICENSE.md" desc="三方库文件，不作修改"/>
                 <filteritem type="filepath" name="sdk/ohos/src/node-addon-api/napi.h" desc="三方库文件，不作修改"/>
                 <filteritem type="filepath" name="sdk/ohos/src/node-addon-api/napi-inl.h" desc="三方库文件，不作修改"/>
-                <filteritem type="filepath" name="LICENSE" desc="上游WebRTC许可证文件，保持原样"/>
-                <filteritem type="filepath" name="AUTHORS" desc="上游WebRTC作者列表，保持原样"/>
-                <filteritem type="filepath" name="PATENTS" desc="上游WebRTC专利声明文件，保持原样"/>
-                <filteritem type="filepath" name="PRESUBMIT.py" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name="presubmit_test.py" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name="presubmit_test_mocks.py" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name="pylintrc" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name="pylintrc_old_style" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name="license_template.txt" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name="webrtc.gni" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name="webrtc_lib_link_test.cc" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name="BUILD.gn" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name="LICENSE" desc="上游WebRTC许可证文件，保持原样"/>
+                <filteritem type="filename" name="AUTHORS" desc="上游WebRTC作者列表，保持原样"/>
+                <filteritem type="filename" name="PATENTS" desc="上游WebRTC专利声明文件，保持原样"/>
+                <filteritem type="filename" name="PRESUBMIT.py" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name="presubmit_test.py" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name="presubmit_test_mocks.py" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name="pylintrc" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name="pylintrc_old_style" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name="license_template.txt" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name="webrtc.gni" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name="webrtc_lib_link_test.cc" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name="BUILD.gn" desc="上游WebRTC工程配置文件，保持原样"/>
                 <filteritem type="filepath" name="sdk/BUILD.gn" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name=".gn" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name=".style.yapf" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name=".vpython" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name=".vpython3" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name=".mailmap" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name=".git-blame-ignore-revs" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name="OWNERS" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name=".gn" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name=".style.yapf" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name=".vpython" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name=".vpython3" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name=".mailmap" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name=".git-blame-ignore-revs" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name="OWNERS" desc="上游WebRTC工程配置文件，保持原样"/>
                 <filteritem type="filepath" name="docs/OWNERS" desc="上游WebRTC工程配置文件，保持原样"/>
                 <filteritem type="filepath" name="sdk/OWNERS" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name="OWNERS_INFRA" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name="ENG_REVIEW_OWNERS" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name="WATCHLISTS" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name="DEPS" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name="DIR_METADATA" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name="README.chromium" desc="上游WebRTC工程配置文件，保持原样"/>
-                <filteritem type="filepath" name="codereview.settings" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name="OWNERS_INFRA" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name="ENG_REVIEW_OWNERS" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name="WATCHLISTS" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name="DEPS" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name="DIR_METADATA" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name="README.chromium" desc="上游WebRTC工程配置文件，保持原样"/>
+                <filteritem type="filename" name="codereview.settings" desc="上游WebRTC工程配置文件，保持原样"/>
                 <filteritem type="filepath" name="sdk/media_constraints.h" desc="上游WebRTC源码文件，保持原样"/>
                 <filteritem type="filepath" name="sdk/media_constraints.cc" desc="上游WebRTC源码文件，保持原样"/>
                 <filteritem type="filepath" name="sdk/media_constraints_unittest.cc" desc="上游WebRTC源码文件，保持原样"/>
