@@ -40,18 +40,25 @@ OH_AVRange OhosVideoEncoder::GetBitrateRange() const
 
 uint32_t OhosVideoEncoder::UpdateBitrate(uint32_t bitrate)
 {
-    OH_AVFormat *format = OH_AVFormat_Create();
-    OH_AVFormat_SetLongValue(format, OH_MD_KEY_BITRATE, bitrate);
-    if (encoder_ != nullptr) {
-        int32_t ret = OH_VideoEncoder_SetParameter(encoder_, format);
-        if (ret != AV_ERR_OK) {
-            OH_LOG_Print(LOG_APP, LOG_ERROR, LOG_DOMAIN, "UpdateRates", "OH_VideoEncoder_SetParameter fail!");
-        } else {
-            OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, "UpdateRates", "curBitrate_ %{public}u", bitrate);
-            return bitrate;
-        }
+    if (encoder_ == nullptr) {
+        return 0;
     }
-    return 0;
+    OH_AVFormat *format = OH_AVFormat_Create();
+    if (format == nullptr) {
+        OH_LOG_Print(LOG_APP, LOG_ERROR, LOG_DOMAIN, "UpdateRates", "OH_AVFormat_Create fail!");
+        return 0;
+    }
+    OH_AVFormat_SetLongValue(format, OH_MD_KEY_BITRATE, bitrate);
+    uint32_t result = 0;
+    int32_t ret = OH_VideoEncoder_SetParameter(encoder_, format);
+    if (ret != AV_ERR_OK) {
+        OH_LOG_Print(LOG_APP, LOG_ERROR, LOG_DOMAIN, "UpdateRates", "OH_VideoEncoder_SetParameter fail!");
+    } else {
+        OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, "UpdateRates", "curBitrate_ %{public}u", bitrate);
+        result = bitrate;
+    }
+    OH_AVFormat_Destroy(format);
+    return result;
 }
 
 int32_t OhosVideoEncoder::Create()
@@ -236,13 +243,11 @@ int32_t OhosVideoEncoder::Configure(FormatInfo *formatInfo)
     }
     
     int32_t ret = OH_VideoEncoder_Configure(encoder_, format_);
+    OH_AVFormat_Destroy(format_);
+    format_ = nullptr;
     if (ret != AV_ERR_OK) {
         // 异常处理
         OH_LOG_Print(LOG_APP, LOG_ERROR, LOG_DOMAIN, "OhosVideoEncoder", "OH_VideoEncoder_Configure Failed");
-        return ret;
-    } else {
-        OH_AVFormat_Destroy(format_);
-        format_ = nullptr;
     }
     return ret;
 }

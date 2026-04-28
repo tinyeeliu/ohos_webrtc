@@ -209,9 +209,9 @@ int32_t HardwareVideoEncoder::Encode(const VideoFrame& frame, const std::vector<
 
     if (requestedKeyFrame) {
         RTC_DLOG(LS_VERBOSE) << "Request key frame";
-        OH_AVFormat* format = OH_AVFormat_Create();
-        OH_AVFormat_SetIntValue(format, OH_MD_KEY_REQUEST_I_FRAME, true);
-        int32_t ret = OH_VideoEncoder_SetParameter(encoder_.Raw(), format);
+        auto format = ohos::AVFormat::Create();
+        OH_AVFormat_SetIntValue(format.Raw(), OH_MD_KEY_REQUEST_I_FRAME, true);
+        int32_t ret = OH_VideoEncoder_SetParameter(encoder_.Raw(), format.Raw());
         if (ret != AV_ERR_OK) {
             RTC_LOG(LS_ERROR) << "Failed to set parameter OH_MD_KEY_REQUEST_I_FRAME: " << ret;
         }
