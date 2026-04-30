@@ -576,9 +576,9 @@ inline bool CameraCaptureSession::AddPreviewOutput(const CameraPreviewOutput& ou
     return true;
 }
 
-inline bool CameraCaptureSession::AddVideoOutput(const CameraVideoOutput& videoOutput)
+inline bool CameraCaptureSession::AddVideoOutput(const CameraVideoOutput& output)
 {
-    Camera_ErrorCode ret = OH_CaptureSession_AddVideoOutput(Raw(), videoOutput.Raw());
+    Camera_ErrorCode ret = OH_CaptureSession_AddVideoOutput(Raw(), output.Raw());
     NATIVE_THROW_IF_FAILED(ret == CAMERA_OK, ret, "OH_Camera", "Failed to add video output to capture session", false);
     return true;
 }

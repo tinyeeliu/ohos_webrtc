@@ -35,7 +35,8 @@ GlShader::~GlShader()
 
 bool GlShader::Compile(const char* vertexShaderString, const char* fragmentShaderString)
 {
-    unsigned int vertex, fragment;
+    unsigned int vertex;
+    unsigned int fragment;
 
     // vertex shader
     vertex = glCreateShader(GL_VERTEX_SHADER);

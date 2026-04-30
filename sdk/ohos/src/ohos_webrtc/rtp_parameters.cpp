@@ -121,7 +121,8 @@ bool ParseFmtpLine(const std::string& line_params, std::map<std::string, std::st
 bool ParseMimeType(const std::string& mimeType, std::string& kind, std::string& name)
 {
     auto results = rtc::split(mimeType, '/');
-    if (results.size() != 2) {
+    constexpr size_t kMimeTypePartCount = 2;
+    if (results.size() != kMimeTypePartCount) {
         // split failed, no '/' in mimeType
         return false;
     }

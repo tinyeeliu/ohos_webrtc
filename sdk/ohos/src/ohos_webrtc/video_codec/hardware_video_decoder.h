@@ -95,7 +95,6 @@ private:
     std::atomic<bool> initialized_{false};
 
     const std::string codecName_;
-    const SdpVideoFormat& format_;
     const int32_t colorFormat_;
     const std::shared_ptr<EglContext> sharedContext_;
 

@@ -23,8 +23,8 @@
 namespace webrtc {
 namespace adapter {
 
-DefaultVideoDecoderFactory::DefaultVideoDecoderFactory(std::shared_ptr<EglContext> sharedContext)
-    : DefaultVideoDecoderFactory(std::make_unique<HardwareVideoDecoderFactory>(sharedContext))
+DefaultVideoDecoderFactory::DefaultVideoDecoderFactory(std::shared_ptr<EglContext> sharedEglContext)
+    : DefaultVideoDecoderFactory(std::make_unique<HardwareVideoDecoderFactory>(sharedEglContext))
 {
 }
 
