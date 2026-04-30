@@ -322,7 +322,6 @@ void NapiVideoSource::OnCapturerStarted(bool success)
         jsEvent.Set("success", Boolean::New(env, success));
         jsCallback.Call(context ? context->Value() : env.Undefined(), {jsEvent});
     });
-
     if (status != napi_ok) {
         RTC_LOG(LS_ERROR) << "tsfn call error: " << status;
     }
@@ -343,7 +342,6 @@ void NapiVideoSource::OnCapturerStopped()
         jsEvent.Set("type", String::New(env, "Event"));
         jsCallback.Call(context ? context->Value() : env.Undefined(), {jsEvent});
     });
-
     if (status != napi_ok) {
         RTC_LOG(LS_ERROR) << "tsfn call error: " << status;
     }

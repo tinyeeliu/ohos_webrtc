@@ -186,13 +186,11 @@ bool ValidateStringConstraint(const Value& jsValue, std::string& errorMessage)
     } else if (jsValue.IsObject()) {
         auto jsObject = jsValue.As<Object>();
         if (jsObject.Has(kConstraintsIdeal) &&
-            !ValidateStringConstraint(jsObject.Get(kConstraintsIdeal).As<String>(), errorMessage))
-        {
+            !ValidateStringConstraint(jsObject.Get(kConstraintsIdeal).As<String>(), errorMessage)) {
             return false;
         }
         if (jsObject.Has(kConstraintsExact) &&
-            !ValidateStringConstraint(jsObject.Get(kConstraintsExact).As<String>(), errorMessage))
-        {
+            !ValidateStringConstraint(jsObject.Get(kConstraintsExact).As<String>(), errorMessage)) {
             return false;
         }
         return true;
@@ -318,8 +316,7 @@ bool ValidateAndCopyConstraint(
 {
     if (jsTrackConstraints.Has(constraint.GetName()) && IsConstraintSupported(constraint.GetName())) {
         if (!ValidateAndCopyStringConstraint(
-                jsTrackConstraints.Get(constraint.GetName()), nakedTreatment, constraint, errorMessage))
-        {
+            jsTrackConstraints.Get(constraint.GetName()), nakedTreatment, constraint, errorMessage)) {
             return false;
         }
     }
@@ -423,8 +420,7 @@ MediaTrackConstraints ParseTrackConstraints(const Napi::Object& jsTrackConstrain
         for (uint32_t index = 0; index < jsArray.Length(); index++) {
             auto jsElement = (Napi::Value)jsArray[index];
             if (!ValidateAndCopyConstraintSet(
-                    jsElement.As<Object>(), NakedValueDisposition::kTreatAsExact, advancedElement, errorMessage))
-            {
+                jsElement.As<Object>(), NakedValueDisposition::kTreatAsExact, advancedElement, errorMessage)) {
                 RTC_LOG(LS_ERROR) << "Failed to parse track constraints: " << errorMessage;
                 return MediaTrackConstraints();
             }

@@ -522,17 +522,19 @@ rtc::scoped_refptr<I420BufferInterface> YuvConverter::Convert(rtc::scoped_refptr
         textureBuffer, *drawer_, renderMatrix, frameWidth, frameHeight, 0, 0, viewportWidth, frameHeight);
 
     // Draw U
+    constexpr int kUvWidthDivisor = 2;
     drawer_->SetStepSize(2.0f);
     drawer_->SetCoefficients({-0.148223f, -0.290993f, 0.439216f, 0.501961f});
     frameDrawer_->DrawTexture(
-        textureBuffer, *drawer_, renderMatrix, frameWidth, frameHeight, 0, frameHeight, viewportWidth / 2, uvHeight);
+        textureBuffer, *drawer_, renderMatrix, frameWidth, frameHeight, 0, frameHeight, viewportWidth / kUvWidthDivisor,
+        uvHeight);
 
     // Draw V
     drawer_->SetStepSize(2.0f);
     drawer_->SetCoefficients({0.439216f, -0.367788f, -0.0714274f, 0.501961f});
     frameDrawer_->DrawTexture(
-        textureBuffer, *drawer_, renderMatrix, frameWidth, frameHeight, viewportWidth / 2, frameHeight,
-        viewportWidth / 2, uvHeight);
+        textureBuffer, *drawer_, renderMatrix, frameWidth, frameHeight, viewportWidth / kUvWidthDivisor, frameHeight,
+        viewportWidth / kUvWidthDivisor, uvHeight);
 
     std::unique_ptr<uint8_t, AlignedFreeDeleter> i420Buffer(
         static_cast<uint8_t*>(AlignedMalloc(stride * totalHeight, kBufferAlignment)));
