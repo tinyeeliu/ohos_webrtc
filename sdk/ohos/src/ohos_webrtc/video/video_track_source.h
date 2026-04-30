@@ -86,7 +86,8 @@ protected:
     // VideoCapturer::Observer
     void OnCapturerStarted(bool success) override;
     void OnCapturerStopped() override;
-    void OnFrameCaptured(rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation) override;
+    void OnFrameCaptured(
+        rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation) override;
 
 private:
     std::atomic<bool> is_destroying_{false};

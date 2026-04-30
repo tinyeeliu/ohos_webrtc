@@ -215,7 +215,6 @@ bool PeerConnectionFactoryWrapper::Init(
         videoEncoderFactory ? std::move(videoEncoderFactory) : CreateDefaultVideoEncoderFactory(),
         videoDecoderFactory ? std::move(videoDecoderFactory) : CreateDefaultVideoDecoderFactory(),
         nullptr /* audio_mixer */, audioProcessing);
-
     if (!pcFactory_) {
         RTC_LOG(LS_ERROR) << "Failed to create PeerConnectionFactory";
         return false;
@@ -360,7 +359,8 @@ Napi::Value NapiPeerConnectionFactory::CreateAudioTrack(const CallbackInfo& info
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    if (info.Length() < 2) {
+    constexpr size_t kCreateAudioTrackArgsCount = 2;
+    if (info.Length() < kCreateAudioTrackArgsCount) {
         NAPI_THROW(Error::New(info.Env(), "Wrong number of arguments"), info.Env().Undefined());
     }
 
@@ -429,9 +429,8 @@ Napi::Value NapiPeerConnectionFactory::CreateVideoSource(const CallbackInfo& inf
         CameraCaptureSettings selectedSetting;
         std::string failedConstraintName;
         if (!SelectSettingsForVideo(
-                CameraEnumerator::GetDevices(), video, kDefaultWidth, kDefaultHeight, kDefaultFrameRate,
-                selectedSetting, failedConstraintName))
-        {
+            CameraEnumerator::GetDevices(), video, kDefaultWidth, kDefaultHeight, kDefaultFrameRate,
+            selectedSetting, failedConstraintName)) {
             RTC_LOG(LS_ERROR) << "Failed to select settings for video, unsatisfied constraint: "
                               << failedConstraintName;
             NAPI_THROW(
@@ -458,7 +457,8 @@ Napi::Value NapiPeerConnectionFactory::CreateVideoTrack(const CallbackInfo& info
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    if (info.Length() < 2) {
+    constexpr size_t kCreateVideoTrackArgsCount = 2;
+    if (info.Length() < kCreateVideoTrackArgsCount) {
         NAPI_THROW(Error::New(info.Env(), "Wrong number of arguments"), info.Env().Undefined());
     }
 

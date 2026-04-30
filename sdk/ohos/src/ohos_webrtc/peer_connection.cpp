@@ -774,7 +774,8 @@ Napi::Value NapiPeerConnection::AddTrack(const Napi::CallbackInfo& info)
     }
 
     std::vector<std::string> streamIds;
-    if (info.Length() >= 2) {
+    constexpr int kMinArgsForStreamIds = 2;
+    if (info.Length() >= kMinArgsForStreamIds) {
         // optional parameters from 2
         for (uint32_t i = 1; i < info.Length(); i++) {
             if (!info[i].IsObject()) {
@@ -1001,7 +1002,8 @@ Napi::Value NapiPeerConnection::CreateDataChannel(const Napi::CallbackInfo& info
 
     auto label = info[0].As<String>().Utf8Value();
 
-    if (info.Length() < 2) {
+    constexpr size_t kCreateDataChannelOptionalArgsCount = 2;
+    if (info.Length() < kCreateDataChannelOptionalArgsCount) {
         // second parameter is optional
         auto result = pc_->CreateDataChannelOrError(label, nullptr);
         if (!result.ok()) {
@@ -1141,7 +1143,6 @@ Napi::Value NapiPeerConnection::GetConfiguration(const Napi::CallbackInfo& info)
 
     auto configuration = pc_->GetConfiguration();
     auto jsConfiguration = Object::New(info.Env());
-
     if (!NativeToJsConfiguration(configuration, jsConfiguration)) {
         RTC_LOG(LS_ERROR) << "NativeToJsConfiguration failed";
     }
@@ -1311,7 +1312,6 @@ Napi::Value NapiPeerConnection::GetStats(const Napi::CallbackInfo& info)
     auto numOfReceivers = std::count_if(receivers.cbegin(), receivers.cend(), [track](const auto& receiver) {
         return receiver->track()->id() == track->id();
     });
-
     if ((numOfSenders + numOfReceivers) != 1) {
         // reject with InvalidAccessError
         auto deferred = Promise::Deferred::New(info.Env());

@@ -270,7 +270,8 @@ void VideoFrameReceiverNative::OnImageReceiverCallback()
                 i420Buffer->MutableDataU(), i420Buffer->StrideU(), i420Buffer->MutableDataV(), i420Buffer->StrideV(),
                 bufferConfig.width, bufferConfig.height);
             RTC_DLOG(LS_VERBOSE) << "ABGRToI420 ret = " << ret;
-        } break;
+            break;
+        }
         case NATIVEBUFFER_PIXEL_FMT_YCBCR_420_SP: {
             int32_t ret = libyuv::NV12ToI420(
                 (uint8_t*)addr, bufferConfig.width, (uint8_t*)addr + bufferConfig.width * bufferConfig.height,
@@ -278,7 +279,8 @@ void VideoFrameReceiverNative::OnImageReceiverCallback()
                 i420Buffer->StrideU(), i420Buffer->MutableDataV(), i420Buffer->StrideV(), bufferConfig.width,
                 bufferConfig.height);
             RTC_DLOG(LS_VERBOSE) << "NV12ToI420 ret = " << ret;
-        } break;
+            break;
+        }
         case NATIVEBUFFER_PIXEL_FMT_YCRCB_420_SP: {
             int32_t ret = libyuv::NV21ToI420(
                 (uint8_t*)addr, bufferConfig.width, (uint8_t*)addr + bufferConfig.width * bufferConfig.height,
@@ -286,7 +288,8 @@ void VideoFrameReceiverNative::OnImageReceiverCallback()
                 i420Buffer->StrideU(), i420Buffer->MutableDataV(), i420Buffer->StrideV(), bufferConfig.width,
                 bufferConfig.height);
             RTC_DLOG(LS_VERBOSE) << "NV21ToI420 ret = " << ret;
-        } break;
+            break;
+        }
         default: {
             RTC_LOG(LS_ERROR) << "Unsupported pixel format: " << bufferConfig.format;
             ret = OH_ImageNative_Release(image);

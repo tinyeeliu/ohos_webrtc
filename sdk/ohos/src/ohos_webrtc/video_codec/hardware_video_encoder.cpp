@@ -77,7 +77,8 @@ int HardwareVideoEncoder::InitEncode(const VideoCodec* codec_settings, const Set
 
     codecSettings_ = *codec_settings;
 
-    curBitrate_ = codecSettings_.startBitrate * 1000; // kilobits/sec to bits/sec
+    constexpr int kKilobitsToBitsMultiplier = 1000;
+    curBitrate_ = codecSettings_.startBitrate * kKilobitsToBitsMultiplier; // kilobits/sec to bits/sec
     targetBitrate_ = curBitrate_;
     curFramerate_ = codecSettings_.maxFramerate;
     targetFramerate_ = curFramerate_;
@@ -129,8 +130,7 @@ int HardwareVideoEncoder::InitEncode(const VideoCodec* codec_settings, const Set
         OH_AVFormat_SetIntValue(format.Raw(), OH_MD_KEY_I_FRAME_INTERVAL, codecSettings_.H264()->keyFrameInterval);
         auto profileLevelId = ParseSdpForH264ProfileLevelId(format_.parameters);
         if (profileLevelId && (profileLevelId->profile == H264Profile::kProfileConstrainedHigh &&
-                               profileLevelId->level == H264Level::kLevel3_1))
-        {
+                               profileLevelId->level == H264Level::kLevel3_1)) {
             OH_AVFormat_SetIntValue(format.Raw(), OH_MD_KEY_PROFILE, AVC_PROFILE_HIGH);
             // OH_MD_KEY_LEVEL ?
         }
@@ -480,8 +480,10 @@ VideoEncoder::ScalingSettings HardwareVideoEncoder::GetScalingSettings()
 bool HardwareVideoEncoder::DequeueInputBuffer(ohos::CodecBuffer& buffer)
 {
     std::unique_lock<std::mutex> lock(inputMutex_);
+    constexpr int kDequeueInputBufferTimeoutMs = 10;
     inputCond_.wait_for(
-        lock, std::chrono::milliseconds(10), [this]() { return !inputBufferQueue_.empty() || !initialized_; });
+        lock, std::chrono::milliseconds(kDequeueInputBufferTimeoutMs),
+        [this]() { return !inputBufferQueue_.empty() || !initialized_; });
     if (!initialized_) {
         return false;
     }
@@ -567,28 +569,36 @@ int32_t HardwareVideoEncoder::EncodeByteBuffer(const VideoFrame& frame)
     switch (pixelFormat_) {
         case AV_PIXEL_FORMAT_YUVI420: {
             // copy
+            constexpr int kI420UPlaneOffsetNumerator = 5;
+            constexpr int kI420UPlaneOffsetDenominator = 4;
             memcpy(addr, srcBuffer->DataY(), width * height);                              // y planar
-            memcpy(addr + width * height, srcBuffer->DataU(), width * height / 4);         // u planar
-            memcpy(addr + width * height * 5 / 4, srcBuffer->DataV(), width * height / 4); // v planar
-        } break;
+            memcpy(addr + width * height, srcBuffer->DataU(), width * height / kI420UPlaneOffsetDenominator);         // u planar
+            memcpy(addr + width * height * kI420UPlaneOffsetNumerator / kI420UPlaneOffsetDenominator,
+                srcBuffer->DataV(), width * height / kI420UPlaneOffsetDenominator); // v planar
+            break;
+        }
         case AV_PIXEL_FORMAT_NV12: {
             ret = libyuv::I420ToNV12(
                 srcBuffer->DataY(), srcBuffer->StrideY(), srcBuffer->DataU(), srcBuffer->StrideU(), srcBuffer->DataV(),
                 srcBuffer->StrideV(), addr, width, addr + width * height, width, width, height);
             RTC_DLOG(LS_VERBOSE) << "I420ToNV12 ret = " << ret;
-        } break;
+            break;
+        }
         case AV_PIXEL_FORMAT_NV21: {
             ret = libyuv::I420ToNV21(
                 srcBuffer->DataY(), srcBuffer->StrideY(), srcBuffer->DataU(), srcBuffer->StrideU(), srcBuffer->DataV(),
                 srcBuffer->StrideV(), addr, width, addr + width * height, width, width, height);
             RTC_DLOG(LS_VERBOSE) << "I420ToNV12 ret = " << ret;
-        } break;
+            break;
+        }
         case AV_PIXEL_FORMAT_RGBA: {
+            constexpr int kRgbaBytePerPixel = 4;
             ret = libyuv::I420ToABGR(
                 srcBuffer->DataY(), srcBuffer->StrideY(), srcBuffer->DataU(), srcBuffer->StrideU(), srcBuffer->DataV(),
-                srcBuffer->StrideV(), addr, width * 4, width, height);
+                srcBuffer->StrideV(), addr, width * kRgbaBytePerPixel, width, height);
             RTC_DLOG(LS_VERBOSE) << "I420ToABGR ret = " << ret;
-        } break;
+            break;
+        }
         default: {
             RTC_LOG(LS_ERROR) << "Unsupported pixel format: " << pixelFormat_;
             QueueInputBuffer(codecBuffer);

@@ -24,8 +24,8 @@ namespace webrtc {
 namespace adapter {
 
 DefaultVideoEncoderFactory::DefaultVideoEncoderFactory(
-    std::shared_ptr<EglContext> sharedContext, bool enableH264HighProfile)
-    : DefaultVideoEncoderFactory(std::make_unique<HardwareVideoEncoderFactory>(sharedContext, enableH264HighProfile))
+    std::shared_ptr<EglContext> sharedEglContext, bool enableH264HighProfile)
+    : DefaultVideoEncoderFactory(std::make_unique<HardwareVideoEncoderFactory>(sharedEglContext, enableH264HighProfile))
 {
 }
 
@@ -60,7 +60,6 @@ std::unique_ptr<VideoEncoder> DefaultVideoEncoderFactory::CreateVideoEncoder(con
 
     auto hardwareEncoder = hardwareVideoEncoderFactory_->CreateVideoEncoder(format);
     auto softwareEncoder = softwareVideoEncoderFactory_->CreateVideoEncoder(format);
-
     if (hardwareEncoder && softwareEncoder) {
         // Both hardware and software supported, wrap it in a software fallback
         return CreateVideoEncoderSoftwareFallbackWrapper(std::move(softwareEncoder), std::move(hardwareEncoder));

@@ -375,7 +375,7 @@ public:
     void Initialize();
     void Initialize(const MediaTrackConstraintSet& basic, const std::vector<MediaTrackConstraintSet>& advanced);
 
-    void Assign(const MediaTrackConstraints&);
+    void Assign(const MediaTrackConstraints& other);
 
     void Reset();
     bool IsNull() const
