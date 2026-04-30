@@ -61,8 +61,7 @@ std::vector<SdpVideoFormat> HardwareVideoEncoderFactory::GetSupportedFormats() c
 
         if (type == VideoCodecMimeType::H264) {
             if (enableH264HighProfile_ &&
-                OH_AVCapability_AreProfileAndLevelSupported(capability, AVC_PROFILE_HIGH, AVC_LEVEL_31))
-            {
+                OH_AVCapability_AreProfileAndLevelSupported(capability, AVC_PROFILE_HIGH, AVC_LEVEL_31)) {
                 supportedFormats.push_back(
                     CreateH264Format(H264Profile::kProfileConstrainedHigh, H264Level::kLevel3_1, "1"));
             }
@@ -95,7 +94,6 @@ std::unique_ptr<VideoEncoder> HardwareVideoEncoderFactory::CreateVideoEncoder(co
             format.IsSameCodec(CreateH264Format(H264Profile::kProfileConstrainedHigh, H264Level::kLevel3_1, "1"));
         bool isBaselineProfile =
             format.IsSameCodec(CreateH264Format(H264Profile::kProfileConstrainedBaseline, H264Level::kLevel3_1, "1"));
-
         if (!isHighProfile && !isBaselineProfile) {
             return nullptr;
         }

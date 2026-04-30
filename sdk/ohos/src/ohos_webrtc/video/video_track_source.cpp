@@ -142,14 +142,14 @@ bool OhosVideoTrackSource::AdaptFrame(
     }
 
     if (!videoAdapter_.AdaptFrameResolution(
-            width, height, time_us * rtc::kNumNanosecsPerMicrosec, crop_width, crop_height, out_width, out_height))
-    {
+        width, height, time_us * rtc::kNumNanosecsPerMicrosec, crop_width, crop_height, out_width, out_height)) {
         // VideoAdapter dropped the frame.
         return false;
     }
 
-    *crop_x = (width - *crop_width) / 2;
-    *crop_y = (height - *crop_height) / 2;
+    constexpr int kCenterDivisor = 2;
+    *crop_x = (width - *crop_width) / kCenterDivisor;
+    *crop_y = (height - *crop_height) / kCenterDivisor;
 
     return true;
 }

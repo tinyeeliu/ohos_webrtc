@@ -179,9 +179,11 @@ Napi::Value NapiDtmfSender::InsertDTMF(const Napi::CallbackInfo& info)
         }
     }
 
-    if (info.Length() == 3) {
+    constexpr size_t kInterToneGapArgIndex = 2;
+    constexpr size_t kInterToneGapArgsCount = 3;
+    if (info.Length() == kInterToneGapArgsCount) {
         // third parameter is optional
-        interToneGap = info[2].As<Number>();
+        interToneGap = info[kInterToneGapArgIndex].As<Number>();
         if (interToneGap < kMinInterToneGapMs) {
             RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " The value of interToneGap is less than 30";
             interToneGap = kMinInterToneGapMs;

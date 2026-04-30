@@ -104,8 +104,7 @@ public:
     {
         RTC_DCHECK_LE(lowerBound, upperBound);
         if ((ConstraintHasMax(constraint) && ConstraintMax(constraint) < lowerBound) ||
-            (ConstraintHasMin(constraint) && ConstraintMin(constraint) > upperBound))
-        {
+            (ConstraintHasMin(constraint) && ConstraintMin(constraint) > upperBound)) {
             return NumericRangeSet<decltype(constraint.Min())>(1, 0);
         }
 
@@ -520,9 +519,8 @@ bool SelectSettingsForVideo(
 #endif
             RTC_DCHECK_EQ(bestDistance.size(), candidateDistanceVector.size());
             if (std::lexicographical_compare(
-                    candidateDistanceVector.begin(), candidateDistanceVector.end(), bestDistance.begin(),
-                    bestDistance.end()))
-            {
+                candidateDistanceVector.begin(), candidateDistanceVector.end(), bestDistance.begin(),
+                bestDistance.end())) {
                 bestDistance = candidateDistanceVector;
 #ifndef NDEBUG
                 {

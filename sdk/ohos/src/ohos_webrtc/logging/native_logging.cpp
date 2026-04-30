@@ -139,7 +139,8 @@ Napi::Value NapiNativeLogging::EnableLogTimeStamps(const Napi::CallbackInfo& inf
 
 Napi::Value NapiNativeLogging::Log(const Napi::CallbackInfo& info)
 {
-    if (info.Length() != 3) {
+    constexpr size_t kLogArgsCount = 3;
+    if (info.Length() != kLogArgsCount) {
         NAPI_THROW(Error::New(info.Env(), "Wrong number of arguments"), info.Env().Undefined());
     }
 

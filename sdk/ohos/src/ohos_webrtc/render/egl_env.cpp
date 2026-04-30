@@ -299,7 +299,8 @@ bool EglEnv::Init(EGLContext sharedContext, const std::vector<int32_t>& configAt
     }
     RTC_DLOG(LS_VERBOSE) << "eglDisplay_: " << eglDisplay_;
 
-    EGLint major, minor;
+    EGLint major;
+    EGLint minor;
     // 初始化EGLDisplay
     if (eglInitialize(eglDisplay_, &major, &minor) == EGL_FALSE) {
         RTC_LOG(LS_ERROR) << "Failed to initialize EGLDisplay";

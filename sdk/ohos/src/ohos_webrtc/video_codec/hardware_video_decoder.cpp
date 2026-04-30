@@ -399,8 +399,10 @@ void HardwareVideoDecoder::QueueInputBuffer(const ohos::CodecBuffer& buffer)
 bool HardwareVideoDecoder::DequeueInputBuffer(ohos::CodecBuffer& buffer)
 {
     std::unique_lock<std::mutex> lock(inputMutex_);
+    constexpr int kDequeueInputBufferTimeoutMs = 10;
     inputCond_.wait_for(
-        lock, std::chrono::milliseconds(10), [this]() { return !inputBufferQueue_.empty() || !initialized_; });
+        lock, std::chrono::milliseconds(kDequeueInputBufferTimeoutMs),
+        [this]() { return !inputBufferQueue_.empty() || !initialized_; });
     if (!initialized_) {
         return false;
     }
@@ -506,31 +508,40 @@ void HardwareVideoDecoder::DeliverByteFrame(const ohos::CodecBuffer& buffer)
     switch (colorFormat_) {
         case AV_PIXEL_FORMAT_YUVI420: {
             // copy data
+            constexpr int kI420UPlaneOffsetNumerator = 5;
+            constexpr int kI420UPlaneOffsetDenominator = 4;
             memcpy(i420Buffer->MutableDataY(), addr, width * height);                              // y planar
-            memcpy(i420Buffer->MutableDataU(), addr + width * height, width * height / 4);         // u planar
-            memcpy(i420Buffer->MutableDataV(), addr + width * height * 5 / 4, width * height / 4); // v planar
-        } break;
+            memcpy(i420Buffer->MutableDataU(), addr + width * height,
+                width * height / kI420UPlaneOffsetDenominator);         // u planar
+            memcpy(i420Buffer->MutableDataV(),
+                addr + width * height * kI420UPlaneOffsetNumerator / kI420UPlaneOffsetDenominator,
+                width * height / kI420UPlaneOffsetDenominator); // v planar
+            break;
+        }
         case AV_PIXEL_FORMAT_NV12: {
             int32_t ret = libyuv::NV12ToI420(
                 (uint8_t*)addr, width, (uint8_t*)addr + width * height, width, i420Buffer->MutableDataY(),
                 i420Buffer->StrideY(), i420Buffer->MutableDataU(), i420Buffer->StrideU(), i420Buffer->MutableDataV(),
                 i420Buffer->StrideV(), width, height);
             RTC_DLOG(LS_VERBOSE) << "NV12ToI420 ret = " << ret;
-        } break;
+            break;
+        }
         case AV_PIXEL_FORMAT_NV21: {
             int32_t ret = libyuv::NV21ToI420(
                 (uint8_t*)addr, width, (uint8_t*)addr + width * height, width, i420Buffer->MutableDataY(),
                 i420Buffer->StrideY(), i420Buffer->MutableDataU(), i420Buffer->StrideU(), i420Buffer->MutableDataV(),
                 i420Buffer->StrideV(), width, height);
             RTC_DLOG(LS_VERBOSE) << "NV21ToI420 ret = " << ret;
-        } break;
+            break;
+        }
         case AV_PIXEL_FORMAT_RGBA: {
             int32_t ret = libyuv::ABGRToI420(
                 (uint8_t*)addr, width * 4, i420Buffer->MutableDataY(), i420Buffer->StrideY(),
                 i420Buffer->MutableDataU(), i420Buffer->StrideU(), i420Buffer->MutableDataV(), i420Buffer->StrideV(),
                 width, height);
             RTC_DLOG(LS_VERBOSE) << "ABGRToI420 ret = " << ret;
-        } break;
+            break;
+        }
         default: {
             RTC_LOG(LS_ERROR) << "Unsupported color format: " << colorFormat_;
             ret = OH_VideoDecoder_FreeOutputBuffer(decoder_.Raw(), buffer.index);
