@@ -873,6 +873,24 @@ getStats(selector?: MediaStreamTrack): Promise<RTCStatsReport>;
 | ----------------------- | ------------------------------------------------------------ |
 | Promise<RTCStatsReport> | 返回一个 Promise 对象，该对象在解析后会得到一个 RTCStatsReport ，其中包含了当前时间段内收集到的统计信息。 |
 
+### generateCertificate
+
+static generateCertificate(keygenAlgorithm: AlgorithmIdentifier): Promise\<RTCCertificate>;
+
+生成用于 DTLS 连接的自签名证书。
+
+参数：
+
+| 参数名           | 类型                | 必填 | 说明                                                           |
+| ---------------- | ------------------- | ---- | -------------------------------------------------------------- |
+| keygenAlgorithm  | AlgorithmIdentifier | 是   | 用于生成密钥的算法，如 `{ name: 'ECDSA', namedCurve: 'P-256' }` |
+
+返回值：
+
+| 类型                     | 说明                                 |
+| ------------------------ | ------------------------------------ |
+| Promise\<RTCCertificate> | 解析为生成的 RTCCertificate 证书对象 |
+
 ### setAudioRecording
 
 setAudioRecording(recording: boolean): void
@@ -1175,18 +1193,6 @@ getVideoTracks(): MediaStreamTrack[];
 |-----------------------------------------|-------------------|
 | [MediaStreamTrack](#mediastreamtrack)[] | 包含当前媒体流中所有视频轨道的数组 |
 
-### clone
-
-clone(): MediaStream;
-
-创建当前 MediaStream 对象的一个浅拷贝
-
-返回值
-
-| 类型                          | 说明        |
-|-----------------------------|-----------|
-| [MediaStream](#mediastream) | 当前媒体流的浅拷贝 |
-
 ## RTCRtpTransceiverInit
 
 用于在 PeerConnection 中添加 RTCRtpTransceiver ，指定传输方向、关联的媒体流以及发送编码参数。
@@ -1244,6 +1250,17 @@ setCodecPreferences(codecs: RTCRtpCodec[]): void;
 | sdp  | string     | 是   | 否   | 否   | SDP 描述信息，包含会话的详细配置和参数。 |
 | type | RTCSdpType | 是   | 否   | 是   | 描述会话描述的类型                       |
 
+### toJSON
+
+toJSON(): RTCSessionDescriptionInit;
+
+将会话描述转换为 JSON 对象。
+
+返回值：
+
+| 类型                       | 说明                                      |
+| -------------------------- | ----------------------------------------- |
+| RTCSessionDescriptionInit  | 包含 `sdp` 和 `type` 字段的普通对象。     |
 
 ## RTCIceCandidateInit
 
@@ -1365,18 +1382,6 @@ send(data: string): void;
 | ------ | ------ | ---- | ---- |
 | data   | string | 是   | 数据 |
 
-### send(buffer.Buffer)
-
-send(data: buffer.Buffer): void;
-
-发送数据。
-
-参数：
-
-| 参数名 | 类型          | 必填 | 说明 |
-| ------ | ------------- | ---- | ---- |
-| data   | buffer.Buffer | 是   | 数据 |
-
 ### send(ArrayBuffer)
 
 send(data: ArrayBuffer): void;
@@ -1397,6 +1402,7 @@ send(data: ArrayBuffer): void;
 
 | 名称        | 类型                                     | 可读   | 可写  | 说明                        |
 |-----------|----------------------------------------|------|-----|---------------------------|
+| id        | string \| null                         | 是    | 否   | RTCRtpReceiver 的唯一标识符，未关联轨道时为 null |
 | track     | [MediaStreamTrack](#mediastreamtrack)  | 是    | 否   | 表示与 RTCRtpReceiver 关联的媒体轨道 |
 | transport | [RTCDtlsTransport](#rtcdtlstransport) \| null | 是   | 否 | 用于接收媒体数据的传输机制           |
 
@@ -1854,46 +1860,6 @@ getFingerprints(): RTCDtlsFingerprint[];
 | gatheringstatechange        | Event | 当 RTCIceTransport 的收集状态改变时触发 |
 | selectedcandidatepairchange | Event | 当 RTCIceTransport 选择的候选对改变时触发 |
 
-### getLocalCandidates
-
-getLocalCandidates(): RTCIceCandidate[]
-
-返回值：
-
-| 类型              | 说明                                        |
-| ----------------- | ------------------------------------------- |
-| RTCIceCandidate[] | 返回一个数组，包含本地收集到的 ICE 候选者。 |
-
-### getLocalParameters
-
-getLocalParameters(): RTCIceParameters | null;
-
-返回值：
-
-| 类型                     | 说明                                                         |
-| ------------------------ | ------------------------------------------------------------ |
-| RTCIceParameters \| null | 返回本地的 ICE 参数（usernameFragment和 password），如果没有可用的参数则返回 null。 |
-
-### getRemoteCandidates
-
-getRemoteCandidates(): RTCIceCandidate[]
-
-返回值：
-
-| 类型              | 说明                                        |
-| ----------------- | ------------------------------------------- |
-| RTCIceCandidate[] | 返回一个数组，包含远程对等方的 ICE 候选者。 |
-
-### getRemoteParameters
-
-getRemoteParameters(): RTCIceParameters | null;
-
-返回值：
-
-| 类型                     | 说明                                                         |
-| ------------------------ | ------------------------------------------------------------ |
-| RTCIceParameters \| null | 返回远程对等方的 ICE 参数（usernameFragment和password），如果没有可用的参数则返回null |
-
 ### getSelectedCandidatePair
 
 getSelectedCandidatePair(): RTCIceCandidatePair | null;
@@ -1903,6 +1869,54 @@ getSelectedCandidatePair(): RTCIceCandidatePair | null;
 | 类型                        | 说明                                                         |
 | --------------------------- | ------------------------------------------------------------ |
 | RTCIceCandidatePair \| null | 返回当前选择的 ICE 候选者对，如果没有可用的候选者对则返回 null |
+
+### getLocalCandidates *(暂未实现)*
+
+getLocalCandidates(): RTCIceCandidate[]
+
+> **注意**：该方法已在头文件（`ice_transport.h`）中声明，但当前版本尚未实现，调用无效。
+
+返回值：
+
+| 类型              | 说明                                |
+| ----------------- | ----------------------------------- |
+| RTCIceCandidate[] | 本地收集到的 ICE 候选者数组         |
+
+### getLocalParameters *(暂未实现)*
+
+getLocalParameters(): RTCIceParameters | null;
+
+> **注意**：该方法已在头文件（`ice_transport.h`）中声明，但当前版本尚未实现，调用无效。
+
+返回值：
+
+| 类型                     | 说明                                                         |
+| ------------------------ | ------------------------------------------------------------ |
+| RTCIceParameters \| null | 本地的 ICE 参数（usernameFragment 和 password），无可用参数时返回 null |
+
+### getRemoteCandidates *(暂未实现)*
+
+getRemoteCandidates(): RTCIceCandidate[]
+
+> **注意**：该方法已在头文件（`ice_transport.h`）中声明，但当前版本尚未实现，调用无效。
+
+返回值：
+
+| 类型              | 说明                                |
+| ----------------- | ----------------------------------- |
+| RTCIceCandidate[] | 远程对等方的 ICE 候选者数组         |
+
+### getRemoteParameters *(暂未实现)*
+
+getRemoteParameters(): RTCIceParameters | null;
+
+> **注意**：该方法已在头文件（`ice_transport.h`）中声明，但当前版本尚未实现，调用无效。
+
+返回值：
+
+| 类型                     | 说明                                                         |
+| ------------------------ | ------------------------------------------------------------ |
+| RTCIceParameters \| null | 远程对等方的 ICE 参数（usernameFragment 和 password），无可用参数时返回 null |
 
 ## RTCSctpTransport
 
@@ -1916,6 +1930,7 @@ getSelectedCandidatePair(): RTCIceCandidatePair | null;
 | maxMessageSize | number                                          | 是   | 否   | SCTP 传输的最大消息大小          |
 | state          | [RTCSctpTransportState](#rtcsctptransportstate) | 是   | 否   | SCTP 传输的当前状态            |
 | transport      | [RTCDtlsTransport](#rtcdtlstransport)           | 是   | 否   | 用于传输 SCTP 数据的 DTLS 传输对象 |
+| onstatechange  | EventHandler \| null                            | 是   | 是   | 该事件处理器的事件类型为 statechange |
 
 ## RTCStats
 
@@ -2109,22 +2124,6 @@ new(options?: PeerConnectionFactoryOptions): PeerConnectionFactory
 |-----------------------|-------------------------|
 | PeerConnectionFactory | PeerConnectionFactory实例 |
 
-### getDefault
-
-static getDefault(): PeerConnectionFactory
-
-用于获取默认的 PeerConnectionFactory 实例，默认实例可通过 setDefault 设置。
-
-#### 参数
-
-无
-
-#### 返回值
-
-| 类型                    | 说明                      |
-|-----------------------|-------------------------|
-| PeerConnectionFactory | PeerConnectionFactory实例 |
-
 ### setDefault
 
 static setDefault(factory: PeerConnectionFactory): void
@@ -2269,6 +2268,16 @@ startAecDump(fd: number, max_size_bytes: number): boolean;
 | ------- | ------------------------------------------------------------ |
 | boolean | 表示启动操作的结果，返回 true 表示成功启动音频回声消除的转储功能，返回 false 表示启动失败。 |
 
+### stopAecDump
+
+stopAecDump(): void;
+
+停止音频回声消除 (AEC) 的转储功能，停止向文件写入音频数据。
+
+参数：无
+
+返回值：无
+
 ## PeerConnectionFactoryOptions
 
 创建PeerConnectionFactory的参数。
@@ -2280,7 +2289,7 @@ startAecDump(fd: number, max_size_bytes: number): boolean;
 | adm                    | AudioDeviceModule   | 否   | 音频设备管理模块 |
 | videoEncoderFactory    | VideoEncoderFactory | 否   | 视频编码器工厂  |
 | videoDecoderFactory    | VideoDecoderFactory | 否   | 视频解码器工厂  |
-| audioProcessingFactory | AudioProcessingFactory | 否   | 音频处理工厂   |
+| audioProcessing | AudioProcessing | 否   | 音频处理实例   |
 
 ## AudioDeviceModule
 
@@ -2929,10 +2938,11 @@ let mediaStream = await mediaDevices.getDisplayMedia({video: {width: 720, height
 
 ### 属性
 
-| 名称       | 类型                                              | 可读 | 可写  | 说明                                    |
-|----------|-------------------------------------------------|---|-----|---------------------------------------|
-| surfaceId  | string                                   | 是 | 否   | 窗口对应的 Surface Id，由 init 接口设置。       |
-| videoTrack | [VideoTrack](#videotrack) \| undefined   | 是 | 否   | 关联的视频轨道，由 setVideoTrack 接口设置。     |
+| 名称                      | 类型                                              | 可读 | 可写  | 说明                                    |
+|-------------------------|-------------------------------------------------|---|-----|---------------------------------------|
+| surfaceId               | string                                          | 是 | 否   | 窗口对应的 Surface Id，由 init 接口设置。       |
+| videoTrack              | [VideoTrack](#videotrack) \| undefined          | 是 | 否   | 关联的视频轨道，由 setVideoTrack 接口设置。     |
+| onFrameResolutionChanged | EventHandler \| null                           | 是 | 是   | 当视频帧分辨率或旋转角度发生变化时触发，事件对象包含 `width`、`height`、`rotation` 字段。 |
 
 ### init
 
