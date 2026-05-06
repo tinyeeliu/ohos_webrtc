@@ -2205,10 +2205,10 @@ createVideoSource(constraints?: MediaTrackConstraints, isScreencast?: boolean): 
 
 #### 参数
 
-| 参数名          | 类型                                              | 必填 | 说明                                                                                                                                                 |
-|--------------|-------------------------------------------------|----|----------------------------------------------------------------------------------------------------------------------------------------------------|
-| constraints  | [MediaTrackConstraints](#mediatrackconstraints) | 否  | 一个包含视频媒体约束条件的对象，用于指定期望的视频源，如设备ID、分辨率等。                                                                                                             |
-| isScreencast | boolean                                         | 否  | 是否是屏幕录像，true：使用屏幕录像作为视频源（当前仅支持 width、height约束条件，且不支持 advanced 属性）；false：使用相机作为视频源（当前支持 width、height、aspectRatio、framRate、facingMode、deviceId约束条件）。 |
+| 参数名 | 类型 | 必填 | 说明 |
+| - | - | - | - |
+| constraints | [MediaTrackConstraints](#mediatrackconstraints) | 否  | 一个包含视频媒体约束条件的对象，用于指定期望的视频源，如设备ID、分辨率等，当前支持的分辨率范围是 `1280x720` 到 `3840x2160`，具体情况以设备实际支持的情况为准 |
+| isScreencast | boolean | 否 | 是否是屏幕录像，true：使用屏幕录像作为视频源（当前仅支持 width、height约束条件，且不支持 advanced 属性）；false：使用相机作为视频源（当前支持 width、height、aspectRatio、framRate、facingMode、deviceId约束条件） |
 
 #### 返回值
 
