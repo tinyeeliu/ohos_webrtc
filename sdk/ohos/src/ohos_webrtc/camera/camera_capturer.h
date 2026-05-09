@@ -88,6 +88,7 @@ private:
     bool isCameraFrontFacing_{false};
     uint32_t cameraOrientation_{0};
 
+    ohos::CameraDevices cameraDevices_;
     ohos::CameraInput input_;
     ohos::CameraPreviewOutput previewOutput_;
     ohos::CameraVideoOutput videoOutput_;
