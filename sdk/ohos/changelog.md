@@ -1,19 +1,25 @@
 # 更新日志
+## 1.0.2-rc1 （2026-05-11）
+- 修复硬件视频编码器内存泄漏问题（PR !95）
+- 修复 sdk/ohos webrtc 多处规范性问题并更新 OAT.xml
+- 在 libwebrtc API 文档中补充分辨率支持说明
+- 修复相机采集在7.0.0版本闪退问题
+
 ## 1.0.1 （2026-04-21）
-- Fix memory leak issues
-- Fix crash issues
-- Update documentation
-- Add custom resolution feature and abnormal resolution options in demo
+- 修复内存泄漏问题
+- 修复崩溃问题
+- 更新文档
+- 在 demo 中新增自定义分辨率能力与异常分辨率选项
 
 ## 1.0.1-rc2 （2026-01-22）
-- Fix the issue of incorrect rotation angle of the rear camera
-- Achieve variable resolution
+- 修复后置相机旋转角度错误问题
+- 实现可变分辨率
 
 ## 1.0.1-rc1 （2026-01-15）
-- Implement the function that the camera image follows the rotation of the application
+- 实现相机画面跟随应用旋转功能
 
 ## 1.0.0 （2025-01-08）
-- Fix datachannel destructor BUG
+- 修复 DataChannel 析构问题
 
 ## 1.0.0-rc3 （2025-08-20）
 - 支持音轨录制/播放的开启关闭
