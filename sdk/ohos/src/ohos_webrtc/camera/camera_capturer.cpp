@@ -116,7 +116,8 @@ Camera_Device* CameraCapturer::SelectCameraDevice()
 {
     int32_t deviceIndex = -1;
     Camera_Device* device = nullptr;
-    auto devices = CameraManager::GetInstance().GetSupportedCameras();
+    cameraDevices_ = CameraManager::GetInstance().GetSupportedCameras();
+    auto& devices = cameraDevices_;
     for (std::size_t i = 0; i < devices.Size(); i++) {
         if (deviceId_ == devices[i]->cameraId) {
             deviceIndex = i;
@@ -283,6 +284,7 @@ void CameraCapturer::StopInternal()
     input_.Close();
     input_.Reset();
     captureSession_.Reset();
+    cameraDevices_.Reset();
     ohos::DisplayManager::GetInstance().UnregisterChangeCallback(this);
     isStarted_ = false;
 }
