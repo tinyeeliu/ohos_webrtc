@@ -19,6 +19,8 @@ ohpm install @ohos/webrtc
 
 For more information on configuring the OpenHarmony ohpm environment, see [How to Install OpenHarmony ohpm Packages](https://gitcode.com/openharmony-tpc/docs/blob/master/OpenHarmony_har_usage.md).
 
+To integrate `libwebrtc.a` directly in an NDK C++ project, see [Integrating the Binary in a Native App](../../docs/ohos/webrtc_adapter_app.md).
+
 ## Constraints
 
 ### Compatibility
@@ -106,7 +108,7 @@ await peerConnection.setLocalDescription(offer);
 // Send the SDP offer to the remote peer via the signaling channel
 ```
 
-For more examples, see the demo project in the `har_hap` directory. For instructions on compiling the dynamic library, see the [Build Documentation](../../docs/ohos/webrtc_build.md).
+For more examples, see the demo project in the `har_hap` directory. For instructions on compiling the dynamic library, see the [Build Documentation](../../docs/ohos/webrtc_build.md). For common issues during compilation, see the [Build FAQ](../../docs/ohos/webrtc_adapter_questions.md).
 
 The implementation code is in the `src/ohos_webrtc` directory. NAPI interface bindings are built with the open-source project [node-addon-api](https://github.com/nodejs/node-addon-api).
 
