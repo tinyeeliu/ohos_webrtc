@@ -117,15 +117,41 @@ protected:
     {
         RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-        Napi::HandleScope scope(info.Env());
         while (!shouldStop_) {
             auto event = this->Dequeue();
             if (!event) {
                 break;
             }
 
+            Napi::HandleScope scope(info.Env());
             T* target = static_cast<T*>(this);
             event->Process(*target);
+
+            bool isPending = false;
+            napi_is_exception_pending(info.Env(), &isPending);
+            if (isPending) {
+                napi_value exception;
+                napi_get_and_clear_last_exception(info.Env(), &exception);
+
+                std::string errorMsg = "unknown";
+                napi_value strVal;
+                napi_status s = napi_coerce_to_string(info.Env(), exception, &strVal);
+                if (s == napi_ok) {
+                    size_t len = 0;
+                    s = napi_get_value_string_utf8(info.Env(), strVal, nullptr, 0, &len);
+                    if (s == napi_ok && len > 0) {
+                        if (len > 512) len = 512;
+                        errorMsg.resize(len + 1);
+                        size_t actualLen = 0;
+                        napi_get_value_string_utf8(info.Env(), strVal, &errorMsg[0], len + 1, &actualLen);
+                        errorMsg.resize(actualLen);
+                    }
+                } else {
+                    napi_value tmp2;
+                    napi_get_and_clear_last_exception(info.Env(), &tmp2);
+                }
+                RTC_LOG(LS_ERROR) << "Event processing failed, skipping event: " << errorMsg;
+            }
         }
 
         if (shouldStop_) {
