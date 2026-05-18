@@ -86,7 +86,10 @@ int32_t AudioCapturer::Terminate()
     RTC_DCHECK(threadChecker_.IsCurrent());
     StopRecording();
     threadChecker_.Detach();
-    OH_RESULT_CHECK(OH_AudioCapturer_Release(capturer_), -1);
+    if (capturer_) {
+        OH_RESULT_CHECK(OH_AudioCapturer_Release(capturer_), -1);
+        capturer_ = nullptr;
+    }
 
     initialized_ = false;
 
@@ -250,7 +253,7 @@ int32_t AudioCapturer::OnReadData(OH_AudioCapturer* stream, void* buffer, int32_
 
     NotifyDataReady(buffer, length, rtc::TimeMicros(), latencyMillis);
 
-    return -1;
+    return 0;
 }
 
 int32_t AudioCapturer::OnStreamEvent(OH_AudioCapturer* stream, OH_AudioStream_Event event)
