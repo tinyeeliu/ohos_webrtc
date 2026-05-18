@@ -927,7 +927,7 @@ void OhosAudioDeviceModule::OnAudioOutputError(AudioOutput* output, AudioErrorTy
 {
     RTC_LOG(LS_ERROR) << "Audio output error: " << type << ", " << message;
 
-    std::lock_guard<std::mutex> lock(inputObsMutex_);
+    std::lock_guard<std::mutex> lock(outputObsMutex_);
     for (auto& obs : outputObservers_) {
         obs->OnAudioOutputError(output_.get(), type, message);
     }
@@ -937,7 +937,7 @@ void OhosAudioDeviceModule::OnAudioOutputStateChange(AudioOutput* output, AudioS
 {
     RTC_LOG(LS_INFO) << "Audio output state change: " << newState;
 
-    std::lock_guard<std::mutex> lock(inputObsMutex_);
+    std::lock_guard<std::mutex> lock(outputObsMutex_);
     for (auto& obs : outputObservers_) {
         obs->OnAudioOutputStateChange(output_.get(), newState);
     }
@@ -980,7 +980,12 @@ void NapiAudioDeviceModule::Init(Napi::Env env, Napi::Object exports)
 bool GetOption(const Object& obj, const char* key, std::optional<int32_t>* valueOut)
 {
     if (obj.Has(key)) {
-        *valueOut = obj.Get(key).As<Number>().Int32Value();
+        auto val = obj.Get(key);
+        if (!val.IsNumber()) {
+            TypeError::New(obj.Env(), std::string(key) + " must be a number").ThrowAsJavaScriptException();
+            return false;
+        }
+        *valueOut = val.As<Number>().Int32Value();
         return true;
     }
     return false;
@@ -989,7 +994,12 @@ bool GetOption(const Object& obj, const char* key, std::optional<int32_t>* value
 bool GetOption(const Object& obj, const char* key, std::optional<bool>* valueOut)
 {
     if (obj.Has(key)) {
-        *valueOut = obj.Get(key).As<Boolean>().Value();
+        auto val = obj.Get(key);
+        if (!val.IsBoolean()) {
+            TypeError::New(obj.Env(), std::string(key) + " must be a boolean").ThrowAsJavaScriptException();
+            return false;
+        }
+        *valueOut = val.As<Boolean>().Value();
         return true;
     }
     return false;
@@ -1054,6 +1064,11 @@ NapiAudioDeviceModule::NapiAudioDeviceModule(const Napi::CallbackInfo& info) : O
 NapiAudioDeviceModule::~NapiAudioDeviceModule()
 {
     RTC_DLOG(LS_INFO) << __FUNCTION__;
+
+    if (adm_) {
+        adm_->UnregisterInputObserver(this);
+        adm_->UnregisterOutputObserver(this);
+    }
 }
 
 Napi::Value NapiAudioDeviceModule::GetEventHandler(const Napi::CallbackInfo& info)
@@ -1110,6 +1125,9 @@ Napi::Value NapiAudioDeviceModule::SetSpeakerMute(const Napi::CallbackInfo& info
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
+    if (info.Length() < 1 || !info[0].IsBoolean()) {
+        NAPI_THROW(TypeError::New(info.Env(), "mute must be a boolean"), info.Env().Undefined());
+    }
     rtc::scoped_refptr<AudioDeviceModule>(adm_)->SetSpeakerMute(info[0].As<Boolean>().Value());
     return info.Env().Undefined();
 }
@@ -1118,6 +1136,9 @@ Napi::Value NapiAudioDeviceModule::SetMicrophoneMute(const Napi::CallbackInfo& i
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
+    if (info.Length() < 1 || !info[0].IsBoolean()) {
+        NAPI_THROW(TypeError::New(info.Env(), "mute must be a boolean"), info.Env().Undefined());
+    }
     rtc::scoped_refptr<AudioDeviceModule>(adm_)->SetMicrophoneMute(info[0].As<Boolean>().Value());
     return info.Env().Undefined();
 }
@@ -1134,11 +1155,18 @@ Napi::Value NapiAudioDeviceModule::Release(const Napi::CallbackInfo& info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    std::lock_guard<std::mutex> lock(mutex_);
-    for (auto& handler : eventHandlers_) {
-        handler.second.tsfn.Release();
+    if (adm_) {
+        adm_->UnregisterInputObserver(this);
+        adm_->UnregisterOutputObserver(this);
     }
-    eventHandlers_.clear();
+
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        for (auto& handler : eventHandlers_) {
+            handler.second.tsfn.Release();
+        }
+        eventHandlers_.clear();
+    }
 
     return info.Env().Undefined();
 }
@@ -1254,6 +1282,7 @@ void NapiAudioDeviceModule::OnAudioInputDataReady(
         });
     if (status != napi_ok) {
         RTC_LOG(LS_ERROR) << " tsfn call error: " << status;
+        delete data;
     }
 }
 
