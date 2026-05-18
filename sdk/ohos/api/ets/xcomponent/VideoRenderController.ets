@@ -27,7 +27,7 @@ export class VideoRenderController extends XComponentController {
     this.renderer.setVideoTrack(track);
   }
 
-  setMirror(mirror: boolean) : void {
+  setMirror(mirror: boolean): void {
     this.renderer.setMirror(mirror);
   }
   
@@ -35,7 +35,7 @@ export class VideoRenderController extends XComponentController {
     this.renderer.setMirrorVertically(mirrorVertically);
   }
 
-  setScalingMode(mode: ScalingMode) : void {
+  setScalingMode(mode: ScalingMode): void {
     this.renderer.setScalingMode(mode);
   }
 
