@@ -1190,6 +1190,7 @@ void NapiAudioDeviceModule::OnAudioInputDataReady(
         });
     if (status != napi_ok) {
         RTC_LOG(LS_ERROR) << " tsfn call error: " << status;
+        delete data;
     }
 }
 
