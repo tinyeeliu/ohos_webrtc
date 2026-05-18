@@ -38,6 +38,14 @@ Open `entry/src/main/module.json5` and add the following permissions as needed:
 ```json
 "requestPermissions": [
   {
+    "name": "ohos.permission.INTERNET",
+    "reason": "$string:internet_reason",
+    "usedScene": {
+      "abilities": ["EntryAbility"],
+      "when": "inuse"
+    }
+  },
+  {
     "name": "ohos.permission.MICROPHONE",
     "reason": "$string:microphone_reason",
     "usedScene": {

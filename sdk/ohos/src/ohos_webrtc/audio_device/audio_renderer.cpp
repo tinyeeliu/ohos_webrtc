@@ -114,7 +114,11 @@ int32_t AudioRenderer::Terminate()
     RTC_DCHECK(threadChecker_.IsCurrent());
     StopPlayout();
     threadChecker_.Detach();
-    OH_RESULT_CHECK(OH_AudioRenderer_Release(renderer_), -1);
+    if (renderer_) {
+        auto tmp = renderer_;
+        renderer_ = nullptr;
+        OH_RESULT_CHECK(OH_AudioRenderer_Release(tmp), -1);
+    }
 
     initialized_ = false;
 
