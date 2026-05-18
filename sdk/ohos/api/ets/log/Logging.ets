@@ -19,7 +19,7 @@ export enum LoggingSeverity { VERBOSE, INFO, WARNING, ERROR, NONE }
 
 export class Logging {
   private static loggingEnabled: boolean = false;
-  private static loggable: Loggable | null;
+  private static loggable: Loggable | null = null;
   private static loggableSeverity: LoggingSeverity = LoggingSeverity.ERROR;
 
   static injectLoggable(injectedLoggable: Loggable, severity: LoggingSeverity) {

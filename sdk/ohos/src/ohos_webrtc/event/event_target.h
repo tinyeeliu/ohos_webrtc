@@ -117,15 +117,49 @@ protected:
     {
         RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-        Napi::HandleScope scope(info.Env());
         while (!shouldStop_) {
             auto event = this->Dequeue();
             if (!event) {
                 break;
             }
 
+            Napi::HandleScope scope(info.Env());
             T* target = static_cast<T*>(this);
-            event->Process(*target);
+            try {
+                event->Process(*target);
+            } catch (const std::exception& e) {
+                RTC_LOG(LS_ERROR) << "Event processing exception: " << e.what();
+                bool isPending = false;
+                napi_is_exception_pending(info.Env(), &isPending);
+                if (isPending) {
+                    napi_value tmp;
+                    napi_get_and_clear_last_exception(info.Env(), &tmp);
+                }
+            } catch (...) {
+                napi_env env = info.Env();
+                std::string errorMsg = "unknown";
+                napi_value exception;
+                napi_status s = napi_get_and_clear_last_exception(env, &exception);
+                if (s == napi_ok) {
+                    napi_value strVal;
+                    s = napi_coerce_to_string(env, exception, &strVal);
+                    if (s == napi_ok) {
+                        size_t len = 0;
+                        s = napi_get_value_string_utf8(env, strVal, nullptr, 0, &len);
+                        if (s == napi_ok && len > 0) {
+                            if (len > 512) len = 512;
+                            errorMsg.resize(len + 1);
+                            size_t actualLen = 0;
+                            napi_get_value_string_utf8(env, strVal, &errorMsg[0], len + 1, &actualLen);
+                            errorMsg.resize(actualLen);
+                        }
+                    } else {
+                        napi_value tmp2;
+                        napi_get_and_clear_last_exception(env, &tmp2);
+                    }
+                }
+                RTC_LOG(LS_ERROR) << "Event processing failed, skipping event: " << errorMsg;
+            }
         }
 
         if (shouldStop_) {

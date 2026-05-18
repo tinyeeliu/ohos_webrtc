@@ -198,7 +198,7 @@ protected:
 
         tsfn_.BlockingCall([error = new RTCError(std::move(error))](Napi::Env env, Napi::Function jsCallback) {
             auto externalError =
-                External<RTCError>::New(env, new RTCError(RTCError::OK()), [](Napi::Env, RTCError* e) { delete e; });
+                External<RTCError>::New(env, error, [](Napi::Env, RTCError* e) { delete e; });
             jsCallback.Call({Boolean::New(env, false), externalError});
         });
     }
@@ -881,23 +881,40 @@ Napi::Value NapiPeerConnection::SetLocalDescription(const Napi::CallbackInfo& in
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
+    auto reject = [&](const char* msg) -> Napi::Value {
+        auto deferred = Promise::Deferred::New(info.Env());
+        deferred.Reject(TypeError::New(info.Env(), msg).Value());
+        return deferred.Promise();
+    };
+
     std::unique_ptr<SessionDescriptionInterface> desc;
 
     if (info.Length() > 0) {
         if (!info[0].IsObject()) {
-            NAPI_THROW(TypeError::New(info.Env(), "first argument must be a object"), info.Env().Undefined());
+            return reject("first argument must be an object");
         }
 
         Object jsSdp = info[0].As<Object>();
         std::string sdp = "";
         if (jsSdp.Has("sdp")) {
-            sdp = jsSdp.Get("sdp").As<String>();
+            auto sdpVal = jsSdp.Get("sdp");
+            if (!sdpVal.IsString()) {
+                return reject("sdp must be a string");
+            }
+            sdp = sdpVal.As<String>();
         }
-        std::string type = jsSdp.Get("type").As<String>();
+        if (!jsSdp.Has("type")) {
+            return reject("type is required");
+        }
+        auto typeVal = jsSdp.Get("type");
+        if (!typeVal.IsString()) {
+            return reject("type must be a string");
+        }
+        std::string type = typeVal.As<String>();
 
         auto sdpType = SdpTypeFromString(type);
         if (!sdpType) {
-            NAPI_THROW(Error::New(info.Env(), "invalid argument"), info.Env().Undefined());
+            return reject("invalid argument");
         }
 
         SdpParseError error;
@@ -905,7 +922,7 @@ Napi::Value NapiPeerConnection::SetLocalDescription(const Napi::CallbackInfo& in
         if (!desc) {
             RTC_DLOG(LS_WARNING) << "Can't parse received session description message. SdpParseError was: "
                                  << error.description;
-            NAPI_THROW(Error::New(info.Env(), "Invalid argument"), info.Env().Undefined());
+            return reject("Invalid argument");
         }
     }
 
@@ -923,24 +940,41 @@ Napi::Value NapiPeerConnection::SetRemoteDescription(const Napi::CallbackInfo& i
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
+    auto reject = [&](const char* msg) -> Napi::Value {
+        auto deferred = Promise::Deferred::New(info.Env());
+        deferred.Reject(TypeError::New(info.Env(), msg).Value());
+        return deferred.Promise();
+    };
+
     if (info.Length() < 1) {
-        NAPI_THROW(Error::New(info.Env(), "Wrong number of argument"), info.Env().Undefined());
+        return reject("wrong number of arguments");
     }
 
     if (!info[0].IsObject()) {
-        NAPI_THROW(TypeError::New(info.Env(), "First argument is not object"), info.Env().Undefined());
+        return reject("first argument must be an object");
     }
 
     Object jsSdp = info[0].As<Object>();
     std::string sdp = "";
     if (jsSdp.Has("sdp")) {
-        sdp = jsSdp.Get("sdp").As<String>();
+        auto sdpVal = jsSdp.Get("sdp");
+        if (!sdpVal.IsString()) {
+            return reject("sdp must be a string");
+        }
+        sdp = sdpVal.As<String>();
     }
-    std::string type = jsSdp.Get("type").As<String>();
+    if (!jsSdp.Has("type")) {
+        return reject("type is required");
+    }
+    auto typeVal = jsSdp.Get("type");
+    if (!typeVal.IsString()) {
+        return reject("type must be a string");
+    }
+    std::string type = typeVal.As<String>();
 
     auto sdpType = SdpTypeFromString(type);
     if (!sdpType) {
-        NAPI_THROW(Error::New(info.Env(), "Invalid sdp type"), info.Env().Undefined());
+        return reject("invalid sdp type");
     }
 
     SdpParseError error;
@@ -948,7 +982,7 @@ Napi::Value NapiPeerConnection::SetRemoteDescription(const Napi::CallbackInfo& i
     if (!desc) {
         RTC_DLOG(LS_WARNING) << "Can't parse received session description message. SdpParseError was: "
                              << error.description;
-        NAPI_THROW(Error::New(info.Env(), "Invalid argument"), info.Env().Undefined());
+        return reject("invalid argument");
     }
 
     auto observer = rtc::make_ref_counted<SetRemoteSdpObserver>(info.Env());
@@ -1039,26 +1073,51 @@ Napi::Value NapiPeerConnection::AddIceCandidate(const Napi::CallbackInfo& info)
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
+    auto deferred = Promise::Deferred::New(info.Env());
+
+    auto reject = [&](const char* msg) -> Napi::Value {
+        deferred.Reject(TypeError::New(info.Env(), msg).Value());
+        return deferred.Promise();
+    };
+
     std::string sdp;
     std::string sdpMid;
     int sdpMLineIndex = 0;
 
     if (info.Length() > 0) {
+        if (!info[0].IsObject()) {
+            return reject("candidate must be an object");
+        }
         auto jsCandidate = info[0].As<Object>();
-        sdp = jsCandidate.Get("candidate").As<String>().Utf8Value();
+
+        if (!jsCandidate.Has("candidate")) {
+            return reject("candidate is required");
+        }
+        auto candidateVal = jsCandidate.Get("candidate");
+        if (!candidateVal.IsString()) {
+            return reject("candidate must be a string");
+        }
+        sdp = candidateVal.As<String>().Utf8Value();
 
         if (jsCandidate.Has("sdpMid")) {
-            sdpMid = jsCandidate.Get("sdpMid").As<String>().Utf8Value();
+            auto sdpMidVal = jsCandidate.Get("sdpMid");
+            if (!sdpMidVal.IsString()) {
+                return reject("sdpMid must be a string");
+            }
+            sdpMid = sdpMidVal.As<String>().Utf8Value();
         }
 
         if (jsCandidate.Has("sdpMLineIndex")) {
-            sdpMLineIndex = jsCandidate.Get("sdpMLineIndex").As<Number>().Uint32Value();
+            auto sdpMLineIndexVal = jsCandidate.Get("sdpMLineIndex");
+            if (!sdpMLineIndexVal.IsNumber()) {
+                return reject("sdpMLineIndex must be a number");
+            }
+            sdpMLineIndex = sdpMLineIndexVal.As<Number>().Uint32Value();
         }
 
         // ignore usernameFragment
     }
 
-    auto deferred = Promise::Deferred::New(info.Env());
 
     SdpParseError error;
     auto candidate = CreateIceCandidate(sdpMid, sdpMLineIndex, sdp, &error);

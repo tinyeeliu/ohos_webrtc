@@ -927,7 +927,7 @@ void OhosAudioDeviceModule::OnAudioOutputError(AudioOutput* output, AudioErrorTy
 {
     RTC_LOG(LS_ERROR) << "Audio output error: " << type << ", " << message;
 
-    std::lock_guard<std::mutex> lock(inputObsMutex_);
+    std::lock_guard<std::mutex> lock(outputObsMutex_);
     for (auto& obs : outputObservers_) {
         obs->OnAudioOutputError(output_.get(), type, message);
     }
@@ -937,7 +937,7 @@ void OhosAudioDeviceModule::OnAudioOutputStateChange(AudioOutput* output, AudioS
 {
     RTC_LOG(LS_INFO) << "Audio output state change: " << newState;
 
-    std::lock_guard<std::mutex> lock(inputObsMutex_);
+    std::lock_guard<std::mutex> lock(outputObsMutex_);
     for (auto& obs : outputObservers_) {
         obs->OnAudioOutputStateChange(output_.get(), newState);
     }
@@ -1054,6 +1054,11 @@ NapiAudioDeviceModule::NapiAudioDeviceModule(const Napi::CallbackInfo& info) : O
 NapiAudioDeviceModule::~NapiAudioDeviceModule()
 {
     RTC_DLOG(LS_INFO) << __FUNCTION__;
+
+    if (adm_) {
+        adm_->UnregisterInputObserver(this);
+        adm_->UnregisterOutputObserver(this);
+    }
 }
 
 Napi::Value NapiAudioDeviceModule::GetEventHandler(const Napi::CallbackInfo& info)
@@ -1254,6 +1259,7 @@ void NapiAudioDeviceModule::OnAudioInputDataReady(
         });
     if (status != napi_ok) {
         RTC_LOG(LS_ERROR) << " tsfn call error: " << status;
+        delete data;
     }
 }
 
