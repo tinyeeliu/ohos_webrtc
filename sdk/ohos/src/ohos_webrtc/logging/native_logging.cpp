@@ -66,7 +66,18 @@ NapiNativeLogging::NapiNativeLogging(const Napi::CallbackInfo& info) : ObjectWra
 
 Napi::Value NapiNativeLogging::InjectLoggable(const Napi::CallbackInfo& info)
 {
+    constexpr size_t kInjectLoggableArgsCount = 2;
     OH_LOG_Print(LOG_APP, LOG_DEBUG, LOG_DOMAIN, kClassName, __FUNCTION__);
+
+    if (info.Length() < kInjectLoggableArgsCount) {
+        NAPI_THROW(TypeError::New(info.Env(), "Wrong number of arguments"), info.Env().Undefined());
+    }
+    if (!info[0].IsObject()) {
+        NAPI_THROW(TypeError::New(info.Env(), "loggable must be an object"), info.Env().Undefined());
+    }
+    if (!info[1].IsNumber()) {
+        NAPI_THROW(TypeError::New(info.Env(), "severity must be a number"), info.Env().Undefined());
+    }
 
     auto loggable = info[0].As<Object>();
     auto severity = info[1].As<Number>().Int32Value();
@@ -108,7 +119,15 @@ Napi::Value NapiNativeLogging::DeleteLoggable(const Napi::CallbackInfo& info)
 
 Napi::Value NapiNativeLogging::EnableLogToDebugOutput(const Napi::CallbackInfo& info)
 {
+    constexpr size_t kEnableLogToDebugOutputArgsCount = 1;
     OH_LOG_Print(LOG_APP, LOG_DEBUG, LOG_DOMAIN, kClassName, __FUNCTION__);
+
+    if (info.Length() < kEnableLogToDebugOutputArgsCount) {
+        NAPI_THROW(TypeError::New(info.Env(), "Wrong number of arguments"), info.Env().Undefined());
+    }
+    if (!info[0].IsNumber()) {
+        NAPI_THROW(TypeError::New(info.Env(), "severity must be a number"), info.Env().Undefined());
+    }
 
     auto& hilogSink = GetStaticObjects().hilogSink;
     if (hilogSink) {
@@ -143,10 +162,19 @@ Napi::Value NapiNativeLogging::Log(const Napi::CallbackInfo& info)
     if (info.Length() != kLogArgsCount) {
         NAPI_THROW(Error::New(info.Env(), "Wrong number of arguments"), info.Env().Undefined());
     }
+    if (!info[0].IsString()) {
+        NAPI_THROW(TypeError::New(info.Env(), "message must be a string"), info.Env().Undefined());
+    }
+    if (!info[1].IsNumber()) {
+        NAPI_THROW(TypeError::New(info.Env(), "severity must be a number"), info.Env().Undefined());
+    }
+    if (!info[kLogArgsCount - 1].IsString()) {
+        NAPI_THROW(TypeError::New(info.Env(), "tag must be a string"), info.Env().Undefined());
+    }
 
     auto message = info[0].As<String>().Utf8Value();
     auto severity = info[1].As<Number>().Int32Value();
-    auto tag = info[2].As<String>().Utf8Value();
+    auto tag = info[kLogArgsCount - 1].As<String>().Utf8Value();
 
     LogLevel level = LOG_DEBUG;
     switch (severity) {
