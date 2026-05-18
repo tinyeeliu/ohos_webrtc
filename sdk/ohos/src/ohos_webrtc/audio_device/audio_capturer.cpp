@@ -242,7 +242,7 @@ int32_t AudioCapturer::OnReadData(OH_AudioCapturer* stream, void* buffer, int32_
 
     NotifyDataReady(buffer, length, rtc::TimeMicros(), latencyMillis);
 
-    return -1;
+    return 0;
 }
 
 int32_t AudioCapturer::OnStreamEvent(OH_AudioCapturer* stream, OH_AudioStream_Event event)
