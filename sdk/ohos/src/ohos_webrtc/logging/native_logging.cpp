@@ -32,6 +32,9 @@ const char kMethodNameEnableLogThreads[] = "enableLogThreads";
 const char kMethodNameEnableLogTimeStamps[] = "enableLogTimeStamps";
 const char kMethodNameLog[] = "log";
 
+constexpr size_t kInjectLoggableArgsCount = 2;
+constexpr size_t kEnableLogToDebugOutputArgsCount = 1;
+
 struct StaticObjectContainer {
     std::unique_ptr<LogSink> logSink;
     std::unique_ptr<HilogSink> hilogSink;
@@ -67,6 +70,16 @@ NapiNativeLogging::NapiNativeLogging(const Napi::CallbackInfo& info) : ObjectWra
 Napi::Value NapiNativeLogging::InjectLoggable(const Napi::CallbackInfo& info)
 {
     OH_LOG_Print(LOG_APP, LOG_DEBUG, LOG_DOMAIN, kClassName, __FUNCTION__);
+
+    if (info.Length() < kInjectLoggableArgsCount) {
+        NAPI_THROW(TypeError::New(info.Env(), "Wrong number of arguments"), info.Env().Undefined());
+    }
+    if (!info[0].IsObject()) {
+        NAPI_THROW(TypeError::New(info.Env(), "loggable must be an object"), info.Env().Undefined());
+    }
+    if (!info[1].IsNumber()) {
+        NAPI_THROW(TypeError::New(info.Env(), "severity must be a number"), info.Env().Undefined());
+    }
 
     auto loggable = info[0].As<Object>();
     auto severity = info[1].As<Number>().Int32Value();
@@ -110,6 +123,13 @@ Napi::Value NapiNativeLogging::EnableLogToDebugOutput(const Napi::CallbackInfo& 
 {
     OH_LOG_Print(LOG_APP, LOG_DEBUG, LOG_DOMAIN, kClassName, __FUNCTION__);
 
+    if (info.Length() < kEnableLogToDebugOutputArgsCount) {
+        NAPI_THROW(TypeError::New(info.Env(), "Wrong number of arguments"), info.Env().Undefined());
+    }
+    if (!info[0].IsNumber()) {
+        NAPI_THROW(TypeError::New(info.Env(), "severity must be a number"), info.Env().Undefined());
+    }
+
     auto& hilogSink = GetStaticObjects().hilogSink;
     if (hilogSink) {
         rtc::LogMessage::RemoveLogToStream(hilogSink.get());
@@ -143,10 +163,19 @@ Napi::Value NapiNativeLogging::Log(const Napi::CallbackInfo& info)
     if (info.Length() != kLogArgsCount) {
         NAPI_THROW(Error::New(info.Env(), "Wrong number of arguments"), info.Env().Undefined());
     }
+    if (!info[0].IsString()) {
+        NAPI_THROW(TypeError::New(info.Env(), "message must be a string"), info.Env().Undefined());
+    }
+    if (!info[1].IsNumber()) {
+        NAPI_THROW(TypeError::New(info.Env(), "severity must be a number"), info.Env().Undefined());
+    }
+    if (!info[kLogArgsCount - 1].IsString()) {
+        NAPI_THROW(TypeError::New(info.Env(), "tag must be a string"), info.Env().Undefined());
+    }
 
     auto message = info[0].As<String>().Utf8Value();
     auto severity = info[1].As<Number>().Int32Value();
-    auto tag = info[2].As<String>().Utf8Value();
+    auto tag = info[kLogArgsCount - 1].As<String>().Utf8Value();
 
     LogLevel level = LOG_DEBUG;
     switch (severity) {

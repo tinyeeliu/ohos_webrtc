@@ -927,7 +927,7 @@ void OhosAudioDeviceModule::OnAudioOutputError(AudioOutput* output, AudioErrorTy
 {
     RTC_LOG(LS_ERROR) << "Audio output error: " << type << ", " << message;
 
-    std::lock_guard<std::mutex> lock(inputObsMutex_);
+    std::lock_guard<std::mutex> lock(outputObsMutex_);
     for (auto& obs : outputObservers_) {
         obs->OnAudioOutputError(output_.get(), type, message);
     }
@@ -937,7 +937,7 @@ void OhosAudioDeviceModule::OnAudioOutputStateChange(AudioOutput* output, AudioS
 {
     RTC_LOG(LS_INFO) << "Audio output state change: " << newState;
 
-    std::lock_guard<std::mutex> lock(inputObsMutex_);
+    std::lock_guard<std::mutex> lock(outputObsMutex_);
     for (auto& obs : outputObservers_) {
         obs->OnAudioOutputStateChange(output_.get(), newState);
     }
@@ -980,7 +980,12 @@ void NapiAudioDeviceModule::Init(Napi::Env env, Napi::Object exports)
 bool GetOption(const Object& obj, const char* key, std::optional<int32_t>* valueOut)
 {
     if (obj.Has(key)) {
-        *valueOut = obj.Get(key).As<Number>().Int32Value();
+        auto val = obj.Get(key);
+        if (!val.IsNumber()) {
+            TypeError::New(obj.Env(), std::string(key) + " must be a number").ThrowAsJavaScriptException();
+            return false;
+        }
+        *valueOut = val.As<Number>().Int32Value();
         return true;
     }
     return false;
@@ -989,7 +994,12 @@ bool GetOption(const Object& obj, const char* key, std::optional<int32_t>* value
 bool GetOption(const Object& obj, const char* key, std::optional<bool>* valueOut)
 {
     if (obj.Has(key)) {
-        *valueOut = obj.Get(key).As<Boolean>().Value();
+        auto val = obj.Get(key);
+        if (!val.IsBoolean()) {
+            TypeError::New(obj.Env(), std::string(key) + " must be a boolean").ThrowAsJavaScriptException();
+            return false;
+        }
+        *valueOut = val.As<Boolean>().Value();
         return true;
     }
     return false;
@@ -1003,41 +1013,61 @@ NapiAudioDeviceModule::NapiAudioDeviceModule(const Napi::CallbackInfo& info) : O
     AudioOutputOptions outputOptions;
 
     if (info.Length() > 0) {
+        if (!info[0].IsObject()) {
+            NAPI_THROW_VOID(TypeError::New(info.Env(), "options must be an object"));
+        }
         auto options = ((Napi::Value)info[0]).As<Object>();
 
-        GetOption(options, kAttributeNameAudioSource, &inputOptions.source);
-        GetOption(options, kAttributeNameInputSampleRate, &inputOptions.sampleRate);
-        GetOption(options, kAttributeNameUseLowLatency, &inputOptions.useLowLatency);
+        if (!GetOption(options, kAttributeNameAudioSource, &inputOptions.source)) { return; }
+        if (!GetOption(options, kAttributeNameInputSampleRate, &inputOptions.sampleRate)) { return; }
+        if (!GetOption(options, kAttributeNameUseLowLatency, &inputOptions.useLowLatency)) { return; }
 
-        GetOption(options, kAttributeNameOutputSampleRate, &outputOptions.sampleRate);
-        GetOption(options, kAttributeNameRendererUsage, &outputOptions.usage);
-        GetOption(options, kAttributeNameUseLowLatency, &outputOptions.useLowLatency);
+        if (!GetOption(options, kAttributeNameOutputSampleRate, &outputOptions.sampleRate)) { return; }
+        if (!GetOption(options, kAttributeNameRendererUsage, &outputOptions.usage)) { return; }
+        if (!GetOption(options, kAttributeNameUseLowLatency, &outputOptions.useLowLatency)) { return; }
 
         if (options.Has(kAttributeNameUseStereoInput)) {
-            bool useStereoInput = options.Get(kAttributeNameUseStereoInput).As<Boolean>().Value();
+            auto val = options.Get(kAttributeNameUseStereoInput);
+            if (!val.IsBoolean()) {
+                TypeError::New(info.Env(), "useStereoInput must be a boolean").ThrowAsJavaScriptException();
+                return;
+            }
+            bool useStereoInput = val.As<Boolean>().Value();
             inputOptions.channelCount = useStereoInput ? kAudioChannelCount_Stereo : kAudioChannelCount_Mono;
         }
 
         if (options.Has(kAttributeNameUseStereoOutput)) {
-            bool useStereoOutput = options.Get(kAttributeNameUseStereoOutput).As<Boolean>().Value();
-            inputOptions.channelCount = useStereoOutput ? kAudioChannelCount_Stereo : kAudioChannelCount_Mono;
+            auto val = options.Get(kAttributeNameUseStereoOutput);
+            if (!val.IsBoolean()) {
+                TypeError::New(info.Env(), "useStereoOutput must be a boolean").ThrowAsJavaScriptException();
+                return;
+            }
+            bool useStereoOutput = val.As<Boolean>().Value();
+            outputOptions.channelCount = useStereoOutput ? kAudioChannelCount_Stereo : kAudioChannelCount_Mono;
         }
 
         if (options.Has(kAttributeNameAudioFormat)) {
             // Ignore, always use AUDIOSTREAM_SAMPLE_S16LE
-            RTC_DLOG(LS_INFO) << "audioFormat: " << options.Get(kAttributeNameAudioFormat).As<Number>().Int32Value();
+            auto val = options.Get(kAttributeNameAudioFormat);
+            if (val.IsNumber()) {
+                RTC_DLOG(LS_INFO) << "audioFormat: " << val.As<Number>().Int32Value();
+            }
         }
 
         if (options.Has(kAttributeNameUseHardwareAcousticEchoCanceler)) {
             // Ignore
-            RTC_DLOG(LS_INFO) << "useHardwareAcousticEchoCanceler: "
-                              << options.Get(kAttributeNameUseHardwareAcousticEchoCanceler).As<Boolean>().Value();
+            auto val = options.Get(kAttributeNameUseHardwareAcousticEchoCanceler);
+            if (val.IsBoolean()) {
+                RTC_DLOG(LS_INFO) << "useHardwareAcousticEchoCanceler: " << val.As<Boolean>().Value();
+            }
         }
 
         if (options.Has(kAttributeNameUseHardwareNoiseSuppressor)) {
             // Ignore
-            RTC_DLOG(LS_INFO) << "useHardwareNoiseSuppressor: "
-                              << options.Get(kAttributeNameUseHardwareNoiseSuppressor).As<Boolean>().Value();
+            auto val = options.Get(kAttributeNameUseHardwareNoiseSuppressor);
+            if (val.IsBoolean()) {
+                RTC_DLOG(LS_INFO) << "useHardwareNoiseSuppressor: " << val.As<Boolean>().Value();
+            }
         }
     }
 
@@ -1054,6 +1084,11 @@ NapiAudioDeviceModule::NapiAudioDeviceModule(const Napi::CallbackInfo& info) : O
 NapiAudioDeviceModule::~NapiAudioDeviceModule()
 {
     RTC_DLOG(LS_INFO) << __FUNCTION__;
+
+    if (adm_) {
+        adm_->UnregisterInputObserver(this);
+        adm_->UnregisterOutputObserver(this);
+    }
 }
 
 Napi::Value NapiAudioDeviceModule::GetEventHandler(const Napi::CallbackInfo& info)
@@ -1110,6 +1145,9 @@ Napi::Value NapiAudioDeviceModule::SetSpeakerMute(const Napi::CallbackInfo& info
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
+    if (info.Length() < 1 || !info[0].IsBoolean()) {
+        NAPI_THROW(TypeError::New(info.Env(), "mute must be a boolean"), info.Env().Undefined());
+    }
     rtc::scoped_refptr<AudioDeviceModule>(adm_)->SetSpeakerMute(info[0].As<Boolean>().Value());
     return info.Env().Undefined();
 }
@@ -1118,6 +1156,9 @@ Napi::Value NapiAudioDeviceModule::SetMicrophoneMute(const Napi::CallbackInfo& i
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
+    if (info.Length() < 1 || !info[0].IsBoolean()) {
+        NAPI_THROW(TypeError::New(info.Env(), "mute must be a boolean"), info.Env().Undefined());
+    }
     rtc::scoped_refptr<AudioDeviceModule>(adm_)->SetMicrophoneMute(info[0].As<Boolean>().Value());
     return info.Env().Undefined();
 }
@@ -1134,11 +1175,18 @@ Napi::Value NapiAudioDeviceModule::Release(const Napi::CallbackInfo& info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    std::lock_guard<std::mutex> lock(mutex_);
-    for (auto& handler : eventHandlers_) {
-        handler.second.tsfn.Release();
+    if (adm_) {
+        adm_->UnregisterInputObserver(this);
+        adm_->UnregisterOutputObserver(this);
     }
-    eventHandlers_.clear();
+
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        for (auto& handler : eventHandlers_) {
+            handler.second.tsfn.Release();
+        }
+        eventHandlers_.clear();
+    }
 
     return info.Env().Undefined();
 }
@@ -1254,6 +1302,7 @@ void NapiAudioDeviceModule::OnAudioInputDataReady(
         });
     if (status != napi_ok) {
         RTC_LOG(LS_ERROR) << " tsfn call error: " << status;
+        delete data;
     }
 }
 
