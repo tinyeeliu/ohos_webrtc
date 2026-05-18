@@ -26,6 +26,14 @@ import RTCCertificateTest from './RTCCertificate.test';
 import RTCIceTransportTest from './RTCIceTransport.test';
 import RTCDtlsTransportTest from './RTCDtlsTransport.test';
 import RTCIceCandidateTest from './RTCIceCandidate.test';
+import MediaStreamTest from './MediaStream.test';
+import MediaDevicesTest from './MediaDevices.test';
+import AudioDeviceModuleTest from './AudioDeviceModule.test';
+import NativeVideoRendererTest from './NativeVideoRenderer.test';
+import AudioSourceTest from './AudioSource.test';
+import PeerConnectionFactoryTest from './PeerConnectionFactory.test';
+import MediaStreamTrackTest from './MediaStreamTrack.test';
+import LoggingTest from './Logging.test';
 
 export default function testsuite() {
   abilityTest();
@@ -41,4 +49,12 @@ export default function testsuite() {
   RTCIceTransportTest();
   RTCDtlsTransportTest();
   RTCIceCandidateTest();
+  MediaStreamTest();
+  MediaDevicesTest();
+  AudioDeviceModuleTest();
+  NativeVideoRendererTest();
+  AudioSourceTest();
+  PeerConnectionFactoryTest();
+  MediaStreamTrackTest();
+  LoggingTest();
 }
