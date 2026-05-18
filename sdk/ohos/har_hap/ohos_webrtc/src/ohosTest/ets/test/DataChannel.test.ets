@@ -57,8 +57,8 @@ function exchangeIceCandidates(pc1: webrtc.RTCPeerConnection, pc2: webrtc.RTCPee
   const doExchange = (pc1: webrtc.RTCPeerConnection, pc2: webrtc.RTCPeerConnection) => {
     pc1.onicecandidate = (event) => {
       const candidate = event.candidate;
-      if (pc2.signalingState !== 'closed') {
-        pc2.addIceCandidate(candidate);
+      if (pc2.signalingState !== 'closed' && pc2.remoteDescription) {
+        pc2.addIceCandidate(candidate).catch(() => {});
       }
     };
   };
@@ -123,16 +123,8 @@ export default function DataChannelTest() {
       // Presets an action, which is performed before each unit test case starts.
       // The number of execution times is the same as the number of test cases defined by **it**.
       // This API supports only one parameter: preset action function.
-      caller = pcf.createPeerConnection({
-        iceServers: [{
-          urls: STUN_SERVER
-        }]
-      });
-      callee = pcf.createPeerConnection({
-        iceServers: [{
-          urls: STUN_SERVER
-        }]
-      });
+      caller = pcf.createPeerConnection({});
+      callee = pcf.createPeerConnection({});
     })
     afterEach(() => {
       // Presets a clear action, which is performed after each unit test case ends.

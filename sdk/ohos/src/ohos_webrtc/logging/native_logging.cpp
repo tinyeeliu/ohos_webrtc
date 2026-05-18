@@ -68,6 +68,16 @@ Napi::Value NapiNativeLogging::InjectLoggable(const Napi::CallbackInfo& info)
 {
     OH_LOG_Print(LOG_APP, LOG_DEBUG, LOG_DOMAIN, kClassName, __FUNCTION__);
 
+    if (info.Length() < 2) {
+        NAPI_THROW(TypeError::New(info.Env(), "Wrong number of arguments"), info.Env().Undefined());
+    }
+    if (!info[0].IsObject()) {
+        NAPI_THROW(TypeError::New(info.Env(), "loggable must be an object"), info.Env().Undefined());
+    }
+    if (!info[1].IsNumber()) {
+        NAPI_THROW(TypeError::New(info.Env(), "severity must be a number"), info.Env().Undefined());
+    }
+
     auto loggable = info[0].As<Object>();
     auto severity = info[1].As<Number>().Int32Value();
 
@@ -110,6 +120,13 @@ Napi::Value NapiNativeLogging::EnableLogToDebugOutput(const Napi::CallbackInfo& 
 {
     OH_LOG_Print(LOG_APP, LOG_DEBUG, LOG_DOMAIN, kClassName, __FUNCTION__);
 
+    if (info.Length() < 1) {
+        NAPI_THROW(TypeError::New(info.Env(), "Wrong number of arguments"), info.Env().Undefined());
+    }
+    if (!info[0].IsNumber()) {
+        NAPI_THROW(TypeError::New(info.Env(), "severity must be a number"), info.Env().Undefined());
+    }
+
     auto& hilogSink = GetStaticObjects().hilogSink;
     if (hilogSink) {
         rtc::LogMessage::RemoveLogToStream(hilogSink.get());
@@ -142,6 +159,15 @@ Napi::Value NapiNativeLogging::Log(const Napi::CallbackInfo& info)
     constexpr size_t kLogArgsCount = 3;
     if (info.Length() != kLogArgsCount) {
         NAPI_THROW(Error::New(info.Env(), "Wrong number of arguments"), info.Env().Undefined());
+    }
+    if (!info[0].IsString()) {
+        NAPI_THROW(TypeError::New(info.Env(), "message must be a string"), info.Env().Undefined());
+    }
+    if (!info[1].IsNumber()) {
+        NAPI_THROW(TypeError::New(info.Env(), "severity must be a number"), info.Env().Undefined());
+    }
+    if (!info[2].IsString()) {
+        NAPI_THROW(TypeError::New(info.Env(), "tag must be a string"), info.Env().Undefined());
     }
 
     auto message = info[0].As<String>().Utf8Value();
