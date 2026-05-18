@@ -44,6 +44,8 @@ template("ohos_clang_toolchain") {
       abi_target = "arm-linux-ohos"
     } else if (invoker.target_name == "ohos_clang_arm64") {
       abi_target = "aarch64-linux-ohos"
+    } else if (invoker.target_name == "ohos_clang_x86") {
+      abi_target = "i686-linux-ohos"
     } else if (invoker.target_name == "ohos_clang_x86_64") {
       abi_target = "x86_64-linux-ohos"
     }
@@ -99,5 +101,13 @@ ohos_clang_toolchain("ohos_clang_x86_64") {
   lib_dir = "usr/lib/x86_64-linux-ohos"
   toolchain_args = {
     current_cpu = "x86_64"
+  }
+}
+
+ohos_clang_toolchain("ohos_clang_x86") {
+  sysroot = "${sysroot}"
+  lib_dir = "usr/lib/i686-linux-ohos"
+  toolchain_args = {
+    current_cpu = "x86"
   }
 }

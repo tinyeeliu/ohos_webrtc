@@ -78,6 +78,16 @@ WebRTC (Web Real-Time Communications) 是一项实时通讯技术，它允许网
   ninja -C out/webrtc -v -j32                 # 执行编译，-v 查看编译的具体过程， -j32使用32个线程进行编译，提升编译速度
   ```
 
+  ### x86模拟器编译
+
+  如需编译x86模拟器版本，将 `target_cpu` 设置为 `"x86_64"`：
+
+  ```shell
+  # x86_64 模拟器
+  gn gen out/webrtc_x86_64 --args='is_clang=true target_cpu="x86_64" target_os="ohos" ohos_sdk_native_root="/owner/workspace/ohos-sdk/linux/native/"'
+  ninja -C out/webrtc_x86_64 -v -j32
+  ```
+
   编译成功后会在out/webrtc/obj目录下生成libwebrtc.a, 在out/webrtc目录下生成对应的测试用例，其中ohos_test是视频了OH平台的音频测试用例。
   
   ![build result](./pic/build_result.png)
