@@ -63,6 +63,7 @@ void LogSink::CallJs(Napi::Env env, Napi::Function callback, Context* context, D
 {
     if (env == nullptr) {
         // Javascript environment is not available to call into
+        delete data;
         return;
     }
 
