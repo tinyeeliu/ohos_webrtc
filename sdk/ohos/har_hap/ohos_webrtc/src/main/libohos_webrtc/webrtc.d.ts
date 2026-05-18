@@ -789,7 +789,7 @@ export interface MediaSource {
 }
 
 export interface AudioSource extends MediaSource {
-  setVolume(volume: number);
+  setVolume(volume: number): void;
 }
 
 export interface VideoSource extends MediaSource {
@@ -841,7 +841,7 @@ declare var MediaStream: {
 
 export interface MediaDeviceInfo {
   readonly deviceId: string;
-  readonly kind:MediaDeviceKind;
+  readonly kind: MediaDeviceKind;
   readonly label: string;
   readonly groupId: string;
 }
@@ -949,12 +949,12 @@ export interface AudioSamples {
 }
 
 export interface AudioDeviceModule {
-  oncapturererror: ((this: any, event: AudioErrorEvent) => void) | null;
-  oncapturerstatechange: ((this: any, event: AudioStateChangeEvent) => void) | null;
+  oncapturererror: ((this: AudioDeviceModule, event: AudioErrorEvent) => void) | null;
+  oncapturerstatechange: ((this: AudioDeviceModule, event: AudioStateChangeEvent) => void) | null;
   // Called when new audio samples are ready. This should only be set for debug purposes
-  oncapturersamplesready: ((this: any, event: AudioCapturerSamplesReadyEvent) => void) | null;
-  onrenderererror: ((this: any, event: AudioErrorEvent) => void) | null;
-  onrendererstatechange: ((this: any, event: AudioStateChangeEvent) => void) | null;
+  oncapturersamplesready: ((this: AudioDeviceModule, event: AudioCapturerSamplesReadyEvent) => void) | null;
+  onrenderererror: ((this: AudioDeviceModule, event: AudioErrorEvent) => void) | null;
+  onrendererstatechange: ((this: AudioDeviceModule, event: AudioStateChangeEvent) => void) | null;
 
   setSpeakerMute(mute: boolean): void;
   setMicrophoneMute(mute: boolean): void;
@@ -1050,7 +1050,7 @@ export interface Loggable {
 export class NativeLogging {
   static injectLoggable(loggable: Loggable, severity: number): void;
   static deleteLoggable(): void;
-  static enableLogToDebugOutput(severity): void;
+  static enableLogToDebugOutput(severity: number): void;
   static enableLogThreads(): void;
   static enableLogTimeStamps(): void;
   static log(message: string, severity: number, tag: string): void;
