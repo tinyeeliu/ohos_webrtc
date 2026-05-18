@@ -1,0 +1,50 @@
+/**
+ * Copyright (c) 2024 Archermind Technology (Nanjing) Co. Ltd.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import { describe, beforeAll, it, expect } from '@ohos/hypium'
+import webrtc from 'libohos_webrtc.so';
+import { Logging, LoggingSeverity } from '../../../main/ets/log/Logging';
+
+const TAG: string = '[MediaDevicesTest]';
+
+export default function MediaDevicesTest() {
+  describe('MediaDevicesTest', () => {
+    beforeAll(() => {
+      Logging.enableLogToDebugOutput(LoggingSeverity.VERBOSE);
+    })
+
+    it('enumerateDevicesReturnsArrayOfMediaDeviceInfo', 0, async () => {
+      let mediaDevices = new webrtc.MediaDevices();
+      let devices = await mediaDevices.enumerateDevices();
+      expect(Array.isArray(devices)).assertTrue();
+      if (devices.length > 0) {
+        let device = devices[0];
+        expect(typeof device.deviceId).assertEqual('string');
+        expect(device.kind === 'audioinput' || device.kind === 'audiooutput' || device.kind === 'videoinput').assertTrue();
+        expect(typeof device.groupId).assertEqual('string');
+      }
+    })
+
+    it('getUserMediaWithoutPermissionThrows', 0, async () => {
+      let mediaDevices = new webrtc.MediaDevices();
+      try {
+        await mediaDevices.getUserMedia({ audio: true });
+        expect().assertFail();
+      } catch (e) {
+        expect(e).assertInstanceOf('Error');
+      }
+    })
+  })
+}
