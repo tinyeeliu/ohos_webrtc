@@ -65,6 +65,10 @@ if (target_cpu == "") {
 if (current_cpu == "") {
   current_cpu = target_cpu
 }
+# OHOS uses target_cpu="x86_64" but WebRTC BUILD.gn checks use "x64".
+if (target_os == "ohos" && current_cpu == "x86_64") {
+  current_cpu = "x64"
+}
 if (current_os == "") {
   current_os = target_os
 }
