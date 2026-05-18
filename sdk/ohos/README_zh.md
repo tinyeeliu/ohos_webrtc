@@ -38,6 +38,14 @@ OpenHarmony ohpm 环境配置等更多内容，请参考[如何安装 OpenHarmon
 ```json
 "requestPermissions": [
   {
+    "name": "ohos.permission.INTERNET",
+    "reason": "$string:internet_reason",
+    "usedScene": {
+      "abilities": ["EntryAbility"],
+      "when": "inuse"
+    }
+  },
+  {
     "name": "ohos.permission.MICROPHONE",
     "reason": "$string:microphone_reason",
     "usedScene": {
