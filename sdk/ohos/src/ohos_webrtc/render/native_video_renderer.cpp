@@ -156,7 +156,14 @@ Napi::Value NapiNativeVideoRenderer::Init(const Napi::CallbackInfo& info)
         sharedContext_ = EglEnv::GetDefault().GetContext();
     }
 
-    auto nativeWindow = ohos::NativeWindow::CreateFromSurfaceId(std::stoull(*surfaceId_));
+    const std::string& surfaceIdStr = *surfaceId_;
+    char* endPtr = nullptr;
+    errno = 0;
+    unsigned long long surfaceIdValue = std::strtoull(surfaceIdStr.c_str(), &endPtr, 10);
+    if (errno != 0 || endPtr == surfaceIdStr.c_str() || *endPtr != '\0') {
+        NAPI_THROW(Error::New(info.Env(), "Invalid surfaceId"), info.Env().Undefined());
+    }
+    auto nativeWindow = ohos::NativeWindow::CreateFromSurfaceId(surfaceIdValue);
     if (nativeWindow.IsEmpty()) {
         NAPI_THROW(Error::New(info.Env(), "Failed to create native window"), info.Env().Undefined());
     }
