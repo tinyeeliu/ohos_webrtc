@@ -19,6 +19,8 @@
 #include "api/make_ref_counted.h"
 #include "rtc_base/logging.h"
 
+#include <cstdint>
+
 namespace webrtc {
 
 rtc::scoped_refptr<TextureBuffer>
@@ -42,6 +44,10 @@ rtc::scoped_refptr<I420BufferInterface> TextureBuffer::ToI420()
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
     auto texture = texture_.lock();
+    if (!texture) {
+        RTC_LOG(LS_ERROR) << __FUNCTION__ << " failed: texture expired";
+        return nullptr;
+    }
 
     rtc::Thread* toI420Handler = texture->getToI420Handler();
     YuvConverter* yuvConverter = texture->getYuvConverter();
@@ -58,9 +64,45 @@ rtc::scoped_refptr<VideoFrameBuffer> TextureBuffer::CropAndScale(
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    // crop and scale by transformMatrix_
-    // for now, just return self without crop and scale.
-    return rtc::scoped_refptr<VideoFrameBuffer>(this);
+    if (crop_width <= 0 || crop_height <= 0 || scaled_width <= 0 || scaled_height <= 0) {
+        RTC_LOG(LS_ERROR) << "Invalid crop/scale size.";
+        return nullptr;
+    }
+    const int64_t cropRight = static_cast<int64_t>(offset_x) + static_cast<int64_t>(crop_width);
+    const int64_t cropBottom = static_cast<int64_t>(offset_y) + static_cast<int64_t>(crop_height);
+    if (offset_x < 0 || offset_y < 0 || cropRight > static_cast<int64_t>(width_) ||
+        cropBottom > static_cast<int64_t>(height_)) {
+        RTC_LOG(LS_ERROR) << "Crop rect out of bounds.";
+        return nullptr;
+    }
+
+    // Hold a strong ref for the rest of this call so TextureData cannot be destroyed between check and Create
+    // (avoids TOCTOU if we only used a temporary lock() in the condition).
+    const std::shared_ptr<TextureData> textureData = texture_.lock();
+    if (!textureData) {
+        RTC_LOG(LS_ERROR) << __FUNCTION__ << " failed: texture expired";
+        return nullptr;
+    }
+
+    if (offset_x == 0 && offset_y == 0 && crop_width == width_ && crop_height == height_ && scaled_width == width_ &&
+        scaled_height == height_) {
+        return rtc::scoped_refptr<VideoFrameBuffer>(this);
+    }
+
+    // Crop params use WebRTC image coords: origin top-left, y increases downward.
+    // Texture sampling uses an OpenGL-style v axis (origin bottom, v increases upward) in this matrix path.
+    // cropYFromBottom is the distance from the image bottom to the crop rectangle's bottom edge in pixels,
+    // i.e. height_ - (offset_y + crop_height), matching sdk TextureBufferImpl cropYFromBottom.
+    const int cropYFromBottom =
+        static_cast<int>(static_cast<int64_t>(height_) - cropBottom);
+    Matrix cropMatrix;
+    cropMatrix.PreTranslate(offset_x / static_cast<float>(width_), cropYFromBottom / static_cast<float>(height_));
+    cropMatrix.PreScale(
+        crop_width / static_cast<float>(width_), crop_height / static_cast<float>(height_), 0.0f, 0.0f);
+
+    Matrix newMatrix = transformMatrix_;
+    newMatrix.PreConcat(cropMatrix);
+    return TextureBuffer::Create(std::weak_ptr<TextureData>(textureData), scaled_width, scaled_height, newMatrix);
 }
 
 } // namespace webrtc

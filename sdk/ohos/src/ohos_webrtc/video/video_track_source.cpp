@@ -297,6 +297,13 @@ void OhosVideoTrackSource::OnFrameCaptured(
 
     if (adapted_height != buffer->height() || adapted_width != buffer->width()) {
         buffer = buffer->CropAndScale(crop_x, crop_y, crop_width, crop_height, adapted_width, adapted_height);
+        if (!buffer) {
+            RTC_LOG(LS_ERROR) << "CropAndScale returned nullptr. drop frame.";
+            broadcaster_.OnDiscardedFrame();
+            return;
+        }
+        RTC_LOG(LS_VERBOSE) << "After CropAndScale: buffer size=" << buffer->width() << "x" << buffer->height()
+                            << ", type=" << static_cast<int>(buffer->type());
     } else {
         // No adaptations needed, just return the frame as is.
     }
