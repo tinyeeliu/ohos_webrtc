@@ -1,4 +1,7 @@
 # Changelog
+## 1.0.2-rc2 (2026-05-26)
+- Support real-time dynamic changes of the local resolution
+
 ## 1.0.2-rc1 (2026-05-11)
 - Fix memory leak in hardware video encoder
 - Fix multiple code quality issues in sdk/ohos webrtc and update OAT.xml
