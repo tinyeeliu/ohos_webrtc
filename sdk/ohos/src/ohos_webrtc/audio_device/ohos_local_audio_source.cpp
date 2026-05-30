@@ -54,4 +54,14 @@ void OhosLocalAudioSource::SetMute(bool mute)
     audioInput_->SetMute(mute);
 }
 
+void OhosLocalAudioSource::Stop()
+{
+    if (state_ == MediaSourceInterface::kEnded) {
+        return;
+    }
+
+    state_ = MediaSourceInterface::kEnded;
+    FireOnChanged();
+}
+
 } // namespace webrtc

@@ -693,6 +693,24 @@ void AudioRtpSender::OnChanged() {
   RTC_DCHECK_RUN_ON(signaling_thread_);
   TRACE_EVENT0("webrtc", "AudioRtpSender::OnChanged");
   RTC_DCHECK(!stopped_);
+
+  if (track_->state() == MediaStreamTrackInterface::kEnded) {
+    DetachTrack();
+    if (can_send_track()) {
+      signaling_thread_->PostTask(
+          [self = rtc::scoped_refptr<AudioRtpSender>(this)]() {
+            if (self->stopped_) {
+              return;
+            }
+            if (self->can_send_track()) {
+              self->ClearSend();
+              self->RemoveTrackFromStats();
+            }
+          });
+    }
+    return;
+  }
+
   if (cached_track_enabled_ != track_->enabled()) {
     cached_track_enabled_ = track_->enabled();
     if (can_send_track()) {
@@ -813,6 +831,23 @@ void VideoRtpSender::OnChanged() {
   RTC_DCHECK_RUN_ON(signaling_thread_);
   TRACE_EVENT0("webrtc", "VideoRtpSender::OnChanged");
   RTC_DCHECK(!stopped_);
+
+  if (track_->state() == MediaStreamTrackInterface::kEnded) {
+    DetachTrack();
+    if (can_send_track()) {
+      signaling_thread_->PostTask(
+          [self = rtc::scoped_refptr<VideoRtpSender>(this)]() {
+            if (self->stopped_) {
+              return;
+            }
+            if (self->can_send_track()) {
+              self->ClearSend();
+              self->RemoveTrackFromStats();
+            }
+          });
+    }
+    return;
+  }
 
   auto content_hint = video_track()->content_hint();
   if (cached_track_content_hint_ != content_hint) {

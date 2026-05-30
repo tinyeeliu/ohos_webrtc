@@ -315,7 +315,23 @@ Napi::Value NapiMediaStreamTrack::Stop(const Napi::CallbackInfo& info)
         return info.Env().Undefined();
     }
 
-    RemoveAllVideoSinks();
+    auto signalingThread = factory_->GetSignalingThread();
+    if (IsAudioTrack()) {
+        auto source = factory_->GetAudioSource(track_);
+        if (source) {
+            if (signalingThread->IsCurrent()) {
+                source->Stop();
+            } else {
+                signalingThread->PostTask([source] { source->Stop(); });
+            }
+        }
+    } else if (IsVideoTrack()) {
+        RemoveAllVideoSinks();
+        auto source = factory_->GetVideoSource(track_);
+        if (source) {
+            source->Stop();
+        }
+    }
 
     return info.Env().Undefined();
 }

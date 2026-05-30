@@ -36,7 +36,7 @@ public:
 
     SourceState state() const override
     {
-        return kLive;
+        return state_;
     }
 
     bool remote() const override
@@ -61,6 +61,8 @@ public:
 
     void SetMute(bool mute);
 
+    void Stop();
+
 protected:
     OhosLocalAudioSource() = default;
     ~OhosLocalAudioSource() override = default;
@@ -70,6 +72,7 @@ protected:
 private:
     cricket::AudioOptions audioOptions_;
     std::shared_ptr<AudioInput> audioInput_;
+    SourceState state_{kLive};
 };
 
 } // namespace webrtc
