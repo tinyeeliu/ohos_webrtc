@@ -16,6 +16,7 @@
 #ifndef WEBRTC_FAKE_AUDIO_SOURCE_H
 #define WEBRTC_FAKE_AUDIO_SOURCE_H
 
+#include <atomic>
 #include <memory>
 
 #include "api/audio_options.h"
@@ -36,7 +37,7 @@ public:
 
     SourceState state() const override
     {
-        return kLive;
+        return state_.load();
     }
 
     bool remote() const override
@@ -61,6 +62,9 @@ public:
 
     void SetMute(bool mute);
 
+    void SetVolume(double volume) override;
+
+    void Stop();
 protected:
     OhosLocalAudioSource() = default;
     ~OhosLocalAudioSource() override = default;
@@ -70,6 +74,7 @@ protected:
 private:
     cricket::AudioOptions audioOptions_;
     std::shared_ptr<AudioInput> audioInput_;
+    std::atomic<SourceState> state_{kLive};
 };
 
 } // namespace webrtc

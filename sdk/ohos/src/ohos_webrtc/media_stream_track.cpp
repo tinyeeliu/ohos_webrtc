@@ -315,7 +315,43 @@ Napi::Value NapiMediaStreamTrack::Stop(const Napi::CallbackInfo& info)
         return info.Env().Undefined();
     }
 
-    RemoveAllVideoSinks();
+    // MediaStreamTrack.stop(): end underlying source; observers then set track ended and stop RTP.
+    // Run on signaling thread (PostTask from NAPI; no BlockingCall).
+    auto signalingThread = factory_->GetSignalingThread();
+    if (IsAudioTrack()) {
+        auto source = factory_->GetAudioSource(track_);
+        if (source) {
+            if (signalingThread->IsCurrent()) {
+                source->Stop();
+            } else {
+                signalingThread->PostTask([source] { source->Stop(); });
+            }
+        }
+    } else if (IsVideoTrack()) {
+        auto source = factory_->GetVideoSource(track_);
+        auto track = track_;
+        std::set<rtc::VideoSinkInterface<VideoFrame>*> sinks;
+        {
+            UNUSED std::lock_guard<std::mutex> lock(sinksMutex_);
+            videoSinks_.swap(sinks);
+        }
+        auto stopVideo = [track, source, sinks = std::move(sinks)]() mutable {
+            auto* videoTrack = static_cast<VideoTrackInterface*>(track.get());
+            for (auto* sink : sinks) {
+                if (sink) {
+                    videoTrack->RemoveSink(sink);
+                }
+            }
+            if (source) {
+                source->Stop();
+            }
+        };
+        if (signalingThread->IsCurrent()) {
+            stopVideo();
+        } else {
+            signalingThread->PostTask(std::move(stopVideo));
+        }
+    }
 
     return info.Env().Undefined();
 }

@@ -83,6 +83,8 @@ void OhosVideoTrackSource::Stop()
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
+    // Sync ended like OhosLocalAudioSource::Stop(); capturer stop stays async on v-track-source.
+    SetState(kEnded);
     thread_->PostTask([capturer = capturer_] { capturer->Stop(); });
 }
 
