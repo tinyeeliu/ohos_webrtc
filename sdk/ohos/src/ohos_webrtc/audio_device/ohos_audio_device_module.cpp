@@ -169,14 +169,70 @@ void OhosAudioDeviceModule::RemoveAudioInput(std::shared_ptr<AudioInput> input)
 }
 
 rtc::scoped_refptr<OhosLocalAudioSource> OhosAudioDeviceModule::CreateAudioSource(
-    cricket::AudioOptions options, std::shared_ptr<AudioInput> audioInput)
+    cricket::AudioOptions options, rtc::Thread* signalingThread, std::shared_ptr<AudioInput> audioInput)
 {
     if (!audioInput) {
         // Use default
         audioInput = defaultInput_;
     }
 
-    return OhosLocalAudioSource::Create(std::move(options), std::move(audioInput));
+    auto admRef = rtc::scoped_refptr<OhosAudioDeviceModule>(this);
+    auto source = OhosLocalAudioSource::Create(
+        std::move(options), std::move(audioInput), signalingThread, std::move(admRef));
+    if (source) {
+        // Paired with ReleaseLiveAudioSource() when source stops or is destroyed.
+        RegisterLiveAudioSource();
+    }
+    return source;
+}
+
+void OhosAudioDeviceModule::SetAudioControlThread(rtc::Thread* thread)
+{
+    RTC_DCHECK(thread);
+    // WebRTC invokes ADM StartRecording/StopRecording (and AudioDeviceBuffer) on the factory
+    // worker thread. Must be set after workerThread_ is moved in PeerConnectionFactoryWrapper::Init.
+    audioControlThread_ = thread;
+}
+
+void OhosAudioDeviceModule::RegisterLiveAudioSource()
+{
+    std::lock_guard<std::mutex> lock(liveSourceMutex_);
+    ++liveAudioSourceCount_;
+}
+
+void OhosAudioDeviceModule::ReleaseLiveAudioSource()
+{
+    int remaining = 0;
+    {
+        std::lock_guard<std::mutex> lock(liveSourceMutex_);
+        RTC_DCHECK_GT(liveAudioSourceCount_, 0);
+        remaining = --liveAudioSourceCount_;
+    }
+
+    if (remaining > 0) {
+        return;
+    }
+
+    RTC_LOG(LS_INFO) << "Last live audio source released, stopping ADM recording";
+
+    if (!audioControlThread_) {
+        RTC_LOG(LS_ERROR) << "audioControlThread_ is null; cannot stop ADM recording safely";
+        return;
+    }
+
+    // ReleaseLiveAudioSource() is typically called from signaling thread after track.stop().
+    // StopRecording() must run on audioControlThread_ (worker): AudioDeviceBuffer checks thread.
+    auto stopTask = [self = rtc::scoped_refptr<OhosAudioDeviceModule>(this)]() {
+        if (self->Recording()) {
+            self->StopRecording();
+        }
+    };
+
+    if (!audioControlThread_->IsCurrent()) {
+        audioControlThread_->PostTask(std::move(stopTask));
+    } else {
+        stopTask();
+    }
 }
 
 void OhosAudioDeviceModule::RegisterInputObserver(AudioInput::Observer* obs)

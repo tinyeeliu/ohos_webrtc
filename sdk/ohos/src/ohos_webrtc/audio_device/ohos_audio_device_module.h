@@ -25,6 +25,7 @@
 #include "api/sequence_checker.h"
 #include "modules/audio_device/include/audio_device.h"
 #include "modules/audio_device/fine_audio_buffer.h"
+#include "rtc_base/thread.h"
 
 #include "napi.h"
 
@@ -47,8 +48,16 @@ public:
     void RemoveAudioInput(std::shared_ptr<AudioInput> input);
 
     // Create default or system audio source
-    rtc::scoped_refptr<OhosLocalAudioSource>
-    CreateAudioSource(cricket::AudioOptions options, std::shared_ptr<AudioInput> audioInput = nullptr);
+    rtc::scoped_refptr<OhosLocalAudioSource> CreateAudioSource(
+        cricket::AudioOptions options, rtc::Thread* signalingThread,
+        std::shared_ptr<AudioInput> audioInput = nullptr);
+
+    // Worker thread used by WebRTC to control ADM recording; set from PeerConnectionFactoryWrapper::Init.
+    void SetAudioControlThread(rtc::Thread* thread);
+
+    // Refcount of live (non-ended) OhosLocalAudioSource instances tied to this ADM.
+    void RegisterLiveAudioSource();
+    void ReleaseLiveAudioSource();
 
     void RegisterInputObserver(AudioInput::Observer* obs);
     void UnregisterInputObserver(AudioInput::Observer* obs);
@@ -166,6 +175,11 @@ private:
     // Sets all recorded samples to zero if `microphoneMute_` is true, i.e., ensures that
     // the microphone is muted.
     std::atomic<bool> microphoneMute_{false};
+
+    rtc::Thread* audioControlThread_{nullptr};
+    // Count of live OhosLocalAudioSource instances; at zero, StopRecording is posted to worker.
+    std::mutex liveSourceMutex_;
+    int liveAudioSourceCount_{0};
 };
 
 class NapiAudioDeviceModule : public Napi::ObjectWrap<NapiAudioDeviceModule>,

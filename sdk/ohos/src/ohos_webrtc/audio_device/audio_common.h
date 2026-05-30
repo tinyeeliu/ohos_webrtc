@@ -31,6 +31,9 @@ constexpr int kAudioSampleRate_16000 = 16000;
 constexpr int kAudioSampleRate_48000 = 48000;
 constexpr int kAudioSampleRate_Default = kAudioSampleRate_16000;
 
+// UI/API volume range [0, kAudioInputVolumeMax]; applied gain = volume / kAudioInputVolumeMax.
+constexpr double kAudioInputVolumeMax = 10.0;
+
 constexpr float kHalfSec = 0.5;
 
 const int kLowLatencyModeDelayEstimateInMilliseconds = 25;

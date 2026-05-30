@@ -103,7 +103,7 @@ rtc::scoped_refptr<OhosAudioDeviceModule> PeerConnectionFactoryWrapper::GetAudio
 rtc::scoped_refptr<OhosLocalAudioSource> PeerConnectionFactoryWrapper::CreateAudioSource(
     const cricket::AudioOptions& options, std::shared_ptr<AudioInput> audioInput)
 {
-    return adm_->CreateAudioSource(options, std::move(audioInput));
+    return adm_->CreateAudioSource(options, signalingThread_.get(), std::move(audioInput));
 }
 
 rtc::scoped_refptr<OhosVideoTrackSource> PeerConnectionFactoryWrapper::CreateVideoSource(
@@ -225,6 +225,10 @@ bool PeerConnectionFactoryWrapper::Init(
     networkThread_ = std::move(networkThread);
     workerThread_ = std::move(workerThread);
     signalingThread_ = std::move(signalingThread);
+    // Bind ADM recording control to worker thread. Must use workerThread_ after move above;
+    // calling workerThread_.get() before move leaves audioControlThread_ null and StopRecording
+    // would run on signaling thread -> AudioDeviceBuffer thread check failure (SIGABRT).
+    adm_->SetAudioControlThread(workerThread_.get());
 
     return true;
 }
