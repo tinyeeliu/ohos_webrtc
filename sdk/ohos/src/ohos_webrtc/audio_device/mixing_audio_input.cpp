@@ -443,6 +443,14 @@ void MixingAudioInput::DoMix()
             frame.Mute();
         }
 
+        if (volume_ < 10.0) {
+            int16_t* data = frame.mutable_data();
+            int sampleCount = frame.num_channels() * frame.samples_per_channel();
+            for (int i = 0; i < sampleCount; i++) {
+                data[i] = static_cast<int16_t>(data[i] * (volume_ / 10.0));
+            }
+        }
+
         // Timestamp and deley
         NotifyDataReady(
             (void*)frame.data(), frame.num_channels() * frame.samples_per_channel() * sizeof(int16_t), 0, 0);
