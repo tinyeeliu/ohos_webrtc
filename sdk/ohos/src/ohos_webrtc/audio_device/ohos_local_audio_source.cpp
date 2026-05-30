@@ -54,4 +54,21 @@ void OhosLocalAudioSource::SetMute(bool mute)
     audioInput_->SetMute(mute);
 }
 
+void OhosLocalAudioSource::SetVolume(double volume)
+{
+    audioInput_->SetVolume(volume);
+}
+
+void OhosLocalAudioSource::Stop()
+{
+    if (state_ == MediaSourceInterface::kEnded) {
+        return;
+    }
+
+    state_ = MediaSourceInterface::kEnded;
+    // FireOnChanged -> AudioTrack::OnChanged -> AudioRtpSender::ClearSend().
+    // Without it, state_ change does not reach the RTP send path.
+    FireOnChanged();
+}
+
 } // namespace webrtc
