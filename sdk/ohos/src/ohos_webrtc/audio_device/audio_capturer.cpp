@@ -240,6 +240,14 @@ int32_t AudioCapturer::OnReadData(OH_AudioCapturer* stream, void* buffer, int32_
         std::fill(it, it + length, 0);
     }
 
+    if (volume_ < 10.0) {
+        auto samples = static_cast<int16_t*>(buffer);
+        int32_t sampleCount = length / static_cast<int32_t>(sizeof(int16_t));
+        for (int32_t i = 0; i < sampleCount; i++) {
+            samples[i] = static_cast<int16_t>(samples[i] * (volume_ / 10.0));
+        }
+    }
+
     NotifyDataReady(buffer, length, rtc::TimeMicros(), latencyMillis);
 
     return -1;

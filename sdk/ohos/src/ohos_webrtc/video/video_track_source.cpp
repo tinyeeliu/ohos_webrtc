@@ -83,6 +83,27 @@ void OhosVideoTrackSource::Stop()
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
+    if (is_destroying_.load(std::memory_order_acquire)) {
+        RTC_LOG(LS_WARNING) << "Stop called during destruction, ignoring";
+        return;
+    }
+
+    // Align with OhosLocalAudioSource::Stop(): skip duplicate FireOnChanged and capturer stop.
+    if (state_.exchange(kEnded) == kEnded) {
+        return;
+    }
+
+    if (rtc::Thread::Current() == signalingThread_) {
+        FireOnChanged();
+    } else {
+        signalingThread_->PostTask(
+            [self = rtc::scoped_refptr<OhosVideoTrackSource>(this)] {
+                if (!self->is_destroying_.load(std::memory_order_acquire)) {
+                    self->FireOnChanged();
+                }
+            });
+    }
+
     thread_->PostTask([capturer = capturer_] { capturer->Stop(); });
 }
 
