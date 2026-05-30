@@ -62,6 +62,7 @@ public:
     virtual bool Recording() const = 0;
 
     virtual int32_t SetMute(bool mute) = 0;
+    virtual void SetVolume(double volume) {}
 
     virtual void RegisterObserver(Observer* obs) = 0;
     virtual void UnregisterObserver(Observer* obs) = 0;
@@ -128,6 +129,11 @@ public:
         return 0;
     }
 
+    void SetVolume(double volume) override
+    {
+        volume_ = std::max(0.0, std::min(10.0, volume));
+    }
+
 protected:
     void NotifyError(AudioErrorType error, const std::string& message)
     {
@@ -157,6 +163,10 @@ protected:
 
     // Sets all recorded samples to zero if `mute_` is true.
     std::atomic<bool> mute_{false};
+
+    // API/UI volume [0, 10]: 0 = mute, 1 = default (10% gain), 10 = max (100%).
+    // Applied gain is volume_/10 when volume_ < 10.0.
+    std::atomic<double> volume_{1.0};
 
     std::mutex obsMutex_;
     std::list<Observer*> observers_;
