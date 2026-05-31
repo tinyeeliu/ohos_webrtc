@@ -83,6 +83,29 @@ void OhosVideoTrackSource::Stop()
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
+    if (is_destroying_.load(std::memory_order_acquire)) {
+        RTC_LOG(LS_WARNING) << "Stop called during destruction, ignoring";
+        return;
+    }
+
+    // Align with OhosLocalAudioSource::Stop(): skip duplicate FireOnChanged and capturer stop.
+    if (state_.exchange(kEnded) == kEnded) {
+        return;
+    }
+
+    // FireOnChanged notifies VideoTrack/RtpSender on signaling thread (same as audio source).
+    if (rtc::Thread::Current() == signalingThread_) {
+        FireOnChanged();
+    } else {
+        signalingThread_->PostTask(
+            [self = rtc::scoped_refptr<OhosVideoTrackSource>(this)] {
+                if (!self->is_destroying_.load(std::memory_order_acquire)) {
+                    self->FireOnChanged();
+                }
+            });
+    }
+
+    // Capturer runs on dedicated v-track-source thread; stop hardware capture there.
     thread_->PostTask([capturer = capturer_] { capturer->Stop(); });
 }
 
@@ -101,6 +124,7 @@ void OhosVideoTrackSource::SetState(SourceState state)
     }
 
     if (state_.exchange(state) != state) {
+        // Observers require signaling thread; PostTask if called from capturer/worker thread.
         if (rtc::Thread::Current() == signalingThread_) {
             FireOnChanged();
         } else {

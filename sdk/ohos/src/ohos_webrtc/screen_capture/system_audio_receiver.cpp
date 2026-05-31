@@ -181,6 +181,14 @@ void SystemAudioReceiver::OnData(void* buffer, int32_t length, int64_t timestamp
         std::fill(it, it + length, 0);
     }
 
+    if (volume_ < kAudioInputVolumeMax) {
+        auto samples = static_cast<int16_t*>(buffer);
+        int32_t sampleCount = length / static_cast<int32_t>(sizeof(int16_t));
+        for (int32_t i = 0; i < sampleCount; i++) {
+            samples[i] = static_cast<int16_t>(samples[i] * (volume_ / kAudioInputVolumeMax));
+        }
+    }
+
     NotifyDataReady(buffer, length, timestampUs, 0);
 }
 

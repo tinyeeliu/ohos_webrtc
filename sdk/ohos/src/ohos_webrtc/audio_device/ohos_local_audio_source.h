@@ -16,6 +16,7 @@
 #ifndef WEBRTC_FAKE_AUDIO_SOURCE_H
 #define WEBRTC_FAKE_AUDIO_SOURCE_H
 
+#include <atomic>
 #include <memory>
 
 #include "api/audio_options.h"
@@ -28,15 +29,18 @@
 
 namespace webrtc {
 
+class OhosAudioDeviceModule;
+
 class OhosLocalAudioSource : public Notifier<AudioSourceInterface> {
 public:
     // Creates an instance of OhosLocalAudioSource.
-    static rtc::scoped_refptr<OhosLocalAudioSource>
-    Create(cricket::AudioOptions audioOptions, std::shared_ptr<AudioInput> audioInput);
+    static rtc::scoped_refptr<OhosLocalAudioSource> Create(
+        cricket::AudioOptions audioOptions, std::shared_ptr<AudioInput> audioInput,
+        rtc::Thread* signalingThread, rtc::scoped_refptr<OhosAudioDeviceModule> adm);
 
     SourceState state() const override
     {
-        return kLive;
+        return state_.load();
     }
 
     bool remote() const override
@@ -61,15 +65,26 @@ public:
 
     void SetMute(bool mute);
 
+    void SetVolume(double volume) override;
+
+    void Stop();
 protected:
     OhosLocalAudioSource() = default;
-    ~OhosLocalAudioSource() override = default;
+    ~OhosLocalAudioSource() override;
 
-    void Initialize(cricket::AudioOptions audioOptions, std::shared_ptr<AudioInput> audioInput);
+    void Initialize(
+        cricket::AudioOptions audioOptions, std::shared_ptr<AudioInput> audioInput,
+        rtc::Thread* signalingThread, rtc::scoped_refptr<OhosAudioDeviceModule> adm);
 
 private:
+    void ReleaseAdmLiveSourceIfNeeded();
+
     cricket::AudioOptions audioOptions_;
     std::shared_ptr<AudioInput> audioInput_;
+    rtc::Thread* signalingThread_{nullptr}; // PeerConnectionFactory signaling thread
+    rtc::scoped_refptr<OhosAudioDeviceModule> adm_;
+    std::atomic<bool> releasedFromAdm_{false};
+    std::atomic<SourceState> state_{kLive};
 };
 
 } // namespace webrtc
