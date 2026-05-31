@@ -1,4 +1,8 @@
 # Changelog
+## 1.0.2 (2026-05-31)
+- Implement support for the audio track pause interface
+- Implement support for volume adjustment interface
+
 ## 1.0.2-rc2 (2026-05-26)
 - Support real-time dynamic changes of the local resolution
 
