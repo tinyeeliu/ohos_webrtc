@@ -1,6 +1,6 @@
 {
   "name": "@ohos/webrtc",
-  "version": "1.0.2-rc3",
+  "version": "1.0.2-beta.4",
   "description": "ArkTS interfaces of webrtc for OpenHarmony.",
   "keywords": ["webrtc"],
   "main": "Index.ets",
