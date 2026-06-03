@@ -163,7 +163,7 @@ sdk/ohos/
 
 ## Contributing
 
-Feel free to open an [Issue](https://gitcode.com/openharmony-sig/ohos_webrtc/issues) if you encounter any problems, or submit a [PR](https://gitcode.com/openharmony-sig/ohos_webrtc/pulls) to contribute.
+Feel free to open an [Issue](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/issues) if you encounter any problems, or submit a [PR](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pulls) to contribute.
 
 ## License
 
