@@ -2,7 +2,7 @@
 
 ## 简介
 
-北向应用集成webrtc的方法除了通过[源码方式集成](https://gitcode.com/w13263941293/tpc_c_cplusplus/blob/master/docs/adapter_thirdlib.md)，也可以直接集成已交叉编译好的二进制文件。本文主要介绍如何将二进制文件集成到应用中。
+北向应用集成webrtc的方法除了通过[源码方式集成](https://gitcode.com/CPF-ApplicationTPC/tpc_c_cplusplus/blob/master/docs/adapter_thirdlib.md)，也可以直接集成已交叉编译好的二进制文件。本文主要介绍如何将二进制文件集成到应用中。
 
 **注意：集成到北向应用的二进制文件必须是通过OpenHarmony的SDK交叉编译生成的，不能是通过rom方式编译生成的。**
 

@@ -165,7 +165,7 @@ sdk/ohos/
 
 ## 贡献代码
 
-使用过程中发现任何问题都可以提 [Issue](https://gitcode.com/openharmony-sig/ohos_webrtc/issues)，也非常欢迎发 [PR](https://gitcode.com/openharmony-sig/ohos_webrtc/pulls) 共建。
+使用过程中发现任何问题都可以提 [Issue](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/issues)，也非常欢迎发 [PR](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pulls) 共建。
 
 ## 开源协议
 
