@@ -1,6 +1,6 @@
 {
   "name": "libohos_webrtc.so",
   "types": "./index.d.ts",
-  "version": "1.0.2-rc3",
+  "version": "1.0.2-beta.4",
   "description": "Exported ArkTS interface for native c++ webrtc."
 }
