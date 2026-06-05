@@ -166,42 +166,50 @@ std::shared_ptr<EglContext> EglEnv::GetContext() const
 
 bool EglEnv::CreatePbufferSurface(int width, int height)
 {
+    RTC_LOG(LS_ERROR) << __FUNCTION__ << ", Content: " << eglGetCurrentContext();
     if (eglSurface_ != EGL_NO_SURFACE) {
-        RTC_LOG(LS_ERROR) << "Already has an EGLSurface";
+        RTC_LOG(LS_ERROR) << __FUNCTION__ << ", Already has an EGLSurface";
         return false;
     }
 
     EGLint attribs[] = {EGL_WIDTH, width, EGL_HEIGHT, height, EGL_NONE};
     eglSurface_ = eglCreatePbufferSurface(eglDisplay_, eglConfig_, attribs);
     if (eglSurface_ == EGL_NO_SURFACE) {
-        RTC_LOG(LS_ERROR) << "Failed to create pixel buffer surface with size " << width << "x" << height << ": "
+        RTC_LOG(LS_ERROR) << __FUNCTION__ << ", Failed to create pixel buffer surface with size " << width << "x" << height << ": "
                           << eglGetError();
         return false;
     }
+    RTC_LOG(LS_ERROR) << __FUNCTION__ << ", Content: " << eglGetCurrentContext() << ", eglSurface_: " << eglSurface_;
 
     return true;
 }
 
 bool EglEnv::CreateWindowSurface(ohos::NativeWindow window)
 {
+    RTC_LOG(LS_ERROR) << __FUNCTION__ << ", Content: " << eglGetCurrentContext();
+
     if (eglSurface_ != EGL_NO_SURFACE) {
-        RTC_LOG(LS_ERROR) << "Already has an EGLSurface";
+        RTC_LOG(LS_ERROR) << __FUNCTION__ << ", Already has an EGLSurface";
         return false;
     }
 
     eglSurface_ =
         eglCreateWindowSurface(eglDisplay_, eglConfig_, reinterpret_cast<EGLNativeWindowType>(window.Raw()), nullptr);
     if (eglSurface_ == EGL_NO_SURFACE) {
-        RTC_LOG(LS_ERROR) << "Failed to create window surface: " << eglGetError();
+        RTC_LOG(LS_ERROR) << __FUNCTION__ << ", Failed to create window surface: " << eglGetError();
         return false;
     }
+    RTC_LOG(LS_ERROR) << __FUNCTION__ << ", Content: " << eglGetCurrentContext() << ", eglSurface_: " << eglSurface_;
 
     return true;
 }
 
 void EglEnv::ReleaseSurface()
 {
+    RTC_LOG(LS_ERROR) << __FUNCTION__ << ", Content: " << eglGetCurrentContext() << ", eglSurface_: " << eglSurface_;
+
     if (eglSurface_ != EGL_NO_SURFACE) {
+        RTC_LOG(LS_ERROR) << __FUNCTION__ << ", eglSurface destroyed";
         eglDestroySurface(eglDisplay_, eglSurface_);
         eglSurface_ = EGL_NO_SURFACE;
     }
@@ -346,6 +354,10 @@ bool EglEnv::Init(EGLContext sharedContext, const std::vector<int32_t>& configAt
 
 void EglEnv::Release()
 {
+    if (eglGetCurrentContext() == eglContext_ ||
+        eglGetCurrentDisplay() == eglDisplay_) {
+        eglMakeCurrent(eglDisplay_, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+    }
     ReleaseSurface();
 
     if (eglContext_ != EGL_NO_CONTEXT) {

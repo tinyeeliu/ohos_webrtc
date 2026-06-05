@@ -1227,20 +1227,15 @@ void NapiAudioDeviceModule::OnAudioInputDataReady(
         return;
     }
 
-    auto data = new rtc::CopyOnWriteBuffer((uint8_t*)buffer, length);
+    auto data = std::make_shared<rtc::CopyOnWriteBuffer>(static_cast<uint8_t*>(buffer), length);
 
     auto& tsfn = it->second.tsfn;
     NapiAudioDeviceModule* context = tsfn.GetContext();
     napi_status status =
         tsfn.NonBlockingCall([context, sampleRate = input->GetSampleRate(), channelCount = input->GetChannelCount(),
                               data](Napi::Env env, Napi::Function jsCallback) {
-            auto arrayBuffer = ArrayBuffer::New(
-                env, static_cast<void*>(data->MutableData()), data->size(),
-                [](Napi::Env /*env*/, void* /*data*/, rtc::CopyOnWriteBuffer* hint) {
-                    RTC_DLOG(LS_VERBOSE) << "release rtc::CopyOnWriteBuffer";
-                    delete hint;
-                },
-                data);
+            auto arrayBuffer = ArrayBuffer::New(env, data->size());
+            memcpy(arrayBuffer.Data(), data->data(), data->size());
 
             auto jsAudioSamples = Object::New(env);
             jsAudioSamples.Set("sampleRate", Number::New(env, sampleRate));

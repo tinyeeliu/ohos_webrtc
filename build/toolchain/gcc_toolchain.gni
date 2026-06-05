@@ -471,8 +471,10 @@ template("single_gcc_toolchain") {
 
       pool = "//build/toolchain:link_pool($default_toolchain)"
 
+      # Always track the backup path (in lib.unstripped/), regardless of strip.
+      backup_sofile = "{{root_out_dir}}/lib.unstripped/$soname"
       if (defined(invoker.strip)) {
-        unstripped_sofile = "{{root_out_dir}}/lib.unstripped/$soname"
+        unstripped_sofile = backup_sofile
       } else {
         unstripped_sofile = sofile
       }
@@ -505,6 +507,12 @@ template("single_gcc_toolchain") {
       if (defined(invoker.strip)) {
         strip_switch = "--strip=${invoker.strip} "
       }
+      # When strip is not defined, still back up the unstripped .so.
+      unstripped_sofile_switch = ""
+      if (!defined(invoker.strip)) {
+        unstripped_sofile_switch =
+            "--unstripped-sofile=\"$backup_sofile\" "
+      }
 
       # This needs a Python script to avoid using a complex shell command
       # requiring sh control structures, pipelines, and POSIX utilities.
@@ -518,7 +526,7 @@ template("single_gcc_toolchain") {
         # (skipped on Aix)
         solink_extra_flags = "--partitioned-library"
       }
-      command = "\"$python_path\" \"$solink_wrapper\" --readelf=\"$readelf\" --nm=\"$nm\" $strip_switch$dwp_switch --sofile=\"$unstripped_sofile\" --tocfile=\"$tocfile\"$map_switch --output=\"$sofile\" -- $link_command $solink_extra_flags"
+      command = "\"$python_path\" \"$solink_wrapper\" --readelf=\"$readelf\" --nm=\"$nm\" $strip_switch$unstripped_sofile_switch$dwp_switch --sofile=\"$unstripped_sofile\" --tocfile=\"$tocfile\"$map_switch --output=\"$sofile\" -- $link_command $solink_extra_flags"
 
       if (target_cpu == "mipsel" && is_component_build && is_android) {
         rspfile_content = "-Wl,--start-group -Wl,--whole-archive {{inputs}} {{solibs}} -Wl,--no-whole-archive {{libs}} -Wl,--end-group"
@@ -558,6 +566,10 @@ template("single_gcc_toolchain") {
             invoker.use_unstripped_as_runtime_outputs) {
           runtime_outputs = [ unstripped_sofile ]
         }
+      } else {
+        # When strip is not defined, the wrapper still copies to backup_sofile
+        # via --unstripped-sofile.  Register it as an output so ninja tracks it.
+        outputs += [ backup_sofile ]
       }
 
       # Clank build will generate DWP files when Fission is used.

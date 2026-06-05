@@ -1,6 +1,9 @@
 {
   "apiType": "stageMode",
   "buildOption": {
+    "nativeLib": {"debugSymbol": {
+      "strip": false
+    }}
   },
   "targets": [
     {

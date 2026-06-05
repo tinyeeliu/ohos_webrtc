@@ -14,12 +14,15 @@
  */
 
 import router from '@ohos.router';
+import webrtc, { VideoRenderController } from '@ohos/webrtc';
 
 const TAG: string = '[Index]';
 
 @Entry
 @Component
 struct Index {
+  focusXComponentController: VideoRenderController|undefined = new VideoRenderController()
+  stream: webrtc.MediaStream|undefined = undefined
   build() {
     Column() {
       Row() {
@@ -40,12 +43,61 @@ struct Index {
       .alignSelf(ItemAlign.Center)
       .padding({ top: 24 })
 
+      if(this.stream || true){
+        XComponent({
+          id: 'Test' + new Date().getTime(),
+          type: XComponentType.SURFACE,
+          controller: this.focusXComponentController
+        })
+          .onDestroy(() => {
+            this.focusXComponentController?.setVideoTrack(null)
+            this.focusXComponentController = new VideoRenderController()
+          })
+          .onLoad(() => {
+            if(this.stream){
+              this.focusXComponentController?.setVideoTrack(this.stream!.getVideoTracks()[0])
+            }
+          })
+          .enableAnalyzer(false)
+          .width('100%')
+          .height(600)
+          .backgroundColor(Color.Green)
+      }else {
+        Text('nooo')
+          .width('100%')
+          .height(600)
+      }
+      Text('测试123')
+        .fontSize(20)
+        .fontColor(Color.Red)
+        .onClick(async () => {
+          if (!this.stream) {
+
+            let mediaDevices = new webrtc.MediaDevices();
+            this.stream = await mediaDevices.getUserMedia(this.defaultVideoConstraints(false));
+            this.focusXComponentController?.setVideoTrack(this.stream?.getVideoTracks()[0])
+          } else {
+            this.stream?.getTracks().forEach(track => {
+              track.stop()
+            })
+            this.stream = undefined
+            this.focusXComponentController?.setVideoTrack(null)
+          }
+        })
     }
     .width('100%')
     .height('100%')
     .margin({ left: 24, right: 24, top: 24, bottom: 24 })
     .justifyContent(FlexAlign.Center)
   }
+
+  defaultVideoConstraints(arg0: boolean): webrtc.MediaStreamConstraints | undefined {
+    // throw new Error('Method not implemented.');
+    return {
+      video:true
+    }
+  }
+
 
   aboutToAppear(): void {
     console.info(TAG, 'aboutToAppear');

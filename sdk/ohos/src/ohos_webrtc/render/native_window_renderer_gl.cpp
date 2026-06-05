@@ -122,7 +122,11 @@ NativeWindowRendererGl::NativeWindowRendererGl(
 
 NativeWindowRendererGl::~NativeWindowRendererGl()
 {
-    thread_->PostTask([this] { eglEnv_.reset(); });
+    thread_->PostTask([this] {
+        videoFrameDrawer_.reset();
+        textureDrawer_.reset();
+        eglEnv_.reset();
+    });
     thread_->Stop();
 }
 

@@ -6,7 +6,7 @@
   "author": "",
   "license": "",
   "dependencies": {
-    "@ohos/webrtc": "../ohos_webrtc"
+    "@ohos/webrtc": "file:../ohos_webrtc"
   }
 }
 

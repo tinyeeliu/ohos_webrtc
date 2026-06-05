@@ -65,9 +65,13 @@ config("compiler") {
     # assembly code with symbols that aren't hidden properly.
     # http://crbug.com/448386
     "-Wl,--exclude-libs=libvpx_assembly_arm.a",
-    "-s",
     "-L$sysroot/usr/lib/${abi_target}",
   ]
+
+  # Only strip symbols in non-debug (release) builds.
+  if (!is_debug) {
+    ldflags += [ "-s" ]
+  }
 
   cflags += [ "--target=$abi_target" ]
   include_dirs = [

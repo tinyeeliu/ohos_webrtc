@@ -33,7 +33,7 @@ VideoFrameReceiverGl::Create(const std::string& threadName, std::shared_ptr<EglC
 VideoFrameReceiverGl::VideoFrameReceiverGl(const std::string& threadName, std::shared_ptr<EglContext> sharedContext)
     : thread_(rtc::Thread::Create()), yuvConverter_(std::make_unique<YuvConverter>())
 {
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << ": this=" << this;
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << ": this=" << this << ", thread: " << threadName;
 
     thread_->SetName(threadName, this);
     thread_->Start();
@@ -47,6 +47,7 @@ VideoFrameReceiverGl::VideoFrameReceiverGl(const std::string& threadName, std::s
 
 VideoFrameReceiverGl::~VideoFrameReceiverGl()
 {
+    nativeImage_.UnsetOnFrameAvailableListener();
     thread_->PostTask([this] {
         ReleaseNativeImage();
         eglEnv_.reset();
@@ -66,7 +67,7 @@ void VideoFrameReceiverGl::SetVideoFrameSize(int width, int height)
 
 bool VideoFrameReceiverGl::CreateNativeImage()
 {
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << ": " << eglGetCurrentContext() << ", thread: " << thread_->name();
 
     // 创建 OpenGL 纹理
     GLuint textureId;
@@ -96,7 +97,7 @@ bool VideoFrameReceiverGl::CreateNativeImage()
 
 void VideoFrameReceiverGl::ReleaseNativeImage()
 {
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << ", Content : " << eglGetCurrentContext() << ", thread: " << thread_->name();
 
     nativeImage_.UnsetOnFrameAvailableListener();
     nativeImage_.Reset();

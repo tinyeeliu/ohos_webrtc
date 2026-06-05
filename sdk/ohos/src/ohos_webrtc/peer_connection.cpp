@@ -162,12 +162,14 @@ public:
                         auto desc = info[1].As<External<SessionDescriptionInterface>>().Data();
 
                         std::string sdp;
+                        std::string type;
                         desc->ToString(&sdp);
                         RTC_DLOG(LS_VERBOSE) << "sdp: " << sdp;
+                        type = webrtc::SdpTypeToString(desc->GetType());
 
                         auto result = Napi::Object::New(info.Env());
                         result.Set("sdp", Napi::String::New(info.Env(), sdp));
-                        result.Set("type", Napi::String::New(info.Env(), webrtc::SdpTypeToString(desc->GetType())));
+                        result.Set("type", Napi::String::New(info.Env(), type));
                         deferred.Resolve(result);
                     } else {
                         auto error = info[1].As<External<RTCError>>().Data();

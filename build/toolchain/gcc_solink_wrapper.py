@@ -13,6 +13,7 @@ does not have a POSIX-like shell (e.g. Windows).
 import argparse
 import os
 import shlex
+import shutil
 import subprocess
 import sys
 
@@ -115,6 +116,10 @@ def main():
                       help=('Use --Wl,-Map to generate a map file. Will be '
                             'gzipped if extension ends with .gz'),
                       metavar='FILE')
+  parser.add_argument('--unstripped-sofile',
+                      help='Copy unstripped .so to this path as a backup '
+                           '(before stripping)',
+                      metavar='FILE')
   parser.add_argument('--output',
                       required=True,
                       help='Final output shared object file',
@@ -191,6 +196,10 @@ def main():
     # If there is an existing TOC file with identical contents, leave it alone.
     # Otherwise, write out the TOC file.
     UpdateTOC(args.tocfile, toc)
+
+    # Backup unstripped .so if requested (before potential strip).
+    if args.unstripped_sofile:
+      shutil.copy2(args.sofile, args.unstripped_sofile)
 
     # Finally, strip the linked shared object file (if desired).
     if args.strip:
