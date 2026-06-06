@@ -1,4 +1,7 @@
 # Changelog
+## 1.0.2-beta.4 (2026-06-03)
+- Fix the issue of audio track and volume control failure
+
 ## 1.0.2-rc3 (2026-05-31)
 - Implement support for the audio track pause interface
 - Implement support for volume adjustment interface
