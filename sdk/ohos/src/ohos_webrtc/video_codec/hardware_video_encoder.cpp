@@ -291,6 +291,9 @@ int32_t HardwareVideoEncoder::Release()
         std::swap(temp, inputBufferQueue_);
     }
 
+    eglEnv_.reset();
+    nativeWindow_.Reset();
+
     {
         UNUSED std::lock_guard<std::mutex> lock(extraInfosMutex_);
         extraInfos_.clear();
