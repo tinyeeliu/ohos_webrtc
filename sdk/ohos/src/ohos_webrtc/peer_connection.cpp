@@ -198,7 +198,7 @@ protected:
 
         tsfn_.BlockingCall([error = new RTCError(std::move(error))](Napi::Env env, Napi::Function jsCallback) {
             auto externalError =
-                External<RTCError>::New(env, new RTCError(RTCError::OK()), [](Napi::Env, RTCError* e) { delete e; });
+                External<RTCError>::New(env, error, [](Napi::Env, RTCError* e) { delete e; });
             jsCallback.Call({Boolean::New(env, false), externalError});
         });
     }
@@ -237,8 +237,8 @@ protected:
             RTC_LOG(LS_ERROR) << "Error: " << error.type() << ", " << error.message();
         }
 
-        tsfn_.BlockingCall([error = new RTCError(std::move(error))](Napi::Env env, Napi::Function jsCallback) {
-            jsCallback.Call({External<RTCError>::New(env, error, [](Napi::Env, RTCError* e) { delete e; })});
+        tsfn_.BlockingCall([error = std::make_shared<RTCError>(std::move(error))](Napi::Env env, Napi::Function jsCallback) {
+            jsCallback.Call({External<RTCError>::New(env, new RTCError(*error), [](Napi::Env, RTCError* e) { delete e; })});
         });
     }
 };
@@ -276,8 +276,8 @@ protected:
             RTC_LOG(LS_ERROR) << "Error: " << error.type() << ", " << error.message();
         }
 
-        tsfn_.BlockingCall([error = new RTCError(std::move(error))](Napi::Env env, Napi::Function jsCallback) {
-            jsCallback.Call({External<RTCError>::New(env, error, [](Napi::Env, RTCError* e) { delete e; })});
+        tsfn_.BlockingCall([error = std::make_shared<RTCError>(std::move(error))](Napi::Env env, Napi::Function jsCallback) {
+            jsCallback.Call({External<RTCError>::New(env, new RTCError(*error), [](Napi::Env, RTCError* e) { delete e; })});
         });
     }
 };

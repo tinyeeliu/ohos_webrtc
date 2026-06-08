@@ -65,7 +65,11 @@ NapiNativeVideoRenderer::NapiNativeVideoRenderer(const Napi::CallbackInfo& info)
 NapiNativeVideoRenderer::~NapiNativeVideoRenderer()
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+    RemoveAllEventHandlers();
     RemoveSink();
+    renderer_.reset();
+    surfaceId_.reset();
+    jsTrackRef_.Reset();
 }
 
 Napi::Value NapiNativeVideoRenderer::GetSurfaceId(const Napi::CallbackInfo& info)
@@ -295,8 +299,8 @@ Napi::Value NapiNativeVideoRenderer::Release(const Napi::CallbackInfo& info)
     RemoveAllEventHandlers();
     RemoveSink();
 
-    surfaceId_.reset();
     renderer_.reset();
+    surfaceId_.reset();
     jsTrackRef_.Reset();
 
     return info.Env().Undefined();

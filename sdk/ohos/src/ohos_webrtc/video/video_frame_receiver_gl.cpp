@@ -47,6 +47,7 @@ VideoFrameReceiverGl::VideoFrameReceiverGl(const std::string& threadName, std::s
 
 VideoFrameReceiverGl::~VideoFrameReceiverGl()
 {
+    nativeImage_.UnsetOnFrameAvailableListener();
     thread_->PostTask([this] {
         ReleaseNativeImage();
         eglEnv_.reset();

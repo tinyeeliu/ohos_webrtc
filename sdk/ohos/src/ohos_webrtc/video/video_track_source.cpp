@@ -105,8 +105,13 @@ void OhosVideoTrackSource::Stop()
             });
     }
 
-    // Capturer runs on dedicated v-track-source thread; stop hardware capture there.
-    thread_->PostTask([capturer = capturer_] { capturer->Stop(); });
+    // Capturer runs on dedicated v-track-source thread; stop hardware capture and release
+    // GL/EGL/camera resources there. Since MediaStreamTrack.stop() is final (track cannot be
+    // restarted), calling Release() here avoids waiting for JS GC to trigger the destructor chain.
+    thread_->PostTask([capturer = capturer_] {
+        capturer->Stop();
+        capturer->Release();
+    });
 }
 
 void OhosVideoTrackSource::SetCapturerObserver(VideoCapturer::Observer* observer)
