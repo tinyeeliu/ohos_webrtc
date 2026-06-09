@@ -1,4 +1,7 @@
 # Changelog
+## 1.0.2-beta.5 (2026-06-09)
+- Use release version of native library
+
 ## 1.0.2-beta.4 (2026-06-03)
 - Fix the issue of audio track and volume control failure
 
