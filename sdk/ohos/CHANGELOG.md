@@ -1,4 +1,9 @@
 # Changelog
+## 1.0.2 (2026-06-11)
+- Support real-time dynamic changes of the local resolution
+- Implement support for the audio track pause interface
+- Implement support for volume adjustment interface
+
 ## 1.0.2-beta.4 (2026-06-03)
 - Fix the issue of audio track and volume control failure
 
