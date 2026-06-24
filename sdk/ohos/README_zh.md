@@ -2,6 +2,23 @@
 
 本项目基于 [WebRTC](https://webrtc.googlesource.com/src) 开发。
 
+## v1.0.2 兼容升级 —— 稳定性与质量提升 <sub>2026-06-11</sub>
+
+本次升级聚焦库的稳定性与质量提升。
+
+### 🔧 稳定性提升
+- 修复硬件视频编码器内存泄漏 [#95](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/95)，避免长时间通话场景下内存持续增长
+- 修复 API 7.0.0 下相机采集器崩溃 [#99](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/99)
+
+### ✨ 质量提升
+- 修复 sdk/ohos webrtc 多项代码质量问题并更新 OAT.xml [#96](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/96)
+
+### 🔄 兼容性说明
+- 无 Breaking Changes，API 接口保持不变
+- 仅内部实现优化，现有代码无需修改
+
+> 📄 **完整变更历史与 Issue 修复细节，请参阅：** [CHANGELOG.md](./CHANGELOG.md)
+
 ## 简介
 
 本目录下提供 WebRTC 的 ArkTS 接口封装，并在 C++ 层适配了视频的采集、渲染及编解码等模块。其中大部分接口的设计遵循 [WebRTC 规范](https://www.w3.org/TR/webrtc/)，另外也根据实际需要，额外提供了 PeerConnectionFactory 和 AudioDeviceModule 等接口。
