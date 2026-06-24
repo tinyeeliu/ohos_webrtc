@@ -2,6 +2,25 @@
 
 This project is based on [WebRTC](https://webrtc.googlesource.com/src).
 
+## v1.0.2 Compatible Upgrade — Stability & Quality Improvements <sub>2026-06-11</sub>
+
+This upgrade focuses on stability and quality improvements for the OpenHarmony platform.
+
+### 🔧 Stability Improvements
+- Fix memory leak in the hardware video encoder [#95](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/95), avoiding continuous memory growth during long call sessions
+- Fix camera capturer crash on API level 7.0.0 [#99](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/99)
+
+### ✨ Quality Improvements
+- Fix multiple code quality issues in sdk/ohos webrtc and update OAT.xml [#96](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/96)
+- Support real-time dynamic changes of the local resolution [#94](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/94)
+- Implement the audio track pause and volume adjustment interface [#104](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/104), aligning with the original platform's audio control capabilities
+
+### 🔄 Compatibility Notes
+- No Breaking Changes; API interfaces remain unchanged
+- Only internal implementation optimizations; no changes required to existing code
+
+> 📄 **For the full change history and issue fix details, see:** [CHANGELOG.md](./CHANGELOG.md)
+
 ## Introduction
 
 This directory provides ArkTS interface bindings for WebRTC, and adapts the video capture, rendering, and codec modules at the C++ layer. Most interface designs follow the [WebRTC specification](https://www.w3.org/TR/webrtc/). Additional interfaces such as PeerConnectionFactory and AudioDeviceModule are also provided based on practical needs.
