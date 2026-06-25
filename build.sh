@@ -29,7 +29,7 @@ function downlaod_thirdparty() {
         return 0
     fi
 
-    git clone https://gitee.com/zhong-luping/webrtc_third_party.git
+    git clone https://gitcode.com/openharmony-tpc-incubate/webrtc_third_party.git
     if [ $? -ne 0 ]
     then
         echo "git clone webrtc third_party failed!!"
