@@ -11,7 +11,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #!/bin/sh
-
 function check_depot_tools(){
     local tmp=`echo $PATH | grep "depot_tool"`
     if [ -z $tmp ]
