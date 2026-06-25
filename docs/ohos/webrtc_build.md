@@ -53,11 +53,11 @@ WebRTC (Web Real-Time Communications) 是一项实时通讯技术，它允许网
 
 - 下载依赖三方库
   
-  webrtc原库依赖了近300个开源三方库，当前基于满足OHOS交叉编译集成了一个较小的[依赖三方仓](https://gitee.com/zhong-luping/webrtc_third_party),下载方法如下:
+  webrtc原库依赖了近300个开源三方库，当前基于满足OHOS交叉编译集成了一个较小的[依赖三方仓](https://gitcode.com/openharmony-tpc-incubate/webrtc_third_party),下载方法如下:
 
   ```shell
   cd ohos_webrtc                                                    # 进入到webrtc源码目录
-  git clone https://gitee.com/zhong-luping/webrtc_third_party.git   # 下载依赖仓
+  git clone https://gitcode.com/openharmony-tpc-incubate/webrtc_third_party.git   # 下载依赖仓
   mv webrtc_third_party/third_party ./                              # 将三方库目录移到wenrtc根目录
   rm -rf webrtc_third_party                                         # 删除多余文件夹
   ```
