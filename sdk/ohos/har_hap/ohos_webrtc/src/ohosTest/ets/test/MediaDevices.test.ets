@@ -37,14 +37,21 @@ export default function MediaDevicesTest() {
       }
     })
 
-    it('getUserMediaWithoutPermissionThrows', 0, async () => {
+    it('getUserMediaWithAudioReturnsMediaStream', 0, async () => {
       let mediaDevices = new webrtc.MediaDevices();
-      try {
-        await mediaDevices.getUserMedia({ audio: true });
-        expect().assertFail();
-      } catch (e) {
-        expect(e).assertInstanceOf('Error');
-      }
+      let stream = await mediaDevices.getUserMedia({ audio: true });
+      expect(stream instanceof webrtc.MediaStream).assertTrue();
+      let audioTracks = stream.getAudioTracks();
+      expect(audioTracks.length).assertEqual(1);
+      let track = audioTracks[0];
+      expect(track.kind).assertEqual('audio');
+      expect(typeof track.id).assertEqual('string');
+      expect(track.id.length).assertLarger(0);
+      expect(track.readyState).assertEqual('live');
+      expect(track.enabled).assertTrue();
+      expect(stream.getVideoTracks().length).assertEqual(0);
+      expect(stream.active).assertTrue();
+      track.stop();
     })
   })
 }
