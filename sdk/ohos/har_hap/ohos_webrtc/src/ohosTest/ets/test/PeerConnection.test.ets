@@ -1049,6 +1049,11 @@ export default function PeerConnectionTest() {
 
     it("OnDataChannel3", DEFAULT, async () => {
       // Open event should be raised when closing the channel in the datachannel event after enqueuing a task.
+      // 改用 host-only 本机环回：公网 STUN 不可达会使 SCTP 建立过慢，2ms 延迟 close 早于 open 而抑制 onopen
+      caller.close();
+      callee.close();
+      caller = pcf.createPeerConnection({ iceServers: [] });
+      callee = pcf.createPeerConnection({ iceServers: [] });
       let flag = false;
       let promise = new Promise<void>((resolve) => {
         callee.ondatachannel = async (event) => {
