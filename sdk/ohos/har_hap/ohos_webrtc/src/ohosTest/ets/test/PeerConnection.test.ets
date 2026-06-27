@@ -26,7 +26,6 @@ const pcf = new webrtc.PeerConnectionFactory();
 let caller: webrtc.RTCPeerConnection;
 let callee: webrtc.RTCPeerConnection;
 
-const STUN_SERVER = "stun:stun.l.google.com:19302";
 
 const sdp = 'v=0\r\n' +
   'o=- 166855176514521964 2 IN IP4 127.0.0.1\r\n' +
@@ -117,9 +116,7 @@ async function generateAudioReceiveOnlyOffer(pc: webrtc.RTCPeerConnection) {
 
 async function generateAnswer(offer: webrtc.RTCSessionDescriptionInit) {
   let pc = pcf.createPeerConnection({
-    iceServers: [{
-      urls: STUN_SERVER
-    }]
+    iceServers: []
   });
   await pc.setRemoteDescription(offer);
   let answer = await pc.createAnswer();
@@ -129,9 +126,7 @@ async function generateAnswer(offer: webrtc.RTCSessionDescriptionInit) {
 
 async function generateOffer() {
   let pc = pcf.createPeerConnection({
-    iceServers: [{
-      urls: STUN_SERVER
-    }]
+    iceServers: []
   });
   let offer = await pc.createOffer();
   pc.close();
@@ -178,14 +173,10 @@ export default function PeerConnectionTest() {
       // The number of execution times is the same as the number of test cases defined by **it**.
       // This API supports only one parameter: preset action function.
       caller = pcf.createPeerConnection({
-        iceServers: [{
-          urls: STUN_SERVER
-        }]
+        iceServers: []
       });
       callee = pcf.createPeerConnection({
-        iceServers: [{
-          urls: STUN_SERVER
-        }]
+        iceServers: []
       });
     })
     afterEach(() => {
@@ -388,9 +379,7 @@ export default function PeerConnectionTest() {
       expect(config.iceCandidatePoolSize).assertEqual(0);
 
       let newConfig: webrtc.RTCConfiguration = {
-        iceServers: [{
-          urls: "stun:stun1.l.google.com:19302"
-        },],
+        iceServers: [],
         iceCandidatePoolSize: 10
       };
       caller.setConfiguration(newConfig);
