@@ -26,7 +26,6 @@ const pcf = new webrtc.PeerConnectionFactory();
 let caller: webrtc.RTCPeerConnection;
 let callee: webrtc.RTCPeerConnection;
 
-const STUN_SERVER = "stun:stun.l.google.com:19302";
 
 function exchangeIceCandidates(pc1: webrtc.RTCPeerConnection, pc2: webrtc.RTCPeerConnection) {
   const doExchange = (pc1: webrtc.RTCPeerConnection, pc2: webrtc.RTCPeerConnection) => {
@@ -85,14 +84,10 @@ export default function RTCIceTransportTest() {
       // The number of execution times is the same as the number of test cases defined by **it**.
       // This API supports only one parameter: preset action function.
       caller = pcf.createPeerConnection({
-        iceServers: [{
-          urls: STUN_SERVER
-        }]
+        iceServers: []
       });
       callee = pcf.createPeerConnection({
-        iceServers: [{
-          urls: STUN_SERVER
-        }]
+        iceServers: []
       });
     })
     afterEach(() => {
