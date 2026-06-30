@@ -450,10 +450,19 @@ bool RtpSenderEgress::SendPacketToNetwork(const RtpPacketToSend& packet,
       event_log_->Log(std::make_unique<RtcEventRtpPacketOutgoing>(
           packet, pacing_info.probe_cluster_id));
     }
+    RTC_LOG(LS_INFO) << "[H264_PUSH] RtpSenderEgress::SendPacketToNetwork"
+                     << " bytes_sent=" << bytes_sent
+                     << " ssrc=" << packet.Ssrc()
+                     << " seq=" << packet.SequenceNumber()
+                     << " pkt_size=" << packet.size()
+                     << " media_type=" << (packet.packet_type().has_value() ? static_cast<int>(*packet.packet_type()) : -1)
+                     << " probe=" << pacing_info.probe_cluster_id;
   }
 
   if (bytes_sent <= 0) {
-    RTC_LOG(LS_WARNING) << "Transport failed to send packet.";
+    RTC_LOG(LS_WARNING) << "[H264_PUSH] Transport failed to send packet"
+                        << " bytes_sent=" << bytes_sent
+                        << " transport=" << (transport_ ? "SET" : "NULL");
     return false;
   }
   return true;

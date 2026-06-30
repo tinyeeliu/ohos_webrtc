@@ -2187,6 +2187,12 @@ EncodedImageCallback::Result VideoStreamEncoder::OnEncodedImage(
   // running in parallel on different threads.
   encoder_stats_observer_->OnSendEncodedImage(image_copy, codec_specific_info);
 
+  RTC_LOG(LS_INFO) << "[H264_PUSH] VideoStreamEncoder::OnEncodedImage"
+                   << " size=" << image_copy.size()
+                   << " rtpTs=" << image_copy.RtpTimestamp()
+                   << " sink=" << (sink_ ? "SET" : "NULL")
+                   << " codec=" << (codec_specific_info ? static_cast<int>(codec_specific_info->codecType) : -1);
+
   EncodedImageCallback::Result result =
       sink_->OnEncodedImage(image_copy, codec_specific_info);
 

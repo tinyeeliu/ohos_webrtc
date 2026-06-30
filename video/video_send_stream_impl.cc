@@ -560,6 +560,11 @@ EncodedImageCallback::Result VideoSendStreamImpl::OnEncodedImage(
   worker_queue_->PostTask(
       SafeTask(worker_queue_safety_.flag(), std::move(task_to_run_on_worker)));
 
+  RTC_LOG(LS_INFO) << "[H264_PUSH] VideoSendStreamImpl::OnEncodedImage"
+                   << " size=" << encoded_image.size()
+                   << " rtpTs=" << encoded_image.RtpTimestamp()
+                   << " rtp_video_sender=" << (rtp_video_sender_ ? "SET" : "NULL");
+
   return rtp_video_sender_->OnEncodedImage(encoded_image, codec_specific_info);
 }
 

@@ -432,7 +432,8 @@ void HardwareVideoEncoder::OnNewOutputBuffer(OH_AVCodec* codec, uint32_t index, 
 
         do {
             if (extraInfos_.empty()) {
-                RTC_LOG(LS_WARNING) << "Unexpected frame with timestamp: " << timestampUs;
+                RTC_LOG(LS_WARNING) << "[H264_PUSH] Unexpected frame with timestamp: " << timestampUs
+                                    << " — extraInfos_ is empty, encoded frame will be DROPPED!";
                 return;
             }
 
@@ -453,7 +454,19 @@ void HardwareVideoEncoder::OnNewOutputBuffer(OH_AVCodec* codec, uint32_t index, 
     CodecSpecificInfo info;
     info.codecType = codecSettings_.codecType;
 
-    callback_->OnEncodedImage(encodedImage, &info);
+    RTC_LOG(LS_INFO) << "[H264_PUSH] OnNewOutputBuffer: encoded frame ready"
+                     << " size=" << encodedData->size()
+                     << " isKey=" << isKeyFrame
+                     << " timestamp=" << encodedImage.RtpTimestamp()
+                     << " callback=" << (callback_ != nullptr ? "SET" : "NULL");
+
+    if (callback_) {
+        callback_->OnEncodedImage(encodedImage, &info);
+        RTC_LOG(LS_INFO) << "[H264_PUSH] OnEncodedImage called successfully"
+                         << " size=" << encodedData->size();
+    } else {
+        RTC_LOG(LS_ERROR) << "[H264_PUSH] callback_ is NULL! Encoded frame dropped!";
+    }
 }
 
 void HardwareVideoEncoder::UpdateEncoderInfo()
