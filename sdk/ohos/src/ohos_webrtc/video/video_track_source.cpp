@@ -251,6 +251,17 @@ void OhosVideoTrackSource::ProcessConstraints(const VideoTrackSourceConstraints&
     broadcaster_.ProcessConstraints(constraints);
 }
 
+void OhosVideoTrackSource::OnOutputFormatRequest(int width, int height, int maxFps)
+{
+    RTC_LOG(LS_INFO) << __FUNCTION__ << " width=" << width << ", height=" << height << ", maxFps=" << maxFps;
+
+    absl::optional<std::pair<int, int>> aspectRatio = std::make_pair(width, height);
+    absl::optional<int> maxPixelCount = width * height;
+    absl::optional<int> maxFpsOpt = maxFps > 0 ? absl::optional<int>(maxFps) : absl::optional<int>();
+
+    videoAdapter_.OnOutputFormatRequest(aspectRatio, maxPixelCount, maxFpsOpt);
+}
+
 void OhosVideoTrackSource::OnCapturerStarted(bool success)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;

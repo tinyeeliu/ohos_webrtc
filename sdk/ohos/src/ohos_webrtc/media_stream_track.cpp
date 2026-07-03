@@ -41,6 +41,7 @@ const char kAttributeNameOnEnded[] = "onended";
 const char kMethodNameStop[] = "stop";
 const char kMethodNameGetSource[] = "getSource";
 const char kMethodNameToJson[] = "toJSON";
+const char kMethodNameApplyConstraints[] = "applyConstraints";
 
 const char kEnumMediaStreamTrackStateLive[] = "live";
 const char kEnumMediaStreamTrackStateEnded[] = "ended";
@@ -61,6 +62,7 @@ void NapiMediaStreamTrack::Init(Napi::Env env, Object exports)
             InstanceAccessor<&NapiMediaStreamTrack::GetReadyState>(kAttributeNameReadyState),
             InstanceMethod<&NapiMediaStreamTrack::Stop>(kMethodNameStop),
             InstanceMethod<&NapiMediaStreamTrack::GetSource>(kMethodNameGetSource),
+            InstanceMethod<&NapiMediaStreamTrack::ApplyConstraints>(kMethodNameApplyConstraints),
             InstanceMethod<&NapiMediaStreamTrack::ToJson>(kMethodNameToJson),
         });
     exports.Set(kClassName, func);
@@ -364,6 +366,120 @@ Napi::Value NapiMediaStreamTrack::GetSource(const Napi::CallbackInfo& info)
     }
 
     return info.Env().Null();
+}
+
+Napi::Value NapiMediaStreamTrack::ApplyConstraints(const Napi::CallbackInfo& info)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    auto env = info.Env();
+    auto deferred = Napi::Promise::Deferred::New(env);
+
+    if (!track_) {
+        auto error = Error::New(env, "Illegal state");
+        deferred.Reject(error.Value());
+        return deferred.Promise();
+    }
+
+    if (info.Length() == 0 || !info[0].IsObject()) {
+        auto error = TypeError::New(env, "Invalid argument");
+        deferred.Reject(error.Value());
+        return deferred.Promise();
+    }
+
+    auto constraints = info[0].As<Object>();
+
+    if (IsVideoTrack()) {
+        auto videoSource = factory_->GetVideoSource(track_);
+        if (videoSource) {
+            int width = 0;
+            int height = 0;
+            double frameRate = 0.0;
+            bool hasWidth = false;
+            bool hasHeight = false;
+            bool hasFrameRate = false;
+
+            // Validate and read width
+            if (constraints.Has("width")) {
+                auto val = constraints.Get("width");
+                if (!val.IsNumber()) {
+                    auto error = TypeError::New(env, "width must be a number");
+                    deferred.Reject(error.Value());
+                    return deferred.Promise();
+                }
+                width = val.As<Number>().Int32Value();
+                hasWidth = true;
+            }
+
+            // Validate and read height
+            if (constraints.Has("height")) {
+                auto val = constraints.Get("height");
+                if (!val.IsNumber()) {
+                    auto error = TypeError::New(env, "height must be a number");
+                    deferred.Reject(error.Value());
+                    return deferred.Promise();
+                }
+                height = val.As<Number>().Int32Value();
+                hasHeight = true;
+            }
+
+            // Validate and read frameRate
+            if (constraints.Has("frameRate")) {
+                auto val = constraints.Get("frameRate");
+                if (!val.IsNumber()) {
+                    auto error = TypeError::New(env, "frameRate must be a number");
+                    deferred.Reject(error.Value());
+                    return deferred.Promise();
+                }
+                frameRate = val.As<Number>().DoubleValue();
+                hasFrameRate = true;
+            }
+
+            // Validate and read facingMode (type check only, handled at JS layer)
+            if (constraints.Has("facingMode")) {
+                auto val = constraints.Get("facingMode");
+                if (!val.IsString()) {
+                    auto error = TypeError::New(env, "facingMode must be a string");
+                    deferred.Reject(error.Value());
+                    return deferred.Promise();
+                }
+                std::string facingMode = val.As<String>().Utf8Value();
+                RTC_LOG(LS_INFO) << "ApplyConstraints video facingMode: " << facingMode;
+                // facingMode change requires switching camera device
+                // This is handled at the JS layer by creating a new track
+            }
+
+            // Apply resolution constraints via video adapter
+            if (hasWidth || hasHeight) {
+                if (width > 0 && height > 0) {
+                    RTC_LOG(LS_INFO) << "ApplyConstraints video resolution: " << width << "x" << height;
+                    videoSource->OnOutputFormatRequest(width, height, static_cast<int>(frameRate));
+                } else if (width > 0) {
+                    RTC_LOG(LS_INFO) << "ApplyConstraints video width: " << width;
+                } else if (height > 0) {
+                    RTC_LOG(LS_INFO) << "ApplyConstraints video height: " << height;
+                }
+            }
+
+            // Apply frameRate constraints via ProcessConstraints
+            if (hasFrameRate && frameRate > 0) {
+                RTC_LOG(LS_INFO) << "ApplyConstraints video frameRate: " << frameRate;
+                VideoTrackSourceConstraints videoConstraints;
+                videoConstraints.max_fps = frameRate;
+                videoSource->ProcessConstraints(videoConstraints);
+            }
+        }
+
+        deferred.Resolve(env.Undefined());
+        return deferred.Promise();
+    } else if (IsAudioTrack()) {
+        auto error = Error::New(env, "applyConstraints for audio tracks is not supported");
+        deferred.Reject(error.Value());
+        return deferred.Promise();
+    }
+
+    deferred.Resolve(env.Undefined());
+    return deferred.Promise();
 }
 
 Napi::Value NapiMediaStreamTrack::ToJson(const Napi::CallbackInfo& info)
