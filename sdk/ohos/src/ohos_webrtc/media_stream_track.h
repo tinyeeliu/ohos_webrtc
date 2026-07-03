@@ -72,6 +72,7 @@ protected:
     Napi::Value GetReadyState(const Napi::CallbackInfo& info);
     Napi::Value Stop(const Napi::CallbackInfo& info);
     Napi::Value GetSource(const Napi::CallbackInfo& info);
+    Napi::Value ApplyConstraints(const Napi::CallbackInfo& info);
     Napi::Value ToJson(const Napi::CallbackInfo& info);
 
 private:
