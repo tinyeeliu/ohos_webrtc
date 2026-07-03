@@ -26,6 +26,7 @@
 namespace webrtc {
 
 class PeerConnectionFactoryWrapper;
+class OhosVideoTrackSource;
 
 class NapiMediaStreamTrack : public Napi::ObjectWrap<NapiMediaStreamTrack>, public ObserverInterface {
 public:
@@ -72,9 +73,30 @@ protected:
     Napi::Value GetReadyState(const Napi::CallbackInfo& info);
     Napi::Value Stop(const Napi::CallbackInfo& info);
     Napi::Value GetSource(const Napi::CallbackInfo& info);
+    Napi::Value ApplyConstraints(const Napi::CallbackInfo& info);
     Napi::Value ToJson(const Napi::CallbackInfo& info);
 
 private:
+    // Read and validate video constraints from the input object.
+    struct VideoConstraints {
+        int width = 0;
+        int height = 0;
+        double frameRate = 0.0;
+        std::string facingMode;
+        bool hasWidth = false;
+        bool hasHeight = false;
+        bool hasFrameRate = false;
+        bool hasFacingMode = false;
+    };
+    bool ReadVideoConstraints(const Napi::Object& constraints, Napi::Env env, Napi::Promise::Deferred& deferred,
+        VideoConstraints& out);
+    // Apply validated constraints to video source via source thread.
+    // Returns true on success, false on failure (caller should reject Promise).
+    bool DoApplyVideoConstraints(const rtc::scoped_refptr<OhosVideoTrackSource>& videoSource,
+        const VideoConstraints& constraints);
+    bool ApplyFacingModeConstraint(
+        const rtc::scoped_refptr<OhosVideoTrackSource>& videoSource, const std::string& facingMode);
+
     std::shared_ptr<PeerConnectionFactoryWrapper> factory_;
     rtc::scoped_refptr<MediaStreamTrackInterface> track_;
 
