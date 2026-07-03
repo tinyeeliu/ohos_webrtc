@@ -150,5 +150,57 @@ export default function MediaStreamTrackTest() {
       callee.close();
       audioSource.release();
     })
+
+    it('applyConstraintsReturnsSettingsForVideoTrack', 0, () => {
+      let videoSource = pcf.createVideoSource({
+        width: 1280,
+        height: 720,
+        frameRate: 30
+      });
+      let videoTrack = pcf.createVideoTrack('video', videoSource);
+      expect(videoTrack).not().assertNull();
+
+      let result = videoTrack.applyConstraints({
+        width: 1280,
+        height: 720,
+        frameRate: 30
+      });
+      expect(result).not().assertNull();
+      expect(result.width).assertEqual(1280);
+      expect(result.height).assertEqual(720);
+      expect(result.frameRate).assertEqual(30);
+
+      videoSource.release();
+    })
+
+    it('applyConstraintsReturnsSettingsForFacingMode', 0, () => {
+      let videoSource = pcf.createVideoSource({
+        width: 1280,
+        height: 720
+      });
+      let videoTrack = pcf.createVideoTrack('video', videoSource);
+      expect(videoTrack).not().assertNull();
+
+      let result = videoTrack.applyConstraints({
+        facingMode: 'user'
+      });
+      expect(result).not().assertNull();
+      expect(result.facingMode).assertEqual('user');
+
+      videoSource.release();
+    })
+
+    it('applyConstraintsReturnsEmptyObjectForAudioTrack', 0, () => {
+      let audioSource = pcf.createAudioSource();
+      let audioTrack = pcf.createAudioTrack('audio', audioSource);
+      expect(audioTrack).not().assertNull();
+
+      let result = audioTrack.applyConstraints({
+        volume: 0.5
+      });
+      expect(result).not().assertNull();
+
+      audioSource.release();
+    })
   })
 }

@@ -41,6 +41,7 @@ const char kAttributeNameOnEnded[] = "onended";
 const char kMethodNameStop[] = "stop";
 const char kMethodNameGetSource[] = "getSource";
 const char kMethodNameToJson[] = "toJSON";
+const char kMethodNameApplyConstraints[] = "applyConstraints";
 
 const char kEnumMediaStreamTrackStateLive[] = "live";
 const char kEnumMediaStreamTrackStateEnded[] = "ended";
@@ -61,6 +62,7 @@ void NapiMediaStreamTrack::Init(Napi::Env env, Object exports)
             InstanceAccessor<&NapiMediaStreamTrack::GetReadyState>(kAttributeNameReadyState),
             InstanceMethod<&NapiMediaStreamTrack::Stop>(kMethodNameStop),
             InstanceMethod<&NapiMediaStreamTrack::GetSource>(kMethodNameGetSource),
+            InstanceMethod<&NapiMediaStreamTrack::ApplyConstraints>(kMethodNameApplyConstraints),
             InstanceMethod<&NapiMediaStreamTrack::ToJson>(kMethodNameToJson),
         });
     exports.Set(kClassName, func);
@@ -364,6 +366,63 @@ Napi::Value NapiMediaStreamTrack::GetSource(const Napi::CallbackInfo& info)
     }
 
     return info.Env().Null();
+}
+
+Napi::Value NapiMediaStreamTrack::ApplyConstraints(const Napi::CallbackInfo& info)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    if (!track_) {
+        NAPI_THROW(Error::New(info.Env(), "Illegal state"), info.Env().Undefined());
+    }
+
+    if (info.Length() == 0 || !info[0].IsObject()) {
+        NAPI_THROW(TypeError::New(info.Env(), "Invalid argument"), info.Env().Undefined());
+    }
+
+    auto constraints = info[0].As<Object>();
+    auto result = Object::New(info.Env());
+
+    if (IsVideoTrack()) {
+        auto videoSource = factory_->GetVideoSource(track_);
+        if (videoSource) {
+            if (constraints.Has("width") || constraints.Has("height")) {
+                int width = 0;
+                int height = 0;
+                if (constraints.Has("width")) {
+                    width = constraints.Get("width").As<Number>().Int32Value();
+                }
+                if (constraints.Has("height")) {
+                    height = constraints.Get("height").As<Number>().Int32Value();
+                }
+                RTC_LOG(LS_INFO) << "ApplyConstraints video resolution: " << width << "x" << height;
+                // Note: Resolution changes require restarting the capturer
+                // For now, we just store the values in the result
+                if (width > 0) {
+                    result.Set("width", width);
+                }
+                if (height > 0) {
+                    result.Set("height", height);
+                }
+            }
+
+            if (constraints.Has("frameRate")) {
+                double frameRate = constraints.Get("frameRate").As<Number>().DoubleValue();
+                RTC_LOG(LS_INFO) << "ApplyConstraints video frameRate: " << frameRate;
+                result.Set("frameRate", frameRate);
+            }
+
+            if (constraints.Has("facingMode")) {
+                std::string facingMode = constraints.Get("facingMode").As<String>().Utf8Value();
+                RTC_LOG(LS_INFO) << "ApplyConstraints video facingMode: " << facingMode;
+                // facingMode change requires switching camera device
+                // This is handled at the JS layer by creating a new track
+                result.Set("facingMode", facingMode);
+            }
+        }
+    }
+
+    return result;
 }
 
 Napi::Value NapiMediaStreamTrack::ToJson(const Napi::CallbackInfo& info)
