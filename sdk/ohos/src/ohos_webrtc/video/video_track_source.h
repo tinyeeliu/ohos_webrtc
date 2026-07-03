@@ -83,6 +83,9 @@ protected:
     void RemoveEncodedSink(rtc::VideoSinkInterface<RecordableEncodedFrame>* sink) override {}
     void ProcessConstraints(const VideoTrackSourceConstraints& constraints) override;
 
+    // Apply resolution and framerate constraints to the video adapter.
+    void OnOutputFormatRequest(int width, int height, int maxFps);
+
     // VideoCapturer::Observer
     void OnCapturerStarted(bool success) override;
     void OnCapturerStopped() override;
