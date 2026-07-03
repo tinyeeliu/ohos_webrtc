@@ -1,6 +1,7 @@
 {
   "src": [
     "pages/Index",
-    "pages/workPage"
+    "pages/workPage",
+    "pages/ApplyConstraintsTestPage"
   ]
 }
