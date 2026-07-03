@@ -15,9 +15,13 @@
 
 #include "media_stream_track.h"
 #include "media_source.h"
+#include "media_track_constraints.h"
 #include "peer_connection_factory.h"
 #include "audio_device/ohos_local_audio_source.h"
 #include "video/video_track_source.h"
+#include "user_media/media_constraints_util.h"
+#include "camera/camera_capturer.h"
+#include "camera/camera_enumerator.h"
 
 #include "rtc_base/logging.h"
 #include "utils/marcos.h"
@@ -41,6 +45,7 @@ const char kAttributeNameOnEnded[] = "onended";
 const char kMethodNameStop[] = "stop";
 const char kMethodNameGetSource[] = "getSource";
 const char kMethodNameToJson[] = "toJSON";
+const char kMethodNameApplyConstraints[] = "applyConstraints";
 
 const char kEnumMediaStreamTrackStateLive[] = "live";
 const char kEnumMediaStreamTrackStateEnded[] = "ended";
@@ -61,6 +66,7 @@ void NapiMediaStreamTrack::Init(Napi::Env env, Object exports)
             InstanceAccessor<&NapiMediaStreamTrack::GetReadyState>(kAttributeNameReadyState),
             InstanceMethod<&NapiMediaStreamTrack::Stop>(kMethodNameStop),
             InstanceMethod<&NapiMediaStreamTrack::GetSource>(kMethodNameGetSource),
+            InstanceMethod<&NapiMediaStreamTrack::ApplyConstraints>(kMethodNameApplyConstraints),
             InstanceMethod<&NapiMediaStreamTrack::ToJson>(kMethodNameToJson),
         });
     exports.Set(kClassName, func);
@@ -364,6 +370,316 @@ Napi::Value NapiMediaStreamTrack::GetSource(const Napi::CallbackInfo& info)
     }
 
     return info.Env().Null();
+}
+
+bool NapiMediaStreamTrack::ReadLongConstraint(const LongConstraint& constraint, const ConstraintReadContext& ctx,
+    int32_t& outValue, bool& outHasValue)
+{
+    if (!constraint.IsConstrained()) {
+        return true;
+    }
+    if (constraint.HasExact()) {
+        outValue = constraint.Exact();
+        outHasValue = true;
+    } else if (constraint.HasIdeal()) {
+        outValue = constraint.Ideal();
+        outHasValue = true;
+    }
+    if (outHasValue && outValue <= 0) {
+        auto error = Napi::Error::New(ctx.env, std::string(ctx.name) + " must be a positive number");
+        ctx.deferred.Reject(error.Value());
+        return false;
+    }
+    return true;
+}
+
+bool NapiMediaStreamTrack::ReadDoubleConstraint(const DoubleConstraint& constraint, const ConstraintReadContext& ctx,
+    double& outValue, bool& outHasValue)
+{
+    if (!constraint.IsConstrained()) {
+        return true;
+    }
+    if (constraint.HasExact()) {
+        outValue = constraint.Exact();
+        outHasValue = true;
+    } else if (constraint.HasIdeal()) {
+        outValue = constraint.Ideal();
+        outHasValue = true;
+    }
+    if (outHasValue && outValue <= 0) {
+        auto error = Napi::Error::New(ctx.env, std::string(ctx.name) + " must be a positive number");
+        ctx.deferred.Reject(error.Value());
+        return false;
+    }
+    return true;
+}
+
+bool NapiMediaStreamTrack::ReadVideoConstraints(const Napi::Object& constraints, Napi::Env env,
+    Napi::Promise::Deferred& deferred, VideoConstraints& out)
+{
+    MediaTrackConstraints trackConstraints;
+    NapiMediaConstraints::JsToNative(constraints, trackConstraints);
+
+    const auto& basic = trackConstraints.Basic();
+
+    if (!ReadLongConstraint(basic.width, {env, deferred, "width"}, out.width, out.hasWidth)) {
+        return false;
+    }
+    if (!ReadLongConstraint(basic.height, {env, deferred, "height"}, out.height, out.hasHeight)) {
+        return false;
+    }
+    if (!ReadDoubleConstraint(basic.frameRate, {env, deferred, "frameRate"}, out.frameRate, out.hasFrameRate)) {
+        return false;
+    }
+
+    if (basic.facingMode.IsConstrained()) {
+        if (basic.facingMode.HasExact() && !basic.facingMode.Exact().empty()) {
+            out.facingMode = basic.facingMode.Exact()[0];
+            out.hasFacingMode = true;
+            RTC_LOG(LS_INFO) << __FUNCTION__ << ": facingMode exact=" << out.facingMode;
+        } else if (basic.facingMode.HasIdeal() && !basic.facingMode.Ideal().empty()) {
+            out.facingMode = basic.facingMode.Ideal()[0];
+            out.hasFacingMode = true;
+            RTC_LOG(LS_INFO) << __FUNCTION__ << ": facingMode ideal=" << out.facingMode;
+        } else {
+            RTC_LOG(LS_WARNING) << __FUNCTION__ << ": facingMode is constrained but has no exact/ideal value";
+        }
+    } else {
+        RTC_LOG(LS_INFO) << __FUNCTION__ << ": facingMode is not constrained";
+    }
+
+    RTC_LOG(LS_INFO) << __FUNCTION__ << ": VideoConstraints parsed: hasWidth=" << out.hasWidth
+                       << ", hasHeight=" << out.hasHeight << ", hasFrameRate=" << out.hasFrameRate
+                       << ", hasFacingMode=" << out.hasFacingMode << ", facingMode=" << out.facingMode;
+
+    return true;
+}
+
+NapiMediaStreamTrack::Resolution NapiMediaStreamTrack::ExtractResolution(const VideoConstraints& vc) const
+{
+    Resolution res;
+    if (vc.hasWidth || vc.hasHeight) {
+        if (vc.width > 0 && vc.height > 0) {
+            res.width = vc.width;
+            res.height = vc.height;
+            RTC_LOG(LS_INFO) << "ApplyConstraints video resolution: " << res.width << "x" << res.height;
+        } else if (vc.width > 0) {
+            RTC_LOG(LS_WARNING) << "ApplyConstraints video width only: " << vc.width;
+        } else if (vc.height > 0) {
+            RTC_LOG(LS_WARNING) << "ApplyConstraints video height only: " << vc.height;
+        }
+    }
+    return res;
+}
+
+int NapiMediaStreamTrack::ExtractFrameRate(const VideoConstraints& vc) const
+{
+    if (vc.hasFrameRate && vc.frameRate > 0) {
+        RTC_LOG(LS_INFO) << "ApplyConstraints video frameRate: " << vc.frameRate;
+        return static_cast<int>(vc.frameRate);
+    }
+    return 0;
+}
+
+void NapiMediaStreamTrack::ApplyResolutionConstraints(const rtc::scoped_refptr<OhosVideoTrackSource>& videoSource,
+    const VideoConstraints& vc)
+{
+    auto res = ExtractResolution(vc);
+    int maxFps = ExtractFrameRate(vc);
+
+    VideoTrackSourceConstraints constraints;
+    if (maxFps > 0) {
+        constraints.max_fps = vc.frameRate;
+    }
+
+    if (res.width > 0 && res.height > 0) {
+        videoSource->ApplyConstraints(constraints, res.width, res.height, maxFps);
+    } else if (constraints.max_fps.has_value()) {
+        videoSource->ProcessConstraints(constraints);
+    }
+}
+
+bool NapiMediaStreamTrack::DoApplyVideoConstraints(const rtc::scoped_refptr<OhosVideoTrackSource>& videoSource,
+    const VideoConstraints& vc)
+{
+    // Step 1: Validate all constraints before applying any of them.
+    if (vc.hasFacingMode) {
+        int width = vc.hasWidth ? vc.width : 0;
+        int height = vc.hasHeight ? vc.height : 0;
+        int frameRate = vc.hasFrameRate ? static_cast<int>(vc.frameRate) : 0;
+        if (!CanApplyFacingModeConstraint(vc.facingMode, width, height, frameRate)) {
+            return false;
+        }
+    }
+
+    // Step 2: Apply all constraints atomically (all must succeed since validation passed).
+    if (vc.hasFacingMode) {
+        int width = vc.hasWidth ? vc.width : 0;
+        int height = vc.hasHeight ? vc.height : 0;
+        int frameRate = vc.hasFrameRate ? static_cast<int>(vc.frameRate) : 0;
+        if (!ApplyFacingModeConstraint(videoSource, vc.facingMode, width, height, frameRate)) {
+            return false;
+        }
+    }
+
+    // Step 3: Apply resolution and framerate constraints to the video adapter.
+    ApplyResolutionConstraints(videoSource, vc);
+
+    return true;
+}
+
+bool NapiMediaStreamTrack::CanApplyFacingModeConstraint(
+    const std::string& facingMode, int width, int height, int frameRate)
+{
+    RTC_LOG(LS_INFO) << "Validate facingMode constraint: " << facingMode;
+
+    MediaTrackConstraints facingModeConstraint;
+    facingModeConstraint.Initialize();
+    facingModeConstraint.MutableBasic().facingMode.SetExact(facingMode);
+
+    int selectWidth = width > 0 ? width : kDefaultWidth;
+    int selectHeight = height > 0 ? height : kDefaultHeight;
+    int selectFrameRate = frameRate > 0 ? frameRate : kDefaultFrameRate;
+
+    CameraCaptureSettings selectedSetting;
+    std::string failedConstraintName;
+    if (!SelectSettingsForVideo(
+        CameraEnumerator::GetDevices(), facingModeConstraint, selectWidth, selectHeight, selectFrameRate,
+        selectedSetting, failedConstraintName)) {
+        RTC_LOG(LS_ERROR) << "Failed to select settings for facingMode: " << facingMode
+                          << ", unsatisfied constraint: " << failedConstraintName;
+        return false;
+    }
+
+    auto newCapturer = CameraCapturer::Create(selectedSetting.deviceId, selectedSetting.profile);
+    if (!newCapturer) {
+        RTC_LOG(LS_ERROR) << "Failed to create camera capturer for facingMode: " << facingMode;
+        return false;
+    }
+
+    // Validation passed, but we don't apply the constraint here.
+    // The capturer is created but will be destroyed since it's not used.
+    return true;
+}
+
+bool NapiMediaStreamTrack::ApplyFacingModeConstraint(const rtc::scoped_refptr<OhosVideoTrackSource>& videoSource,
+    const std::string& facingMode, int width, int height, int frameRate)
+{
+    RTC_LOG(LS_INFO) << "ApplyConstraints video facingMode: " << facingMode;
+
+    MediaTrackConstraints facingModeConstraint;
+    facingModeConstraint.Initialize();
+    facingModeConstraint.MutableBasic().facingMode.SetExact(facingMode);
+
+    int selectWidth = width > 0 ? width : kDefaultWidth;
+    int selectHeight = height > 0 ? height : kDefaultHeight;
+    int selectFrameRate = frameRate > 0 ? frameRate : kDefaultFrameRate;
+
+    CameraCaptureSettings selectedSetting;
+    std::string failedConstraintName;
+    if (!SelectSettingsForVideo(
+        CameraEnumerator::GetDevices(), facingModeConstraint, selectWidth, selectHeight, selectFrameRate,
+        selectedSetting, failedConstraintName)) {
+        RTC_LOG(LS_ERROR) << "Failed to select settings for facingMode: " << facingMode
+                          << ", unsatisfied constraint: " << failedConstraintName;
+        return false;
+    }
+
+    auto newCapturer = CameraCapturer::Create(selectedSetting.deviceId, selectedSetting.profile);
+    if (!newCapturer) {
+        RTC_LOG(LS_ERROR) << "Failed to create camera capturer for facingMode: " << facingMode;
+        return false;
+    }
+
+    videoSource->SwitchCapturer(std::shared_ptr<VideoCapturer>(newCapturer.release()));
+    return true;
+}
+
+Napi::Value NapiMediaStreamTrack::ValidateApplyConstraintsInput(
+    const Napi::CallbackInfo& info, Napi::Promise::Deferred& deferred)
+{
+    auto env = info.Env();
+    if (!track_) {
+        deferred.Reject(Error::New(env, "Illegal state").Value());
+        return deferred.Promise();
+    }
+    if (track_->state() == MediaStreamTrackInterface::kEnded) {
+        deferred.Reject(Error::New(env, "Cannot apply constraints to an ended track").Value());
+        return deferred.Promise();
+    }
+    if (info.Length() == 0 || !info[0].IsObject()) {
+        deferred.Reject(TypeError::New(env, "Invalid argument").Value());
+        return deferred.Promise();
+    }
+    return env.Undefined();
+}
+
+void NapiMediaStreamTrack::ApplyAudioConstraints(
+    const Napi::Object& constraints, rtc::scoped_refptr<OhosLocalAudioSource> audioSource)
+{
+    if (!audioSource) {
+        return;
+    }
+    MediaTrackConstraints trackConstraints;
+    NapiMediaConstraints::JsToNative(constraints, trackConstraints);
+    if (trackConstraints.IsNull()) {
+        return;
+    }
+    cricket::AudioOptions options;
+    CopyConstraintsIntoAudioOptions(trackConstraints, options);
+    if (options.echo_cancellation.has_value() || options.auto_gain_control.has_value()
+        || options.noise_suppression.has_value()) {
+        audioSource->ApplyConstraints(options);
+    }
+}
+
+Napi::Value NapiMediaStreamTrack::ApplyConstraints(const Napi::CallbackInfo& info)
+{
+    RTC_LOG(LS_INFO) << __FUNCTION__ << " called on " << (IsVideoTrack() ? "video" : "audio") << " track";
+
+    auto env = info.Env();
+    auto deferred = Napi::Promise::Deferred::New(env);
+
+    auto validationResult = ValidateApplyConstraintsInput(info, deferred);
+    if (!validationResult.IsUndefined()) {
+        return validationResult;
+    }
+
+    auto constraints = info[0].As<Object>();
+
+    if (IsVideoTrack()) {
+        auto videoSource = factory_->GetVideoSource(track_);
+        if (!videoSource) {
+            RTC_LOG(LS_ERROR) << __FUNCTION__ << ": videoSource is null";
+            deferred.Resolve(env.Undefined());
+            return deferred.Promise();
+        }
+        VideoConstraints videoConstraints;
+        if (!ReadVideoConstraints(constraints, env, deferred, videoConstraints)) {
+            RTC_LOG(LS_ERROR) << __FUNCTION__ << ": ReadVideoConstraints failed";
+            return deferred.Promise();
+        }
+        RTC_LOG(LS_INFO) << __FUNCTION__ << ": ReadVideoConstraints success, hasFacingMode=" << videoConstraints.hasFacingMode
+                         << ", facingMode=" << videoConstraints.facingMode;
+        if (!DoApplyVideoConstraints(videoSource, videoConstraints)) {
+            RTC_LOG(LS_ERROR) << __FUNCTION__ << ": DoApplyVideoConstraints failed";
+            deferred.Reject(Error::New(env, "Constraints could not be satisfied").Value());
+            return deferred.Promise();
+        }
+        RTC_LOG(LS_INFO) << __FUNCTION__ << ": DoApplyVideoConstraints success";
+        deferred.Resolve(env.Undefined());
+        return deferred.Promise();
+    }
+
+    if (IsAudioTrack()) {
+        auto error = TypeError::New(env, "Applying echoCancellation/autoGainControl/noiseSuppression "
+            "constraints to an audio track at runtime is not supported");
+        deferred.Reject(error.Value());
+        return deferred.Promise();
+    }
+
+    deferred.Resolve(env.Undefined());
+    return deferred.Promise();
 }
 
 Napi::Value NapiMediaStreamTrack::ToJson(const Napi::CallbackInfo& info)

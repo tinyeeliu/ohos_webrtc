@@ -19,7 +19,6 @@ import { Logging, LoggingSeverity } from '../../../main/ets/log/Logging';
 
 const TAG: string = '[MediaStreamTrackTest]';
 
-const STUN_SERVER = "stun:stun.l.google.com:19302";
 
 const pcf = new webrtc.PeerConnectionFactory();
 
@@ -97,14 +96,10 @@ export default function MediaStreamTrackTest() {
 
     it('calleeReceivesTrackViaOntrack', 0, async () => {
       let caller = pcf.createPeerConnection({
-        iceServers: [{
-          urls: STUN_SERVER
-        }]
+        iceServers: []
       });
       let callee = pcf.createPeerConnection({
-        iceServers: [{
-          urls: STUN_SERVER
-        }]
+        iceServers: []
       });
 
       let audioSource = pcf.createAudioSource();
