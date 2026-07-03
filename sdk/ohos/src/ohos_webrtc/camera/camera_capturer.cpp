@@ -236,6 +236,8 @@ void CameraCapturer::StartInternal()
 
     Camera_Device* device = SelectCameraDevice();
     if (device == nullptr) {
+        RTC_LOG(LS_ERROR) << "Failed to select camera device";
+        NotifyCapturedStart(false);
         return;
     }
 
@@ -243,25 +245,31 @@ void CameraCapturer::StartInternal()
     auto capability = CameraManager::GetInstance().GetSupportedCameraOutputCapability(device);
     Camera_Profile* previewProfile = FindPreviewProfile(capability, device);
     if (previewProfile == nullptr) {
+        RTC_LOG(LS_ERROR) << "Failed to find preview profile";
+        NotifyCapturedStart(false);
         return;
     }
 
     input_ = CameraManager::GetInstance().CreateCameraInput(device);
     if (input_.IsEmpty()) {
         RTC_LOG(LS_ERROR) << "Failed to create camera input";
+        NotifyCapturedStart(false);
         return;
     }
 
     if (!input_.Open()) {
         RTC_LOG(LS_ERROR) << "Failed to open camera input";
+        NotifyCapturedStart(false);
         return;
     }
 
     if (!StartCaptureSession(previewProfile)) {
+        // StartCaptureSession already calls NotifyCapturedStart(false) on failure.
         return;
     }
 
     isStarted_ = true;
+    NotifyCapturedStart(true);
 }
 
 void CameraCapturer::StopInternal()
