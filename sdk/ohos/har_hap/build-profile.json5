@@ -1,13 +1,27 @@
 {
   "app": {
-    "signingConfigs": [],
+    "signingConfigs": [
+      {
+        "name": "default",
+        "type": "HarmonyOS",
+        "material": {
+          "certpath": "C:\\Users\\Administrator\\.ohos\\config\\default_har_hap_Lx4su3x342os_tdt1ASS9UnyQ4NAZjnmwgvDOWYFJdA=.cer",
+          "keyAlias": "debugKey",
+          "keyPassword": "0000001BD3CC4FDA07F2131EF9F9077058F2C8D2C113802771F256622F9C1CF96DA8B6F0692E29978AAE87",
+          "profile": "C:\\Users\\Administrator\\.ohos\\config\\default_har_hap_Lx4su3x342os_tdt1ASS9UnyQ4NAZjnmwgvDOWYFJdA=.p7b",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "C:\\Users\\Administrator\\.ohos\\config\\default_har_hap_Lx4su3x342os_tdt1ASS9UnyQ4NAZjnmwgvDOWYFJdA=.p12",
+          "storePassword": "0000001B1791134DC78B2EB74A55CE7324D7E658881B7A208321E7148557F92E42C3939A2C1791741CE6EA"
+        }
+      }
+    ],
     "products": [
       {
         "name": "default",
         "signingConfig": "default",
-        "compileSdkVersion": 12,
-        "compatibleSdkVersion": 12,
-        "runtimeOS": "OpenHarmony"
+        "compatibleSdkVersion": "5.0.0(12)",
+        "runtimeOS": "HarmonyOS",
+        "targetSdkVersion": "6.1.1(24)"
       }
     ],
     "buildModeSet": [
