@@ -65,9 +65,11 @@ OhosVideoTrackSource::~OhosVideoTrackSource()
 {
     RTC_LOG(LS_INFO) << __FUNCTION__;
     is_destroying_.store(true, std::memory_order_release);
-    thread_->PostTask([capturer = capturer_] {
-        capturer->Stop();
-        capturer->Release();
+    thread_->PostTask([this] {
+        if (capturer_) {
+            capturer_->Stop();
+            capturer_->Release();
+        }
     });
     thread_->Stop();
 }
@@ -220,7 +222,11 @@ bool OhosVideoTrackSource::is_screencast() const
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    return capturer_->IsScreencast();
+    std::shared_ptr<VideoCapturer> capturer;
+    thread_->BlockingCall([this, &capturer] {
+        capturer = capturer_;
+    });
+    return capturer ? capturer->IsScreencast() : false;
 }
 
 absl::optional<bool> OhosVideoTrackSource::needs_denoising() const
@@ -249,6 +255,66 @@ void OhosVideoTrackSource::ProcessConstraints(const VideoTrackSourceConstraints&
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
     broadcaster_.ProcessConstraints(constraints);
+}
+
+void OhosVideoTrackSource::OnOutputFormatRequest(int width, int height, int maxFps)
+{
+    if (width <= 0 || height <= 0) {
+        RTC_LOG(LS_WARNING) << __FUNCTION__ << " invalid resolution: " << width << "x" << height;
+        return;
+    }
+
+    RTC_LOG(LS_INFO) << __FUNCTION__ << " width=" << width << ", height=" << height << ", maxFps=" << maxFps;
+
+    absl::optional<std::pair<int, int>> aspectRatio = std::make_pair(width, height);
+    absl::optional<int> maxPixelCount = width * height;
+    absl::optional<int> maxFpsOpt = maxFps > 0 ? absl::optional<int>(maxFps) : absl::optional<int>();
+
+    videoAdapter_.OnOutputFormatRequest(aspectRatio, maxPixelCount, maxFpsOpt);
+}
+
+void OhosVideoTrackSource::ApplyConstraints(const VideoTrackSourceConstraints& constraints, int width, int height,
+    int maxFps)
+{
+    thread_->PostTask([this, constraints, width, height, maxFps] {
+        OnOutputFormatRequest(width, height, maxFps);
+        ProcessConstraints(constraints);
+    });
+}
+
+void OhosVideoTrackSource::SwitchCapturer(std::shared_ptr<VideoCapturer> capturer)
+{
+    RTC_LOG(LS_INFO) << __FUNCTION__;
+
+    if (is_destroying_.load(std::memory_order_acquire)) {
+        RTC_LOG(LS_WARNING) << "SwitchCapturer called during destruction, ignoring";
+        return;
+    }
+
+    if (!capturer) {
+        RTC_LOG(LS_ERROR) << "The capturer is nullptr";
+        return;
+    }
+
+    thread_->PostTask([this, capturer] {
+        RTC_LOG(LS_INFO) << "Switching capturer on thread";
+
+        // Stop and release old capturer
+        if (capturer_) {
+            capturer_->Stop();
+            capturer_->Release();
+        }
+
+        // Replace with new capturer
+        capturer_ = capturer;
+
+        // Initialize new capturer
+        capturer_->Init(
+            VideoFrameReceiverGl::Create("v-frame-receiver", sharedContext_), this);
+
+        // Start new capturer
+        capturer_->Start();
+    });
 }
 
 void OhosVideoTrackSource::OnCapturerStarted(bool success)

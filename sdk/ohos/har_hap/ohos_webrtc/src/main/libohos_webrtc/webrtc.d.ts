@@ -806,6 +806,7 @@ export interface MediaStreamTrack extends EventTarget {
 
   stop(): void;
   getSource(): MediaSource | null;
+  applyConstraints(constraints: MediaTrackConstraints): Promise<void>;
 }
 
 export declare var MediaStreamTrack: {
