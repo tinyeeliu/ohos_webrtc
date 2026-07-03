@@ -26,6 +26,7 @@
 namespace webrtc {
 
 class PeerConnectionFactoryWrapper;
+class OhosVideoTrackSource;
 
 class NapiMediaStreamTrack : public Napi::ObjectWrap<NapiMediaStreamTrack>, public ObserverInterface {
 public:
@@ -72,9 +73,27 @@ protected:
     Napi::Value GetReadyState(const Napi::CallbackInfo& info);
     Napi::Value Stop(const Napi::CallbackInfo& info);
     Napi::Value GetSource(const Napi::CallbackInfo& info);
+    Napi::Value ApplyConstraints(const Napi::CallbackInfo& info);
     Napi::Value ToJson(const Napi::CallbackInfo& info);
 
 private:
+    // Helper to validate a constraint value and return it; returns true on success.
+    static bool GetNumberConstraint(
+        const Napi::Object& constraints, const char* name, int& out, Napi::Env env, Napi::Promise::Deferred& deferred);
+    static bool GetNumberConstraint(
+        const Napi::Object& constraints, const char* name, double& out, Napi::Env env,
+        Napi::Promise::Deferred& deferred);
+    static bool GetStringConstraint(
+        const Napi::Object& constraints, const char* name, std::string& out, Napi::Env env,
+        Napi::Promise::Deferred& deferred);
+
+    // Read and validate video constraints from the input object.
+    bool ReadVideoConstraints(const Napi::Object& constraints, Napi::Env env, Napi::Promise::Deferred& deferred,
+        int& width, bool& hasWidth, int& height, bool& hasHeight, double& frameRate, bool& hasFrameRate);
+    // Apply validated constraints to video source via signaling thread.
+    void DoApplyVideoConstraints(const rtc::scoped_refptr<OhosVideoTrackSource>& videoSource,
+        int width, bool hasWidth, int height, bool hasHeight, double frameRate, bool hasFrameRate);
+
     std::shared_ptr<PeerConnectionFactoryWrapper> factory_;
     rtc::scoped_refptr<MediaStreamTrackInterface> track_;
 
