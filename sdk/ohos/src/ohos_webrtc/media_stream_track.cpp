@@ -41,6 +41,7 @@ const char kAttributeNameOnEnded[] = "onended";
 const char kMethodNameStop[] = "stop";
 const char kMethodNameGetSource[] = "getSource";
 const char kMethodNameToJson[] = "toJSON";
+const char K_METHOD_NAME_APPLY_CONSTRAINTS[] = "applyConstraints";
 
 const char kEnumMediaStreamTrackStateLive[] = "live";
 const char kEnumMediaStreamTrackStateEnded[] = "ended";
@@ -61,6 +62,7 @@ void NapiMediaStreamTrack::Init(Napi::Env env, Object exports)
             InstanceAccessor<&NapiMediaStreamTrack::GetReadyState>(kAttributeNameReadyState),
             InstanceMethod<&NapiMediaStreamTrack::Stop>(kMethodNameStop),
             InstanceMethod<&NapiMediaStreamTrack::GetSource>(kMethodNameGetSource),
+            InstanceMethod<&NapiMediaStreamTrack::ApplyConstraints>(K_METHOD_NAME_APPLY_CONSTRAINTS),
             InstanceMethod<&NapiMediaStreamTrack::ToJson>(kMethodNameToJson),
         });
     exports.Set(kClassName, func);
@@ -364,6 +366,188 @@ Napi::Value NapiMediaStreamTrack::GetSource(const Napi::CallbackInfo& info)
     }
 
     return info.Env().Null();
+}
+
+bool NapiMediaStreamTrack::GetNumberConstraint(
+    const Napi::Object& constraints, const char* name, int& out, Napi::Env env, Napi::Promise::Deferred& deferred)
+{
+    if (!constraints.Has(name)) {
+        return true;
+    }
+    auto val = constraints.Get(name);
+    if (!val.IsNumber()) {
+        std::string msg = std::string(name) + " must be a number";
+        auto error = TypeError::New(env, msg);
+        deferred.Reject(error.Value());
+        return false;
+    }
+    out = val.As<Number>().Int32Value();
+    return true;
+}
+
+bool NapiMediaStreamTrack::GetNumberConstraint(
+    const Napi::Object& constraints, const char* name, double& out, Napi::Env env, Napi::Promise::Deferred& deferred)
+{
+    if (!constraints.Has(name)) {
+        return true;
+    }
+    auto val = constraints.Get(name);
+    if (!val.IsNumber()) {
+        std::string msg = std::string(name) + " must be a number";
+        auto error = TypeError::New(env, msg);
+        deferred.Reject(error.Value());
+        return false;
+    }
+    out = val.As<Number>().DoubleValue();
+    return true;
+}
+
+bool NapiMediaStreamTrack::GetStringConstraint(
+    const Napi::Object& constraints, const char* name, std::string& out, Napi::Env env,
+    Napi::Promise::Deferred& deferred)
+{
+    if (!constraints.Has(name)) {
+        return true;
+    }
+    auto val = constraints.Get(name);
+    if (!val.IsString()) {
+        std::string msg = std::string(name) + " must be a string";
+        auto error = TypeError::New(env, msg);
+        deferred.Reject(error.Value());
+        return false;
+    }
+    out = val.As<String>().Utf8Value();
+    return true;
+}
+
+bool NapiMediaStreamTrack::ReadVideoConstraints(const Napi::Object& constraints, Napi::Env env,
+    Napi::Promise::Deferred& deferred, VideoConstraints& out)
+{
+    if (constraints.Has("width")) {
+        if (!GetNumberConstraint(constraints, "width", out.width, env, deferred)) {
+            return false;
+        }
+        out.hasWidth = true;
+    }
+
+    if (constraints.Has("height")) {
+        if (!GetNumberConstraint(constraints, "height", out.height, env, deferred)) {
+            return false;
+        }
+        out.hasHeight = true;
+    }
+
+    if (constraints.Has("frameRate")) {
+        if (!GetNumberConstraint(constraints, "frameRate", out.frameRate, env, deferred)) {
+            return false;
+        }
+        out.hasFrameRate = true;
+    }
+
+    if (constraints.Has("facingMode")) {
+        std::string facingMode;
+        if (!GetStringConstraint(constraints, "facingMode", facingMode, env, deferred)) {
+            return false;
+        }
+        RTC_LOG(LS_INFO) << "ApplyConstraints video facingMode: " << facingMode;
+    }
+
+    return true;
+}
+
+void NapiMediaStreamTrack::DoApplyResolutionConstraints(
+    const rtc::scoped_refptr<OhosVideoTrackSource>& videoSource, const VideoConstraints& vc, rtc::Thread* thread)
+{
+    if (!vc.hasWidth && !vc.hasHeight) {
+        return;
+    }
+    if (vc.width > 0 && vc.height > 0) {
+        RTC_LOG(LS_INFO) << "ApplyConstraints video resolution: " << vc.width << "x" << vc.height;
+        int maxFps = static_cast<int>(vc.frameRate);
+        if (thread->IsCurrent()) {
+            videoSource->OnOutputFormatRequest(vc.width, vc.height, maxFps);
+        } else {
+            thread->PostTask([videoSource, vc, maxFps] {
+                videoSource->OnOutputFormatRequest(vc.width, vc.height, maxFps);
+            });
+        }
+    } else if (vc.width > 0) {
+        RTC_LOG(LS_INFO) << "ApplyConstraints video width: " << vc.width;
+    } else if (vc.height > 0) {
+        RTC_LOG(LS_INFO) << "ApplyConstraints video height: " << vc.height;
+    }
+}
+
+void NapiMediaStreamTrack::DoApplyFrameRateConstraints(
+    const rtc::scoped_refptr<OhosVideoTrackSource>& videoSource, const VideoConstraints& vc, rtc::Thread* thread)
+{
+    if (!vc.hasFrameRate || vc.frameRate <= 0) {
+        return;
+    }
+    RTC_LOG(LS_INFO) << "ApplyConstraints video frameRate: " << vc.frameRate;
+    if (thread->IsCurrent()) {
+        VideoTrackSourceConstraints videoConstraints;
+        videoConstraints.max_fps = vc.frameRate;
+        videoSource->ProcessConstraints(videoConstraints);
+    } else {
+        thread->PostTask([videoSource, frameRate = vc.frameRate] {
+            VideoTrackSourceConstraints videoConstraints;
+            videoConstraints.max_fps = frameRate;
+            videoSource->ProcessConstraints(videoConstraints);
+        });
+    }
+}
+
+void NapiMediaStreamTrack::DoApplyVideoConstraints(const rtc::scoped_refptr<OhosVideoTrackSource>& videoSource,
+    const VideoConstraints& vc)
+{
+    auto signalingThread = factory_->GetSignalingThread();
+    DoApplyResolutionConstraints(videoSource, vc, signalingThread);
+    DoApplyFrameRateConstraints(videoSource, vc, signalingThread);
+}
+
+Napi::Value NapiMediaStreamTrack::ApplyConstraints(const Napi::CallbackInfo& info)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    auto env = info.Env();
+    auto deferred = Napi::Promise::Deferred::New(env);
+
+    if (!track_) {
+        auto error = Error::New(env, "Illegal state");
+        deferred.Reject(error.Value());
+        return deferred.Promise();
+    }
+
+    if (info.Length() == 0 || !info[0].IsObject()) {
+        auto error = TypeError::New(env, "Invalid argument");
+        deferred.Reject(error.Value());
+        return deferred.Promise();
+    }
+
+    auto constraints = info[0].As<Object>();
+
+    if (IsVideoTrack()) {
+        auto videoSource = factory_->GetVideoSource(track_);
+        if (videoSource) {
+            VideoConstraints videoConstraints;
+            if (!ReadVideoConstraints(constraints, env, deferred, videoConstraints)) {
+                return deferred.Promise();
+            }
+            DoApplyVideoConstraints(videoSource, videoConstraints);
+        }
+        deferred.Resolve(env.Undefined());
+        return deferred.Promise();
+    }
+
+    if (IsAudioTrack()) {
+        auto error = Error::New(env, "applyConstraints for audio tracks is not supported");
+        deferred.Reject(error.Value());
+        return deferred.Promise();
+    }
+
+    deferred.Resolve(env.Undefined());
+    return deferred.Promise();
 }
 
 Napi::Value NapiMediaStreamTrack::ToJson(const Napi::CallbackInfo& info)
