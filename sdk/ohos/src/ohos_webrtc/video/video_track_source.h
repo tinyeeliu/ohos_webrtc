@@ -34,6 +34,7 @@ namespace webrtc {
 
 class OhosVideoTrackSource : public Notifier<VideoTrackSourceInterface>, VideoCapturer::Observer {
 public:
+    friend class NapiMediaStreamTrack;
     static rtc::scoped_refptr<OhosVideoTrackSource> Create(
         std::unique_ptr<VideoCapturer> capturer, rtc::Thread* signalingThread,
         std::shared_ptr<EglContext> sharedContext = nullptr);
@@ -82,6 +83,9 @@ protected:
     void AddEncodedSink(rtc::VideoSinkInterface<RecordableEncodedFrame>* sink) override {}
     void RemoveEncodedSink(rtc::VideoSinkInterface<RecordableEncodedFrame>* sink) override {}
     void ProcessConstraints(const VideoTrackSourceConstraints& constraints) override;
+
+    // Apply resolution and framerate constraints to the video adapter.
+    void OnOutputFormatRequest(int width, int height, int maxFps);
 
     // VideoCapturer::Observer
     void OnCapturerStarted(bool success) override;

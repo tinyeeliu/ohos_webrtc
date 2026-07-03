@@ -150,5 +150,56 @@ export default function MediaStreamTrackTest() {
       callee.close();
       audioSource.release();
     })
+
+    it('applyConstraintsResolvesForVideoTrack', 0, async () => {
+      let videoSource = pcf.createVideoSource({
+        width: 1280,
+        height: 720,
+        frameRate: 30
+      });
+      let videoTrack = pcf.createVideoTrack('video', videoSource);
+      expect(videoTrack).not().assertNull();
+
+      await videoTrack.applyConstraints({
+        width: 1280,
+        height: 720,
+        frameRate: 30
+      });
+
+      videoSource.release();
+    })
+
+    it('applyConstraintsResolvesForFacingMode', 0, async () => {
+      let videoSource = pcf.createVideoSource({
+        width: 1280,
+        height: 720
+      });
+      let videoTrack = pcf.createVideoTrack('video', videoSource);
+      expect(videoTrack).not().assertNull();
+
+      await videoTrack.applyConstraints({
+        facingMode: 'user'
+      });
+
+      videoSource.release();
+    })
+
+    it('applyConstraintsRejectsForAudioTrack', 0, async () => {
+      let audioSource = pcf.createAudioSource();
+      let audioTrack = pcf.createAudioTrack('audio', audioSource);
+      expect(audioTrack).not().assertNull();
+
+      let rejected = false;
+      try {
+        await audioTrack.applyConstraints({
+          volume: 0.5
+        });
+      } catch (e) {
+        rejected = true;
+      }
+      expect(rejected).assertTrue();
+
+      audioSource.release();
+    })
   })
 }
