@@ -29,7 +29,7 @@ export default function PeerConnectionFactoryTest() {
 
     it('createPeerConnectionReturnsValidPc', 0, () => {
       let pc = pcf.createPeerConnection({
-        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+        iceServers: []
       });
       expect(pc.signalingState).assertEqual('stable');
       expect(pc.iceConnectionState).assertEqual('new');

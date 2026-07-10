@@ -26,7 +26,6 @@ const pcf = new webrtc.PeerConnectionFactory();
 let caller: webrtc.RTCPeerConnection;
 let callee: webrtc.RTCPeerConnection;
 
-const STUN_SERVER = "stun:stun.l.google.com:19302";
 
 async function exchangeAnswer(caller: webrtc.RTCPeerConnection, callee: webrtc.RTCPeerConnection) {
   const answer = await callee.createAnswer();
@@ -69,15 +68,11 @@ async function CreatePeerConnection() {
   }
 
   caller = pcf.createPeerConnection({
-    iceServers: [{
-      urls: STUN_SERVER
-    }],
+    iceServers: [],
     bundlePolicy: "balanced"
   });
   callee = pcf.createPeerConnection({
-    iceServers: [{
-      urls: STUN_SERVER
-    }],
+    iceServers: [],
     bundlePolicy: "balanced"
   });
 }
