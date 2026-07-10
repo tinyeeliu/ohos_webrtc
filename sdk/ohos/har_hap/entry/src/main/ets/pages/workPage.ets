@@ -536,9 +536,11 @@ struct Index {
   }
 
   async createPeerConnectionFactory() {
+    // 统一使用默认工厂(硬件 H264/H265 + 软件 VP8/VP9 回退)。
+    // 真机↔真机仍优先协商 H264 硬件；真机↔模拟器可回落 VP8。
+    // 勿仅指定 HardwareVideoEncoder/DecoderFactory：模拟器无 video/avc 能力时
+    // 接收方向 codec 列表为空，会导致 setLocalDescription 失败。
     this.pcf = new webrtc.PeerConnectionFactory({
-      videoEncoderFactory: new webrtc.HardwareVideoEncoderFactory,
-      videoDecoderFactory: new webrtc.HardwareVideoDecoderFactory,
       adm: this.adm
     });
     Logging.d(TAG, 'this.pcf: ' + JSON.stringify(this.pcf));
@@ -551,6 +553,25 @@ struct Index {
     this.pcf.startAecDump(file.fd, -1);
   }
 
+  // 手机首选后置摄像头（environment）；PC/模拟器无后置时回退为不限定 facingMode。
+  createVideoSourceWithFallback(width: number, height: number): webrtc.VideoSource | undefined {
+    let src: webrtc.VideoSource | undefined;
+    try {
+      src = this.pcf?.createVideoSource({ width, height, facingMode: 'environment' }, false);
+    } catch (e) {
+      console.warn(TAG, `createVideoSource(environment) threw: ${JSON.stringify(e)}`);
+    }
+    if (!src) {
+      console.warn(TAG, 'environment facingMode unsatisfied, retry without facingMode');
+      try {
+        src = this.pcf?.createVideoSource({ width, height }, false);
+      } catch (e) {
+        console.error(TAG, `createVideoSource(fallback) threw: ${JSON.stringify(e)}`);
+      }
+    }
+    return src;
+  }
+
   async prepareLocalMedia() {
     if (!this.localAudioTrack) {
       this.localAudioSource = this.pcf?.createAudioSource({ echoCancellation: true, noiseSuppression: true });
@@ -561,12 +582,18 @@ struct Index {
     }
 
     if (!this.localVideoTrack) {
-      this.localVideoSource = this.pcf?.createVideoSource({ width: 1280, height: 720, facingMode: 'environment' }, false);
+      this.localVideoSource = this.createVideoSourceWithFallback(1280, 720);
       console.info(TAG, 'videoSource: ' + JSON.stringify(this.localVideoSource));
-      this.localVideoSource!.oncapturerstarted = (event: webrtc.VideoCapturerStartedEvent) => {
+      if (!this.localVideoSource) {
+        // 摄像头不可用（API18 以下模拟器等），降级为 audio-only 模式。
+        this.setStatus('No camera available, audio-only mode');
+        this.mXComponentController1.setVideoTrack(null);
+        return;
+      }
+      this.localVideoSource.oncapturerstarted = (event: webrtc.VideoCapturerStartedEvent) => {
         console.info(TAG, 'oncapturerstarted: event=' + JSON.stringify(event));
       };
-      this.localVideoSource!.oncapturerstopped = (event: webrtc.Event) => {
+      this.localVideoSource.oncapturerstopped = (event: webrtc.Event) => {
         console.info(TAG, 'oncapturerstopped: event=' + JSON.stringify(event));
       };
 
@@ -886,10 +913,7 @@ struct Index {
         return;
       }
 
-      newVideoSource = this.pcf?.createVideoSource(
-        { width: width, height: height, facingMode: 'environment' },
-        false
-      );
+      newVideoSource = this.createVideoSourceWithFallback(width, height);
 
       if (!newVideoSource) {
         console.error(TAG, "Failed to create new video source");

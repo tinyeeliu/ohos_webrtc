@@ -40,6 +40,7 @@ protected:
     void OnConstraintsChanged(const webrtc::VideoTrackSourceConstraints& constraints) override;
 
     void RenderByteBuffer(rtc::scoped_refptr<I420BufferInterface> buffer);
+    void RenderFrame(const VideoFrame& frame);
 
 private:
     int32_t width_{};

@@ -16,6 +16,9 @@
 #include "video_track_source.h"
 #include "utils/marcos.h"
 #include "video_frame_receiver_gl.h"
+#if defined(__x86_64__)
+#include "video_frame_receiver_native.h"
+#endif
 
 #include "api/video/i420_buffer.h"
 #include "rtc_base/logging.h"
@@ -56,8 +59,15 @@ OhosVideoTrackSource::OhosVideoTrackSource(
     thread_->Start();
     thread_->PostTask(
         [this, capturer = capturer_, sharedContext = sharedContext_] {
+#if defined(__x86_64__)
+            // x86_64 模拟器：dgles 不支持外部纹理(EGLImage)零拷贝路径，
+            // 采集改用 CPU(ImageReceiver -> I420)，避免渲染线程 dgles memcpy 崩溃。
+            (void)sharedContext;
+            capturer->Init(VideoFrameReceiverNative::Create("v-frame-receiver"), this);
+#else
             capturer->Init(
                 VideoFrameReceiverGl::Create("v-frame-receiver", sharedContext), this);
+#endif
         });
 }
 

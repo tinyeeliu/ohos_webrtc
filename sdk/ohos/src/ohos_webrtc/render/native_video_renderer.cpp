@@ -171,7 +171,14 @@ Napi::Value NapiNativeVideoRenderer::Init(const Napi::CallbackInfo& info)
         NAPI_THROW(Error::New(info.Env(), "Failed to create native window"), info.Env().Undefined());
     }
 
+#if defined(__x86_64__)
+    // x86_64 模拟器：dgles 渲染外部纹理会触发 memcpy 崩溃，
+    // 改用 CPU 光栅渲染(I420 -> RGBA)，绕开 GL 外部纹理路径。
+    (void)sharedContext_;
+    renderer_ = NativeWindowRendererRaster::Create(nativeWindow);
+#else
     renderer_ = NativeWindowRendererGl::Create(nativeWindow, sharedContext_, "native-window-renderer");
+#endif
     if (renderer_) {
         renderer_->SetFrameSizeChangeCallback([this](int width, int height, int rotation) {
             RTC_DLOG(LS_VERBOSE) << "[NapiNativeVideoRenderer] Frame size changed: " << width << "x" << height;
