@@ -19,7 +19,6 @@ import { Logging, LoggingSeverity } from '../../../main/ets/log/Logging';
 import { sleep } from './Helper';
 
 const TAG: string = '[DataChannelTest]';
-const STUN_SERVER = "stun:stun.l.google.com:19302";
 
 const pcf = new webrtc.PeerConnectionFactory();
 
@@ -124,14 +123,10 @@ export default function DataChannelTest() {
       // The number of execution times is the same as the number of test cases defined by **it**.
       // The API supports only one parameter: preset action function.
       caller = pcf.createPeerConnection({
-        iceServers: [{
-          urls: STUN_SERVER
-        }]
+        iceServers: []
       });
       callee = pcf.createPeerConnection({
-        iceServers: [{
-          urls: STUN_SERVER
-        }]
+        iceServers: []
       });
     })
     afterEach(() => {
