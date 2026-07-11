@@ -249,6 +249,9 @@ NapiPeerConnectionFactory::NapiPeerConnectionFactory(const CallbackInfo& info)
         if (jsOptions.Has(NapiPeerConnectionFactoryOptions::kAttributeNameAdm)) {
             auto jsAdm = jsOptions.Get(NapiPeerConnectionFactoryOptions::kAttributeNameAdm).As<Object>();
             auto napiAdm = NapiAudioDeviceModule::Unwrap(jsAdm);
+            if (!napiAdm) {
+                NAPI_THROW(TypeError::New(info.Env(), "Invalid argument"), info.Env().Undefined());
+            }
             adm = napiAdm->Get();
         }
         if (jsOptions.Has(NapiPeerConnectionFactoryOptions::kAttributeNameVideoEncoderFactory)) {
@@ -265,6 +268,9 @@ NapiPeerConnectionFactory::NapiPeerConnectionFactory(const CallbackInfo& info)
             auto jsAudioProcessing =
                 jsOptions.Get(NapiPeerConnectionFactoryOptions::kAttributeNameAudioProcessing).As<Object>();
             auto napiAudioProcessing = NapiAudioProcessing::Unwrap(jsAudioProcessing);
+            if (!napiAudioProcessing) {
+                NAPI_THROW(TypeError::New(info.Env(), "Invalid argument"), info.Env().Undefined());
+            }
             audioProcessing = napiAudioProcessing->Get();
         }
     }
