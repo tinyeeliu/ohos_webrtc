@@ -20,6 +20,17 @@ gn gen out/arm32 --args='is_clang=true target_os="ohos" target_cpu="arm" arm_flo
 ninja -C out/arm32
 ```
 
+`x86_64`版本（供模拟器调试使用）放置在`ohos_webrtc/libs/x86_64`目录下。与 arm64 共用同一套 `sdk/ohos` 源码，可使用如下命令编译：
+``` shell
+gn gen out/x86_64 --args='is_clang=true target_os="ohos" target_cpu="x86_64" ohos_extra_ldflags="-static-libstdc++" is_official_build=true ohos_sdk_native_root="path/to/ohos/sdk"'
+ninja -C out/x86_64
+```
+
+**x86_64 模拟器注意**：
+
+- 模拟器不支持硬件编解码。请使用默认 `PeerConnectionFactory`，其内部同时包含软件编解码能力，可在硬件编解码不可用时自动改用软件编解码；若仅使用 `HardwareVideoEncoderFactory` / `HardwareVideoDecoderFactory`，模拟器上因缺少硬件编解码支持，将出现编解码协商失败。
+- 自 API HarmonyOS 5.1.0(18) 版本起，模拟器支持调用本地计算机的摄像头。请确保本地计算机上存在可用的摄像头（不支持通过 USB 连接的摄像头）；示例工程中，若未获取到可用摄像头，将回退为仅音频通信模式。
+
 **注意**
 > 如果不指定`ohos_extra_ldflags="-static-libstdc++"`参数，则需要将sdk中的`libc++_shared.so`一起放到对应目录下。
 
