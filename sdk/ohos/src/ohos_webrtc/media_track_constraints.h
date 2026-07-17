@@ -34,6 +34,7 @@ public:
     NAPI_ATTRIBUTE_NAME_DECLARE(Height, height);
     NAPI_ATTRIBUTE_NAME_DECLARE(AspectRatio, aspectRatio);
     NAPI_ATTRIBUTE_NAME_DECLARE(FrameRate, frameRate);
+    NAPI_ATTRIBUTE_NAME_DECLARE(Zoom, zoom);
     NAPI_ATTRIBUTE_NAME_DECLARE(FacingMode, facingMode);
     NAPI_ATTRIBUTE_NAME_DECLARE(ResizeMode, resizeMode);
     NAPI_ATTRIBUTE_NAME_DECLARE(SampleRate, sampleRate);
