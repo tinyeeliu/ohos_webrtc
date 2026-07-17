@@ -19,6 +19,7 @@
 
 #include "api/video/i420_buffer.h"
 #include "rtc_base/logging.h"
+#include "hilog/log.h"
 
 namespace webrtc {
 
@@ -65,9 +66,15 @@ OhosVideoTrackSource::~OhosVideoTrackSource()
 {
     RTC_LOG(LS_INFO) << __FUNCTION__;
     is_destroying_.store(true, std::memory_order_release);
-    thread_->PostTask([capturer = capturer_] {
-        capturer->Stop();
-        capturer->Release();
+    thread_->PostTask([this] {
+        if (capturer_) {
+            capturer_->Stop();
+            capturer_->Release();
+        }
+        if (pendingSwitchCapturer_) {
+            pendingSwitchCapturer_->Stop();
+            pendingSwitchCapturer_->Release();
+        }
     });
     thread_->Stop();
 }
@@ -220,7 +227,11 @@ bool OhosVideoTrackSource::is_screencast() const
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    return capturer_->IsScreencast();
+    std::shared_ptr<VideoCapturer> capturer;
+    thread_->BlockingCall([this, &capturer] {
+        capturer = capturer_;
+    });
+    return capturer ? capturer->IsScreencast() : false;
 }
 
 absl::optional<bool> OhosVideoTrackSource::needs_denoising() const
@@ -251,10 +262,123 @@ void OhosVideoTrackSource::ProcessConstraints(const VideoTrackSourceConstraints&
     broadcaster_.ProcessConstraints(constraints);
 }
 
+void OhosVideoTrackSource::OnOutputFormatRequest(int width, int height, int maxFps)
+{
+    if (width <= 0 || height <= 0) {
+        RTC_LOG(LS_WARNING) << __FUNCTION__ << " invalid resolution: " << width << "x" << height;
+        return;
+    }
+
+    RTC_LOG(LS_INFO) << __FUNCTION__ << " width=" << width << ", height=" << height << ", maxFps=" << maxFps;
+
+    videoAdapter_.OnOutputFormatRequest(std::make_pair(width, height), width * height,
+        maxFps > 0 ? absl::optional<int>(maxFps) : absl::optional<int>());
+}
+
+void OhosVideoTrackSource::ApplyConstraints(const VideoTrackSourceConstraints& constraints, int width, int height,
+    int maxFps)
+{
+    thread_->PostTask([this, constraints, width, height, maxFps] {
+        OnOutputFormatRequest(width, height, maxFps);
+        ProcessConstraints(constraints);
+    });
+}
+
+void OhosVideoTrackSource::SetZoomRatio(double ratio)
+{
+    OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, "mhg", "【mhg】 VideoTrackSource::SetZoomRatio ratio=%{public}f posting to source thread", ratio);
+    auto thread = thread_;
+    thread->PostTask([this, ratio] {
+        if (is_destroying_.load(std::memory_order_acquire)) {
+            OH_LOG_Print(LOG_APP, LOG_WARN, LOG_DOMAIN, "mhg", "【mhg】 SetZoomRatio SKIP: source destroying");
+            return;
+        }
+        if (capturer_) {
+            OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, "mhg", "【mhg】 SetZoomRatio calling capturer->SetZoomRatio ratio=%{public}f", ratio);
+            capturer_->SetZoomRatio(ratio);
+        } else {
+            OH_LOG_Print(LOG_APP, LOG_WARN, LOG_DOMAIN, "mhg", "【mhg】 SetZoomRatio SKIP: capturer_ is null");
+        }
+    });
+}
+
+bool OhosVideoTrackSource::GetZoomRatioRange(float* minZoom, float* maxZoom)
+{
+    if (is_destroying_.load(std::memory_order_acquire)) {
+        return false;
+    }
+    if (!capturer_) {
+        return false;
+    }
+    return capturer_->GetZoomRatioRange(minZoom, maxZoom);
+}
+
+void OhosVideoTrackSource::SwitchCapturer(std::shared_ptr<VideoCapturer> capturer)
+{
+    RTC_LOG(LS_INFO) << __FUNCTION__;
+
+    if (is_destroying_.load(std::memory_order_acquire)) {
+        RTC_LOG(LS_WARNING) << "SwitchCapturer called during destruction, ignoring";
+        return;
+    }
+
+    if (!capturer) {
+        RTC_LOG(LS_ERROR) << "The capturer is nullptr";
+        return;
+    }
+
+    thread_->PostTask([this, capturer] {
+        RTC_LOG(LS_INFO) << "Switching capturer on thread";
+
+        // Stop and release old capturer first to avoid camera resource conflict.
+        if (capturer_) {
+            RTC_LOG(LS_INFO) << "Stopping old capturer before switching";
+            capturer_->Stop();
+            capturer_->Release();
+        }
+
+        // Store new capturer as pending; do NOT replace old capturer yet.
+        // Replacement happens in OnCapturerStarted callback after confirming success.
+        pendingSwitchCapturer_ = capturer;
+
+        // Initialize and start new capturer.
+        // OnCapturerStarted callback will handle success/failure.
+        capturer->Init(
+            VideoFrameReceiverGl::Create("v-frame-receiver", sharedContext_), this);
+        capturer->Start();
+    });
+}
+
 void OhosVideoTrackSource::OnCapturerStarted(bool success)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-    SetState(success);
+
+    // Handle SwitchCapturer pending capturer replacement.
+    if (pendingSwitchCapturer_) {
+        if (success) {
+            RTC_LOG(LS_INFO) << "New capturer started successfully, replacing old capturer";
+            // Stop and release old capturer.
+            if (capturer_) {
+                capturer_->Stop();
+                capturer_->Release();
+            }
+            // Replace with new capturer.
+            capturer_ = std::move(pendingSwitchCapturer_);
+            // Only set state to live if we successfully replaced the capturer.
+            SetState(true);
+        } else {
+            RTC_LOG(LS_ERROR) << "New capturer failed to start, discarding and keeping old capturer";
+            // Stop and release the failed new capturer.
+            pendingSwitchCapturer_->Stop();
+            pendingSwitchCapturer_->Release();
+            pendingSwitchCapturer_.reset();
+            // Do NOT set state to ended; keep old capturer running.
+            // The track should remain live since the old capturer is still active.
+        }
+    } else {
+        // Normal startup (not from SwitchCapturer).
+        SetState(success);
+    }
 
     VideoCapturer::Observer* observer = nullptr;
     {
@@ -270,7 +394,14 @@ void OhosVideoTrackSource::OnCapturerStarted(bool success)
 void OhosVideoTrackSource::OnCapturerStopped()
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-    SetState(false);
+
+    // Only set state to ended if this is the current capturer.
+    // If a new capturer has been switched in, ignore this stop notification.
+    if (capturer_) {
+        SetState(false);
+    } else {
+        RTC_LOG(LS_INFO) << "Ignoring OnCapturerStopped for old capturer after SwitchCapturer";
+    }
 
     VideoCapturer::Observer* observer = nullptr;
     {
