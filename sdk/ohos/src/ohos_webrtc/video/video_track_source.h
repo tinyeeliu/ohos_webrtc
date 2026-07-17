@@ -94,6 +94,10 @@ public:
     // Switch to a new capturer (for facingMode change).
     void SwitchCapturer(std::shared_ptr<VideoCapturer> capturer);
 
+    // Set camera zoom ratio (dispatched to source thread, then forwarded to capturer)
+    void SetZoomRatio(double ratio);
+    bool GetZoomRatioRange(float* minZoom, float* maxZoom);
+
 protected:
     // VideoCapturer::Observer
     void OnCapturerStarted(bool success) override;

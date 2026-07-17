@@ -283,6 +283,33 @@ void OhosVideoTrackSource::ApplyConstraints(const VideoTrackSourceConstraints& c
     });
 }
 
+void OhosVideoTrackSource::SetZoomRatio(double ratio)
+{
+    RTC_LOG(LS_INFO) << __FUNCTION__ << ": ratio=" << ratio;
+    thread_->PostTask([this, ratio] {
+        if (is_destroying_.load(std::memory_order_acquire)) {
+            RTC_LOG(LS_WARNING) << "SetZoomRatio: source destroying, skip";
+            return;
+        }
+        if (capturer_) {
+            capturer_->SetZoomRatio(ratio);
+        } else {
+            RTC_LOG(LS_WARNING) << "SetZoomRatio: capturer_ is null, skip";
+        }
+    });
+}
+
+bool OhosVideoTrackSource::GetZoomRatioRange(float* minZoom, float* maxZoom)
+{
+    if (is_destroying_.load(std::memory_order_acquire)) {
+        return false;
+    }
+    if (!capturer_) {
+        return false;
+    }
+    return capturer_->GetZoomRatioRange(minZoom, maxZoom);
+}
+
 void OhosVideoTrackSource::SwitchCapturer(std::shared_ptr<VideoCapturer> capturer)
 {
     RTC_LOG(LS_INFO) << __FUNCTION__;
