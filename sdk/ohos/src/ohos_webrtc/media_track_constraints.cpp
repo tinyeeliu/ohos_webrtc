@@ -48,6 +48,7 @@ const std::map<std::string, bool> SUPPORTED_CONSTRAINTS_MAP = {
     {NapiMediaConstraints::kAttributeNameHeight, true},
     {NapiMediaConstraints::kAttributeNameAspectRatio, true},
     {NapiMediaConstraints::kAttributeNameFrameRate, true},
+    {NapiMediaConstraints::kAttributeNameZoom, true},
     {NapiMediaConstraints::kAttributeNameFacingMode, true},
     {NapiMediaConstraints::kAttributeNameResizeMode, false},
     {NapiMediaConstraints::kAttributeNameSampleRate, false},
@@ -368,6 +369,7 @@ bool ValidateAndCopyConstraintSet(
     ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.height);
     ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.aspectRatio);
     ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.frameRate);
+    ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.zoom);
     ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.sampleRate);
     ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.sampleSize);
     ValidateAndCopyConstraint(jsTrackConstraints, nakedTreatment, trackConstraints.echoCancellation);

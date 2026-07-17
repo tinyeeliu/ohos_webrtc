@@ -383,31 +383,45 @@ private:
 bool FacingModeSatisfiesConstraint(webrtc::FacingMode value, const webrtc::StringConstraint& constraint)
 {
     std::string stringValue = FacingModeToString(value);
+    RTC_LOG(LS_INFO) << "FacingModeSatisfiesConstraint: value=" << static_cast<int>(value)
+                     << ", stringValue='" << stringValue << "', constraint exact=["
+                     << (constraint.Exact().empty() ? "" : constraint.Exact()[0]) << "]";
     if (stringValue.empty()) {
         return constraint.Exact().empty();
     }
 
-    return constraint.Matches(stringValue);
+    bool matches = constraint.Matches(stringValue);
+    RTC_LOG(LS_INFO) << "FacingModeSatisfiesConstraint: matches=" << matches;
+    return matches;
 }
 
 bool DeviceSatisfiesConstraintSet(
     const CameraDeviceInfo& device, const MediaTrackConstraintSet& constraintSet, std::string* failedConstraintName)
 {
+    RTC_LOG(LS_INFO) << "DeviceSatisfiesConstraintSet: deviceId=" << device.deviceId
+                     << ", facingMode=" << FacingModeToString(device.facingMode)
+                     << ", constraint facingMode exact=["
+                     << (constraintSet.facingMode.Exact().empty() ? "" : constraintSet.facingMode.Exact()[0]) << "]";
+
     if (!constraintSet.deviceId.Matches(device.deviceId)) {
         UpdateFailedConstraintName(constraintSet.deviceId, failedConstraintName);
+        RTC_LOG(LS_INFO) << "DeviceSatisfiesConstraintSet: deviceId mismatch";
         return false;
     }
 
     if (!constraintSet.groupId.Matches(device.groupId)) {
         UpdateFailedConstraintName(constraintSet.groupId, failedConstraintName);
+        RTC_LOG(LS_INFO) << "DeviceSatisfiesConstraintSet: groupId mismatch";
         return false;
     }
 
     if (!FacingModeSatisfiesConstraint(device.facingMode, constraintSet.facingMode)) {
         UpdateFailedConstraintName(constraintSet.facingMode, failedConstraintName);
+        RTC_LOG(LS_INFO) << "DeviceSatisfiesConstraintSet: facingMode mismatch";
         return false;
     }
 
+    RTC_LOG(LS_INFO) << "DeviceSatisfiesConstraintSet: device " << device.deviceId << " satisfies all constraints";
     return true;
 }
 

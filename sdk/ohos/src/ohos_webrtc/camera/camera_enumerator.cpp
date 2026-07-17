@@ -27,12 +27,13 @@ std::vector<CameraDeviceInfo> CameraEnumerator::GetDevices()
     std::vector<CameraDeviceInfo> result;
 
     auto cameras = ohos::CameraManager::GetInstance().GetSupportedCameras();
+    RTC_LOG(LS_INFO) << "CameraEnumerator::GetDevices() found " << cameras.Size() << " cameras";
     for (std::size_t i = 0; i < cameras.Size(); i++) {
         auto camera = cameras[i];
-        RTC_DLOG(LS_VERBOSE) << "camera id: " << camera->cameraId;
-        RTC_DLOG(LS_VERBOSE) << "camera type: " << camera->cameraType;
-        RTC_DLOG(LS_VERBOSE) << "camera position: " << camera->cameraPosition;
-        RTC_DLOG(LS_VERBOSE) << "camera connection type: " << camera->connectionType;
+        RTC_LOG(LS_INFO) << "camera id: " << camera->cameraId;
+        RTC_LOG(LS_INFO) << "camera type: " << camera->cameraType;
+        RTC_LOG(LS_INFO) << "camera position: " << camera->cameraPosition;
+        RTC_LOG(LS_INFO) << "camera connection type: " << camera->connectionType;
 
         CameraDeviceInfo device;
         device.deviceId = camera->cameraId;
@@ -42,12 +43,15 @@ std::vector<CameraDeviceInfo> CameraEnumerator::GetDevices()
         switch (camera->cameraPosition) {
             case CAMERA_POSITION_FRONT:
                 device.facingMode = FacingMode::kUser;
+                RTC_LOG(LS_INFO) << "Camera " << camera->cameraId << " set to FacingMode::kUser";
                 break;
             case CAMERA_POSITION_BACK:
                 device.facingMode = FacingMode::kEnvironment;
+                RTC_LOG(LS_INFO) << "Camera " << camera->cameraId << " set to FacingMode::kEnvironment";
                 break;
             default:
                 device.facingMode = FacingMode::kNone;
+                RTC_LOG(LS_INFO) << "Camera " << camera->cameraId << " set to FacingMode::kNone";
                 break;
         }
 

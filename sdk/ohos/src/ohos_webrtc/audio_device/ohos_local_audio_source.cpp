@@ -74,6 +74,23 @@ void OhosLocalAudioSource::SetVolume(double volume)
     audioInput_->SetVolume(volume);
 }
 
+void OhosLocalAudioSource::ApplyConstraints(const cricket::AudioOptions& options)
+{
+    RTC_LOG(LS_INFO) << __FUNCTION__ << " echo_cancellation=" << options.echo_cancellation.has_value()
+                     << ", auto_gain_control=" << options.auto_gain_control.has_value()
+                     << ", noise_suppression=" << options.noise_suppression.has_value();
+
+    if (options.echo_cancellation.has_value()) {
+        audioOptions_.echo_cancellation = options.echo_cancellation;
+    }
+    if (options.auto_gain_control.has_value()) {
+        audioOptions_.auto_gain_control = options.auto_gain_control;
+    }
+    if (options.noise_suppression.has_value()) {
+        audioOptions_.noise_suppression = options.noise_suppression;
+    }
+}
+
 void OhosLocalAudioSource::ReleaseAdmLiveSourceIfNeeded()
 {
     if (releasedFromAdm_.exchange(true)) {
