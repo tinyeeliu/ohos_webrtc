@@ -77,6 +77,7 @@ protected:
     Napi::Value Stop(const Napi::CallbackInfo& info);
     Napi::Value GetSource(const Napi::CallbackInfo& info);
     Napi::Value ApplyConstraints(const Napi::CallbackInfo& info);
+    Napi::Value GetZoomRange(const Napi::CallbackInfo& info);
     Napi::Value ToJson(const Napi::CallbackInfo& info);
 
 private:
@@ -90,10 +91,12 @@ private:
         int height = 0;
         double frameRate = 0.0;
         std::string facingMode;
+        double zoom = 0.0;
         bool hasWidth = false;
         bool hasHeight = false;
         bool hasFrameRate = false;
         bool hasFacingMode = false;
+        bool hasZoom = false;
     };
     bool ReadVideoConstraints(const Napi::Object& constraints, Napi::Env env, Napi::Promise::Deferred& deferred,
         VideoConstraints& out);

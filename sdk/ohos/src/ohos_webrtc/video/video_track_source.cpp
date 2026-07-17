@@ -283,6 +283,39 @@ void OhosVideoTrackSource::ApplyConstraints(const VideoTrackSourceConstraints& c
     });
 }
 
+void OhosVideoTrackSource::SetZoomRatio(double ratio)
+{
+    RTC_LOG(LS_INFO) << __FUNCTION__ << ": ratio=" << ratio;
+    thread_->PostTask([this, ratio] {
+        if (is_destroying_.load(std::memory_order_acquire)) {
+            RTC_LOG(LS_WARNING) << "SetZoomRatio: source destroying, skip";
+            return;
+        }
+        if (pendingSwitchCapturer_) {
+            // Camera switch in progress; defer zoom to OnCapturerStarted
+            pendingZoomRatio_ = ratio;
+            RTC_LOG(LS_INFO) << "SetZoomRatio: switch in progress, deferred ratio=" << ratio;
+            return;
+        }
+        if (capturer_) {
+            capturer_->SetZoomRatio(ratio);
+        } else {
+            RTC_LOG(LS_WARNING) << "SetZoomRatio: capturer_ is null, skip";
+        }
+    });
+}
+
+bool OhosVideoTrackSource::GetZoomRatioRange(float* minZoom, float* maxZoom)
+{
+    if (is_destroying_.load(std::memory_order_acquire)) {
+        return false;
+    }
+    if (!capturer_) {
+        return false;
+    }
+    return capturer_->GetZoomRatioRange(minZoom, maxZoom);
+}
+
 void OhosVideoTrackSource::SwitchCapturer(std::shared_ptr<VideoCapturer> capturer)
 {
     RTC_LOG(LS_INFO) << __FUNCTION__;
@@ -334,6 +367,12 @@ void OhosVideoTrackSource::OnCapturerStarted(bool success)
             }
             // Replace with new capturer.
             capturer_ = std::move(pendingSwitchCapturer_);
+            // Apply deferred zoom if any (from SetZoomRatio during switch).
+            if (pendingZoomRatio_ > 0.0) {
+                capturer_->SetZoomRatio(pendingZoomRatio_);
+                RTC_LOG(LS_INFO) << "Applied deferred zoom ratio=" << pendingZoomRatio_;
+                pendingZoomRatio_ = 0.0;
+            }
             // Only set state to live if we successfully replaced the capturer.
             SetState(true);
         } else {
@@ -342,6 +381,7 @@ void OhosVideoTrackSource::OnCapturerStarted(bool success)
             pendingSwitchCapturer_->Stop();
             pendingSwitchCapturer_->Release();
             pendingSwitchCapturer_.reset();
+            pendingZoomRatio_ = 0.0;
             // Do NOT set state to ended; keep old capturer running.
             // The track should remain live since the old capturer is still active.
         }
