@@ -969,6 +969,7 @@ setAudioPlayout(playout: boolean): void
 | height           | ConstrainULong   | 否   | 表示媒体轨道需要满足的视频高度约束条件，以像素为单位。用于屏幕采集时，以设备自然方向为参考（手机为竖屏） |
 | aspectRatio      | ConstrainDouble  | 否   | 表示媒体轨道需要满足的视频纵横比约束条件   |
 | frameRate        | ConstrainDouble  | 否   | 表示媒体轨道需要满足的帧率约束条件      |
+| zoom             | ConstrainDouble  | 否   | 表示媒体轨道需要满足的相机变焦倍率约束条件   |
 | facingMode       | ConstrainString  | 否   | 表示媒体轨道需要满足的摄像头朝向模式约束条件 |
 | resizeMode       | ConstrainString  | 否   | 表示媒体轨道需要满足的视频调整模式约束条件  |
 | sampleRate       | ConstrainULong   | 否   | 表示媒体轨道需要满足的音频采样率约束条件   |
@@ -1034,6 +1035,7 @@ setAudioPlayout(playout: boolean): void
 | height           | boolean | 否   | 表示媒体轨道是否支持高度约束条件      |
 | aspectRatio      | boolean | 否   | 表示媒体轨道是否支持纵横比约束条件     |
 | frameRate        | boolean | 否   | 表示媒体轨道是否支持帧率约束条件      |
+| zoom             | boolean | 否   | 表示媒体轨道是否支持变焦约束条件      |
 | facingMode       | boolean | 否   | 表示媒体轨道是否支持摄像头朝向模式约束条件 |
 | resizeMode       | boolean | 否   | 表示媒体轨道是否支持视频调整模式约束条件  |
 | sampleRate       | boolean | 否   | 表示媒体轨道是否支持音频采样率约束条件   |
@@ -1112,6 +1114,36 @@ getSource(): MediaSource | null
 |---------------------------------------|-------------|
 | [MediaSource](#mediasource)           | 媒体源  |
 | null                                  | 未找到（如远端媒体流轨道）  |
+
+### applyConstraints
+
+applyConstraints(constraints: MediaTrackConstraints): Promise\<void\>
+
+对媒体轨道应用约束条件。对于视频轨道，支持通过 zoom 字段设置相机变焦倍率，经库内部调用鸿蒙 Camera NDK 实现实时硬件变焦。传入的 zoom 值超出设备支持范围时将自动 clamp 到合法范围。仅支持扁平写法（如 `{ zoom: 2.0 }`），advanced 数组形式不被读取。
+
+**参数**
+
+| 参数名        | 类型                                                | 必填  | 说明                 |
+|------------|---------------------------------------------------|-----|----------------------|
+| constraints | [MediaTrackConstraints](#mediatrackconstraints) | 是   | 包含约束条件的对象，如 `{ zoom: 2.0 }` |
+
+**返回值**
+
+| 类型                | 说明                      |
+|-------------------|-------------------------|
+| Promise\<void\>   | 约束应用成功时 resolve，失败时 reject |
+
+### getZoomRange
+
+getZoomRange(): { min: number; max: number; supported: boolean }
+
+查询设备当前摄像头支持的变焦范围。不同摄像头（前置/后置）支持的范围不同，切换摄像头后需重新查询。
+
+**返回值**
+
+| 类型                                                          | 说明                           |
+|-------------------------------------------------------------|------------------------------|
+| { min: number; max: number; supported: boolean }           | min 为最小变焦倍率，max 为最大变焦倍率，supported 表示设备是否支持变焦 |
 
 ## MediaStream
 
