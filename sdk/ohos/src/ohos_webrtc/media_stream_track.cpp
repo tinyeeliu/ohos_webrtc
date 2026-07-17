@@ -46,6 +46,7 @@ const char kMethodNameStop[] = "stop";
 const char kMethodNameGetSource[] = "getSource";
 const char kMethodNameToJson[] = "toJSON";
 const char kMethodNameApplyConstraints[] = "applyConstraints";
+const char kMethodNameGetZoomRange[] = "getZoomRange";
 
 const char kEnumMediaStreamTrackStateLive[] = "live";
 const char kEnumMediaStreamTrackStateEnded[] = "ended";
@@ -67,6 +68,7 @@ void NapiMediaStreamTrack::Init(Napi::Env env, Object exports)
             InstanceMethod<&NapiMediaStreamTrack::Stop>(kMethodNameStop),
             InstanceMethod<&NapiMediaStreamTrack::GetSource>(kMethodNameGetSource),
             InstanceMethod<&NapiMediaStreamTrack::ApplyConstraints>(kMethodNameApplyConstraints),
+            InstanceMethod<&NapiMediaStreamTrack::GetZoomRange>(kMethodNameGetZoomRange),
             InstanceMethod<&NapiMediaStreamTrack::ToJson>(kMethodNameToJson),
         });
     exports.Set(kClassName, func);
@@ -432,6 +434,11 @@ bool NapiMediaStreamTrack::ReadVideoConstraints(const Napi::Object& constraints,
         return false;
     }
 
+    if (!ReadDoubleConstraint(basic.zoom, {env, deferred, "zoom"}, out.zoom, out.hasZoom)) {
+        return false;
+    }
+    RTC_LOG(LS_INFO) << __FUNCTION__ << ": hasZoom=" << out.hasZoom << ", zoom=" << out.zoom;
+
     if (basic.facingMode.IsConstrained()) {
         if (basic.facingMode.HasExact() && !basic.facingMode.Exact().empty()) {
             out.facingMode = basic.facingMode.Exact()[0];
@@ -524,6 +531,12 @@ bool NapiMediaStreamTrack::DoApplyVideoConstraints(const rtc::scoped_refptr<Ohos
 
     // Step 3: Apply resolution and framerate constraints to the video adapter.
     ApplyResolutionConstraints(videoSource, vc);
+
+    // Step 4: Apply zoom to the camera capturer (hardware zoom).
+    if (vc.hasZoom && vc.zoom > 0.0) {
+        RTC_LOG(LS_INFO) << __FUNCTION__ << ": applying zoom=" << vc.zoom;
+        videoSource->SetZoomRatio(vc.zoom);
+    }
 
     return true;
 }
@@ -659,6 +672,37 @@ Napi::Value NapiMediaStreamTrack::ApplyConstraints(const Napi::CallbackInfo& inf
 
     deferred.Resolve(env.Undefined());
     return deferred.Promise();
+}
+
+Napi::Value NapiMediaStreamTrack::GetZoomRange(const Napi::CallbackInfo& info)
+{
+    auto env = info.Env();
+    auto obj = Object::New(env);
+
+    if (!IsVideoTrack()) {
+        RTC_LOG(LS_WARNING) << __FUNCTION__ << ": not a video track";
+        obj.Set("supported", false);
+        return obj;
+    }
+
+    auto videoSource = factory_->GetVideoSource(track_);
+    if (!videoSource) {
+        RTC_LOG(LS_WARNING) << __FUNCTION__ << ": videoSource is null";
+        obj.Set("supported", false);
+        return obj;
+    }
+
+    float minZoom = 1.0f;
+    float maxZoom = 1.0f;
+    bool supported = videoSource->GetZoomRatioRange(&minZoom, &maxZoom);
+
+    obj.Set("min", static_cast<double>(minZoom));
+    obj.Set("max", static_cast<double>(maxZoom));
+    obj.Set("supported", supported);
+
+    RTC_LOG(LS_INFO) << __FUNCTION__ << ": supported=" << supported << ", min=" << minZoom << ", max=" << maxZoom;
+
+    return obj;
 }
 
 Napi::Value NapiMediaStreamTrack::ToJson(const Napi::CallbackInfo& info)
