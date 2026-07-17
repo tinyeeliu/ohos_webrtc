@@ -77,6 +77,7 @@ private:
     void GetCameraOrientationAndSceneMode(Camera_Device* device);
     Camera_Profile* FindPreviewProfile(ohos::CameraOutputCapability& capability, Camera_Device* device);
     bool StartCaptureSession(Camera_Profile* previewProfile);
+    void UpdateRotation();
 
     const std::string deviceId_;
     const video::VideoProfile profile_;
@@ -98,7 +99,8 @@ private:
 
     VideoCapturer::Observer* observer_{};
     std::mutex obsMutex_;
-    std::atomic<VideoRotation> finalRotation_;
+    std::atomic<VideoRotation> finalRotation_{kVideoRotation_0};
+    std::atomic<VideoRotation> i420Rotation_{kVideoRotation_0};
 };
 
 } // namespace webrtc
