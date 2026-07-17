@@ -98,6 +98,6 @@ ohos_clang_toolchain("ohos_clang_x86_64") {
   sysroot = "${sysroot}"
   lib_dir = "usr/lib/x86_64-linux-ohos"
   toolchain_args = {
-    current_cpu = "x86_64"
+    current_cpu = "x64"
   }
 }

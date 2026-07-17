@@ -134,7 +134,6 @@ Camera_Device* CameraCapturer::SelectCameraDevice()
     RTC_LOG(LS_VERBOSE) << "device: " << deviceIndex << ", " << device->cameraId;
     isCameraFrontFacing_ = device->cameraPosition == CAMERA_POSITION_FRONT;
     ohos::DisplayManager::GetInstance().RegisterChangeCallback(this);
-    OnDisplayChange(0);
     return device;
 }
 
@@ -242,6 +241,7 @@ void CameraCapturer::StartInternal()
     }
 
     GetCameraOrientationAndSceneMode(device);
+    UpdateRotation();
     auto capability = CameraManager::GetInstance().GetSupportedCameraOutputCapability(device);
     Camera_Profile* previewProfile = FindPreviewProfile(capability, device);
     if (previewProfile == nullptr) {
@@ -346,14 +346,9 @@ void CameraCapturer::OnFrameAvailable(
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
     (void)rotation;
-    int32_t cameraOrientation = cameraOrientation_;
-    if (cameraOrientation % VideoRotation::kVideoRotation_90 != 0) {
-        RTC_LOG(LS_WARNING) << "rotation must be a multiple of 90: " << cameraOrientation;
-        cameraOrientation = 0;
-    }
+    VideoRotation frameRotation = kVideoRotation_0;
 
-    // Undo the mirror that the OS "helps" us with.
-    // Also, undo camera orientation, we report it as rotation instead.
+    // GL 纹理路径：NativeImage 变换矩阵已包含传感器方向，此处仅补偿屏幕旋转与前置镜像。
     if (buffer->type() == VideoFrameBuffer::Type::kNative) {
         auto textureBuffer = static_cast<TextureBuffer*>(buffer.get());
 
@@ -367,28 +362,48 @@ void CameraCapturer::OnFrameAvailable(
         newMatrix.PreConcat(transformMatrix);
         buffer = TextureBuffer::Create(
             textureBuffer->GetTexture(), textureBuffer->width(), textureBuffer->height(), newMatrix);
+    } else {
+        // CPU 路径（x86_64 模拟器 ImageReceiver）：无系统变换矩阵，通过 rotation 元数据上报。
+        frameRotation = i420Rotation_;
     }
 
     UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
     if (observer_) {
-        observer_->OnFrameCaptured(buffer, timestampUs, VideoRotation::kVideoRotation_0);
+        observer_->OnFrameCaptured(buffer, timestampUs, frameRotation);
     }
+}
+
+void CameraCapturer::UpdateRotation()
+{
+    NativeDisplayManager_Rotation displayRotation = ohos::DisplayManager::GetInstance().GetDefaultDisplayRotation();
+    constexpr int kDegreesPerRotationUnit = 90;
+    constexpr int kFullCircleDegrees = 360;
+    int displayDegrees = displayRotation * kDegreesPerRotationUnit;
+    int cameraDegrees = static_cast<int>(cameraOrientation_);
+    if (cameraDegrees % kVideoRotation_90 != 0) {
+        RTC_LOG(LS_WARNING) << "camera orientation must be a multiple of 90: " << cameraDegrees;
+        cameraDegrees = 0;
+    }
+
+    if (isCameraFrontFacing_) {
+        finalRotation_ =
+            static_cast<VideoRotation>((kFullCircleDegrees - displayDegrees) % kFullCircleDegrees);
+        i420Rotation_ = static_cast<VideoRotation>((cameraDegrees + displayDegrees) % kFullCircleDegrees);
+    } else {
+        finalRotation_ = static_cast<VideoRotation>(displayDegrees % kFullCircleDegrees);
+        i420Rotation_ = static_cast<VideoRotation>(
+            (cameraDegrees - displayDegrees + kFullCircleDegrees) % kFullCircleDegrees);
+    }
+
+    RTC_DLOG(LS_VERBOSE) << "UpdateRotation: camera=" << cameraDegrees << ", display=" << displayDegrees
+                         << ", finalRotation=" << finalRotation_ << ", i420Rotation=" << i420Rotation_
+                         << ", isFrontFacing=" << isCameraFrontFacing_;
 }
 
 void CameraCapturer::OnDisplayChange(uint64_t displayId)
 {
-    NativeDisplayManager_Rotation displayRotation = ohos::DisplayManager::GetInstance().GetDefaultDisplayRotation();
-    RTC_DLOG(LS_VERBOSE) << "cameraRotation: " << cameraOrientation_ << ", displayRotation: " << displayRotation <<
-        ", isFrontFacing_: " << isCameraFrontFacing_;
-    constexpr int kDegreesPerRotationUnit = 90;
-    constexpr int kFullCircleDegrees = 360;
-    int displayDegrees = displayRotation * kDegreesPerRotationUnit;
-    if (isCameraFrontFacing_) {
-        finalRotation_ =
-            static_cast<VideoRotation>((0 - displayDegrees + kFullCircleDegrees) % kFullCircleDegrees);
-    } else {
-        finalRotation_ = static_cast<VideoRotation>((displayDegrees) % kFullCircleDegrees);
-    }
+    (void)displayId;
+    UpdateRotation();
 }
 
 } // namespace webrtc
