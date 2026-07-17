@@ -179,16 +179,14 @@ export default function PeerConnectionTest() {
         iceServers: []
       });
     })
-    afterEach(() => {
-      // Presets a clear action, which is performed after each unit test case ends.
-      // The number of execution times is the same as the number of test cases defined by **it**.
-      // This API supports only one parameter: clear action function.
+    afterEach(async () => {
       if (caller) {
         caller.close();
       }
       if (callee) {
         callee.close();
       }
+      await sleep(300);
     })
     afterAll(() => {
       // Presets a clear action, which is performed after all test cases of the test suite end.
@@ -385,7 +383,7 @@ export default function PeerConnectionTest() {
       caller.setConfiguration(newConfig);
 
       let updatedConfig = caller.getConfiguration();
-      expect(updatedConfig.iceServers.length).assertEqual(1);
+      expect(updatedConfig.iceServers!.length).assertEqual(1);
       expect(updatedConfig.iceCandidatePoolSize).assertEqual(10);
 
       try {
@@ -1375,6 +1373,16 @@ export default function PeerConnectionTest() {
       expect(track.kind).assertEqual('audio');
       expect(track.readyState).assertEqual('live');
       expect([receiver]).assertDeepEquals(caller.getReceivers());
+    })
+
+    it("setAudioRecordingDoesNotCrash", DEFAULT, () => {
+      caller.setAudioRecording(true);
+      caller.setAudioRecording(false);
+    })
+
+    it("setAudioPlayoutDoesNotCrash", DEFAULT, () => {
+      caller.setAudioPlayout(true);
+      caller.setAudioPlayout(false);
     })
 
   })

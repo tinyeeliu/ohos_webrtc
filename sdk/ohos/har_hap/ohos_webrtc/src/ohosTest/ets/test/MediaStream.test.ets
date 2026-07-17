@@ -53,7 +53,7 @@ export default function MediaStreamTest() {
       let stream = new webrtc.MediaStream([audioTrack]);
       let found = stream.getTrackById(audioTrack.id);
       expect(found).not().assertNull();
-      expect(found.id).assertEqual(audioTrack.id);
+      expect(found!.id).assertEqual(audioTrack.id);
       audioSource.release();
     })
 
@@ -74,6 +74,22 @@ export default function MediaStreamTest() {
       expect(stream.getVideoTracks().length).assertEqual(1);
       audioSource.release();
       videoSource.release();
+    })
+
+    it('idPropertyIsString', 0, () => {
+      let stream = new webrtc.MediaStream();
+      expect(typeof stream.id).assertEqual('string');
+      expect(stream.id.length).assertLarger(0);
+    })
+
+    it('copyConstructorPreservesTracks', 0, () => {
+      let audioSource = pcf.createAudioSource();
+      let audioTrack = pcf.createAudioTrack('audio', audioSource);
+      let original = new webrtc.MediaStream([audioTrack]);
+      let copy = new webrtc.MediaStream(original);
+      expect(copy.getTracks().length).assertEqual(1);
+      expect(copy.getAudioTracks()[0].id).assertEqual(audioTrack.id);
+      audioSource.release();
     })
   })
 }
