@@ -52,6 +52,9 @@ public:
     void Stop() override;
     bool IsScreencast() override;
 
+    void SetZoomRatio(double ratio) override;
+    bool GetZoomRatioRange(float* minZoom, float* maxZoom) override;
+
 protected:
     void NotifyCapturedStart(bool success);
     void NotifyCapturedStop();

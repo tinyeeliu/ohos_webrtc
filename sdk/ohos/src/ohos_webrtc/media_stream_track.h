@@ -26,6 +26,10 @@
 namespace webrtc {
 
 class PeerConnectionFactoryWrapper;
+class OhosVideoTrackSource;
+class OhosLocalAudioSource;
+class LongConstraint;
+class DoubleConstraint;
 
 class NapiMediaStreamTrack : public Napi::ObjectWrap<NapiMediaStreamTrack>, public ObserverInterface {
 public:
@@ -72,9 +76,72 @@ protected:
     Napi::Value GetReadyState(const Napi::CallbackInfo& info);
     Napi::Value Stop(const Napi::CallbackInfo& info);
     Napi::Value GetSource(const Napi::CallbackInfo& info);
+    Napi::Value ApplyConstraints(const Napi::CallbackInfo& info);
     Napi::Value ToJson(const Napi::CallbackInfo& info);
 
 private:
+    // Validate track state and input arguments for ApplyConstraints.
+    // Returns a valid Promise on error, or Undefined() on success (caller should continue).
+    Napi::Value ValidateApplyConstraintsInput(const Napi::CallbackInfo& info, Napi::Promise::Deferred& deferred);
+
+    // Apply audio constraints to the audio source.
+    void ApplyAudioConstraints(const Napi::Object& constraints, rtc::scoped_refptr<OhosLocalAudioSource> audioSource);
+
+    // Read and validate video constraints from the input object.
+    struct VideoConstraints {
+        int width = 0;
+        int height = 0;
+        double frameRate = 0.0;
+        std::string facingMode;
+        double zoom = 0.0;
+        bool hasWidth = false;
+        bool hasHeight = false;
+        bool hasFrameRate = false;
+        bool hasFacingMode = false;
+        bool hasZoom = false;
+    };
+    bool ReadVideoConstraints(const Napi::Object& constraints, Napi::Env env, Napi::Promise::Deferred& deferred,
+        VideoConstraints& out);
+    // Apply validated constraints to video source via source thread.
+    // Returns true on success, false on failure (caller should reject Promise).
+    bool DoApplyVideoConstraints(const rtc::scoped_refptr<OhosVideoTrackSource>& videoSource,
+        const VideoConstraints& constraints);
+
+private:
+    // Extract resolution from VideoConstraints.
+    struct Resolution {
+        int width = 0;
+        int height = 0;
+    };
+    Resolution ExtractResolution(const VideoConstraints& vc) const;
+    // Extract frameRate from VideoConstraints.
+    int ExtractFrameRate(const VideoConstraints& vc) const;
+    // Apply resolution and framerate constraints to the video adapter.
+    void ApplyResolutionConstraints(const rtc::scoped_refptr<OhosVideoTrackSource>& videoSource,
+        const VideoConstraints& vc);
+
+public:
+    // Validate facingMode constraint without applying it.
+    // Returns true if facingMode can be satisfied, false otherwise.
+    bool CanApplyFacingModeConstraint(const std::string& facingMode, int width, int height, int frameRate);
+    // Apply facingMode constraint (must be called after CanApplyFacingModeConstraint returns true).
+    // Returns true on success, false on failure.
+    bool ApplyFacingModeConstraint(const rtc::scoped_refptr<OhosVideoTrackSource>& videoSource,
+        const std::string& facingMode, int width, int height, int frameRate);
+
+    // Context for reading numeric constraints.
+    struct ConstraintReadContext {
+        Napi::Env env;
+        Napi::Promise::Deferred& deferred;
+        const char* name;
+    };
+    // Helper to read a numeric constraint (width/height) and validate it's positive.
+    bool ReadLongConstraint(const LongConstraint& constraint, const ConstraintReadContext& ctx,
+        int32_t& outValue, bool& outHasValue);
+    // Helper to read a numeric constraint (frameRate) and validate it's positive.
+    bool ReadDoubleConstraint(const DoubleConstraint& constraint, const ConstraintReadContext& ctx,
+        double& outValue, bool& outHasValue);
+
     std::shared_ptr<PeerConnectionFactoryWrapper> factory_;
     rtc::scoped_refptr<MediaStreamTrackInterface> track_;
 

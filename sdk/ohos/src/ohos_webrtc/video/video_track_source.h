@@ -81,8 +81,23 @@ protected:
     void GenerateKeyFrame() override {}
     void AddEncodedSink(rtc::VideoSinkInterface<RecordableEncodedFrame>* sink) override {}
     void RemoveEncodedSink(rtc::VideoSinkInterface<RecordableEncodedFrame>* sink) override {}
+
+public:
     void ProcessConstraints(const VideoTrackSourceConstraints& constraints) override;
 
+    // Apply resolution and framerate constraints to the video adapter.
+    void OnOutputFormatRequest(int width, int height, int maxFps);
+
+    // Apply both resolution and framerate constraints on the source thread.
+    void ApplyConstraints(const VideoTrackSourceConstraints& constraints, int width, int height, int maxFps);
+
+    // Switch to a new capturer (for facingMode change).
+    void SwitchCapturer(std::shared_ptr<VideoCapturer> capturer);
+
+    // Set camera zoom ratio (dispatched to source thread, then forwarded to capturer)
+    void SetZoomRatio(double ratio);
+
+protected:
     // VideoCapturer::Observer
     void OnCapturerStarted(bool success) override;
     void OnCapturerStopped() override;
@@ -94,6 +109,8 @@ private:
     std::unique_ptr<rtc::Thread> thread_;
     rtc::Thread* signalingThread_;
     std::shared_ptr<VideoCapturer> capturer_;
+    // Pending capturer for SwitchCapturer; will replace capturer_ on success.
+    std::shared_ptr<VideoCapturer> pendingSwitchCapturer_;
     std::shared_ptr<EglContext> sharedContext_;
     cricket::VideoAdapter videoAdapter_;
     rtc::VideoBroadcaster broadcaster_;

@@ -696,6 +696,7 @@ export interface MediaTrackConstraintSet {
   height?: ConstrainULong;
   aspectRatio?: ConstrainDouble;
   frameRate?: ConstrainDouble;
+  zoom?: ConstrainDouble;
   facingMode?: ConstrainString;
   resizeMode?: ConstrainString;
   sampleRate?: ConstrainULong;
@@ -806,6 +807,7 @@ export interface MediaStreamTrack extends EventTarget {
 
   stop(): void;
   getSource(): MediaSource | null;
+  applyConstraints(constraints: MediaTrackConstraints): Promise<void>;
 }
 
 export declare var MediaStreamTrack: {
@@ -1039,7 +1041,6 @@ export interface PeerConnectionFactory {
 declare var PeerConnectionFactory: {
   prototype: PeerConnectionFactory;
   new(options?: PeerConnectionFactoryOptions): PeerConnectionFactory;
-  getDefault(): PeerConnectionFactory;
   setDefault(factory: PeerConnectionFactory): void;
 };
 
