@@ -31,8 +31,24 @@ struct Index {
           .margin({ top: 20 })
           .onClick(() => {
             console.log(TAG, "switch to working page!");
-            // TODO jump to workpage
             router.pushUrl({ url: "pages/workPage"})
+          })
+          .margin({ left: 10, right: 20 })
+
+      }
+      .alignSelf(ItemAlign.Center)
+      .padding({ top: 24 })
+
+      Row() {
+        Button("applyConstraints test page")
+          .width(300)
+          .height(60)
+          .fontSize(20)
+          .fontWeight(FontWeight.Bold)
+          .margin({ top: 20 })
+          .onClick(() => {
+            console.log(TAG, "switch to applyConstraints test page!");
+            router.pushUrl({ url: "pages/ApplyConstraintsTestPage"})
           })
           .margin({ left: 10, right: 20 })
 

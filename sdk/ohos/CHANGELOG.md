@@ -1,4 +1,8 @@
 # Changelog
+## Unreleased
+- Support camera zoom via applyConstraints({ zoom }) and getZoomRange() [#121](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/merge_requests/121)
+- Support applyConstraints for video track (resolution/frameRate/facingMode) [#119](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/119)
+
 ## 1.0.2 (2026-06-11)
 - Support real-time dynamic changes of the local resolution [#94](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/94)
 - Implement support for the audio track pause and volume adjustment interface [#104](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/104)
