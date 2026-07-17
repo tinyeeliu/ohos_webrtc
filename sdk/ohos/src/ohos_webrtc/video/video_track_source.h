@@ -94,6 +94,10 @@ public:
     // Switch to a new capturer (for facingMode change).
     void SwitchCapturer(std::shared_ptr<VideoCapturer> capturer);
 
+    // Set camera zoom ratio (dispatched to source thread, then forwarded to capturer)
+    void SetZoomRatio(double ratio);
+    bool GetZoomRatioRange(float* minZoom, float* maxZoom);
+
 protected:
     // VideoCapturer::Observer
     void OnCapturerStarted(bool success) override;
@@ -111,6 +115,7 @@ private:
     std::shared_ptr<VideoCapturer> capturer_;
     // Pending capturer for SwitchCapturer; will replace capturer_ on success.
     std::shared_ptr<VideoCapturer> pendingSwitchCapturer_;
+    double pendingZoomRatio_ = 0.0;
     std::shared_ptr<EglContext> sharedContext_;
     cricket::VideoAdapter videoAdapter_;
     rtc::VideoBroadcaster broadcaster_;
