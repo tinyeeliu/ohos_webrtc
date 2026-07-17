@@ -1039,7 +1039,6 @@ export interface PeerConnectionFactory {
 declare var PeerConnectionFactory: {
   prototype: PeerConnectionFactory;
   new(options?: PeerConnectionFactoryOptions): PeerConnectionFactory;
-  getDefault(): PeerConnectionFactory;
   setDefault(factory: PeerConnectionFactory): void;
 };
 

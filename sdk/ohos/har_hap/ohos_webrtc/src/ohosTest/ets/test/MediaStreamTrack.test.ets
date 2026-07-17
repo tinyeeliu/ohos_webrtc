@@ -73,7 +73,7 @@ export default function MediaStreamTrackTest() {
       let audioTrack = pcf.createAudioTrack('audio', audioSource);
       let sender = pc.addTrack(audioTrack);
       expect(sender.track).not().assertNull();
-      audioTrack.stop();
+      pc.removeTrack(sender);
       expect(sender.track).assertNull();
       pc.close();
       audioSource.release();
