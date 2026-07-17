@@ -67,6 +67,9 @@ public:
 
     void SetVolume(double volume) override;
 
+    // Apply audio constraints (echoCancellation, autoGainControl, noiseSuppression).
+    void ApplyConstraints(const cricket::AudioOptions& options);
+
     void Stop();
 protected:
     OhosLocalAudioSource() = default;
