@@ -24,6 +24,7 @@
 #include "camera/camera_enumerator.h"
 
 #include "rtc_base/logging.h"
+#include "hilog/log.h"
 #include "utils/marcos.h"
 
 namespace webrtc {
@@ -46,6 +47,7 @@ const char kMethodNameStop[] = "stop";
 const char kMethodNameGetSource[] = "getSource";
 const char kMethodNameToJson[] = "toJSON";
 const char kMethodNameApplyConstraints[] = "applyConstraints";
+const char kMethodNameGetZoomRange[] = "getZoomRange";
 
 const char kEnumMediaStreamTrackStateLive[] = "live";
 const char kEnumMediaStreamTrackStateEnded[] = "ended";
@@ -67,6 +69,7 @@ void NapiMediaStreamTrack::Init(Napi::Env env, Object exports)
             InstanceMethod<&NapiMediaStreamTrack::Stop>(kMethodNameStop),
             InstanceMethod<&NapiMediaStreamTrack::GetSource>(kMethodNameGetSource),
             InstanceMethod<&NapiMediaStreamTrack::ApplyConstraints>(kMethodNameApplyConstraints),
+            InstanceMethod<&NapiMediaStreamTrack::GetZoomRange>(kMethodNameGetZoomRange),
             InstanceMethod<&NapiMediaStreamTrack::ToJson>(kMethodNameToJson),
         });
     exports.Set(kClassName, func);
@@ -432,6 +435,11 @@ bool NapiMediaStreamTrack::ReadVideoConstraints(const Napi::Object& constraints,
         return false;
     }
 
+    if (!ReadDoubleConstraint(basic.zoom, {env, deferred, "zoom"}, out.zoom, out.hasZoom)) {
+        return false;
+    }
+    OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, "mhg", "【mhg】 ReadVideoConstraints: hasZoom=%{public}d zoom=%{public}f", out.hasZoom ? 1 : 0, out.zoom);
+
     if (basic.facingMode.IsConstrained()) {
         if (basic.facingMode.HasExact() && !basic.facingMode.Exact().empty()) {
             out.facingMode = basic.facingMode.Exact()[0];
@@ -525,6 +533,14 @@ bool NapiMediaStreamTrack::DoApplyVideoConstraints(const rtc::scoped_refptr<Ohos
     // Step 3: Apply resolution and framerate constraints to the video adapter.
     ApplyResolutionConstraints(videoSource, vc);
 
+    // Step 4: Apply zoom to the camera capturer (hardware zoom).
+    if (vc.hasZoom && vc.zoom > 0.0) {
+        OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, "mhg", "【mhg】 DoApplyVideoConstraints: dispatch zoom=%{public}f to SetZoomRatio", vc.zoom);
+        videoSource->SetZoomRatio(vc.zoom);
+    } else {
+        OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, "mhg", "【mhg】 DoApplyVideoConstraints: zoom not set (hasZoom=%{public}d), skip", vc.hasZoom ? 1 : 0);
+    }
+
     return true;
 }
 
@@ -532,6 +548,7 @@ bool NapiMediaStreamTrack::CanApplyFacingModeConstraint(
     const std::string& facingMode, int width, int height, int frameRate)
 {
     RTC_LOG(LS_INFO) << "Validate facingMode constraint: " << facingMode;
+    OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, "mhg", "【mhg】 CanApplyFacingMode: facingMode=%{public}s w=%{public}d h=%{public}d fps=%{public}d", facingMode.c_str(), width, height, frameRate);
 
     MediaTrackConstraints facingModeConstraint;
     facingModeConstraint.Initialize();
@@ -540,6 +557,7 @@ bool NapiMediaStreamTrack::CanApplyFacingModeConstraint(
     int selectWidth = width > 0 ? width : kDefaultWidth;
     int selectHeight = height > 0 ? height : kDefaultHeight;
     int selectFrameRate = frameRate > 0 ? frameRate : kDefaultFrameRate;
+    OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, "mhg", "【mhg】 CanApplyFacingMode: defaults w=%{public}d h=%{public}d fps=%{public}d", selectWidth, selectHeight, selectFrameRate);
 
     CameraCaptureSettings selectedSetting;
     std::string failedConstraintName;
@@ -548,15 +566,19 @@ bool NapiMediaStreamTrack::CanApplyFacingModeConstraint(
         selectedSetting, failedConstraintName)) {
         RTC_LOG(LS_ERROR) << "Failed to select settings for facingMode: " << facingMode
                           << ", unsatisfied constraint: " << failedConstraintName;
+        OH_LOG_Print(LOG_APP, LOG_ERROR, LOG_DOMAIN, "mhg", "【mhg】 CanApplyFacingMode: SelectSettingsForVideo FAILED, constraint=%{public}s", failedConstraintName.c_str());
         return false;
     }
+    OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, "mhg", "【mhg】 CanApplyFacingMode: SelectSettings OK, deviceId=%{public}s", selectedSetting.deviceId.c_str());
 
     auto newCapturer = CameraCapturer::Create(selectedSetting.deviceId, selectedSetting.profile);
     if (!newCapturer) {
         RTC_LOG(LS_ERROR) << "Failed to create camera capturer for facingMode: " << facingMode;
+        OH_LOG_Print(LOG_APP, LOG_ERROR, LOG_DOMAIN, "mhg", "【mhg】 CanApplyFacingMode: CameraCapturer::Create FAILED");
         return false;
     }
 
+    OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, "mhg", "【mhg】 CanApplyFacingMode: OK (validation passed)");
     // Validation passed, but we don't apply the constraint here.
     // The capturer is created but will be destroyed since it's not used.
     return true;
@@ -566,6 +588,7 @@ bool NapiMediaStreamTrack::ApplyFacingModeConstraint(const rtc::scoped_refptr<Oh
     const std::string& facingMode, int width, int height, int frameRate)
 {
     RTC_LOG(LS_INFO) << "ApplyConstraints video facingMode: " << facingMode;
+    OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, "mhg", "【mhg】 ApplyFacingMode: facingMode=%{public}s w=%{public}d h=%{public}d fps=%{public}d", facingMode.c_str(), width, height, frameRate);
 
     MediaTrackConstraints facingModeConstraint;
     facingModeConstraint.Initialize();
@@ -582,16 +605,21 @@ bool NapiMediaStreamTrack::ApplyFacingModeConstraint(const rtc::scoped_refptr<Oh
         selectedSetting, failedConstraintName)) {
         RTC_LOG(LS_ERROR) << "Failed to select settings for facingMode: " << facingMode
                           << ", unsatisfied constraint: " << failedConstraintName;
+        OH_LOG_Print(LOG_APP, LOG_ERROR, LOG_DOMAIN, "mhg", "【mhg】 ApplyFacingMode: SelectSettingsForVideo FAILED, constraint=%{public}s", failedConstraintName.c_str());
         return false;
     }
+    OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, "mhg", "【mhg】 ApplyFacingMode: SelectSettings OK, deviceId=%{public}s", selectedSetting.deviceId.c_str());
 
     auto newCapturer = CameraCapturer::Create(selectedSetting.deviceId, selectedSetting.profile);
     if (!newCapturer) {
         RTC_LOG(LS_ERROR) << "Failed to create camera capturer for facingMode: " << facingMode;
+        OH_LOG_Print(LOG_APP, LOG_ERROR, LOG_DOMAIN, "mhg", "【mhg】 ApplyFacingMode: CameraCapturer::Create FAILED");
         return false;
     }
 
+    OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, "mhg", "【mhg】 ApplyFacingMode: calling SwitchCapturer");
     videoSource->SwitchCapturer(std::shared_ptr<VideoCapturer>(newCapturer.release()));
+    OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, "mhg", "【mhg】 ApplyFacingMode: SwitchCapturer done, returning true");
     return true;
 }
 
@@ -617,6 +645,7 @@ Napi::Value NapiMediaStreamTrack::ValidateApplyConstraintsInput(
 Napi::Value NapiMediaStreamTrack::ApplyConstraints(const Napi::CallbackInfo& info)
 {
     RTC_LOG(LS_INFO) << __FUNCTION__ << " called on " << (IsVideoTrack() ? "video" : "audio") << " track";
+    OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, "mhg", "【mhg】 ApplyConstraints: entry, track type=%{public}s", IsVideoTrack() ? "video" : "audio");
 
     auto env = info.Env();
     auto deferred = Napi::Promise::Deferred::New(env);
@@ -659,6 +688,37 @@ Napi::Value NapiMediaStreamTrack::ApplyConstraints(const Napi::CallbackInfo& inf
 
     deferred.Resolve(env.Undefined());
     return deferred.Promise();
+}
+
+Napi::Value NapiMediaStreamTrack::GetZoomRange(const Napi::CallbackInfo& info)
+{
+    auto env = info.Env();
+    auto obj = Object::New(env);
+
+    if (!IsVideoTrack()) {
+        OH_LOG_Print(LOG_APP, LOG_WARN, LOG_DOMAIN, "mhg", "【mhg】 GetZoomRange: SKIP, not a video track");
+        obj.Set("supported", false);
+        return obj;
+    }
+
+    auto videoSource = factory_->GetVideoSource(track_);
+    if (!videoSource) {
+        OH_LOG_Print(LOG_APP, LOG_WARN, LOG_DOMAIN, "mhg", "【mhg】 GetZoomRange: SKIP, videoSource is null");
+        obj.Set("supported", false);
+        return obj;
+    }
+
+    float minZoom = 1.0f;
+    float maxZoom = 1.0f;
+    bool supported = videoSource->GetZoomRatioRange(&minZoom, &maxZoom);
+
+    obj.Set("min", static_cast<double>(minZoom));
+    obj.Set("max", static_cast<double>(maxZoom));
+    obj.Set("supported", supported);
+
+    OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, "mhg", "【mhg】 GetZoomRange: result supported=%{public}d min=%{public}f max=%{public}f", supported ? 1 : 0, minZoom, maxZoom);
+
+    return obj;
 }
 
 Napi::Value NapiMediaStreamTrack::ToJson(const Napi::CallbackInfo& info)

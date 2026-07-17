@@ -18,8 +18,12 @@
 #include "../utils/marcos.h"
 
 #include <ohcamera/camera_device.h>
+#include <ohcamera/capture_session.h>
+
+#include <algorithm>
 
 #include "rtc_base/logging.h"
+#include "hilog/log.h"
 
 namespace webrtc {
 
@@ -295,6 +299,57 @@ void CameraCapturer::StopInternal()
     cameraDevices_.Reset();
     ohos::DisplayManager::GetInstance().UnregisterChangeCallback(this);
     isStarted_ = false;
+}
+
+void CameraCapturer::SetZoomRatio(double ratio)
+{
+    RTC_LOG(LS_INFO) << __FUNCTION__ << ": ratio=" << ratio;
+    OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, "mhg", "【mhg】 CameraCapturer::SetZoomRatio ratio=%{public}f", ratio);
+
+    if (!isStarted_ || !captureSession_.Raw()) {
+        RTC_LOG(LS_WARNING) << "SetZoomRatio ignored: capture session not active";
+        OH_LOG_Print(LOG_APP, LOG_WARN, LOG_DOMAIN, "mhg", "【mhg】 SetZoomRatio SKIP: session not active (isStarted=%{public}d)", isStarted_ ? 1 : 0);
+        return;
+    }
+
+    float minZoom = 1.0f;
+    float maxZoom = 1.0f;
+    bool supported = GetZoomRatioRange(&minZoom, &maxZoom);
+    if (!supported) {
+        RTC_LOG(LS_WARNING) << "SetZoomRatio ignored: zoom not supported by device";
+        OH_LOG_Print(LOG_APP, LOG_WARN, LOG_DOMAIN, "mhg", "【mhg】 SetZoomRatio SKIP: zoom not supported by device");
+        return;
+    }
+
+    float clamped = std::clamp(static_cast<float>(ratio), minZoom, maxZoom);
+    RTC_LOG(LS_INFO) << "SetZoomRatio: clamped=" << clamped << " (range " << minZoom << "-" << maxZoom << ")";
+    OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, "mhg", "【mhg】 SetZoomRatio clamped=%{public}f (range %{public}f-%{public}f)", clamped, minZoom, maxZoom);
+
+    Camera_ErrorCode ret = OH_CaptureSession_SetZoomRatio(captureSession_.Raw(), clamped);
+    if (ret != CAMERA_OK) {
+        RTC_LOG(LS_ERROR) << "OH_CaptureSession_SetZoomRatio failed, code=" << ret << ", ratio=" << clamped;
+        OH_LOG_Print(LOG_APP, LOG_ERROR, LOG_DOMAIN, "mhg", "【mhg】 SetZoomRatio NDK FAILED code=%{public}d ratio=%{public}f", ret, clamped);
+    } else {
+        OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, "mhg", "【mhg】 SetZoomRatio NDK OK ratio=%{public}f", clamped);
+    }
+}
+
+bool CameraCapturer::GetZoomRatioRange(float* minZoom, float* maxZoom)
+{
+    if (!captureSession_.Raw()) {
+        OH_LOG_Print(LOG_APP, LOG_WARN, LOG_DOMAIN, "mhg", "【mhg】 CameraCapturer::GetZoomRatioRange: SKIP, captureSession_ is null (isStarted=%{public}d)", isStarted_ ? 1 : 0);
+        if (minZoom) *minZoom = 1.0f;
+        if (maxZoom) *maxZoom = 1.0f;
+        return false;
+    }
+    Camera_ErrorCode ret = OH_CaptureSession_GetZoomRatioRange(captureSession_.Raw(), minZoom, maxZoom);
+    if (ret != CAMERA_OK) {
+        RTC_LOG(LS_WARNING) << "OH_CaptureSession_GetZoomRatioRange failed, code=" << ret;
+        OH_LOG_Print(LOG_APP, LOG_WARN, LOG_DOMAIN, "mhg", "【mhg】 CameraCapturer::GetZoomRatioRange: NDK FAILED code=%{public}d", ret);
+        return false;
+    }
+    OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, "mhg", "【mhg】 CameraCapturer::GetZoomRatioRange: NDK OK min=%{public}f max=%{public}f", minZoom ? *minZoom : -1.0f, maxZoom ? *maxZoom : -1.0f);
+    return true;
 }
 
 void CameraCapturer::OnCameraManagerStatusCallback(Camera_StatusInfo* status)

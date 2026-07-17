@@ -19,6 +19,7 @@
 
 #include "api/video/i420_buffer.h"
 #include "rtc_base/logging.h"
+#include "hilog/log.h"
 
 namespace webrtc {
 
@@ -281,6 +282,38 @@ void OhosVideoTrackSource::ApplyConstraints(const VideoTrackSourceConstraints& c
         OnOutputFormatRequest(width, height, maxFps);
         ProcessConstraints(constraints);
     });
+}
+
+void OhosVideoTrackSource::SetZoomRatio(double ratio)
+{
+    OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, "mhg", "【mhg】 VideoTrackSource::SetZoomRatio ratio=%{public}f posting to source thread", ratio);
+    thread_->PostTask([this, ratio] {
+        if (is_destroying_.load(std::memory_order_acquire)) {
+            OH_LOG_Print(LOG_APP, LOG_WARN, LOG_DOMAIN, "mhg", "【mhg】 SetZoomRatio SKIP: source destroying");
+            return;
+        }
+        if (capturer_) {
+            OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, "mhg", "【mhg】 SetZoomRatio calling capturer->SetZoomRatio ratio=%{public}f", ratio);
+            capturer_->SetZoomRatio(ratio);
+        } else {
+            OH_LOG_Print(LOG_APP, LOG_WARN, LOG_DOMAIN, "mhg", "【mhg】 SetZoomRatio SKIP: capturer_ is null");
+        }
+    });
+}
+
+bool OhosVideoTrackSource::GetZoomRatioRange(float* minZoom, float* maxZoom)
+{
+    if (is_destroying_.load(std::memory_order_acquire)) {
+        OH_LOG_Print(LOG_APP, LOG_WARN, LOG_DOMAIN, "mhg", "【mhg】 Source::GetZoomRatioRange: SKIP, source destroying");
+        return false;
+    }
+    if (!capturer_) {
+        OH_LOG_Print(LOG_APP, LOG_WARN, LOG_DOMAIN, "mhg", "【mhg】 Source::GetZoomRatioRange: SKIP, capturer_ is null (camera not started yet?)");
+        return false;
+    }
+    bool ret = capturer_->GetZoomRatioRange(minZoom, maxZoom);
+    OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, "mhg", "【mhg】 Source::GetZoomRatioRange: capturer returned supported=%{public}d min=%{public}f max=%{public}f", ret ? 1 : 0, *minZoom, *maxZoom);
+    return ret;
 }
 
 void OhosVideoTrackSource::SwitchCapturer(std::shared_ptr<VideoCapturer> capturer)

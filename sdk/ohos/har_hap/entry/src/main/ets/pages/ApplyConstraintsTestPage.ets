@@ -36,6 +36,15 @@ struct ApplyConstraintsTestPage {
   // facingMode
   @State facingMode: string = 'user';
 
+  // zoom
+  @State currentZoom: number = 1.0;
+  @State zoomInput: string = '2.0';
+  @State zoomMin: number = 1.0;
+  @State zoomMax: number = 6.0;
+  @State zoomSupported: boolean = true;
+  private zoomAtGestureStart: number = 1.0;
+  private zoomRangeValid: boolean = false;
+
 
   private pcf?: webrtc.PeerConnectionFactory;
   private localVideoSource?: webrtc.VideoSource;
@@ -58,7 +67,7 @@ struct ApplyConstraintsTestPage {
         }
 
         if (!granted) {
-          this.setStatus('权限未授予');
+          this.setStatus("权限未授予");
           return;
         }
 
@@ -89,12 +98,45 @@ struct ApplyConstraintsTestPage {
 
   async prepareVideoTrack() {
     if (!this.localVideoTrack) {
-      this.localVideoSource = this.pcf?.createVideoSource({});
-      this.localVideoTrack = this.pcf?.createVideoTrack('video', this.localVideoSource);
+      console.info(TAG, `【mhg】 prepareVideoTrack: creating video source (facingMode=environment)`);
+      this.localVideoSource = this.pcf?.createVideoSource({ facingMode: 'environment' });
+      this.localVideoTrack = this.pcf?.createVideoTrack("video", this.localVideoSource);
       if (this.localVideoTrack) {
+        console.info(TAG, `【mhg】 prepareVideoTrack: track created, scheduling zoom range query in 1500ms`);
         this.mXComponentController.setVideoTrack(this.localVideoTrack);
         this.mXComponentController.setScalingMode(ScalingMode.AspectFit);
+        setTimeout(() => {
+          console.info(TAG, `【mhg】 prepareVideoTrack: delayed queryZoomRange fired`);
+          this.queryZoomRange();
+        }, 1500);
+      } else {
+        console.info(TAG, `【mhg】 prepareVideoTrack: FAILED to create track`);
       }
+    } else {
+      console.info(TAG, `【mhg】 prepareVideoTrack: track already exists, skip`);
+    }
+  }
+
+  ensureZoomRange() {
+    console.info(TAG, `【mhg】 ensureZoomRange: zoomRangeValid=${this.zoomRangeValid}, ${this.zoomRangeValid ? 'range known, skip' : 'range unknown, querying'}`);
+    if (!this.zoomRangeValid) {
+      this.queryZoomRange();
+    }
+  }
+
+  queryZoomRange() {
+    try {
+      let range = this.localVideoTrack?.getZoomRange();
+      if (range) {
+        this.zoomMin = range.min;
+        this.zoomMax = range.max;
+        this.zoomSupported = range.supported;
+        this.zoomRangeValid = range.supported;
+        console.info(TAG, `【mhg】 queryZoomRange: supported=${range.supported}, min=${range.min}, max=${range.max}, valid=${this.zoomRangeValid}`);
+        this.setStatus(`zoom 范围: ${range.min.toFixed(2)}x ~ ${range.max.toFixed(2)}x ${range.supported ? '(支持)' : '(不支持)'}`);
+      }
+    } catch (e) {
+      console.info(TAG, `【mhg】 queryZoomRange: FAILED - ${e}`);
     }
   }
 
@@ -173,10 +215,82 @@ struct ApplyConstraintsTestPage {
       // 记录切换后的状态
       console.info(TAG, `[testFacingModeSwitch] 切换完成`);
 
+      // 相机已切换，重置 zoom 范围（新摄像头的范围不同）
+      this.zoomRangeValid = false;
+      this.currentZoom = 1.0;
+      console.info(TAG, `【mhg】 [testFacingModeSwitch] camera switched, reset zoomRangeValid=false, currentZoom=1.0, scheduling re-query`);
+      setTimeout(() => {
+        console.info(TAG, `【mhg】 [testFacingModeSwitch] delayed queryZoomRange after camera switch`);
+        this.queryZoomRange();
+      }, 1500);
+
       this.addResult(`✓ testFacingModeSwitch(facingMode=${this.facingMode}): 通过 (Promise resolved)`);
     } catch (e) {
       console.error(TAG, `[testFacingModeSwitch] 失败: ${e}`);
       this.addResult(`✗ testFacingModeSwitch(facingMode=${this.facingMode}): 失败 - ${e}`);
+    }
+  }
+
+  // 测试6: zoom 变焦
+  async testVideoZoom() {
+    this.setStatus('测试: zoom 变焦');
+    await this.prepareVideoTrack();
+    this.ensureZoomRange();
+
+    const zoom = parseFloat(this.zoomInput);
+    if (isNaN(zoom) || zoom <= 0) {
+      this.addResult(`✗ testVideoZoom: 无效的 zoom 值 (${this.zoomInput})`);
+      return;
+    }
+
+    try {
+      console.info(TAG, `【mhg】 testVideoZoom: calling applyConstraints({ zoom: ${zoom} })`);
+      await this.localVideoTrack!.applyConstraints({
+        zoom: zoom
+      });
+      this.currentZoom = zoom;
+      console.info(TAG, `【mhg】 testVideoZoom: SUCCESS zoom=${zoom}`);
+      this.addResult(`✓ testVideoZoom(zoom=${zoom}): 通过 (Promise resolved)`);
+    } catch (e) {
+      console.info(TAG, `【mhg】 testVideoZoom: FAILED - ${e}`);
+      this.addResult(`✗ testVideoZoom(zoom=${zoom}): 失败 - ${e}`);
+    }
+  }
+
+  // 测试7: zoom 超界（测试 C++ clamp 保护）
+  async testVideoZoomOutOfRange() {
+    this.setStatus('测试: zoom 超界 (应被 clamp，不崩溃)');
+    await this.prepareVideoTrack();
+    this.ensureZoomRange();
+
+    try {
+      console.info(TAG, `【mhg】 testVideoZoomOutOfRange: calling applyConstraints({ zoom: 9999 })`);
+      await this.localVideoTrack!.applyConstraints({
+        zoom: 9999
+      });
+      console.info(TAG, `【mhg】 testVideoZoomOutOfRange: SUCCESS (C++ should have clamped)`);
+      this.addResult(`✓ testVideoZoomOutOfRange(zoom=9999): 通过 (Promise resolved, C++ 应已 clamp)`);
+    } catch (e) {
+      console.info(TAG, `【mhg】 testVideoZoomOutOfRange: FAILED - ${e}`);
+      this.addResult(`✗ testVideoZoomOutOfRange(zoom=9999): 失败 - ${e}`);
+    }
+  }
+
+  // 重置 zoom 到 1.0
+  async resetZoom() {
+    this.setStatus('重置 zoom 到 1.0');
+    await this.prepareVideoTrack();
+    this.ensureZoomRange();
+
+    try {
+      console.info(TAG, `【mhg】 resetZoom: calling applyConstraints({ zoom: 1.0 })`);
+      await this.localVideoTrack!.applyConstraints({ zoom: 1.0 });
+      this.currentZoom = 1.0;
+      console.info(TAG, `【mhg】 resetZoom: SUCCESS`);
+      this.addResult(`✓ resetZoom: 已重置到 1.0x`);
+    } catch (e) {
+      console.info(TAG, `【mhg】 resetZoom: FAILED - ${e}`);
+      this.addResult(`✗ resetZoom: 失败 - ${e}`);
     }
   }
 
@@ -194,13 +308,38 @@ struct ApplyConstraintsTestPage {
           .margin({ bottom: 12 })
 
         XComponent({
-          id: 'test-video',
+          id: "test-video",
           type: XComponentType.SURFACE,
           controller: this.mXComponentController
         })
           .width('100%')
           .height(200)
           .margin({ bottom: 16 })
+          .gesture(
+            PinchGesture({ fingers: 2 })
+              .onActionStart(() => {
+                this.ensureZoomRange();
+                this.zoomAtGestureStart = this.currentZoom;
+                console.info(TAG, `【mhg】 [PinchZoom] start, base zoom=${this.zoomAtGestureStart}, range=${this.zoomMin}-${this.zoomMax}`);
+              })
+              .onActionUpdate((event: GestureEvent) => {
+                let target = this.zoomAtGestureStart * event.scale;
+                let prevZoom = this.currentZoom;
+                this.currentZoom = Math.max(this.zoomMin, Math.min(target, this.zoomMax));
+                if (target > this.zoomMax && prevZoom < this.zoomMax) {
+                  promptAction.showToast({ message: `已达到最大变焦 ${this.zoomMax.toFixed(2)}x` });
+                } else if (target < this.zoomMin && prevZoom > this.zoomMin) {
+                  promptAction.showToast({ message: `已达到最小变焦 ${this.zoomMin.toFixed(2)}x` });
+                }
+                console.info(TAG, `【mhg】 [PinchZoom] update, scale=${event.scale}, target=${target.toFixed(2)}, clamped=${this.currentZoom.toFixed(2)}`);
+                this.localVideoTrack?.applyConstraints({
+                  zoom: this.currentZoom
+                });
+              })
+              .onActionEnd(() => {
+                console.info(TAG, `【mhg】 [PinchZoom] end, final zoom=${this.currentZoom}`);
+              })
+          )
 
         // 分辨率选择 (Radio单选)
         Text('分辨率选择')
@@ -329,6 +468,59 @@ struct ApplyConstraintsTestPage {
           .height(44)
           .fontSize(16)
           .onClick(() => { this.testFacingModeSwitch(); })
+          .margin({ bottom: 16 })
+
+        // ===== zoom 变焦测试 =====
+        Text('变焦 (Zoom) 测试')
+          .fontSize(18)
+          .fontWeight(FontWeight.Bold)
+          .alignSelf(ItemAlign.Start)
+          .margin({ bottom: 8 })
+
+        Text(`当前 zoom: ${this.currentZoom.toFixed(2)}x  (范围 ${this.zoomMin.toFixed(2)}x ~ ${this.zoomMax.toFixed(2)}x)`)
+          .fontSize(16)
+          .fontColor(0x007DFF)
+          .margin({ bottom: 8 })
+
+        Row() {
+          Text('zoom:')
+            .fontSize(16)
+            .width(60)
+
+          TextInput({ text: this.zoomInput, placeholder: 'zoom 值' })
+            .width(100)
+            .height(44)
+            .fontSize(14)
+            .type(InputType.Normal)
+            .onChange((value: string) => { this.zoomInput = value; })
+        }
+        .width('100%')
+        .margin({ bottom: 8 })
+
+        Button('测试6: 设置 zoom')
+          .width('100%')
+          .height(44)
+          .fontSize(16)
+          .onClick(() => { this.testVideoZoom(); })
+          .margin({ bottom: 8 })
+
+        Button('测试7: zoom 超界 (9999)')
+          .width('100%')
+          .height(44)
+          .fontSize(16)
+          .onClick(() => { this.testVideoZoomOutOfRange(); })
+          .margin({ bottom: 8 })
+
+        Button('重置 zoom (1.0x)')
+          .width('100%')
+          .height(44)
+          .fontSize(16)
+          .onClick(() => { this.resetZoom(); })
+          .margin({ bottom: 8 })
+
+        Text('提示: 默认使用后置摄像头。双指捏合实时变焦，已自动限制在设备支持范围内（达到极限会提示）。若 zoom 不生效，查看日志中 "SetZoomRatio" 的 clamp 范围。')
+          .fontSize(12)
+          .fontColor(0x999999)
           .margin({ bottom: 16 })
 
         // 测试结果
