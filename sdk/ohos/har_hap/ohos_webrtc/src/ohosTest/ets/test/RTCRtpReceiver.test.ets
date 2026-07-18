@@ -21,7 +21,6 @@ import { validateReceiverRtpParameters } from './RTCRtpParametersHelper';
 import * as helper from './Helper';
 
 const TAG: string = '[RTCRtpReceiverTest]';
-const STUN_SERVER = "stun:stun.l.google.com:19302";
 
 const pcf = new webrtc.PeerConnectionFactory();
 
@@ -104,14 +103,10 @@ export default function RTCRtpReceiverTest() {
       // The number of execution times is the same as the number of test cases defined by **it**.
       // This API supports only one parameter: preset action function.
       caller = pcf.createPeerConnection({
-        iceServers: [{
-          urls: STUN_SERVER
-        }]
+        iceServers: []
       });
       callee = pcf.createPeerConnection({
-        iceServers: [{
-          urls: STUN_SERVER
-        }]
+        iceServers: []
       });
     })
     afterEach(() => {
