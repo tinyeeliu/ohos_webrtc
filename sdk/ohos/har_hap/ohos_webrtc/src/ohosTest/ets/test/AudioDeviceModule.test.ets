@@ -80,5 +80,24 @@ export default function AudioDeviceModuleTest() {
       expect(pc.signalingState).assertEqual('stable');
       pc.close();
     })
+
+    it('isBuiltInAcousticEchoCancelerSupportedReturnsBoolean', 0, () => {
+      let result = webrtc.AudioDeviceModule.isBuiltInAcousticEchoCancelerSupported();
+      expect(typeof result).assertEqual('boolean');
+    })
+
+    it('isBuiltInNoiseSuppressorSupportedReturnsBoolean', 0, () => {
+      let result = webrtc.AudioDeviceModule.isBuiltInNoiseSuppressorSupported();
+      expect(typeof result).assertEqual('boolean');
+    })
+
+    it('callbackPropertiesExist', 0, () => {
+      let adm = new webrtc.AudioDeviceModule();
+      expect(adm.oncapturererror).assertNull();
+      expect(adm.oncapturerstatechange).assertNull();
+      expect(adm.oncapturersamplesready).assertNull();
+      expect(adm.onrenderererror).assertNull();
+      expect(adm.onrendererstatechange).assertNull();
+    })
   })
 }

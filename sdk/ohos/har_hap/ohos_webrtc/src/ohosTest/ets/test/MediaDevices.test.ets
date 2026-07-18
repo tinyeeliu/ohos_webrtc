@@ -69,5 +69,19 @@ export default function MediaDevicesTest() {
         }
       }
     })
+
+    it('getSupportedConstraintsReturnsValidObject', 0, () => {
+      let mediaDevices = new webrtc.MediaDevices();
+      let constraints = mediaDevices.getSupportedConstraints();
+      expect(constraints).not().assertNull();
+      expect(typeof constraints.width).assertEqual('boolean');
+      expect(typeof constraints.height).assertEqual('boolean');
+      expect(typeof constraints.frameRate).assertEqual('boolean');
+      expect(typeof constraints.echoCancellation).assertEqual('boolean');
+      expect(typeof constraints.autoGainControl).assertEqual('boolean');
+      expect(typeof constraints.noiseSuppression).assertEqual('boolean');
+      expect(typeof constraints.deviceId).assertEqual('boolean');
+      expect(typeof constraints.groupId).assertEqual('boolean');
+    })
   })
 }
