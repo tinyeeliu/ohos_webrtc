@@ -109,26 +109,37 @@ int32_t AudioCapturer::InitRecording()
     RTC_DCHECK(!recording_);
 
     OH_AudioStreamBuilder* builder = nullptr;
-    OH_RESULT_CHECK(
-        OH_AudioStreamBuilder_Create(&builder, AUDIOSTREAM_TYPE_CAPTURER),
-        NotifyError(AudioErrorType::INIT, "system error"), -1);
+    auto buildResult = OH_AudioStreamBuilder_Create(&builder, AUDIOSTREAM_TYPE_CAPTURER);
+    if (buildResult != AUDIOSTREAM_SUCCESS) {
+        RTC_LOG(LS_ERROR) << "OH_AudioStreamBuilder_Create: " << buildResult;
+        NotifyError(AudioErrorType::INIT, "system error");
+        return -1;
+    }
+
+    // Ensure builder is always released on every exit path (success or failure).
+    auto releaseBuilder = [builder]() {
+        auto ret = OH_AudioStreamBuilder_Destroy(builder);
+        if (ret != AUDIOSTREAM_SUCCESS) {
+            RTC_LOG(LS_WARNING) << "OH_AudioStreamBuilder_Destroy: " << ret;
+        }
+    };
 
     OH_RESULT_CHECK(
         OH_AudioStreamBuilder_SetCapturerInfo(builder, static_cast<OH_AudioStream_SourceType>(GetAudioSource())),
-        NotifyError(AudioErrorType::INIT, "failed to set capturer info"), -1);
+        NotifyError(AudioErrorType::INIT, "failed to set capturer info"), releaseBuilder(), -1);
     OH_RESULT_CHECK(
         OH_AudioStreamBuilder_SetSamplingRate(builder, GetSampleRate()),
-        NotifyError(AudioErrorType::INIT, "failed to set sample rate"), -1);
+        NotifyError(AudioErrorType::INIT, "failed to set sample rate"), releaseBuilder(), -1);
     OH_RESULT_CHECK(
         OH_AudioStreamBuilder_SetChannelCount(builder, GetChannelCount()),
-        NotifyError(AudioErrorType::INIT, "failed to set channel count"), -1);
+        NotifyError(AudioErrorType::INIT, "failed to set channel count"), releaseBuilder(), -1);
     OH_RESULT_CHECK(
         OH_AudioStreamBuilder_SetSampleFormat(builder, static_cast<OH_AudioStream_SampleFormat>(GetSampleFormat())),
-        NotifyError(AudioErrorType::INIT, "failed to set sample format"), -1);
+        NotifyError(AudioErrorType::INIT, "failed to set sample format"), releaseBuilder(), -1);
     OH_RESULT_CHECK(
         OH_AudioStreamBuilder_SetLatencyMode(
             builder, UseLowLatency() ? AUDIOSTREAM_LATENCY_MODE_FAST : AUDIOSTREAM_LATENCY_MODE_NORMAL),
-        NotifyError(AudioErrorType::INIT, "failed to set latency mode"), -1);
+        NotifyError(AudioErrorType::INIT, "failed to set latency mode"), releaseBuilder(), -1);
 
     OH_AudioCapturer_Callbacks callbacks;
     callbacks.OH_AudioCapturer_OnReadData = OnReadData1;
@@ -137,14 +148,26 @@ int32_t AudioCapturer::InitRecording()
     callbacks.OH_AudioCapturer_OnError = OnError1;
     OH_RESULT_CHECK(
         OH_AudioStreamBuilder_SetCapturerCallback(builder, callbacks, this),
-        NotifyError(AudioErrorType::INIT, "failed to set capture callback"), -1);
+        NotifyError(AudioErrorType::INIT, "failed to set capture callback"), releaseBuilder(), -1);
 
     OH_AudioCapturer* stream = nullptr;
-    OH_RESULT_CHECK(
-        OH_AudioStreamBuilder_GenerateCapturer(builder, &stream), NotifyError(AudioErrorType::INIT, "system error"),
-        -1);
+    auto genResult = OH_AudioStreamBuilder_GenerateCapturer(builder, &stream);
+    if (genResult != AUDIOSTREAM_SUCCESS) {
+        RTC_LOG(LS_ERROR) << "OH_AudioStreamBuilder_GenerateCapturer: " << genResult;
+        NotifyError(AudioErrorType::INIT, "system error");
+        releaseBuilder();
+        return -1;
+    }
+
+    // Builder is no longer needed once the capturer has been generated.
+    releaseBuilder();
 
     if (!CheckConfiguration(stream)) {
+        // CheckConfiguration already notified the error; release the generated capturer.
+        auto releaseResult = OH_AudioCapturer_Release(stream);
+        if (releaseResult != AUDIOSTREAM_SUCCESS) {
+            RTC_LOG(LS_WARNING) << "OH_AudioCapturer_Release: " << releaseResult;
+        }
         return -1;
     }
 

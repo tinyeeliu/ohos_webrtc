@@ -19,7 +19,6 @@ import { Logging, LoggingSeverity } from '../../../main/ets/log/Logging';
 import { sleep } from './Helper';
 
 const TAG: string = '[DataChannelTest]';
-const STUN_SERVER = "stun:stun.l.google.com:19302";
 
 const pcf = new webrtc.PeerConnectionFactory();
 
@@ -54,13 +53,29 @@ async function exchangeOfferAnswer(caller: webrtc.RTCPeerConnection, callee: web
 }
 
 function exchangeIceCandidates(pc1: webrtc.RTCPeerConnection, pc2: webrtc.RTCPeerConnection) {
-  const doExchange = (pc1: webrtc.RTCPeerConnection, pc2: webrtc.RTCPeerConnection) => {
-    pc1.onicecandidate = (event) => {
-      const candidate = event.candidate;
-      if (pc2.signalingState !== 'closed' && pc2.remoteDescription) {
-        pc2.addIceCandidate(candidate).catch(() => {});
+  const doExchange = (source: webrtc.RTCPeerConnection, target: webrtc.RTCPeerConnection) => {
+    const pending: webrtc.RTCIceCandidateInit[] = [];
+    source.onicecandidate = (event) => {
+      if (!event.candidate) return;
+      if (target.signalingState !== 'closed' && target.remoteDescription) {
+        target.addIceCandidate(event.candidate).catch(() => {});
+      } else {
+        pending.push(event.candidate);
       }
     };
+    const timer = setInterval(() => {
+      if (source.signalingState === 'closed' || target.signalingState === 'closed') {
+        clearInterval(timer);
+        return;
+      }
+      if (pending.length > 0 && target.remoteDescription) {
+        const toFlush = pending.splice(0);
+        toFlush.forEach(c => target.addIceCandidate(c).catch(() => {}));
+      }
+      if (source.iceGatheringState === 'complete' && pending.length === 0) {
+        clearInterval(timer);
+      }
+    }, 50);
   };
 
   doExchange(pc1, pc2);
@@ -124,26 +139,20 @@ export default function DataChannelTest() {
       // The number of execution times is the same as the number of test cases defined by **it**.
       // The API supports only one parameter: preset action function.
       caller = pcf.createPeerConnection({
-        iceServers: [{
-          urls: STUN_SERVER
-        }]
+        iceServers: []
       });
       callee = pcf.createPeerConnection({
-        iceServers: [{
-          urls: STUN_SERVER
-        }]
+        iceServers: []
       });
     })
-    afterEach(() => {
-      // Presets a clear action, which is performed after each unit test case ends.
-      // The number of execution times is the same as the number of test cases defined by **it**.
-      // This API supports only one parameter: clear action function.
+    afterEach(async () => {
       if (caller) {
         caller.close();
       }
       if (callee) {
         callee.close();
       }
+      await sleep(500);
     })
     afterAll(() => {
       // Presets a clear action, which is performed after all test cases of the test suite end.

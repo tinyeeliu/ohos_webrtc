@@ -259,5 +259,19 @@ export default function LoggingTest() {
       Logging.d(TAG, 'after enableLogTimeStamps');
       expect(receivedSeverities.length).assertLarger(0);
     })
+
+    it('noneSeverityFiltersAllMessages', 0, () => {
+      let receivedCount = 0;
+      let loggable: webrtc.Loggable = {
+        logMessage: (_message: string, _severity: number, _tag: string) => {
+          receivedCount++;
+        }
+      };
+      Logging.injectLoggable(loggable, LoggingSeverity.NONE);
+      Logging.d(TAG, 'info should be filtered');
+      Logging.e(TAG, 'error should be filtered');
+      Logging.v(TAG, 'verbose should be filtered');
+      expect(receivedCount).assertEqual(0);
+    })
   })
 }
