@@ -1,4 +1,8 @@
 # Changelog
+
+## 1.0.3-rc.1 (2026-07-20)
+- Support MediaStreamTrack.applyConstraints [#119](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/119)
+
 ## 1.0.2 (2026-06-11)
 - Support real-time dynamic changes of the local resolution [#94](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/94)
 - Implement support for the audio track pause and volume adjustment interface [#104](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/104)
