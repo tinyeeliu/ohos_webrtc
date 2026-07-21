@@ -102,6 +102,9 @@ protected:
         rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation) override;
 
 private:
+    void HandleSwitchCapturerResult(bool success);
+
+private:
     std::atomic<bool> is_destroying_{false};
     std::unique_ptr<rtc::Thread> thread_;
     rtc::Thread* signalingThread_;

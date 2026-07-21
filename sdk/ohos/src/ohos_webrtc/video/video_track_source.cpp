@@ -226,11 +226,7 @@ bool OhosVideoTrackSource::is_screencast() const
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    std::shared_ptr<VideoCapturer> capturer;
-    thread_->BlockingCall([this, &capturer] {
-        capturer = capturer_;
-    });
-    return capturer ? capturer->IsScreencast() : false;
+    return capturer_ ? capturer_->IsScreencast() : false;
 }
 
 absl::optional<bool> OhosVideoTrackSource::needs_denoising() const
@@ -300,6 +296,13 @@ void OhosVideoTrackSource::SwitchCapturer(std::shared_ptr<VideoCapturer> capture
     thread_->PostTask([this, capturer] {
         RTC_LOG(LS_INFO) << "Switching capturer on thread";
 
+        if (pendingSwitchCapturer_) {
+            RTC_LOG(LS_WARNING) << "SwitchCapturer: cancelling previous pending switch";
+            pendingSwitchCapturer_->Stop();
+            pendingSwitchCapturer_->Release();
+            pendingSwitchCapturer_.reset();
+        }
+
         // Stop and release old capturer first to avoid camera resource conflict.
         if (capturer_) {
             RTC_LOG(LS_INFO) << "Stopping old capturer before switching";
@@ -325,26 +328,7 @@ void OhosVideoTrackSource::OnCapturerStarted(bool success)
 
     // Handle SwitchCapturer pending capturer replacement.
     if (pendingSwitchCapturer_) {
-        if (success) {
-            RTC_LOG(LS_INFO) << "New capturer started successfully, replacing old capturer";
-            // Stop and release old capturer.
-            if (capturer_) {
-                capturer_->Stop();
-                capturer_->Release();
-            }
-            // Replace with new capturer.
-            capturer_ = std::move(pendingSwitchCapturer_);
-            // Only set state to live if we successfully replaced the capturer.
-            SetState(true);
-        } else {
-            RTC_LOG(LS_ERROR) << "New capturer failed to start, discarding and keeping old capturer";
-            // Stop and release the failed new capturer.
-            pendingSwitchCapturer_->Stop();
-            pendingSwitchCapturer_->Release();
-            pendingSwitchCapturer_.reset();
-            // Do NOT set state to ended; keep old capturer running.
-            // The track should remain live since the old capturer is still active.
-        }
+        HandleSwitchCapturerResult(success);
     } else {
         // Normal startup (not from SwitchCapturer).
         SetState(success);
@@ -358,6 +342,36 @@ void OhosVideoTrackSource::OnCapturerStarted(bool success)
 
     if (observer) {
         observer->OnCapturerStarted(success);
+    }
+}
+
+void OhosVideoTrackSource::HandleSwitchCapturerResult(bool success)
+{
+    if (!success) {
+        RTC_LOG(LS_ERROR) << "New capturer failed to start, discarding and keeping old capturer";
+        // Stop and release the failed new capturer.
+        pendingSwitchCapturer_->Stop();
+        pendingSwitchCapturer_->Release();
+        pendingSwitchCapturer_.reset();
+        return;
+    }
+
+    RTC_LOG(LS_INFO) << "New capturer started successfully, replacing old capturer";
+    // Stop and release old capturer.
+    if (capturer_) {
+        capturer_->Stop();
+        capturer_->Release();
+    }
+    // Replace with new capturer.
+    capturer_ = std::move(pendingSwitchCapturer_);
+    // Only set state to live if we successfully replaced the capturer.
+    state_ = kLive;
+    if (signalingThread_) {
+        signalingThread_->PostTask([self = rtc::scoped_refptr<OhosVideoTrackSource>(this)] {
+            if (!self->is_destroying_.load(std::memory_order_acquire)) {
+                self->FireOnChanged();
+            }
+        });
     }
 }
 
