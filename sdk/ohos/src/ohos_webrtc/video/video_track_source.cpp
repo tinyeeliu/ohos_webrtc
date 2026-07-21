@@ -226,11 +226,11 @@ bool OhosVideoTrackSource::is_screencast() const
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
-    std::shared_ptr<VideoCapturer> capturer;
-    thread_->BlockingCall([this, &capturer] {
-        capturer = capturer_;
-    });
-    return capturer ? capturer->IsScreencast() : false;
+    // NOTE: Avoid BlockingCall here because it can trigger thread-safety
+    // assertions (IsInvokeToThreadAllowed) when called from signaling thread.
+    // The capturer_ pointer is only modified on the v-track-source thread,
+    // so a simple atomic read is sufficient for this query.
+    return capturer_ ? capturer_->IsScreencast() : false;
 }
 
 absl::optional<bool> OhosVideoTrackSource::needs_denoising() const
@@ -300,6 +300,15 @@ void OhosVideoTrackSource::SwitchCapturer(std::shared_ptr<VideoCapturer> capture
     thread_->PostTask([this, capturer] {
         RTC_LOG(LS_INFO) << "Switching capturer on thread";
 
+        // If there's already a pending capturer from a previous SwitchCapturer
+        // that hasn't completed yet, clean it up to avoid resource leak.
+        if (pendingSwitchCapturer_) {
+            RTC_LOG(LS_WARNING) << "SwitchCapturer: cancelling previous pending switch";
+            pendingSwitchCapturer_->Stop();
+            pendingSwitchCapturer_->Release();
+            pendingSwitchCapturer_.reset();
+        }
+
         // Stop and release old capturer first to avoid camera resource conflict.
         if (capturer_) {
             RTC_LOG(LS_INFO) << "Stopping old capturer before switching";
@@ -335,7 +344,17 @@ void OhosVideoTrackSource::OnCapturerStarted(bool success)
             // Replace with new capturer.
             capturer_ = std::move(pendingSwitchCapturer_);
             // Only set state to live if we successfully replaced the capturer.
-            SetState(true);
+            // NOTE: SetState may trigger thread-safety assertions when called from
+            // v-track-source thread because it posts to signalingThread_.
+            // Use PostTask to ensure FireOnChanged runs on the correct thread.
+            state_ = kLive;
+            if (signalingThread_) {
+                signalingThread_->PostTask([self = rtc::scoped_refptr<OhosVideoTrackSource>(this)] {
+                    if (!self->is_destroying_.load(std::memory_order_acquire)) {
+                        self->FireOnChanged();
+                    }
+                });
+            }
         } else {
             RTC_LOG(LS_ERROR) << "New capturer failed to start, discarding and keeping old capturer";
             // Stop and release the failed new capturer.
