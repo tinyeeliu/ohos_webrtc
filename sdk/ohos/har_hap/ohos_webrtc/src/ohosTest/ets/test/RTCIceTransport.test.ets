@@ -16,7 +16,7 @@
 import { describe, beforeAll, beforeEach, afterEach, afterAll, it, expect } from '@ohos/hypium'
 import webrtc from 'libohos_webrtc.so';
 import { Logging, LoggingSeverity } from '../../../main/ets/log/Logging';
-import { sleep } from './Helper';
+import { sleep, isX86, pollUntilOrFail } from './Helper';
 
 const DEFAULT = 0
 const TAG: string = '[RTCIceTransportTest]';
@@ -128,15 +128,22 @@ export default function RTCIceTransportTest() {
       await caller.setLocalDescription();
       const iceTransport = transceiver.sender.transport?.iceTransport;
 
-      let promise = new Promise<void>((resolve) => {
+      if (isX86()) {
         iceTransport!.ongatheringstatechange = () => {
           console.info(TAG, 'gatheringState: ', iceTransport?.gatheringState);
-          resolve();
         };
-      });
-
-      if (iceTransport?.gatheringState != "complete") {
-        await promise;
+        await pollUntilOrFail(() => iceTransport?.gatheringState !== "new",
+          `ICE gathering still new, state=${iceTransport?.gatheringState}`);
+      } else {
+        let promise = new Promise<void>((resolve) => {
+          iceTransport!.ongatheringstatechange = () => {
+            console.info(TAG, 'gatheringState: ', iceTransport?.gatheringState);
+            resolve();
+          };
+        });
+        if (iceTransport?.gatheringState != "complete") {
+          await promise;
+        }
       }
       expect(iceTransport?.gatheringState).not().assertEqual("new");
     })
