@@ -38,6 +38,7 @@ import RTCSessionDescriptionTest from './RTCSessionDescription.test';
 import VideoSourceTest from './VideoSource.test';
 import VideoRenderControllerTest from './VideoRenderController.test';
 import VideoEncoderFactoryTest from './VideoEncoderFactory.test';
+import X86EmulatorFallbackTest from './X86EmulatorFallback.test';
 
 export default function testsuite() {
   abilityTest();
@@ -65,4 +66,5 @@ export default function testsuite() {
   VideoSourceTest();
   VideoRenderControllerTest();
   VideoEncoderFactoryTest();
+  X86EmulatorFallbackTest();
 }

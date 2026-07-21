@@ -16,7 +16,7 @@
 import { describe, beforeAll, beforeEach, afterEach, afterAll, it, expect } from '@ohos/hypium'
 import webrtc from 'libohos_webrtc.so';
 import { Logging, LoggingSeverity } from '../../../main/ets/log/Logging';
-import { sleep } from './Helper';
+import { sleep, isX86, pollUntilOrFail } from './Helper';
 
 const DEFAULT = 0
 const TAG: string = '[RTCDtlsTransportTest]';
@@ -106,8 +106,8 @@ export default function RTCDtlsTransportTest() {
       await createDtlsTransport(caller, callee);
       let transport1 = caller.getTransceivers()[0].sender.transport;
       let transport2 = callee.getTransceivers()[0].sender.transport;
-      let flag1: string | undefined = "";
-      let flag2: string | undefined = "";
+      let flag1: string | undefined = isX86() && transport1?.state === "connected" ? transport1.state : "";
+      let flag2: string | undefined = isX86() && transport2?.state === "connected" ? transport2.state : "";
       transport1!.onstatechange = () => {
         console.info(TAG, "state: ", transport1?.state);
         if (transport1?.state == "connected") {
@@ -120,7 +120,20 @@ export default function RTCDtlsTransportTest() {
           flag2 = transport2?.state;
         }
       }
-      await sleep(5000);
+      if (isX86()) {
+        await pollUntilOrFail(() => transport1?.state === "connected",
+          `transport1 not connected, state=${transport1?.state}`);
+        await pollUntilOrFail(() => transport2?.state === "connected",
+          `transport2 not connected, state=${transport2?.state}`);
+        if (transport1?.state === "connected") {
+          flag1 = transport1.state;
+        }
+        if (transport2?.state === "connected") {
+          flag2 = transport2.state;
+        }
+      } else {
+        await sleep(5000);
+      }
       expect(flag1).assertEqual("connected");
       expect(flag2).assertEqual("connected");
     })

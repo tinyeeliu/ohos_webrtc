@@ -14,8 +14,40 @@
  */
  
 import { expect } from '@ohos/hypium';
+import deviceInfo from '@ohos.deviceInfo';
 
 export type ValueType = number | string | boolean | bigint | object | null | undefined;
+
+export function isX86(): boolean {
+  const abi: string = deviceInfo.abiList;
+  return abi.indexOf('x86_64') >= 0;
+}
+
+const DEFAULT_POLL_TIMEOUT_MS = 15000;
+const DEFAULT_POLL_INTERVAL_MS = 50;
+
+/** 轮询直到 condition 为 true 或超时，返回是否在时限内满足条件。 */
+export async function pollUntil(condition: () => boolean,
+  timeoutMs: number = DEFAULT_POLL_TIMEOUT_MS,
+  intervalMs: number = DEFAULT_POLL_INTERVAL_MS): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (!condition() && Date.now() < deadline) {
+    await sleep(intervalMs);
+  }
+  return condition();
+}
+
+/** 轮询直到 condition 为 true，超时则输出描述并 assertFail。 */
+export async function pollUntilOrFail(condition: () => boolean,
+  message: string,
+  timeoutMs: number = DEFAULT_POLL_TIMEOUT_MS,
+  intervalMs: number = DEFAULT_POLL_INTERVAL_MS): Promise<void> {
+  const ok = await pollUntil(condition, timeoutMs, intervalMs);
+  if (!ok) {
+    console.error(`pollUntilOrFail timeout: ${message}`);
+    expect().assertFail();
+  }
+}
 
 export function assertOptionalBoolean(value: ValueType) {
   if(value !== undefined) {
