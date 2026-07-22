@@ -15,6 +15,14 @@
     {
       "name": "internet",
       "value": "internet permission"
+    },
+    {
+      "name": "microphone_reason",
+      "value": "microphone permission for audio capture"
+    },
+    {
+      "name": "camera_reason",
+      "value": "camera permission for video capture"
     }
   ]
 }

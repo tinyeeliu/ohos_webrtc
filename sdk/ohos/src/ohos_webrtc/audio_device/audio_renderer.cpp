@@ -137,27 +137,38 @@ int32_t AudioRenderer::InitPlayout()
     RTC_DCHECK(!playing_);
 
     OH_AudioStreamBuilder* builder = nullptr;
-    OH_RESULT_CHECK(
-        OH_AudioStreamBuilder_Create(&builder, AUDIOSTREAM_TYPE_RENDERER),
-        NotifyError(AudioErrorType::INIT, "System error"), -1);
+    auto buildResult = OH_AudioStreamBuilder_Create(&builder, AUDIOSTREAM_TYPE_RENDERER);
+    if (buildResult != AUDIOSTREAM_SUCCESS) {
+        RTC_LOG(LS_ERROR) << "OH_AudioStreamBuilder_Create: " << buildResult;
+        NotifyError(AudioErrorType::INIT, "System error");
+        return -1;
+    }
+
+    // Ensure builder is always released on every exit path (success or failure).
+    auto releaseBuilder = [builder]() {
+        auto ret = OH_AudioStreamBuilder_Destroy(builder);
+        if (ret != AUDIOSTREAM_SUCCESS) {
+            RTC_LOG(LS_WARNING) << "OH_AudioStreamBuilder_Destroy: " << ret;
+        }
+    };
 
     OH_RESULT_CHECK(
         OH_AudioStreamBuilder_SetRendererInfo(builder, static_cast<OH_AudioStream_Usage>(GetUsage())),
-        NotifyError(AudioErrorType::INIT, "failed to set renderer info"), -1);
+        NotifyError(AudioErrorType::INIT, "failed to set renderer info"), releaseBuilder(), -1);
     OH_RESULT_CHECK(
         OH_AudioStreamBuilder_SetSamplingRate(builder, GetSampleRate()),
-        NotifyError(AudioErrorType::INIT, "failed to set sample rate"), -1);
+        NotifyError(AudioErrorType::INIT, "failed to set sample rate"), releaseBuilder(), -1);
     OH_RESULT_CHECK(
         OH_AudioStreamBuilder_SetChannelCount(builder, GetChannelCount()),
-        NotifyError(AudioErrorType::INIT, "failed to set channel count"), -1);
+        NotifyError(AudioErrorType::INIT, "failed to set channel count"), releaseBuilder(), -1);
     // Use s16le in webrtc
     OH_RESULT_CHECK(
         OH_AudioStreamBuilder_SetSampleFormat(builder, AUDIOSTREAM_SAMPLE_S16LE),
-        NotifyError(AudioErrorType::INIT, "failed to set sample format"), -1);
+        NotifyError(AudioErrorType::INIT, "failed to set sample format"), releaseBuilder(), -1);
     OH_RESULT_CHECK(
         OH_AudioStreamBuilder_SetLatencyMode(
             builder, UseLowLatency() ? AUDIOSTREAM_LATENCY_MODE_FAST : AUDIOSTREAM_LATENCY_MODE_NORMAL),
-        NotifyError(AudioErrorType::INIT, "failed to set latency mode"), -1);
+        NotifyError(AudioErrorType::INIT, "failed to set latency mode"), releaseBuilder(), -1);
 
     OH_AudioRenderer_Callbacks callbacks;
     callbacks.OH_AudioRenderer_OnWriteData = OnWriteData1;
@@ -166,18 +177,30 @@ int32_t AudioRenderer::InitPlayout()
     callbacks.OH_AudioRenderer_OnError = OnError1;
     OH_RESULT_CHECK(
         OH_AudioStreamBuilder_SetRendererCallback(builder, callbacks, this),
-        NotifyError(AudioErrorType::INIT, "failed to set renderer callback"), -1);
+        NotifyError(AudioErrorType::INIT, "failed to set renderer callback"), releaseBuilder(), -1);
 
     OH_RESULT_CHECK(
         OH_AudioStreamBuilder_SetRendererOutputDeviceChangeCallback(builder, OnDeviceChangeCallback1, this),
-        NotifyError(AudioErrorType::INIT, "failed to set renderer callback"), -1);
+        NotifyError(AudioErrorType::INIT, "failed to set renderer callback"), releaseBuilder(), -1);
 
     OH_AudioRenderer* stream = nullptr;
-    OH_RESULT_CHECK(
-        OH_AudioStreamBuilder_GenerateRenderer(builder, &stream),
-        NotifyError(AudioErrorType::INIT, "failed to generate renderer"), -1);
+    auto genResult = OH_AudioStreamBuilder_GenerateRenderer(builder, &stream);
+    if (genResult != AUDIOSTREAM_SUCCESS) {
+        RTC_LOG(LS_ERROR) << "OH_AudioStreamBuilder_GenerateRenderer: " << genResult;
+        NotifyError(AudioErrorType::INIT, "failed to generate renderer");
+        releaseBuilder();
+        return -1;
+    }
+
+    // Builder is no longer needed once the renderer has been generated.
+    releaseBuilder();
 
     if (!CheckConfiguration(stream)) {
+        // CheckConfiguration already notified the error; release the generated renderer.
+        auto releaseResult = OH_AudioRenderer_Release(stream);
+        if (releaseResult != AUDIOSTREAM_SUCCESS) {
+            RTC_LOG(LS_WARNING) << "OH_AudioRenderer_Release: " << releaseResult;
+        }
         return -1;
     }
 

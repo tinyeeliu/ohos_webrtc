@@ -969,6 +969,7 @@ setAudioPlayout(playout: boolean): void
 | height           | ConstrainULong   | 否   | 表示媒体轨道需要满足的视频高度约束条件，以像素为单位。用于屏幕采集时，以设备自然方向为参考（手机为竖屏） |
 | aspectRatio      | ConstrainDouble  | 否   | 表示媒体轨道需要满足的视频纵横比约束条件   |
 | frameRate        | ConstrainDouble  | 否   | 表示媒体轨道需要满足的帧率约束条件      |
+| zoom             | ConstrainDouble  | 否   | 表示媒体轨道需要满足的相机变焦倍率约束条件   |
 | facingMode       | ConstrainString  | 否   | 表示媒体轨道需要满足的摄像头朝向模式约束条件 |
 | resizeMode       | ConstrainString  | 否   | 表示媒体轨道需要满足的视频调整模式约束条件  |
 | sampleRate       | ConstrainULong   | 否   | 表示媒体轨道需要满足的音频采样率约束条件   |
@@ -1034,6 +1035,7 @@ setAudioPlayout(playout: boolean): void
 | height           | boolean | 否   | 表示媒体轨道是否支持高度约束条件      |
 | aspectRatio      | boolean | 否   | 表示媒体轨道是否支持纵横比约束条件     |
 | frameRate        | boolean | 否   | 表示媒体轨道是否支持帧率约束条件      |
+| zoom             | boolean | 否   | 表示媒体轨道是否支持变焦约束条件      |
 | facingMode       | boolean | 否   | 表示媒体轨道是否支持摄像头朝向模式约束条件 |
 | resizeMode       | boolean | 否   | 表示媒体轨道是否支持视频调整模式约束条件  |
 | sampleRate       | boolean | 否   | 表示媒体轨道是否支持音频采样率约束条件   |
@@ -1184,6 +1186,18 @@ try {
   console.error('Failed to apply constraints:', error);
 }
 ```
+
+### getZoomRange
+
+getZoomRange(): { min: number; max: number; supported: boolean }
+
+查询设备当前摄像头支持的变焦范围。不同摄像头（前置/后置）支持的范围不同，切换摄像头后需重新查询。
+
+**返回值**
+
+| 类型                                                          | 说明                           |
+|-------------------------------------------------------------|------------------------------|
+| { min: number; max: number; supported: boolean }           | min 为最小变焦倍率，max 为最大变焦倍率，supported 表示设备是否支持变焦 |
 
 ## MediaStream
 

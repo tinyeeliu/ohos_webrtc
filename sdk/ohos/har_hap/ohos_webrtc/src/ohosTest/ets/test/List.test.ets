@@ -36,6 +36,9 @@ import MediaStreamTrackTest from './MediaStreamTrack.test';
 import LoggingTest from './Logging.test';
 import RTCSessionDescriptionTest from './RTCSessionDescription.test';
 import VideoSourceTest from './VideoSource.test';
+import VideoRenderControllerTest from './VideoRenderController.test';
+import VideoEncoderFactoryTest from './VideoEncoderFactory.test';
+import CameraZoomTest from './CameraZoom.test';
 
 export default function testsuite() {
   abilityTest();
@@ -61,4 +64,7 @@ export default function testsuite() {
   LoggingTest();
   RTCSessionDescriptionTest();
   VideoSourceTest();
+  VideoRenderControllerTest();
+  VideoEncoderFactoryTest();
+  CameraZoomTest();
 }

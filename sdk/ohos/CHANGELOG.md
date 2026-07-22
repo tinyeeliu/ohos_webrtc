@@ -11,6 +11,11 @@
 - Fix audio builder memory leaks and add null checks for NAPI Unwrap [#120](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/120)
 - Add missing interface test coverage (VideoEncoderFactory, VideoRenderController), fix existing test races, and remove the non-existent getDefault declaration from webrtc.d.ts [#122](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/122)
 
+## Unreleased
+
+- Support camera zoom via applyConstraints({ zoom }) and getZoomRange() [#121](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/merge_requests/121)
+- Support applyConstraints for video track (resolution/frameRate/facingMode) [#119](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/119)
+
 ## 1.0.2 (2026-06-11)
 - Support real-time dynamic changes of the local resolution [#94](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/94)
 - Implement support for the audio track pause and volume adjustment interface [#104](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/104)

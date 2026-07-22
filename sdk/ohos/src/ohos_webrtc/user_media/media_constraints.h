@@ -320,6 +320,7 @@ public:
     LongConstraint height;
     DoubleConstraint aspectRatio;
     DoubleConstraint frameRate;
+    DoubleConstraint zoom;
     StringConstraint facingMode;
     StringConstraint resizeMode;
     LongConstraint sampleRate;
