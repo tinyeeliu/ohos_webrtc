@@ -16,7 +16,7 @@
 import { describe, beforeAll, beforeEach, afterEach, afterAll, it, expect } from '@ohos/hypium'
 import webrtc from 'libohos_webrtc.so';
 import { Logging, LoggingSeverity } from '../../../main/ets/log/Logging';
-import { sleep } from './Helper';
+import { sleep, isX86 } from './Helper';
 
 const DEFAULT = 0
 const TAG: string = '[PeerConnectionTest]';
@@ -1383,6 +1383,43 @@ export default function PeerConnectionTest() {
     it("setAudioPlayoutDoesNotCrash", DEFAULT, () => {
       caller.setAudioPlayout(true);
       caller.setAudioPlayout(false);
+    })
+
+    // audio-only 端到端 ICE：x86 模拟器仅验证协商 stable，真机严格断言 ICE connected
+    it("audioOnly_call_shouldConnectICE", DEFAULT, async () => {
+      const audioSource = pcf.createAudioSource();
+      const audioTrack = pcf.createAudioTrack('audio', audioSource);
+      caller.addTrack(audioTrack);
+
+      exchangeIceCandidates(caller, callee);
+      await exchangeOfferAnswer(caller, callee);
+
+      let iceConnected = false;
+      const maxWaitMs = 10000;
+      const pollIntervalMs = 200;
+      let elapsed = 0;
+      while (elapsed < maxWaitMs) {
+        const callerState = caller.iceConnectionState;
+        const calleeState = callee.iceConnectionState;
+        if ((callerState === 'connected' || callerState === 'completed') &&
+            (calleeState === 'connected' || calleeState === 'completed')) {
+          iceConnected = true;
+          break;
+        }
+        if (callerState === 'failed' || calleeState === 'failed') {
+          break;
+        }
+        await sleep(pollIntervalMs);
+        elapsed += pollIntervalMs;
+      }
+
+      if (!isX86()) {
+        expect(iceConnected).assertTrue();
+      } else {
+        expect(caller.signalingState).assertEqual('stable');
+        expect(callee.signalingState).assertEqual('stable');
+      }
+      audioSource.release();
     })
 
   })

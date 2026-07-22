@@ -85,5 +85,51 @@ export default function PeerConnectionFactoryTest() {
       let factory = new webrtc.PeerConnectionFactory();
       webrtc.PeerConnectionFactory.setDefault(factory);
     })
+
+    // audio-only 双端完整 SDP 协商（x86 无摄像头降级场景核心路径）
+    it('audioOnly_SDPNegotiation_shouldSucceed', 0, async () => {
+      const factory = new webrtc.PeerConnectionFactory();
+      const caller = factory.createPeerConnection({ iceServers: [] });
+      const callee = factory.createPeerConnection({ iceServers: [] });
+      const audioSource = factory.createAudioSource();
+      const audioTrack = factory.createAudioTrack('audio', audioSource);
+      caller.addTrack(audioTrack);
+
+      const offer = await caller.createOffer();
+      await caller.setLocalDescription(offer);
+      expect(caller.signalingState).assertEqual('have-local-offer');
+
+      await callee.setRemoteDescription(caller.localDescription!);
+      expect(callee.signalingState).assertEqual('have-remote-offer');
+
+      const answer = await callee.createAnswer();
+      await callee.setLocalDescription(answer);
+      expect(callee.signalingState).assertEqual('stable');
+
+      await caller.setRemoteDescription(callee.localDescription!);
+      expect(caller.signalingState).assertEqual('stable');
+      expect(caller.getSenders().length).assertLarger(0);
+      expect(caller.getSenders()[0].track).not().assertNull();
+
+      audioSource.release();
+      caller.close();
+      callee.close();
+    })
+
+    // VideoSource 创建/释放后工厂可正常回收，验证无泄漏崩溃
+    it('dispose_afterCreateVideoSource_shouldNotCrash', 0, () => {
+      const factory = new webrtc.PeerConnectionFactory();
+      let videoSource: webrtc.VideoSource | undefined;
+      try {
+        videoSource = factory.createVideoSource({ width: 320, height: 240 }, false);
+        if (videoSource) {
+          videoSource.release();
+        }
+        expect(true).assertTrue();
+      } catch (e) {
+        console.error(TAG, 'dispose after createVideoSource error: ' + JSON.stringify(e));
+        expect().assertFail();
+      }
+    })
   })
 }

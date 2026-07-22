@@ -16,7 +16,7 @@
 import { describe, beforeAll, beforeEach, afterEach, afterAll, it, expect } from '@ohos/hypium'
 import webrtc from 'libohos_webrtc.so';
 import { Logging, LoggingSeverity } from '../../../main/ets/log/Logging';
-import { sleep } from './Helper';
+import { sleep, isX86 } from './Helper';
 
 const DEFAULT = 0
 const TAG: string = '[RTCSctpTransportTest]';
@@ -146,11 +146,22 @@ export default function RTCSctpTransportTest() {
       let flag = false;
       let promise = new Promise<void>((resolve) => {
         caller.sctp!.onstatechange = () => {
-          flag = true;
-          resolve();
+          if (!isX86() || caller.sctp?.state === "connected") {
+            flag = true;
+            resolve();
+          }
         }
       });
-      await promise;
+      if (isX86()) {
+        if (caller.sctp?.state === "connected") {
+          flag = true;
+        }
+        if (!flag) {
+          await Promise.race([promise, sleep(15000)]);
+        }
+      } else {
+        await promise;
+      }
       expect(flag).assertTrue();
     })
   })

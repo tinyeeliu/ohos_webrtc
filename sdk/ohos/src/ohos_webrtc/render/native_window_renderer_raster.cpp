@@ -90,14 +90,42 @@ void NativeWindowRendererRaster::OnFrame(const VideoFrame& frame)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " this=" << this;
     RTC_DLOG(LS_VERBOSE) << "render frame, id=" << frame.id() << " size=" << frame.width() << "x" << frame.height()
-                         << ", timestamp=" << frame.timestamp_us();
+                         << ", timestamp=" << frame.timestamp_us() << ", rotation=" << frame.rotation();
 
     if (!frame.video_frame_buffer()) {
         RTC_LOG(LS_ERROR) << "Buffer is null";
         return;
     }
 
-    thread_->PostTask([this, frame] { RenderByteBuffer(frame.video_frame_buffer()->ToI420()); });
+    if (frame.width() != lastFrameWidth_ || frame.height() != lastFrameHeight_ ||
+        frame.rotation() != lastFrameRotation_) {
+        lastFrameWidth_ = frame.width();
+        lastFrameHeight_ = frame.height();
+        lastFrameRotation_ = frame.rotation();
+        RTC_DLOG(LS_VERBOSE) << "[NativeWindowRendererRaster] Frame size changed: " << lastFrameWidth_ << "x"
+                             << lastFrameHeight_;
+        if (frameSizeChangeCallback_) {
+            frameSizeChangeCallback_(lastFrameWidth_, lastFrameHeight_, lastFrameRotation_);
+        }
+    }
+
+    thread_->PostTask([this, frame] { RenderFrame(frame); });
+}
+
+void NativeWindowRendererRaster::RenderFrame(const VideoFrame& frame)
+{
+    auto i420 = frame.video_frame_buffer()->ToI420();
+    if (!i420) {
+        RTC_LOG(LS_ERROR) << "Failed to convert frame to I420";
+        return;
+    }
+
+    rtc::scoped_refptr<I420BufferInterface> buffer = i420;
+    if (frame.rotation() != kVideoRotation_0) {
+        buffer = I420Buffer::Rotate(*i420, frame.rotation());
+    }
+
+    RenderByteBuffer(buffer);
 }
 
 void NativeWindowRendererRaster::OnDiscardedFrame()
