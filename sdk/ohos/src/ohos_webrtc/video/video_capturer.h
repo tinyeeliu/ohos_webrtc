@@ -44,6 +44,19 @@ public:
     virtual void Start() = 0;
     virtual void Stop() = 0;
     virtual bool IsScreencast() = 0;
+
+    // Camera zoom. Default no-op; non-camera capturers (e.g. ScreenCapturer) need not override.
+    virtual void SetZoomRatio(double ratio) { (void)ratio; }
+    virtual bool GetZoomRatioRange(float* minZoom, float* maxZoom)
+    {
+        if (minZoom) {
+            *minZoom = 1.0f;
+        }
+        if (maxZoom) {
+            *maxZoom = 1.0f;
+        }
+        return false;
+    }
 };
 
 } // namespace webrtc

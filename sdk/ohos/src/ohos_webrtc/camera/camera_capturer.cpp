@@ -18,6 +18,9 @@
 #include "../utils/marcos.h"
 
 #include <ohcamera/camera_device.h>
+#include <ohcamera/capture_session.h>
+
+#include <algorithm>
 
 #include "rtc_base/logging.h"
 
@@ -295,6 +298,55 @@ void CameraCapturer::StopInternal()
     cameraDevices_.Reset();
     ohos::DisplayManager::GetInstance().UnregisterChangeCallback(this);
     isStarted_ = false;
+}
+
+void CameraCapturer::SetZoomRatio(double ratio)
+{
+    RTC_LOG(LS_INFO) << __FUNCTION__ << ": ratio=" << ratio;
+
+    if (!isStarted_ || !captureSession_.Raw()) {
+        RTC_LOG(LS_WARNING) << "SetZoomRatio ignored: capture session not active";
+        return;
+    }
+
+    float minZoom = 1.0f;
+    float maxZoom = 1.0f;
+    bool supported = GetZoomRatioRange(&minZoom, &maxZoom);
+    if (!supported) {
+        RTC_LOG(LS_WARNING) << "SetZoomRatio ignored: zoom not supported by device";
+        return;
+    }
+
+    float clamped = std::clamp(static_cast<float>(ratio), minZoom, maxZoom);
+    RTC_LOG(LS_INFO) << "SetZoomRatio: clamped=" << clamped << " (range " << minZoom << "-" << maxZoom << ")";
+
+    Camera_ErrorCode ret = OH_CaptureSession_SetZoomRatio(captureSession_.Raw(), clamped);
+    if (ret != CAMERA_OK) {
+        RTC_LOG(LS_ERROR) << "OH_CaptureSession_SetZoomRatio failed, code=" << ret << ", ratio=" << clamped;
+    } else {
+        RTC_LOG(LS_INFO) << "OH_CaptureSession_SetZoomRatio OK, ratio=" << clamped;
+    }
+}
+
+bool CameraCapturer::GetZoomRatioRange(float* minZoom, float* maxZoom)
+{
+    if (!captureSession_.Raw()) {
+        RTC_LOG(LS_WARNING) << "GetZoomRatioRange: captureSession_ is null";
+        if (minZoom) {
+            *minZoom = 1.0f;
+        }
+        if (maxZoom) {
+            *maxZoom = 1.0f;
+        }
+        return false;
+    }
+    Camera_ErrorCode ret = OH_CaptureSession_GetZoomRatioRange(captureSession_.Raw(), minZoom, maxZoom);
+    if (ret != CAMERA_OK) {
+        RTC_LOG(LS_WARNING) << "OH_CaptureSession_GetZoomRatioRange failed, code=" << ret;
+        return false;
+    }
+    RTC_LOG(LS_INFO) << "GetZoomRatioRange OK, min=" << *minZoom << ", max=" << *maxZoom;
+    return true;
 }
 
 void CameraCapturer::OnCameraManagerStatusCallback(Camera_StatusInfo* status)
