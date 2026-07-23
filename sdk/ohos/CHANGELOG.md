@@ -1,4 +1,7 @@
 # Changelog
+## 1.0.3-rc.2 (2026-07-23)
+- Support x86 emulators [#106](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/106)
+
 ## Unreleased
 - Support camera zoom via applyConstraints({ zoom }) and getZoomRange() [#121](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/merge_requests/121)
 - Support applyConstraints for video track (resolution/frameRate/facingMode) [#119](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/119)
