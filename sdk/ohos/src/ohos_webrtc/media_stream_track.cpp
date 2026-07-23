@@ -645,7 +645,7 @@ Napi::Value NapiMediaStreamTrack::ApplyConstraints(const Napi::CallbackInfo& inf
         auto videoSource = factory_->GetVideoSource(track_);
         if (!videoSource) {
             RTC_LOG(LS_ERROR) << __FUNCTION__ << ": videoSource is null";
-            deferred.Resolve(env.Undefined());
+            deferred.Reject(Error::New(env, "Video source is not available").Value());
             return deferred.Promise();
         }
         VideoConstraints videoConstraints;

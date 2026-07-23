@@ -1117,21 +1117,75 @@ getSource(): MediaSource | null
 
 ### applyConstraints
 
-applyConstraints(constraints: MediaTrackConstraints): Promise\<void\>
+applyConstraints(constraints: MediaTrackConstraints): Promise<void>;
 
-对媒体轨道应用约束条件。对于视频轨道，支持通过 zoom 字段设置相机变焦倍率，经库内部调用系统 Camera NDK 实现实时硬件变焦。传入的 zoom 值超出设备支持范围时将自动 clamp 到合法范围。仅支持扁平写法（如 `{ zoom: 2.0 }`），advanced 数组形式不被读取。
+动态应用约束到媒体流轨道。对于视频轨道，支持通过 `width`、`height`、`frameRate` 和 `facingMode` 等约束动态调整视频采集参数；对于音频轨道，当前不支持运行时约束调整。
 
-**参数**
+当传入的约束包含 `facingMode` 时，会触发摄像头切换逻辑：先验证目标摄像头是否可用，然后创建新的采集器并切换，同时保持原有视频轨道不变。切换过程中通过 `pendingSwitchCapturer_` 机制确保旧采集器在新采集器成功启动后才被释放，避免资源冲突和黑屏。
 
-| 参数名        | 类型                                                | 必填  | 说明                 |
-|------------|---------------------------------------------------|-----|----------------------|
-| constraints | [MediaTrackConstraints](#mediatrackconstraints) | 是   | 包含约束条件的对象，如 `{ zoom: 2.0 }` |
+当传入的约束包含 `width`、`height` 或 `frameRate` 时，会通过 `VideoAdapter` 动态调整输出分辨率或帧率，无需重新创建采集器。
 
-**返回值**
+> **注意**：
+> 1. 当前音频轨道不支持运行时约束调整。对音频轨道调用 `applyConstraints` 会返回 `Promise.reject`，提示不支持该操作。
+> 2. 当约束包含 `facingMode` 时，Promise 的行为分两个阶段：
+>    - **验证阶段**：如果目标摄像头不存在或约束无法满足（如设备无对应摄像头），`applyConstraints` 会 **reject**，返回 `"Constraints could not be satisfied'` 错误。
+>    - **切换阶段**：验证通过后，Promise 在**开始切换**后即 resolve，实际摄像头切换在后台异步完成。如果切换失败（如新摄像头无法启动），Promise 不会 reject，旧采集器会继续运行以保持视频流不中断。如需感知切换结果，可通过监听 VideoSource 的 `oncapturerstarted` 事件获取状态。
 
-| 类型                | 说明                      |
-|-------------------|-------------------------|
-| Promise\<void\>   | 约束应用成功时 resolve，失败时 reject |
+#### 参数
+
+| 参数名      | 类型                  | 必填 | 说明                                                         |
+|-------------|-----------------------|------|--------------------------------------------------------------|
+| constraints | MediaTrackConstraints | 是   | 要应用的约束对象，可包含 width、height、frameRate、facingMode 等 |
+
+#### 返回值
+
+| 类型          | 说明                                                         |
+|---------------|--------------------------------------------------------------|
+| Promise<void> | 返回一个 Promise 对象，约束应用成功时解析，失败时抛出错误。     |
+
+#### 约束说明
+
+| 约束名称   | 类型    | 说明                                                         |
+|------------|---------|--------------------------------------------------------------|
+| width      | number  | 视频宽度（像素）。若只提供 width 或 height 之一，则不会生效。 |
+| height     | number  | 视频高度（像素）。需与 width 同时提供才生效。                  |
+| frameRate  | number  | 目标帧率（fps）。通过 VideoAdapter 限制输出帧率。             |
+| facingMode | string  | 摄像头朝向，取值为 `"user"`（前置）或 `"environment"`（后置）。|
+
+#### 示例
+
+```typescript
+// 切换分辨率
+try {
+  await videoTrack.applyConstraints({
+    width: 1920,
+    height: 1080,
+    frameRate: 30
+  });
+} catch (error) {
+  console.error('Failed to apply constraints:', error);
+}
+
+// 切换摄像头（前置/后置）
+try {
+  await videoTrack.applyConstraints({
+    facingMode: 'environment'
+  });
+} catch (error) {
+  console.error('Failed to apply constraints:', error);
+}
+
+// 组合约束：切换摄像头并指定分辨率
+try {
+  await videoTrack.applyConstraints({
+    width: 1280,
+    height: 720,
+    facingMode: 'user'
+  });
+} catch (error) {
+  console.error('Failed to apply constraints:', error);
+}
+```
 
 ### getZoomRange
 
