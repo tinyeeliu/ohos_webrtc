@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.3-rc.4 (2026-07-24)
+
+- Add applyConstraints XTS [#127](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/127)
+
 ## 1.0.3-rc.1 (2026-07-20)
 
 - Support MediaStreamTrack.applyConstraints [#119](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/119)
