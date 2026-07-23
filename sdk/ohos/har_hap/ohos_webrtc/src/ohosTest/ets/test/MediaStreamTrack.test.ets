@@ -145,5 +145,79 @@ export default function MediaStreamTrackTest() {
       callee.close();
       audioSource.release();
     })
+
+    it('applyConstraintsWithWidthHeightFrameRate', 0, () => {
+      let videoSource = pcf.createVideoSource({});
+      let videoTrack = pcf.createVideoTrack('video', videoSource);
+      expect(videoTrack).not().assertNull();
+
+      videoTrack.applyConstraints({
+        width: 1280,
+        height: 720,
+        frameRate: 30
+      });
+
+      videoTrack.stop();
+      videoSource.release();
+    })
+
+    it('applyConstraintsWithFacingModeUser', 0, () => {
+      let videoSource = pcf.createVideoSource({});
+      let videoTrack = pcf.createVideoTrack('video', videoSource);
+      expect(videoTrack).not().assertNull();
+
+      videoTrack.applyConstraints({
+        facingMode: 'user'
+      });
+
+      videoTrack.stop();
+      videoSource.release();
+    })
+
+    it('applyConstraintsWithFacingModeEnvironment', 0, () => {
+      let videoSource = pcf.createVideoSource({});
+      let videoTrack = pcf.createVideoTrack('video', videoSource);
+      expect(videoTrack).not().assertNull();
+
+      videoTrack.applyConstraints({
+        facingMode: 'environment'
+      });
+
+      videoTrack.stop();
+      videoSource.release();
+    })
+
+    it('applyConstraintsWithAllParams', 0, () => {
+      let videoSource = pcf.createVideoSource({});
+      let videoTrack = pcf.createVideoTrack('video', videoSource);
+      expect(videoTrack).not().assertNull();
+
+      videoTrack.applyConstraints({
+        width: 1920,
+        height: 1080,
+        frameRate: 60,
+        facingMode: 'user'
+      });
+
+      videoTrack.stop();
+      videoSource.release();
+    })
+
+    it('applyConstraintsAudioTrackNotSupported', 0, async () => {
+      let audioSource = pcf.createAudioSource();
+      let audioTrack = pcf.createAudioTrack('audio', audioSource);
+      expect(audioTrack).not().assertNull();
+
+      try {
+        await audioTrack.applyConstraints({
+          echoCancellation: true
+        });
+        expect().assertFail();
+      } catch (e) {
+        expect(e).assertInstanceOf('Error');
+      }
+
+      audioSource.release();
+    })
   })
 }
