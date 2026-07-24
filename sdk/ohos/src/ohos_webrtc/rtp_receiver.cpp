@@ -20,11 +20,15 @@
 #include "rtp_parameters.h"
 #include "peer_connection.h"
 
+#include <atomic>
 #include <limits>
+#include <thread>
 
 #include "rtc_base/logging.h"
 
 namespace webrtc {
+
+static std::atomic<int> g_receiverNewInFlight{0};
 
 using namespace Napi;
 
@@ -48,7 +52,7 @@ const char kAttributeNameSource[] = "source";
 const char kAttributeNameAudioLevel[] = "audioLevel";
 
 /// NapiRtpReceiver
-FunctionReference NapiRtpReceiver::constructor_;
+thread_local FunctionReference NapiRtpReceiver::constructor_;
 
 static constexpr int indexTwo = 2;
 static constexpr int callbackInfoLen = 3;
@@ -73,23 +77,28 @@ void NapiRtpReceiver::Init(Napi::Env env, Napi::Object exports)
     exports.Set(kClassName, func);
 
     constructor_ = Persistent(func);
+    constructor_.SuppressDestruct();
 }
 
 Napi::Object NapiRtpReceiver::NewInstance(
     std::shared_ptr<PeerConnectionFactoryWrapper> factory, rtc::scoped_refptr<PeerConnectionInterface> pc,
     rtc::scoped_refptr<RtpReceiverInterface> receiver)
 {
+    int cur = ++g_receiverNewInFlight;
+
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
     auto env = constructor_.Env();
     if (!factory || !pc || !receiver) {
+        --g_receiverNewInFlight;
         NAPI_THROW(Error::New(env, "Invalid argument"), Object());
     }
 
-    return constructor_.New(
+    auto obj = constructor_.New(
         {External<std::shared_ptr<PeerConnectionFactoryWrapper>>::New(env, &factory),
          External<rtc::scoped_refptr<PeerConnectionInterface>>::New(env, &pc),
          External<rtc::scoped_refptr<RtpReceiverInterface>>::New(env, &receiver)});
+    return obj;
 }
 
 NapiRtpReceiver::NapiRtpReceiver(const Napi::CallbackInfo& info) : Napi::ObjectWrap<NapiRtpReceiver>(info)

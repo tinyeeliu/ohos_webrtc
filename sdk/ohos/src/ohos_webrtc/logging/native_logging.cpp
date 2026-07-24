@@ -43,7 +43,7 @@ StaticObjectContainer& GetStaticObjects()
     return *static_objects;
 }
 
-FunctionReference NapiNativeLogging::constructor_;
+thread_local FunctionReference NapiNativeLogging::constructor_;
 
 void NapiNativeLogging::Init(class Env env, Object exports)
 {
@@ -60,6 +60,7 @@ void NapiNativeLogging::Init(class Env env, Object exports)
     exports.Set(kClassName, func);
 
     constructor_ = Persistent(func);
+    constructor_.SuppressDestruct();
 }
 
 NapiNativeLogging::NapiNativeLogging(const Napi::CallbackInfo& info) : ObjectWrap<NapiNativeLogging>(info) {}

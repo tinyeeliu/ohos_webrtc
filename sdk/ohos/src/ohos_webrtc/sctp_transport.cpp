@@ -36,7 +36,7 @@ const char kMethodNameToJson[] = "toJSON";
 
 const char kEventStateChange[] = "statechange";
 
-FunctionReference NapiSctpTransport::constructor_;
+thread_local FunctionReference NapiSctpTransport::constructor_;
 
 void NapiSctpTransport::Init(Napi::Env env, Napi::Object exports)
 {
@@ -56,6 +56,7 @@ void NapiSctpTransport::Init(Napi::Env env, Napi::Object exports)
     exports.Set("RTCSctpTransport", func);
 
     constructor_ = Persistent(func);
+    constructor_.SuppressDestruct();
 }
 
 Napi::Object NapiSctpTransport::NewInstance(
