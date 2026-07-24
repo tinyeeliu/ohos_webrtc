@@ -39,7 +39,7 @@ const char kMethodNameToJson[] = "toJSON";
 
 const char kEventNameToneChange[] = "tonechange";
 
-FunctionReference NapiDtmfSender::constructor_;
+thread_local FunctionReference NapiDtmfSender::constructor_;
 static constexpr int callbackInfoLen = 2;
 
 void NapiDtmfSender::Init(Napi::Env env, Napi::Object exports)
@@ -59,6 +59,7 @@ void NapiDtmfSender::Init(Napi::Env env, Napi::Object exports)
     exports.Set(kClassName, func);
 
     constructor_ = Persistent(func);
+    constructor_.SuppressDestruct();
 }
 
 NapiDtmfSender::~NapiDtmfSender()

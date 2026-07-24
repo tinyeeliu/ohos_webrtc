@@ -21,7 +21,7 @@ namespace webrtc {
 
 using namespace Napi;
 
-FunctionReference NapiAudioProcessing::constructor_;
+thread_local FunctionReference NapiAudioProcessing::constructor_;
 
 void NapiAudioProcessing::Init(Napi::Env env, Napi::Object exports)
 {
@@ -35,6 +35,7 @@ void NapiAudioProcessing::Init(Napi::Env env, Napi::Object exports)
     exports.Set(kClassName, func);
 
     constructor_ = Persistent(func);
+    constructor_.SuppressDestruct();
 }
 
 Napi::Object NapiAudioProcessing::NewInstance(Napi::Env env, rtc::scoped_refptr<AudioProcessing> audioProcessing)
@@ -77,7 +78,7 @@ Napi::Value NapiAudioProcessing::ToJson(const Napi::CallbackInfo& info)
     return json;
 }
 
-FunctionReference NapiAudioProcessingFactory::constructor_;
+thread_local FunctionReference NapiAudioProcessingFactory::constructor_;
 
 void NapiAudioProcessingFactory::Init(Napi::Env env, Napi::Object exports)
 {
@@ -92,6 +93,7 @@ void NapiAudioProcessingFactory::Init(Napi::Env env, Napi::Object exports)
     exports.Set(kClassName, func);
 
     constructor_ = Persistent(func);
+    constructor_.SuppressDestruct();
 }
 
 NapiAudioProcessingFactory::NapiAudioProcessingFactory(const Napi::CallbackInfo& info)

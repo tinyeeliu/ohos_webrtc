@@ -23,11 +23,19 @@
 #include "async_work/async_worker_get_stats.h"
 #include "peer_connection.h"
 
+#include <algorithm>
+#include <atomic>
+#include <thread>
+
 #include "rtc_base/logging.h"
 
 namespace webrtc {
 
 using namespace Napi;
+
+// [WDIAG] NewInstance 并发诊断:检测 H2(FunctionReference 并发竞态)。
+// 进入 NewInstance 时 inFlight++,退出时--。若复现后日志峰值 >1 即并发证据。
+static std::atomic<int> g_senderNewInFlight{0};
 
 const char kClassName[] = "RTCRtpSender";
 
@@ -101,7 +109,7 @@ private:
     rtc::scoped_refptr<MediaStreamTrackInterface> track_;
 };
 
-FunctionReference NapiRtpSender::constructor_;
+thread_local FunctionReference NapiRtpSender::constructor_;
 
 void NapiRtpSender::Init(Napi::Env env, Napi::Object exports)
 {
@@ -124,24 +132,36 @@ void NapiRtpSender::Init(Napi::Env env, Napi::Object exports)
     exports.Set(kClassName, func);
 
     constructor_ = Persistent(func);
+    constructor_.SuppressDestruct();
 }
 
 Napi::Object NapiRtpSender::NewInstance(
     std::shared_ptr<PeerConnectionFactoryWrapper> factory, rtc::scoped_refptr<PeerConnectionInterface> pc,
     rtc::scoped_refptr<RtpSenderInterface> sender)
 {
+    // [WDIAG] H2 并发 + H3 env错配 诊断
+    int cur = ++g_senderNewInFlight;
+    RTC_LOG(LS_INFO) << "[WDIAG] Sender::NewInstance enter inFlight=" << cur
+                     << " ctorEnv=" << (void*)(napi_env)constructor_.Env()
+                     << " tid=" << std::this_thread::get_id();
+
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
     auto env = constructor_.Env();
     if (!factory || !pc || !sender) {
+        RTC_LOG(LS_ERROR) << "[WDIAG] Sender::NewInstance null arg, inFlight=" << g_senderNewInFlight;
+        --g_senderNewInFlight;
         NAPI_THROW(Error::New(env, "Invalid argument"), Object());
     }
 
     Napi::HandleScope scope(env);
-    return constructor_.New(
+    auto obj = constructor_.New(
         {External<std::shared_ptr<PeerConnectionFactoryWrapper>>::New(env, &factory),
          External<rtc::scoped_refptr<PeerConnectionInterface>>::New(env, &pc),
          External<rtc::scoped_refptr<RtpSenderInterface>>::New(env, &sender)});
+    RTC_LOG(LS_INFO) << "[WDIAG] Sender::NewInstance exit inFlight=" << (--g_senderNewInFlight)
+                     << " obj=" << (void*)(napi_value)obj;
+    return obj;
 }
 
 NapiRtpSender::NapiRtpSender(const Napi::CallbackInfo& info) : Napi::ObjectWrap<NapiRtpSender>(info)
@@ -252,8 +272,13 @@ Napi::Value NapiRtpSender::SetParameters(const Napi::CallbackInfo& info)
     }
 
     auto jsParameters = info[0].As<Object>();
-    RtpParameters parameters;
-    NapiRtpSendParameters::JsToNative(jsParameters, parameters);
+
+    // setParameters 是 read-modify-write。这里只从 JS 参数中解析出 encodings 的可变字段,
+    // 真正下发时以 sender 当前的权威参数为基准(见下方 PostTask),绝不用 JS 往返重建的
+    // codecs/headerExtensions/rtcp 覆盖它们——codec 往返(NativeToJs/JsToNative)会丢失
+    // rtcp_feedback 等字段,导致 webrtc 误判"改动了 codecs 集合"而返回 INTERNAL_ERROR(type=10)。
+    RtpParameters jsParams;
+    NapiRtpSendParameters::JsToNative(jsParameters, jsParams);
     if (info.Env().IsExceptionPending()) {
         NAPI_THROW(info.Env().GetAndClearPendingException(), info.Env().Undefined());
     }
@@ -277,7 +302,25 @@ Napi::Value NapiRtpSender::SetParameters(const Napi::CallbackInfo& info)
             }),
         "SetParametersAsync", 0, 1);
 
-    pc_->signaling_thread()->PostTask([rtpSender = rtpSender_, parameters, tsfn]() mutable {
+        pc_->signaling_thread()->PostTask([rtpSender = rtpSender_, jsParams, tsfn]() mutable {
+        // 以当前权威参数为基准,只覆盖 encodings 的可变字段(active/maxBitrate/maxFramerate/
+        // scaleResolutionDownBy),其余字段(codecs/headerExtensions/rtcp/rid/ssrc/transactionId)
+        // 全部保持权威值。GetParameters 与 SetParametersAsync 在同一信令线程任务内完成,
+        // 保证传回的 transaction_id 与最近一次 GetParameters 一致。
+        RtpParameters parameters = rtpSender->GetParameters();
+        const size_t encCount = std::min(parameters.encodings.size(), jsParams.encodings.size());
+        if (jsParams.encodings.size() != parameters.encodings.size()) {
+            RTC_LOG(LS_WARNING) << "SetParameters: encodings count mismatch, "
+                                << "js=" << jsParams.encodings.size()
+                                << " native=" << parameters.encodings.size()
+                                << ", using min=" << encCount;
+        }
+        for (size_t i = 0; i < encCount; i++) {
+            parameters.encodings[i].active = jsParams.encodings[i].active;
+            parameters.encodings[i].max_bitrate_bps = jsParams.encodings[i].max_bitrate_bps;
+            parameters.encodings[i].max_framerate = jsParams.encodings[i].max_framerate;
+            parameters.encodings[i].scale_resolution_down_by = jsParams.encodings[i].scale_resolution_down_by;
+        }
         rtpSender->SetParametersAsync(parameters, [tsfn](RTCError error) {
             RTC_DLOG(LS_INFO) << "SetParametersAsync complete: " << error.ok();
             tsfn.BlockingCall([error = new RTCError(std::move(error))](Napi::Env env, Napi::Function jsCallback) {

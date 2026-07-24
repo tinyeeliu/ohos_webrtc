@@ -943,7 +943,7 @@ void OhosAudioDeviceModule::OnAudioOutputStateChange(AudioOutput* output, AudioS
     }
 }
 
-FunctionReference NapiAudioDeviceModule::constructor_;
+thread_local FunctionReference NapiAudioDeviceModule::constructor_;
 
 void NapiAudioDeviceModule::Init(Napi::Env env, Napi::Object exports)
 {
@@ -975,6 +975,7 @@ void NapiAudioDeviceModule::Init(Napi::Env env, Napi::Object exports)
     exports.Set(kClassName, func);
 
     constructor_ = Persistent(func);
+    constructor_.SuppressDestruct();
 }
 
 bool GetOption(const Object& obj, const char* key, std::optional<int32_t>* valueOut)

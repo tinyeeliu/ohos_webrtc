@@ -101,7 +101,7 @@ protected:
     void HandleMessage(const DataBuffer& buffer);
 
 private:
-    static Napi::FunctionReference constructor_;
+    static thread_local Napi::FunctionReference constructor_;
 
     std::shared_ptr<PeerConnectionFactoryWrapper> factory_;
     rtc::scoped_refptr<DataChannelInterface> dataChannel_;

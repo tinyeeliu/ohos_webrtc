@@ -172,6 +172,14 @@ export interface VideoCapturerStartedEvent extends Event {
   readonly success: boolean;
 }
 
+export interface CameraSwitchDoneEvent extends Event {
+  readonly newCameraId: string;
+}
+
+export interface CameraSwitchErrorEvent extends Event {
+  readonly errorMessage: string;
+}
+
 // https://www.w3.org/TR/WebCryptoAPI/#algorithm
 export interface Algorithm {
   name: string;
@@ -795,6 +803,13 @@ export interface AudioSource extends MediaSource {
 export interface VideoSource extends MediaSource {
   oncapturerstarted: ((this: VideoSource, ev: VideoCapturerStartedEvent) => any) | null;
   oncapturerstopped: ((this: VideoSource, ev: Event) => any) | null;
+  oncameraswitchdone: ((this: VideoSource, ev: CameraSwitchDoneEvent) => any) | null;
+  oncameraswitcherror: ((this: VideoSource, ev: CameraSwitchErrorEvent) => any) | null;
+
+  // 切换到下一个可用摄像头; 设备仅一个摄像头时触发 oncameraswitcherror。
+  switchCamera(): void;
+  // 切换到指定 cameraId 的摄像头; cameraId 不存在时触发 oncameraswitcherror。
+  switchCamera(cameraId: string): void;
 }
 
 // https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack

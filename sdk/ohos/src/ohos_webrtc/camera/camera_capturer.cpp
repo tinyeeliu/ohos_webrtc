@@ -56,6 +56,12 @@ void CameraCapturer::NotifyCapturedStart(bool success)
 
 void CameraCapturer::NotifyCapturedStop()
 {
+    // 摄像头切换期间(StopInternal→StartInternal)屏蔽 stop 通知: 否则 track readyState 会短暂变
+    // 'ended', 触发上层 RTCVideoView RemoveSink→capturer->Stop(), 与 SwitchCamera 的 StartInternal
+    // 竞态导致新建 session 又被停(卡死)。是否补发由 SwitchCamera 末尾按重建结果决定。
+    if (isSwitching_.load()) {
+        return;
+    }
     UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
     if (observer_) {
         observer_->OnCapturerStopped();
@@ -113,6 +119,117 @@ void CameraCapturer::Stop()
 bool CameraCapturer::IsScreencast()
 {
     return false;
+}
+
+void CameraCapturer::SwitchCamera()
+{
+    RTC_LOG(LS_INFO) << __FUNCTION__;
+
+    auto devices = CameraManager::GetInstance().GetSupportedCameras();
+    const std::size_t minDeviceCount = 2;
+    if (devices.Size() < minDeviceCount) {
+        RTC_LOG(LS_ERROR) << "No camera to switch to";
+        {
+            UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
+            if (observer_) {
+                observer_->OnCameraSwitchError("No camera to switch to");
+            }
+        }
+        return;
+    }
+
+    // 定位当前摄像头在设备列表中的下标。
+    int currentIndex = -1;
+    for (std::size_t i = 0; i < devices.Size(); i++) {
+        if (deviceId_ == devices[i]->cameraId) {
+            currentIndex = static_cast<int>(i);
+            break;
+        }
+    }
+
+    if (currentIndex == -1) {
+        RTC_LOG(LS_ERROR) << "Current camera not found";
+        {
+            UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
+            if (observer_) {
+                observer_->OnCameraSwitchError("Current camera not found");
+            }
+        }
+        return;
+    }
+
+    // 切换到下一个可用摄像头, 防重入/错误处理交给 SwitchCamera(cameraId) 统一负责。
+    std::size_t nextIndex = (static_cast<std::size_t>(currentIndex) + 1) % devices.Size();
+    std::string nextCameraId = devices[nextIndex]->cameraId;
+    SwitchCamera(nextCameraId);
+}
+
+void CameraCapturer::SwitchCamera(const std::string& cameraId)
+{
+    RTC_LOG(LS_INFO) << __FUNCTION__ << ": Switching to camera " << cameraId;
+
+    // 防重入。
+    bool expected = false;
+    if (!isSwitching_.compare_exchange_strong(expected, true)) {
+        RTC_LOG(LS_WARNING) << "Camera switch already in progress";
+        return;
+    }
+
+    if (!isStarted_) {
+        RTC_LOG(LS_ERROR) << "Camera is not started";
+        isSwitching_ = false;
+        {
+            UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
+            if (observer_) {
+                observer_->OnCameraSwitchError("Camera is not started");
+            }
+        }
+        return;
+    }
+
+    // 校验目标摄像头是否存在。
+    auto devices = CameraManager::GetInstance().GetSupportedCameras();
+    bool cameraExists = false;
+    for (std::size_t i = 0; i < devices.Size(); i++) {
+        if (cameraId == devices[i]->cameraId) {
+            cameraExists = true;
+            break;
+        }
+    }
+
+    if (!cameraExists) {
+        RTC_LOG(LS_ERROR) << "Camera not found: " << cameraId;
+        isSwitching_ = false;
+        {
+            UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
+            if (observer_) {
+                observer_->OnCameraSwitchError("Camera not found: " + cameraId);
+            }
+        }
+        return;
+    }
+
+    // 停止当前采集会话 → 更新设备 ID → 重建会话。
+    // 注意: 必须在 capturer 所属线程上调用(由 OhosVideoTrackSource::SwitchCamera PostTask 保证),
+    // 否则会与正在运行的采集线程产生竞态。
+    StopInternal();
+    deviceId_ = cameraId;
+    StartInternal();
+
+    // 切换期间 NotifyCapturedStop 被 isSwitching_ 屏蔽(见该函数)。重建结束后复位标志;
+    // 若重建失败(isStarted_ 仍为 false), 主动补发一次 stop 通知, 让 track 进入正确的 ended 态。
+    isSwitching_ = false;
+    if (!isStarted_) {
+        NotifyCapturedStop();
+    }
+
+    // 通知切换成功。
+    {
+        UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
+        if (observer_) {
+            observer_->OnCameraSwitchDone(cameraId);
+        }
+    }
 }
 
 Camera_Device* CameraCapturer::SelectCameraDevice()
@@ -284,17 +401,21 @@ void CameraCapturer::StopInternal()
         return;
     }
 
+    // 释放顺序: CaptureSession 持有 input/previewOutput 的引用, 必须先停并释放 session,
+    // 再释放 input/preview, 否则系统侧异步 UpdateSetting 会报 inputDevice is nullptr。
+    // Stop 失败时保留原版行为(直接返回, 不强行释放), 避免对仍在运行的 session 做破坏性释放。
     if (!captureSession_.Stop()) {
         RTC_LOG(LS_ERROR) << "Failed to stop capture session";
         return;
     }
+    captureSession_.Reset();
 
     previewOutput_.RemoveObserver(this);
     previewOutput_.Reset();
 
     input_.Close();
     input_.Reset();
-    captureSession_.Reset();
+
     cameraDevices_.Reset();
     ohos::DisplayManager::GetInstance().UnregisterChangeCallback(this);
     isStarted_ = false;
@@ -356,7 +477,7 @@ void CameraCapturer::OnCameraManagerStatusCallback(Camera_StatusInfo* status)
 
 void CameraCapturer::OnPreviewOutputFrameStart()
 {
-    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
     NotifyCapturedStart(true);
 }
