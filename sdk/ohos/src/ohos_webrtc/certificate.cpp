@@ -21,7 +21,7 @@ namespace webrtc {
 
 using namespace Napi;
 
-FunctionReference NapiCertificate::constructor_;
+thread_local FunctionReference NapiCertificate::constructor_;
 
 void NapiCertificate::Init(Napi::Env env, Napi::Object exports)
 {
@@ -36,6 +36,7 @@ void NapiCertificate::Init(Napi::Env env, Napi::Object exports)
     exports.Set("RTCCertificate", func);
 
     constructor_ = Persistent(func);
+    constructor_.SuppressDestruct();
 }
 
 Napi::Object NapiCertificate::NewInstance(Napi::Env env, rtc::scoped_refptr<rtc::RTCCertificate> certificate)

@@ -35,7 +35,7 @@ const char kEnumIceCandidateTypeRelay[] = "relay";
 const char kEnumIceCandidateRtp[] = "rtp";
 const char kEnumIceCandidateRtcp[] = "rtcp";
 
-FunctionReference NapiIceCandidate::constructor_;
+thread_local FunctionReference NapiIceCandidate::constructor_;
 
 void NapiIceCandidate::Init(class Env env, Object exports)
 {
@@ -61,6 +61,7 @@ void NapiIceCandidate::Init(class Env env, Object exports)
     exports.Set("RTCIceCandidate", func);
 
     constructor_ = Persistent(func);
+    constructor_.SuppressDestruct();
 }
 
 Napi::Object NapiIceCandidate::NewInstance(const Napi::CallbackInfo& info, IceCandidateInterface* candidate)

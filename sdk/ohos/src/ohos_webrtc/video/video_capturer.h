@@ -35,6 +35,11 @@ public:
         virtual void OnCapturerStopped() = 0;
         virtual void
         OnFrameCaptured(rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation) = 0;
+
+        // 摄像头切换结果通知。带默认空实现, 仅需要响应的 Observer(如 OhosVideoTrackSource)
+        // 才 override, 不破坏已有实现者(如录屏 ScreenCapturer 的使用者)。
+        virtual void OnCameraSwitchDone(const std::string& newCameraId) { (void)newCameraId; }
+        virtual void OnCameraSwitchError(const std::string& errorMessage) { (void)errorMessage; }
     };
 
     virtual ~VideoCapturer() = default;
@@ -57,6 +62,9 @@ public:
         }
         return false;
     }
+
+    virtual void SwitchCamera() {}
+    virtual void SwitchCamera(const std::string& cameraId) { (void)cameraId; }
 };
 
 } // namespace webrtc

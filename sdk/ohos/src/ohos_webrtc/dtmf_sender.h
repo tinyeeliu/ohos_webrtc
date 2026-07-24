@@ -50,7 +50,7 @@ protected:
     void OnToneChange(const std::string& tone, const std::string& tone_buffer) override;
 
 private:
-    static Napi::FunctionReference constructor_;
+    static thread_local Napi::FunctionReference constructor_;
 
     rtc::scoped_refptr<DtmfSenderInterface> dtmfSender_;
 };
