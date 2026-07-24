@@ -53,7 +53,7 @@ protected:
     void OnStateChange(SctpTransportInformation info) override;
 
 private:
-    static Napi::FunctionReference constructor_;
+    static thread_local Napi::FunctionReference constructor_;
 
     std::shared_ptr<PeerConnectionFactoryWrapper> factory_;
     rtc::scoped_refptr<SctpTransportInterface> sctpTransport_;

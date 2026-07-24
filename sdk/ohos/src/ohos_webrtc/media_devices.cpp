@@ -27,7 +27,7 @@ namespace webrtc {
 
 using namespace Napi;
 
-FunctionReference NapiMediaDevices::constructor_;
+thread_local FunctionReference NapiMediaDevices::constructor_;
 
 void NapiMediaDevices::Init(Napi::Env env, Napi::Object exports)
 {
@@ -43,6 +43,7 @@ void NapiMediaDevices::Init(Napi::Env env, Napi::Object exports)
     exports.Set(kClassName, func);
 
     constructor_ = Persistent(func);
+    constructor_.SuppressDestruct();
 }
 
 NapiMediaDevices::NapiMediaDevices(const Napi::CallbackInfo& info) : Napi::ObjectWrap<NapiMediaDevices>(info) {}

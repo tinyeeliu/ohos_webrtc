@@ -31,7 +31,7 @@ const char kEnumSdpTypeAnswer[] = "answer";
 const char kEnumSdpTypePranswer[] = "pranswer";
 const char kEnumSdpTypeRollback[] = "rollback";
 
-FunctionReference NapiSessionDescription::constructor_;
+thread_local FunctionReference NapiSessionDescription::constructor_;
 
 void NapiSessionDescription::Init(Napi::Env env, Napi::Object exports)
 {
@@ -46,6 +46,7 @@ void NapiSessionDescription::Init(Napi::Env env, Napi::Object exports)
         });
 
     constructor_ = Persistent(func);
+    constructor_.SuppressDestruct();
 
     exports.Set("RTCSessionDescription", func);
 }

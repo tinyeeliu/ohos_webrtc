@@ -74,7 +74,7 @@ protected:
     void RemoveSink();
 
 private:
-    static Napi::FunctionReference constructor_;
+    static thread_local Napi::FunctionReference constructor_;
 
     std::optional<std::string> surfaceId_;
     std::shared_ptr<EglContext> sharedContext_;

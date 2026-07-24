@@ -37,7 +37,7 @@ protected:
     Napi::Value GetFingerprints(const Napi::CallbackInfo& info);
 
 private:
-    static Napi::FunctionReference constructor_;
+    static thread_local Napi::FunctionReference constructor_;
 
     rtc::scoped_refptr<rtc::RTCCertificate> certificate_;
 };

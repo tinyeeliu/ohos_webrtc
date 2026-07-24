@@ -224,7 +224,7 @@ protected:
     void OnAudioOutputStateChange(AudioOutput* output, AudioStateType newState) override;
 
 private:
-    static Napi::FunctionReference constructor_;
+    static thread_local Napi::FunctionReference constructor_;
 
     rtc::scoped_refptr<OhosAudioDeviceModule> adm_;
 

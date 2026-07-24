@@ -56,7 +56,7 @@ protected:
     Napi::Value ToJson(const Napi::CallbackInfo& info);
 
 private:
-    static Napi::FunctionReference constructor_;
+    static thread_local Napi::FunctionReference constructor_;
 
     std::shared_ptr<EglContext> sharedContext_;
     bool enableH264HighProfile_{false};
@@ -79,7 +79,7 @@ protected:
     Napi::Value ToJson(const Napi::CallbackInfo& info);
 
 private:
-    static Napi::FunctionReference constructor_;
+    static thread_local Napi::FunctionReference constructor_;
 };
 
 std::unique_ptr<VideoEncoderFactory> CreateVideoEncoderFactory(const Napi::Object& jsVideoEncoderFactory);
