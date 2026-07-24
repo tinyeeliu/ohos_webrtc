@@ -26,6 +26,7 @@
 #include <memory>
 #include <cstdint>
 #include <mutex>
+#include <atomic>
 
 #include <ohcamera/camera_manager.h>
 
@@ -51,6 +52,8 @@ public:
     void Start() override;
     void Stop() override;
     bool IsScreencast() override;
+    void SwitchCamera() override;
+    void SwitchCamera(const std::string& cameraId) override;
 
 protected:
     void NotifyCapturedStart(bool success);
@@ -78,11 +81,14 @@ private:
     Camera_Profile* FindPreviewProfile(ohos::CameraOutputCapability& capability, Camera_Device* device);
     bool StartCaptureSession(Camera_Profile* previewProfile);
 
-    const std::string deviceId_;
+    // 切换摄像头时需更新为新的设备 ID, 故非 const。
+    std::string deviceId_;
     const video::VideoProfile profile_;
 
     bool isInitialized_{false};
     bool isStarted_{false};
+    // 摄像头切换进行中标记(防重入; 切换期间屏蔽 NotifyCapturedStop)。
+    std::atomic<bool> isSwitching_{false};
 
     bool useVideoSceneMode_{false};
     bool isCameraFrontFacing_{false};

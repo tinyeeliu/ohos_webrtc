@@ -21,7 +21,7 @@ namespace webrtc {
 
 using namespace Napi;
 
-FunctionReference NapiEglContext::constructor_;
+thread_local FunctionReference NapiEglContext::constructor_;
 
 void NapiEglContext::Init(Napi::Env env, Napi::Object exports)
 {
@@ -33,6 +33,7 @@ void NapiEglContext::Init(Napi::Env env, Napi::Object exports)
     exports.Set(kClassName, func);
 
     constructor_ = Persistent(func);
+    constructor_.SuppressDestruct();
 }
 
 Napi::Value NapiEglContext::NewInstance(Napi::Env env, std::shared_ptr<EglContext> eglContext)

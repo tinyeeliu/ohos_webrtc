@@ -689,6 +689,7 @@ void AudioRtpSender::OnChanged() {
                 if (!self->stopped_)
                     self->OnChanged();
             });
+            return;
     }
   RTC_DCHECK_RUN_ON(signaling_thread_);
   TRACE_EVENT0("webrtc", "AudioRtpSender::OnChanged");
@@ -830,6 +831,7 @@ void VideoRtpSender::OnChanged() {
                 if (!self->stopped_)
                     self->OnChanged();
             });
+        return;
     }
   RTC_DCHECK_RUN_ON(signaling_thread_);
   TRACE_EVENT0("webrtc", "VideoRtpSender::OnChanged");

@@ -34,7 +34,7 @@ using namespace Napi;
 const char kAttributeNameOnFrameResolutionChanged[] = "onFrameResolutionChanged";
 const char kEventFrameResolutionChanged[] = "frameResolutionChanged";
 
-FunctionReference NapiNativeVideoRenderer::constructor_;
+thread_local FunctionReference NapiNativeVideoRenderer::constructor_;
 
 void NapiNativeVideoRenderer::Init(Napi::Env env, Napi::Object exports)
 {
@@ -57,6 +57,7 @@ void NapiNativeVideoRenderer::Init(Napi::Env env, Napi::Object exports)
     exports.Set(kClassName, func);
 
     constructor_ = Persistent(func);
+    constructor_.SuppressDestruct();
 }
 
 NapiNativeVideoRenderer::NapiNativeVideoRenderer(const Napi::CallbackInfo& info)

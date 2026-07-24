@@ -66,6 +66,7 @@ void NapiMediaStreamTrack::Init(Napi::Env env, Object exports)
     exports.Set(kClassName, func);
 
     Constructor() = Persistent(func);
+    Constructor().SuppressDestruct();
 }
 
 Napi::Object NapiMediaStreamTrack::NewInstance(
@@ -83,7 +84,7 @@ Napi::Object NapiMediaStreamTrack::NewInstance(
 
 Napi::FunctionReference& NapiMediaStreamTrack::Constructor()
 {
-    static Napi::FunctionReference constructor;
+    static thread_local Napi::FunctionReference constructor;
     return constructor;
 }
 

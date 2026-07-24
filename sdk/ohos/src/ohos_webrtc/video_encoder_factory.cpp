@@ -26,7 +26,7 @@ namespace webrtc {
 
 using namespace Napi;
 
-FunctionReference NapiHardwareVideoEncoderFactory::constructor_;
+thread_local FunctionReference NapiHardwareVideoEncoderFactory::constructor_;
 
 void NapiHardwareVideoEncoderFactory::Init(Napi::Env env, Napi::Object exports)
 {
@@ -43,6 +43,7 @@ void NapiHardwareVideoEncoderFactory::Init(Napi::Env env, Napi::Object exports)
     exports.Set(kClassName, func);
 
     constructor_ = Persistent(func);
+    constructor_.SuppressDestruct();
 }
 
 NapiHardwareVideoEncoderFactory::~NapiHardwareVideoEncoderFactory() = default;
@@ -57,7 +58,10 @@ NapiHardwareVideoEncoderFactory::NapiHardwareVideoEncoderFactory(const Napi::Cal
 
     if (info.Length() > 1) {
         if (info[1].IsObject()) {
-            sharedContext_ = NapiEglContext::Unwrap(info[1].As<Object>())->Get();
+            auto napiCtx = NapiEglContext::Unwrap(info[1].As<Object>());
+            if (napiCtx) {
+                sharedContext_ = napiCtx->Get();
+            }
         }
     } else {
         sharedContext_ = EglEnv::GetDefault().GetContext();
@@ -88,7 +92,7 @@ Napi::Value NapiHardwareVideoEncoderFactory::ToJson(const Napi::CallbackInfo& in
     return json;
 }
 
-FunctionReference NapiSoftwareVideoEncoderFactory::constructor_;
+thread_local FunctionReference NapiSoftwareVideoEncoderFactory::constructor_;
 
 void NapiSoftwareVideoEncoderFactory::Init(Napi::Env env, Napi::Object exports)
 {
@@ -102,6 +106,7 @@ void NapiSoftwareVideoEncoderFactory::Init(Napi::Env env, Napi::Object exports)
     exports.Set(kClassName, func);
 
     constructor_ = Persistent(func);
+    constructor_.SuppressDestruct();
 }
 
 NapiSoftwareVideoEncoderFactory::~NapiSoftwareVideoEncoderFactory() = default;
