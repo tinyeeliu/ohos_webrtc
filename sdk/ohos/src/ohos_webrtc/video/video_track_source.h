@@ -43,6 +43,10 @@ public:
     void Start();
     void Stop();
 
+    // 切换摄像头: 投递到 capturer 线程执行, 保证 StopInternal/StartInternal 不与运行中的采集竞态。
+    void SwitchCamera();
+    void SwitchCamera(const std::string& cameraId);
+
     void SetCapturerObserver(VideoCapturer::Observer* observer);
 
 protected:
@@ -104,6 +108,8 @@ protected:
     void OnCapturerStopped() override;
     void OnFrameCaptured(
         rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation) override;
+    void OnCameraSwitchDone(const std::string& newCameraId) override;
+    void OnCameraSwitchError(const std::string& errorMessage) override;
 
 private:
     void HandleSwitchCapturerResult(bool success);

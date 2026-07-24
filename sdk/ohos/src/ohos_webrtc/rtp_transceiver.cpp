@@ -20,10 +20,16 @@
 #include "rtp_parameters.h"
 #include "peer_connection.h"
 
+#include <atomic>
+#include <thread>
+
 #include "rtc_base/logging.h"
 #include "api/rtp_transceiver_direction.h"
 
 namespace webrtc {
+
+// [WDIAG] NewInstance 并发诊断:检测 H2(FunctionReference 并发竞态)。
+static std::atomic<int> g_transceiverNewInFlight{0};
 
 using namespace Napi;
 
@@ -51,7 +57,7 @@ const char kEnumRtpTransceiverDirectionSendOnly[] = "sendonly";
 const char kEnumRtpTransceiverDirectionSendRecv[] = "sendrecv";
 const char kEnumRtpTransceiverDirectionStopped[] = "stopped";
 
-FunctionReference NapiRtpTransceiver::constructor_;
+thread_local FunctionReference NapiRtpTransceiver::constructor_;
 static constexpr int indexTwo = 2;
 static constexpr int callbackInfoLen = 3;
 
@@ -75,24 +81,36 @@ void NapiRtpTransceiver::Init(Napi::Env env, Napi::Object exports)
     exports.Set(kClassName, func);
 
     constructor_ = Persistent(func);
+    constructor_.SuppressDestruct();
 }
 
 Napi::Object NapiRtpTransceiver::NewInstance(
     std::shared_ptr<PeerConnectionFactoryWrapper> factory, rtc::scoped_refptr<PeerConnectionInterface> pc,
     rtc::scoped_refptr<RtpTransceiverInterface> transceiver)
 {
+    // [WDIAG] H2 并发 + H3 env错配 诊断
+    int cur = ++g_transceiverNewInFlight;
+    RTC_LOG(LS_INFO) << "[WDIAG] Transceiver::NewInstance enter inFlight=" << cur
+                     << " ctorEnv=" << (void*)(napi_env)constructor_.Env()
+                     << " tid=" << std::this_thread::get_id();
+
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
     auto env = constructor_.Env();
     if (!factory || !pc || !transceiver) {
+        RTC_LOG(LS_ERROR) << "[WDIAG] Transceiver::NewInstance null arg, inFlight=" << g_transceiverNewInFlight;
+        --g_transceiverNewInFlight;
         NAPI_THROW(Error::New(env, "Invalid argument"), Object());
     }
 
     Napi::HandleScope scope(env);
-    return constructor_.New(
+    auto obj = constructor_.New(
         {External<std::shared_ptr<PeerConnectionFactoryWrapper>>::New(env, &factory),
          External<rtc::scoped_refptr<PeerConnectionInterface>>::New(env, &pc),
          External<rtc::scoped_refptr<RtpTransceiverInterface>>::New(env, &transceiver)});
+    RTC_LOG(LS_INFO) << "[WDIAG] Transceiver::NewInstance exit inFlight=" << (--g_transceiverNewInFlight)
+                     << " obj=" << (void*)(napi_value)obj;
+    return obj;
 }
 
 NapiRtpTransceiver::NapiRtpTransceiver(const Napi::CallbackInfo& info) : Napi::ObjectWrap<NapiRtpTransceiver>(info)
@@ -318,7 +336,20 @@ void PopulateTransceiverInit(const Object& obj, webrtc::RtpTransceiverInit& init
             Value streamValue = streamsArray.Get(i);
             if (streamValue.IsObject()) {
                 auto napiStream = NapiMediaStream::Unwrap(streamValue.As<Object>());
+                // 判空:Unwrap 可能返回 nullptr(对象不是合法 MediaStream 包装),
+                // Get() 可能返回空 ref(对象已失效)。漏判会导致 stream->id() NULL 解引用
+                // (struct 偏移 @0x30)崩溃。参照 media_stream.cpp:111-114 的判空范式。
+                if (!napiStream) {
+                    RTC_LOG(LS_WARNING) << "PopulateTransceiverInit: streams[" << i
+                                        << "] is not a valid MediaStream, skipped";
+                    continue;
+                }
                 auto stream = napiStream->Get();
+                if (!stream) {
+                    RTC_LOG(LS_WARNING) << "PopulateTransceiverInit: streams[" << i
+                                        << "] has null native stream, skipped";
+                    continue;
+                }
                 init.stream_ids.push_back(stream->id());
             }
         }

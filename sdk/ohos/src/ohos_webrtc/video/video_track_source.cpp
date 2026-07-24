@@ -448,6 +448,50 @@ void OhosVideoTrackSource::OnCapturerStopped()
     }
 }
 
+void OhosVideoTrackSource::SwitchCamera()
+{
+    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
+    // 投递到 capturer 线程执行: SwitchCamera 内部会 StopInternal/StartInternal,
+    // 这两个操作必须在 capturer 所属线程上做, 否则会与运行中的采集线程竞态。
+    thread_->PostTask([capturer = capturer_] { capturer->SwitchCamera(); });
+}
+
+void OhosVideoTrackSource::SwitchCamera(const std::string& cameraId)
+{
+    RTC_LOG(LS_VERBOSE) << __FUNCTION__ << ": cameraId=" << cameraId;
+    thread_->PostTask([capturer = capturer_, cameraId] { capturer->SwitchCamera(cameraId); });
+}
+
+void OhosVideoTrackSource::OnCameraSwitchDone(const std::string& newCameraId)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << ": newCameraId=" << newCameraId;
+
+    VideoCapturer::Observer* observer = nullptr;
+    {
+        UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
+        observer = capturerObserver_;
+    }
+
+    if (observer) {
+        observer->OnCameraSwitchDone(newCameraId);
+    }
+}
+
+void OhosVideoTrackSource::OnCameraSwitchError(const std::string& errorMessage)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << ": errorMessage=" << errorMessage;
+
+    VideoCapturer::Observer* observer = nullptr;
+    {
+        UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
+        observer = capturerObserver_;
+    }
+
+    if (observer) {
+        observer->OnCameraSwitchError(errorMessage);
+    }
+}
+
 void OhosVideoTrackSource::OnFrameCaptured(
     rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation)
 {

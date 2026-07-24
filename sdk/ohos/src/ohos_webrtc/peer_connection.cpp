@@ -283,7 +283,7 @@ protected:
 };
 
 /// NapiPeerConnection
-FunctionReference NapiPeerConnection::constructor_;
+thread_local FunctionReference NapiPeerConnection::constructor_;
 
 void NapiPeerConnection::Init(class Env env, Object exports)
 {
@@ -348,6 +348,7 @@ void NapiPeerConnection::Init(class Env env, Object exports)
         OH_LOG_Print(LOG_APP, LOG_ERROR, LOG_DOMAIN, "NapiPeerConnection", "func is empty or undefined");
     }
     constructor_ = Persistent(func);
+    constructor_.SuppressDestruct();
     OH_LOG_Print(
         LOG_APP, LOG_INFO, LOG_DOMAIN, "NapiPeerConnection", "constructor_=%{public}p", (napi_ref)constructor_);
 
@@ -803,9 +804,16 @@ Napi::Value NapiPeerConnection::AddTrack(const Napi::CallbackInfo& info)
     // AddTrack must be called on the signaling thread to ensure RtpSender's
     // signaling_thread_ is correctly initialized (it uses rtc::Thread::Current())
     RTCErrorOr<rtc::scoped_refptr<RtpSenderInterface>> result;
+    // [WDIAG] H4 BlockingCall 重入诊断:BlockingCall 阻塞 JS 线程等 signaling thread,
+    // 若期间 webrtc 回调 tsfn_.BlockingCall 回 JS 线程 -> 重入/死锁破坏 env。
+    // 复现后看「BlockingCall BEFORE」与「AFTER」之间是否夹有 [WDIAG] ...NewInstance enter 日志。
+    RTC_LOG(LS_INFO) << "[WDIAG] AddTrack BlockingCall BEFORE tid=" << std::this_thread::get_id()
+                     << " curEnv=" << (void*)(napi_env)info.Env();
     pc_->signaling_thread()->BlockingCall([pc = pc_, track, &streamIds, &result] {
         result = pc->AddTrack(track, streamIds);
     });
+    RTC_LOG(LS_INFO) << "[WDIAG] AddTrack BlockingCall AFTER ok=" << result.ok()
+                     << " tid=" << std::this_thread::get_id();
 
     if (!result.ok()) {
         RTC_LOG(LS_ERROR) << "Failed to add audio track to PeerConnection: " << result.error().message();

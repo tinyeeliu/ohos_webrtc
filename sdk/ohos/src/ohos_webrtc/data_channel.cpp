@@ -99,7 +99,7 @@ void DataChannelObserverTemp::OnBufferedAmountChange(uint64_t sentDataSize)
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 }
 
-FunctionReference NapiDataChannel::constructor_;
+thread_local FunctionReference NapiDataChannel::constructor_;
 
 void NapiDataChannel::Init(Napi::Env env, Napi::Object exports)
 {
@@ -141,6 +141,7 @@ void NapiDataChannel::Init(Napi::Env env, Napi::Object exports)
     exports.Set(kClassName, func);
 
     constructor_ = Persistent(func);
+    constructor_.SuppressDestruct();
 }
 
 Napi::Object NapiDataChannel::NewInstance(Napi::Env env, std::unique_ptr<DataChannelObserverTemp> observer)
