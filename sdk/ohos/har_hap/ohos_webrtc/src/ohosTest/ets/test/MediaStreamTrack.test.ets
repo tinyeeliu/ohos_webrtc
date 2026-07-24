@@ -145,5 +145,242 @@ export default function MediaStreamTrackTest() {
       callee.close();
       audioSource.release();
     })
+
+    it('applyConstraintsWithWidthHeightFrameRate', 0, () => {
+      let videoSource = pcf.createVideoSource({});
+      let videoTrack = pcf.createVideoTrack('video', videoSource);
+      expect(videoTrack).not().assertNull();
+
+      videoTrack.applyConstraints({
+        width: 1280,
+        height: 720,
+        frameRate: 30
+      });
+
+      videoTrack.stop();
+      videoSource.release();
+    })
+
+    it('applyConstraintsWithFacingModeUser', 0, () => {
+      let videoSource = pcf.createVideoSource({});
+      let videoTrack = pcf.createVideoTrack('video', videoSource);
+      expect(videoTrack).not().assertNull();
+
+      videoTrack.applyConstraints({
+        facingMode: 'user'
+      });
+
+      videoTrack.stop();
+      videoSource.release();
+    })
+
+    it('applyConstraintsWithFacingModeEnvironment', 0, () => {
+      let videoSource = pcf.createVideoSource({});
+      let videoTrack = pcf.createVideoTrack('video', videoSource);
+      expect(videoTrack).not().assertNull();
+
+      videoTrack.applyConstraints({
+        facingMode: 'environment'
+      });
+
+      videoTrack.stop();
+      videoSource.release();
+    })
+
+    it('applyConstraintsWithAllParams', 0, () => {
+      let videoSource = pcf.createVideoSource({});
+      let videoTrack = pcf.createVideoTrack('video', videoSource);
+      expect(videoTrack).not().assertNull();
+
+      videoTrack.applyConstraints({
+        width: 1920,
+        height: 1080,
+        frameRate: 60,
+        facingMode: 'user'
+      });
+
+      videoTrack.stop();
+      videoSource.release();
+    })
+
+    it('applyConstraintsAudioTrackNotSupported', 0, async () => {
+      let audioSource = pcf.createAudioSource();
+      let audioTrack = pcf.createAudioTrack('audio', audioSource);
+      expect(audioTrack).not().assertNull();
+
+      try {
+        await audioTrack.applyConstraints({
+          echoCancellation: true
+        });
+        expect().assertFail();
+      } catch (e) {
+        expect(e).assertInstanceOf('Error');
+      }
+
+      audioSource.release();
+    })
+
+    it('applyConstraintsWithNegativeWidthShouldReject', 0, async () => {
+      let videoSource = pcf.createVideoSource({});
+      let videoTrack = pcf.createVideoTrack('video', videoSource);
+      expect(videoTrack).not().assertNull();
+
+      try {
+        await videoTrack.applyConstraints({
+          width: -1
+        });
+        expect().assertFail();
+      } catch (e) {
+        expect(e).assertInstanceOf('Error');
+      }
+
+      videoTrack.stop();
+      videoSource.release();
+    })
+
+    it('applyConstraintsWithZeroWidthShouldReject', 0, async () => {
+      let videoSource = pcf.createVideoSource({});
+      let videoTrack = pcf.createVideoTrack('video', videoSource);
+      expect(videoTrack).not().assertNull();
+
+      try {
+        await videoTrack.applyConstraints({
+          width: 0
+        });
+        expect().assertFail();
+      } catch (e) {
+        expect(e).assertInstanceOf('Error');
+      }
+
+      videoTrack.stop();
+      videoSource.release();
+    })
+
+    it('applyConstraintsWithNegativeHeightShouldReject', 0, async () => {
+      let videoSource = pcf.createVideoSource({});
+      let videoTrack = pcf.createVideoTrack('video', videoSource);
+      expect(videoTrack).not().assertNull();
+
+      try {
+        await videoTrack.applyConstraints({
+          height: -1
+        });
+        expect().assertFail();
+      } catch (e) {
+        expect(e).assertInstanceOf('Error');
+      }
+
+      videoTrack.stop();
+      videoSource.release();
+    })
+
+    it('applyConstraintsWithZeroHeightShouldReject', 0, async () => {
+      let videoSource = pcf.createVideoSource({});
+      let videoTrack = pcf.createVideoTrack('video', videoSource);
+      expect(videoTrack).not().assertNull();
+
+      try {
+        await videoTrack.applyConstraints({
+          height: 0
+        });
+        expect().assertFail();
+      } catch (e) {
+        expect(e).assertInstanceOf('Error');
+      }
+
+      videoTrack.stop();
+      videoSource.release();
+    })
+
+    it('applyConstraintsWithNegativeFrameRateShouldReject', 0, async () => {
+      let videoSource = pcf.createVideoSource({});
+      let videoTrack = pcf.createVideoTrack('video', videoSource);
+      expect(videoTrack).not().assertNull();
+
+      try {
+        await videoTrack.applyConstraints({
+          frameRate: -1
+        });
+        expect().assertFail();
+      } catch (e) {
+        expect(e).assertInstanceOf('Error');
+      }
+
+      videoTrack.stop();
+      videoSource.release();
+    })
+
+    it('applyConstraintsWithZeroFrameRateShouldReject', 0, async () => {
+      let videoSource = pcf.createVideoSource({});
+      let videoTrack = pcf.createVideoTrack('video', videoSource);
+      expect(videoTrack).not().assertNull();
+
+      try {
+        await videoTrack.applyConstraints({
+          frameRate: 0
+        });
+        expect().assertFail();
+      } catch (e) {
+        expect(e).assertInstanceOf('Error');
+      }
+
+      videoTrack.stop();
+      videoSource.release();
+    })
+
+    it('applyConstraintsWithInvalidFacingModeShouldReject', 0, async () => {
+      let videoSource = pcf.createVideoSource({});
+      let videoTrack = pcf.createVideoTrack('video', videoSource);
+      expect(videoTrack).not().assertNull();
+
+      try {
+        await videoTrack.applyConstraints({
+          facingMode: 'invalid_facing_mode'
+        });
+        expect().assertFail();
+      } catch (e) {
+        expect(e).assertInstanceOf('Error');
+      }
+
+      videoTrack.stop();
+      videoSource.release();
+    })
+
+    it('applyConstraintsWithEmptyFacingModeShouldReject', 0, async () => {
+      let videoSource = pcf.createVideoSource({});
+      let videoTrack = pcf.createVideoTrack('video', videoSource);
+      expect(videoTrack).not().assertNull();
+
+      try {
+        await videoTrack.applyConstraints({
+          facingMode: ''
+        });
+        expect().assertFail();
+      } catch (e) {
+        expect(e).assertInstanceOf('Error');
+      }
+
+      videoTrack.stop();
+      videoSource.release();
+    })
+
+    it('applyConstraintsToEndedTrackShouldReject', 0, async () => {
+      let videoSource = pcf.createVideoSource({});
+      let videoTrack = pcf.createVideoTrack('video', videoSource);
+      expect(videoTrack).not().assertNull();
+      videoTrack.stop();
+
+      try {
+        await videoTrack.applyConstraints({
+          width: 1280,
+          height: 720
+        });
+        expect().assertFail();
+      } catch (e) {
+        expect(e).assertInstanceOf('Error');
+      }
+
+      videoSource.release();
+    })
   })
 }
