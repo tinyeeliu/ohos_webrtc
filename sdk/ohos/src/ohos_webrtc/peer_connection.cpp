@@ -283,7 +283,7 @@ protected:
 };
 
 /// NapiPeerConnection
-FunctionReference NapiPeerConnection::constructor_;
+thread_local FunctionReference NapiPeerConnection::constructor_;
 
 void NapiPeerConnection::Init(class Env env, Object exports)
 {
@@ -348,6 +348,7 @@ void NapiPeerConnection::Init(class Env env, Object exports)
         OH_LOG_Print(LOG_APP, LOG_ERROR, LOG_DOMAIN, "NapiPeerConnection", "func is empty or undefined");
     }
     constructor_ = Persistent(func);
+    constructor_.SuppressDestruct();
     OH_LOG_Print(
         LOG_APP, LOG_INFO, LOG_DOMAIN, "NapiPeerConnection", "constructor_=%{public}p", (napi_ref)constructor_);
 

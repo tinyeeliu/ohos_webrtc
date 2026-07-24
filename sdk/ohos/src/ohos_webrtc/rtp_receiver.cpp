@@ -20,11 +20,16 @@
 #include "rtp_parameters.h"
 #include "peer_connection.h"
 
+#include <atomic>
 #include <limits>
+#include <thread>
 
 #include "rtc_base/logging.h"
 
 namespace webrtc {
+
+// [WDIAG] NewInstance 并发诊断:检测 H2(FunctionReference 并发竞态)。
+static std::atomic<int> g_receiverNewInFlight{0};
 
 using namespace Napi;
 
@@ -48,7 +53,7 @@ const char kAttributeNameSource[] = "source";
 const char kAttributeNameAudioLevel[] = "audioLevel";
 
 /// NapiRtpReceiver
-FunctionReference NapiRtpReceiver::constructor_;
+thread_local FunctionReference NapiRtpReceiver::constructor_;
 
 static constexpr int indexTwo = 2;
 static constexpr int callbackInfoLen = 3;
@@ -73,23 +78,35 @@ void NapiRtpReceiver::Init(Napi::Env env, Napi::Object exports)
     exports.Set(kClassName, func);
 
     constructor_ = Persistent(func);
+    constructor_.SuppressDestruct();
 }
 
 Napi::Object NapiRtpReceiver::NewInstance(
     std::shared_ptr<PeerConnectionFactoryWrapper> factory, rtc::scoped_refptr<PeerConnectionInterface> pc,
     rtc::scoped_refptr<RtpReceiverInterface> receiver)
 {
+    // [WDIAG] H2 并发 + H3 env错配 诊断
+    int cur = ++g_receiverNewInFlight;
+    RTC_LOG(LS_INFO) << "[WDIAG] Receiver::NewInstance enter inFlight=" << cur
+                     << " ctorEnv=" << (void*)(napi_env)constructor_.Env()
+                     << " tid=" << std::this_thread::get_id();
+
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
     auto env = constructor_.Env();
     if (!factory || !pc || !receiver) {
+        RTC_LOG(LS_ERROR) << "[WDIAG] Receiver::NewInstance null arg, inFlight=" << g_receiverNewInFlight;
+        --g_receiverNewInFlight;
         NAPI_THROW(Error::New(env, "Invalid argument"), Object());
     }
 
-    return constructor_.New(
+    auto obj = constructor_.New(
         {External<std::shared_ptr<PeerConnectionFactoryWrapper>>::New(env, &factory),
          External<rtc::scoped_refptr<PeerConnectionInterface>>::New(env, &pc),
          External<rtc::scoped_refptr<RtpReceiverInterface>>::New(env, &receiver)});
+    RTC_LOG(LS_INFO) << "[WDIAG] Receiver::NewInstance exit inFlight=" << (--g_receiverNewInFlight)
+                     << " obj=" << (void*)(napi_value)obj;
+    return obj;
 }
 
 NapiRtpReceiver::NapiRtpReceiver(const Napi::CallbackInfo& info) : Napi::ObjectWrap<NapiRtpReceiver>(info)

@@ -43,7 +43,7 @@ const char kMethodNameToJson[] = "toJSON";
 const char kEventNameStateChange[] = "statechange";
 const char kEventNameError[] = "error";
 
-FunctionReference NapiDtlsTransport::constructor_;
+thread_local FunctionReference NapiDtlsTransport::constructor_;
 static constexpr int callbackInfoLen = 2;
 
 void NapiDtlsTransport::Init(Napi::Env env, Napi::Object exports)
@@ -65,6 +65,7 @@ void NapiDtlsTransport::Init(Napi::Env env, Napi::Object exports)
     exports.Set(kClassName, func);
 
     constructor_ = Persistent(func);
+    constructor_.SuppressDestruct();
 }
 
 NapiDtlsTransport::~NapiDtlsTransport()
