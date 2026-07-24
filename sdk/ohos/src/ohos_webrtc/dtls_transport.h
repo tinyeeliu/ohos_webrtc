@@ -56,7 +56,7 @@ protected:
     void OnError(RTCError error) override;
 
 private:
-    static Napi::FunctionReference constructor_;
+    static thread_local Napi::FunctionReference constructor_;
 
     std::shared_ptr<PeerConnectionFactoryWrapper> factory_;
     rtc::scoped_refptr<DtlsTransportInterface> dtlsTransport_;
