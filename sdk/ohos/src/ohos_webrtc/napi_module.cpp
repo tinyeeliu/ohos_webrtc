@@ -18,7 +18,12 @@
 
 #include "napi.h"
 
+#include <atomic>
+#include <mutex>
+
 #include "rtc_base/ssl_adapter.h"
+#include "rtc_base/logging.h"
+#include "logging/hilog_sink.h"
 
 #include "certificate.h"
 #include "data_channel.h"
@@ -47,17 +52,26 @@
 using namespace Napi;
 using namespace webrtc;
 
+// SSL 是进程级全局资源:多个 napi_env(RNOH 主线程引擎 + Worker 引擎)会各调一次
+// 模块 Init。若每个 env 都 InitializeSSL/CleanupSSL,某个 env 销毁时的 CleanupSSL 会
+// 破坏仍在使用 SSL 的另一个 env。用引用计数保证「首个 env 初始化、最后一个 env 才清理」。
+static std::atomic<int> g_sslRefCount{0};
+
 struct SSLInitializer {
     SSLInitializer()
     {
-        OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, "napi_module", "InitializeSSL");
-        RTC_CHECK(rtc::InitializeSSL()) << "Failed to InitializeSSL()";
+        if (g_sslRefCount.fetch_add(1) == 0) {
+            OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, "napi_module", "InitializeSSL");
+            RTC_CHECK(rtc::InitializeSSL()) << "Failed to InitializeSSL()";
+        }
     }
 
     ~SSLInitializer()
     {
-        OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, "napi_module", "CleanupSSL");
-        RTC_CHECK(rtc::CleanupSSL()) << "Failed to CleanupSSL()";
+        if (g_sslRefCount.fetch_sub(1) == 1) {
+            OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, "napi_module", "CleanupSSL");
+            RTC_CHECK(rtc::CleanupSSL()) << "Failed to CleanupSSL()";
+        }
     }
 };
 
@@ -65,6 +79,11 @@ EXTERN_C_START
 static napi_value Init(napi_env env, napi_value exports)
 {
     OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, "napi_module", "Init");
+
+    static std::once_flag g_hilogSinkOnce;
+    std::call_once(g_hilogSinkOnce, []() {
+        rtc::LogMessage::AddLogToStream(new HilogSink(), rtc::LS_INFO);
+    });
 
     Env e(env);
     Object exp(env, exports);

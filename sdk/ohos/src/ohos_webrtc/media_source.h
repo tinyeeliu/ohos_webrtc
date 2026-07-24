@@ -66,7 +66,7 @@ protected:
     Napi::Value ToJson(const Napi::CallbackInfo& info);
 
 private:
-    static Napi::FunctionReference constructor_;
+    static thread_local Napi::FunctionReference constructor_;
 
     rtc::scoped_refptr<OhosLocalAudioSource> source_;
 };
@@ -76,10 +76,15 @@ public:
     NAPI_CLASS_NAME_DECLARE(VideoSource);
     NAPI_ATTRIBUTE_NAME_DECLARE(OnCapturerStarted, oncapturerstarted);
     NAPI_ATTRIBUTE_NAME_DECLARE(OnCapturerStopped, oncapturerstopped);
+    NAPI_ATTRIBUTE_NAME_DECLARE(OnCameraSwitchDone, oncameraswitchdone);
+    NAPI_ATTRIBUTE_NAME_DECLARE(OnCameraSwitchError, oncameraswitcherror);
     NAPI_EVENT_NAME_DECLARE(CapturerStarted, capturerstarted);
     NAPI_EVENT_NAME_DECLARE(CapturerStopped, capturerstopped);
+    NAPI_EVENT_NAME_DECLARE(CameraSwitchDone, cameraswitchdone);
+    NAPI_EVENT_NAME_DECLARE(CameraSwitchError, cameraswitcherror);
     NAPI_METHOD_NAME_DECLARE(StartCapture, startCapture);
     NAPI_METHOD_NAME_DECLARE(StopCapture, stopCapture);
+    NAPI_METHOD_NAME_DECLARE(SwitchCamera, switchCamera);
 
     static void Init(Napi::Env env, Napi::Object exports);
 
@@ -103,6 +108,7 @@ protected:
     void SetEventHandler(const Napi::CallbackInfo& info, const Napi::Value& value);
     Napi::Value StartCapture(const Napi::CallbackInfo& info);
     Napi::Value StopCapture(const Napi::CallbackInfo& info);
+    Napi::Value SwitchCamera(const Napi::CallbackInfo& info);
     Napi::Value ToJson(const Napi::CallbackInfo& info);
 
 protected:
@@ -113,6 +119,8 @@ protected:
     OnFrameCaptured(rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation) override
     {
     }
+    void OnCameraSwitchDone(const std::string& newCameraId) override;
+    void OnCameraSwitchError(const std::string& errorMessage) override;
 
 private:
     bool GetEventHandler(const std::string& type, Napi::Function& fn);
@@ -122,7 +130,7 @@ private:
     void RemoveAllEventHandlers();
 
 private:
-    static Napi::FunctionReference constructor_;
+    static thread_local Napi::FunctionReference constructor_;
 
     rtc::scoped_refptr<OhosVideoTrackSource> source_;
     rtc::Thread* signalThread_{};

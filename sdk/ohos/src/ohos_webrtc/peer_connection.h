@@ -108,7 +108,7 @@ protected:
     void OnRemoveTrack(rtc::scoped_refptr<RtpReceiverInterface> receiver) override;
 
 private:
-    static Napi::FunctionReference constructor_;
+    static thread_local Napi::FunctionReference constructor_;
 
     std::shared_ptr<PeerConnectionFactoryWrapper> factory_;
     rtc::scoped_refptr<PeerConnectionInterface> pc_;
