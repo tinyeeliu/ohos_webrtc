@@ -159,10 +159,20 @@ rtc::scoped_refptr<OhosVideoTrackSource> PeerConnectionFactoryWrapper::GetVideoS
     rtc::scoped_refptr<MediaStreamTrackInterface> track) const
 {
     auto it = videoSources_.find(track);
-    if (it == videoSources_.end()) {
-        return nullptr;
+    if (it != videoSources_.end()) {
+        return it->second;
     }
-    return it->second;
+
+    if (track && track->kind() == MediaStreamTrackInterface::kVideoKind) {
+        auto videoTrack = static_cast<VideoTrackInterface*>(track.get());
+        auto source = videoTrack->GetSource();
+        if (source) {
+            return rtc::scoped_refptr<OhosVideoTrackSource>(
+                static_cast<OhosVideoTrackSource*>(source));
+        }
+    }
+
+    return nullptr;
 }
 
 void PeerConnectionFactoryWrapper::RemoveAudioSource(rtc::scoped_refptr<MediaStreamTrackInterface> track)
