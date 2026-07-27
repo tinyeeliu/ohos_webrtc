@@ -429,14 +429,6 @@ void OhosVideoTrackSource::OnCapturerStopped()
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    // Only set state to ended if this is the current capturer.
-    // If a new capturer has been switched in, ignore this stop notification.
-    if (capturer_) {
-        SetState(false);
-    } else {
-        RTC_LOG(LS_INFO) << "Ignoring OnCapturerStopped for old capturer after SwitchCapturer";
-    }
-
     VideoCapturer::Observer* observer = nullptr;
     {
         UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
@@ -445,6 +437,59 @@ void OhosVideoTrackSource::OnCapturerStopped()
 
     if (observer) {
         observer->OnCapturerStopped();
+    }
+}
+
+void OhosVideoTrackSource::SwitchCamera()
+{
+    if (is_destroying_.load(std::memory_order_acquire)) {
+        RTC_LOG(LS_WARNING) << "SwitchCamera: source destroying, skip";
+        return;
+    }
+    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
+    thread_->PostTask([capturer = capturer_] { capturer->SwitchCamera(); });
+}
+
+void OhosVideoTrackSource::SwitchCamera(const std::string& cameraId)
+{
+    if (is_destroying_.load(std::memory_order_acquire)) {
+        RTC_LOG(LS_WARNING) << "SwitchCamera: source destroying, skip";
+        return;
+    }
+    RTC_LOG(LS_VERBOSE) << __FUNCTION__ << ": cameraId=" << cameraId;
+    thread_->PostTask([capturer = capturer_, cameraId] { capturer->SwitchCamera(cameraId); });
+}
+
+void OhosVideoTrackSource::OnCameraSwitchDone(const std::string& newCameraId)
+{
+    if (is_destroying_.load(std::memory_order_acquire)) {
+        RTC_LOG(LS_WARNING) << "OnCameraSwitchDone: source destroying, skip";
+        return;
+    }
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << ": newCameraId=" << newCameraId;
+    VideoCapturer::Observer* observer = nullptr;
+    {
+        UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
+        observer = capturerObserver_;
+    }
+
+    if (observer) {
+        observer->OnCameraSwitchDone(newCameraId);
+    }
+}
+
+void OhosVideoTrackSource::OnCameraSwitchError(const std::string& errorMessage)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << ": errorMessage=" << errorMessage;
+
+    VideoCapturer::Observer* observer = nullptr;
+    {
+        UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
+        observer = capturerObserver_;
+    }
+
+    if (observer) {
+        observer->OnCameraSwitchError(errorMessage);
     }
 }
 

@@ -233,7 +233,7 @@ bool PeerConnectionFactoryWrapper::Init(
     return true;
 }
 
-FunctionReference NapiPeerConnectionFactory::constructor_;
+thread_local FunctionReference NapiPeerConnectionFactory::constructor_;
 
 NapiPeerConnectionFactory::NapiPeerConnectionFactory(const CallbackInfo& info)
     : ObjectWrap<NapiPeerConnectionFactory>(info)
@@ -299,6 +299,7 @@ void NapiPeerConnectionFactory::Init(Napi::Env env, Object exports)
     exports.Set(kClassName, func);
 
     constructor_ = Persistent(func);
+    constructor_.SuppressDestruct();
 }
 
 Napi::Value NapiPeerConnectionFactory::SetDefault(const Napi::CallbackInfo& info)

@@ -64,7 +64,7 @@ const char kEventNameSelectedCandidatePairChange[] = "selectedcandidatepairchang
 const char kMethodNameGetSelectedCandidatePair[] = "getSelectedCandidatePair";
 const char kMethodNameToJson[] = "toJSON";
 
-FunctionReference NapiIceTransport::constructor_;
+thread_local FunctionReference NapiIceTransport::constructor_;
 static constexpr int callbackInfoLen = 2;
 
 void NapiIceTransport::Init(Napi::Env env, Napi::Object exports)
@@ -91,6 +91,7 @@ void NapiIceTransport::Init(Napi::Env env, Napi::Object exports)
     exports.Set(kClassName, func);
 
     constructor_ = Persistent(func);
+    constructor_.SuppressDestruct();
 }
 
 NapiIceTransport::~NapiIceTransport()

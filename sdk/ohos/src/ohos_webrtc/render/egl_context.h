@@ -53,7 +53,7 @@ protected:
     Napi::Value ToJson(const Napi::CallbackInfo& info);
 
 private:
-    static Napi::FunctionReference constructor_;
+    static thread_local Napi::FunctionReference constructor_;
 
     std::shared_ptr<EglContext> eglContext_;
 };
