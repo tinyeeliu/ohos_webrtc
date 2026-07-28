@@ -15,6 +15,7 @@
 
 import {Loggable, NativeLogging} from 'libohos_webrtc.so'
 
+
 export enum LoggingSeverity { VERBOSE, INFO, WARNING, ERROR, NONE }
 
 export class Logging {
