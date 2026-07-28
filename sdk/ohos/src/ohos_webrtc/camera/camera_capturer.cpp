@@ -534,15 +534,10 @@ void CameraCapturer::OnFrameAvailable(
     (void)rotation;
     VideoRotation frameRotation = kVideoRotation_0;
 
-    // GL 纹理路径：NativeImage 变换矩阵已包含传感器方向，此处仅补偿屏幕旋转与前置镜像。
     if (buffer->type() == VideoFrameBuffer::Type::kNative) {
         auto textureBuffer = static_cast<TextureBuffer*>(buffer.get());
 
         Matrix transformMatrix;
-        // Perform mirror and rotation around (0.5, 0.5) since that is the center of the texture.
-        if (isCameraFrontFacing_) {
-            transformMatrix.PreScale(-1.0f, 1.0f, 0.5f, 0.5f);
-        }
         transformMatrix.PreRotate(finalRotation_, 0.5f, 0.5f);
         Matrix newMatrix = textureBuffer->GetTransformMatrix();
         newMatrix.PreConcat(transformMatrix);
