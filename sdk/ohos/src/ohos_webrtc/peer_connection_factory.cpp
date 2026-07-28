@@ -29,6 +29,7 @@
 #include "audio_device/ohos_audio_device_module.h"
 #include "audio_device/ohos_local_audio_source.h"
 #include "camera/camera_enumerator.h"
+#include "pc/video_track.h"
 #include "camera/camera_capturer.h"
 #include "screen_capture/screen_capturer.h"
 #include "video/video_track_source.h"
@@ -164,11 +165,17 @@ rtc::scoped_refptr<OhosVideoTrackSource> PeerConnectionFactoryWrapper::GetVideoS
     }
 
     if (track && track->kind() == MediaStreamTrackInterface::kVideoKind) {
-        auto videoTrack = static_cast<VideoTrackInterface*>(track.get());
-        auto source = videoTrack->GetSource();
-        if (source) {
-            return rtc::scoped_refptr<OhosVideoTrackSource>(
-                static_cast<OhosVideoTrackSource*>(source));
+        auto* videoTrack = static_cast<VideoTrackInterface*>(track.get());
+        auto* sourceProxy = videoTrack->GetSource();
+        if (sourceProxy) {
+            auto* internal =
+                static_cast<VideoTrackSourceProxyWithInternal<VideoTrackSourceInterface>*>(
+                    sourceProxy)
+                    ->internal();
+            if (internal) {
+                return rtc::scoped_refptr<OhosVideoTrackSource>(
+                    static_cast<OhosVideoTrackSource*>(internal));
+            }
         }
     }
 
