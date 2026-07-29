@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.0.3 (2026-07-29)
+
+- Support MediaStreamTrack.applyConstraints (resolution/frameRate/facingMode) [#119](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/119)
+- Support camera hardware zoom via applyConstraints({ zoom }) and getZoomRange() [#121](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/121)
+- Add camera flip/mirror interface [#128](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/128)
+- Support x86 emulator
+- Fix crash and memory leak caused by connection [#125](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/125)
+- Fix event-loop exception isolation, SDP/ICE parameter type validation, and audio device stability issues [#102](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/102)
+- Fix audio builder memory leaks and NAPI Unwrap null checks [#120](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/120)
+- Fix libohos_webrtc.so multiple loading resource contention [#128](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/128)
+- Fix NapiMediaStreamTrack GC causing camera switch failure [#129](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/129)
+- Fix local preview double mirror and GetVideoSource crash [#130](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/130)
+- Add applyConstraints XTS test coverage [#127](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/127)
+- Add MediaDevices test coverage and switch loopback suites to host-only [#116](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/116)
+- Add missing interface test coverage (VideoEncoderFactory, VideoRenderController), fix existing test races [#122](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/122)
+- Migrate ohosTest module from HAR to entry [#131](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/131)
+- Update the WebRTC build guide documentation [#113](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/113)
+- Add v1.0.2 upgrade notice and version recommendation table to sdk/ohos README [#117](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/117)
+
 ## 1.0.3-rc.4 (2026-07-24)
 
 - Add applyConstraints XTS [#127](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/127)
@@ -14,11 +33,6 @@
 - Add v1.0.2 upgrade notice and version recommendation table to sdk/ohos README [#117](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/117)
 - Fix audio builder memory leaks and add null checks for NAPI Unwrap [#120](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/120)
 - Add missing interface test coverage (VideoEncoderFactory, VideoRenderController), fix existing test races, and remove the non-existent getDefault declaration from webrtc.d.ts [#122](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/122)
-
-## Unreleased
-
-- Support camera zoom via applyConstraints({ zoom }) and getZoomRange() [#121](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/merge_requests/121)
-- Support applyConstraints for video track (resolution/frameRate/facingMode) [#119](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/119)
 
 ## 1.0.2 (2026-06-11)
 - Support real-time dynamic changes of the local resolution [#94](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/94)
