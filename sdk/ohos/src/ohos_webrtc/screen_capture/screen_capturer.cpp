@@ -80,13 +80,34 @@ void ScreenCapturer::Init(std::unique_ptr<VideoFrameReceiver> dataReceiver, Obse
     dataReceiver_->SetTimestampConverter(
         TimestampConverter([](int64_t timestamp) { return TimestampCast<std::nano, std::micro>(timestamp); }));
 
+    if (!SetupCapture()) {
+        return;
+    }
+
+    isInitialized_ = true;
+}
+
+bool ScreenCapturer::SetupCapture()
+{
+    // The OH_AVScreenCapture instance is single-use; Stop() releases it, so recreate on restart.
+    if (screenCapture_.IsEmpty()) {
+        screenCapture_ = AVScreenCapture::Create();
+        if (screenCapture_.IsEmpty()) {
+            RTC_LOG(LS_ERROR) << "Failed to create screen capture";
+            return false;
+        }
+    }
+
+    int32_t width = GetVideoFrameWidth();
+    int32_t height = GetVideoFrameHeight();
+
     OH_AVScreenCaptureConfig config{};
     SetupConfig(width, height, config);
 
     OH_AVSCREEN_CAPTURE_ErrCode ret = OH_AVScreenCapture_Init(screenCapture_.Raw(), config);
     if (ret != AV_SCREEN_CAPTURE_ERR_OK) {
         RTC_LOG(LS_ERROR) << "Failed to init: " << ret;
-        return;
+        return false;
     }
 
     ret = OH_AVScreenCapture_SetMicrophoneEnabled(screenCapture_.Raw(), false);
@@ -104,7 +125,7 @@ void ScreenCapturer::Init(std::unique_ptr<VideoFrameReceiver> dataReceiver, Obse
     ret = OH_AVScreenCapture_ExcludeContent(screenCapture_.Raw(), contentFilter.Raw());
     if (ret != AV_SCREEN_CAPTURE_ERR_OK) {
         RTC_LOG(LS_ERROR) << "Failed to exclude content: " << ret;
-        return;
+        return false;
     }
 
     if (!options_.skipPrivacyModeWindowIds.empty()) {
@@ -112,16 +133,21 @@ void ScreenCapturer::Init(std::unique_ptr<VideoFrameReceiver> dataReceiver, Obse
             const_cast<int32_t*>(options_.skipPrivacyModeWindowIds.data()), options_.skipPrivacyModeWindowIds.size());
         if (ret != AV_SCREEN_CAPTURE_ERR_OK) {
             RTC_LOG(LS_ERROR) << "Failed to skip privacy mode: " << ret;
-            return;
+            return false;
         }
     }
 
-    isInitialized_ = true;
+    return true;
 }
 
 void ScreenCapturer::Release()
 {
     RTC_LOG(LS_INFO) << __FUNCTION__;
+
+    if (isReleased_.exchange(true)) {
+        RTC_LOG(LS_WARNING) << "Screen capturer already released";
+        return;
+    }
 
     screenCapture_.Reset();
     dataReceiver_.reset();
@@ -130,11 +156,18 @@ void ScreenCapturer::Release()
         UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
         observer_ = nullptr;
     }
+
+    isStarted_ = false;
 }
 
 void ScreenCapturer::Start()
 {
     RTC_LOG(LS_INFO) << __FUNCTION__;
+
+    if (isReleased_.load()) {
+        RTC_LOG(LS_WARNING) << "Screen capturer already released";
+        return;
+    }
 
     if (isStarted_) {
         RTC_LOG(LS_WARNING) << "Capture is started";
@@ -147,6 +180,18 @@ void ScreenCapturer::Start()
         return;
     }
 
+    // The instance is single-use: recreate it if it was started before (including an external
+    // stop, where Stop() did not run) or was already released by Stop().
+    if (startedOnce_.load() || screenCapture_.IsEmpty()) {
+        screenCapture_.Reset();
+        if (!SetupCapture()) {
+            RTC_LOG(LS_ERROR) << "Failed to recreate screen capture";
+            NotifyCaptureStart(false);
+            return;
+        }
+        startedOnce_ = false;
+    }
+
     uint64_t surfaceId = dataReceiver_->GetSurfaceId();
     RTC_DLOG(LS_INFO) << "surfaceId: " << surfaceId;
 
@@ -154,39 +199,43 @@ void ScreenCapturer::Start()
     int32_t ret = OH_NativeWindow_CreateNativeWindowFromSurfaceId(surfaceId, &window);
     if (ret != 0) {
         RTC_LOG(LS_ERROR) << "Failed to create native window from surface id: " << ret;
+        NotifyCaptureStart(false);
         return;
     }
 
     ret = OH_AVScreenCapture_StartScreenCaptureWithSurface(screenCapture_.Raw(), window);
     if (ret != AV_SCREEN_CAPTURE_ERR_OK) {
         RTC_LOG(LS_ERROR) << "Failed to start screen capture width surface: " << ret;
+        NotifyCaptureStart(false);
         return;
     }
 
     isStarted_ = true;
+    startedOnce_ = true;
 }
 
 void ScreenCapturer::Stop()
 {
     RTC_LOG(LS_INFO) << __FUNCTION__;
 
-    if (!isStarted_) {
-        RTC_LOG(LS_ERROR) << "Capture is not started";
+    if (screenCapture_.IsEmpty()) {
+        RTC_LOG(LS_WARNING) << "Screen capture already released";
         return;
     }
 
-    OH_AVSCREEN_CAPTURE_ErrCode ret = OH_AVScreenCapture_StopScreenCapture(screenCapture_.Raw());
-    if (ret != AV_SCREEN_CAPTURE_ERR_OK) {
-        RTC_LOG(LS_ERROR) << "Failed to stop screen capture: " << ret;
-        return;
-    }
-    ret = OH_AVScreenCapture_Release(screenCapture_.Raw());
-    if (ret != AV_SCREEN_CAPTURE_ERR_OK) {
-        RTC_LOG(LS_ERROR) << "Failed to release screen capture: " << ret;
-        return;
+    // Stop also when the engine already stopped externally; release in all cases.
+    if (isStarted_) {
+        OH_AVSCREEN_CAPTURE_ErrCode ret = OH_AVScreenCapture_StopScreenCapture(screenCapture_.Raw());
+        if (ret != AV_SCREEN_CAPTURE_ERR_OK) {
+            RTC_LOG(LS_ERROR) << "Failed to stop screen capture: " << ret;
+            return;
+        }
+        isStarted_ = false;
     }
 
-    isStarted_ = false;
+    // Single-use instance: release it now so the next capture can create a fresh one. Reset()
+    // runs the RAII deleter exactly once and empties the wrapper, so Release() cannot double-free.
+    screenCapture_.Reset();
 
     // No state change callback, notify manually.
     NotifyCaptureStop();
@@ -368,12 +417,20 @@ void ScreenCapturer::OnBufferAvailable1(OH_AVScreenCapture* capture, OH_AVBuffer
 
 void ScreenCapturer::OnError(OH_AVScreenCapture* capture, int32_t errorCode)
 {
+    if (isReleased_.load()) {
+        return;
+    }
+
     RTC_LOG(LS_ERROR) << "Error: " << errorCode;
     (void)capture;
 }
 
 void ScreenCapturer::OnStateChange(struct OH_AVScreenCapture* capture, OH_AVScreenCaptureStateCode stateCode)
 {
+    if (isReleased_.load()) {
+        return;
+    }
+
     (void)capture;
 
     switch (stateCode) {
@@ -400,6 +457,7 @@ void ScreenCapturer::OnStateChange(struct OH_AVScreenCapture* capture, OH_AVScre
         }
         case OH_SCREEN_CAPTURE_STATE_CANCELED:
         case OH_SCREEN_CAPTURE_STATE_STOPPED_BY_USER: {
+            isStarted_ = false;
             NotifyCaptureStop();
             if (systemAudioReceiver_) {
                 systemAudioReceiver_->OnStopped();
@@ -409,6 +467,7 @@ void ScreenCapturer::OnStateChange(struct OH_AVScreenCapture* capture, OH_AVScre
         case OH_SCREEN_CAPTURE_STATE_INTERRUPTED_BY_OTHER:
         case OH_SCREEN_CAPTURE_STATE_STOPPED_BY_CALL:
         case OH_SCREEN_CAPTURE_STATE_STOPPED_BY_USER_SWITCHES: {
+            isStarted_ = false;
             NotifyCaptureStop();
             if (systemAudioReceiver_) {
                 systemAudioReceiver_->OnError(0, "Interrupted");
@@ -423,6 +482,10 @@ void ScreenCapturer::OnStateChange(struct OH_AVScreenCapture* capture, OH_AVScre
 void ScreenCapturer::OnBufferAvailable(
     OH_AVScreenCapture* capture, OH_AVBuffer* buffer, OH_AVScreenCaptureBufferType bufferType, int64_t timestamp)
 {
+    if (isReleased_.load()) {
+        return;
+    }
+
     RTC_DLOG(LS_VERBOSE) << "Buffer available: " << bufferType << ", " << timestamp;
     (void)capture;
 

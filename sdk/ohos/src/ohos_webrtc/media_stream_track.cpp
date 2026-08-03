@@ -334,7 +334,7 @@ Napi::Value NapiMediaStreamTrack::Stop(const Napi::CallbackInfo& info)
             if (signalingThread->IsCurrent()) {
                 source->Stop();
             } else {
-                signalingThread->PostTask([source] { source->Stop(); });
+                signalingThread->BlockingCall([source] { source->Stop(); });
             }
         }
     } else if (IsVideoTrack()) {
@@ -344,7 +344,7 @@ Napi::Value NapiMediaStreamTrack::Stop(const Napi::CallbackInfo& info)
             if (signalingThread->IsCurrent()) {
                 source->Stop();
             } else {
-                signalingThread->PostTask([source] { source->Stop(); });
+                signalingThread->BlockingCall([source] { source->Stop(); });
             }
         }
     }
