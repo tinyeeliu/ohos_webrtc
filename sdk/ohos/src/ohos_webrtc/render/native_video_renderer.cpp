@@ -199,6 +199,8 @@ Napi::Value NapiNativeVideoRenderer::Init(const Napi::CallbackInfo& info)
                 RTC_LOG(LS_ERROR) << "tsfn call error: " << status;
             }
         });
+        // setVideoTrack 可能在 init 之前调用，此时 AddSink 会跳过；init 完成后补挂 sink。
+        AddSink();
     }
 
     return info.Env().Undefined();
@@ -392,7 +394,7 @@ Napi::Value NapiNativeVideoRenderer::ToJson(const Napi::CallbackInfo& info)
 void NapiNativeVideoRenderer::AddSink()
 {
     if (!renderer_) {
-        RTC_DLOG(LS_VERBOSE) << "renderer is null";
+        RTC_DLOG(LS_VERBOSE) << "renderer not initialized yet";
         return;
     }
 
@@ -408,6 +410,10 @@ void NapiNativeVideoRenderer::AddSink()
     }
 
     auto napiTrack = NapiMediaStreamTrack::Unwrap(jsTrack);
+    if (!napiTrack) {
+        RTC_LOG(LS_ERROR) << "AddSink failed: invalid track";
+        return;
+    }
     napiTrack->AddSink(renderer_.get());
 }
 
@@ -430,6 +436,10 @@ void NapiNativeVideoRenderer::RemoveSink()
     }
 
     auto napiTrack = NapiMediaStreamTrack::Unwrap(jsTrack);
+    if (!napiTrack) {
+        RTC_LOG(LS_ERROR) << "RemoveSink failed: invalid track";
+        return;
+    }
     napiTrack->RemoveSink(renderer_.get());
 }
 

@@ -51,10 +51,12 @@ export class VideoRenderController extends XComponentController {
     Logging.d(TAG, 'onSurfaceCreated surfaceId: ' + surfaceId);
     this.renderer = new NativeVideoRenderer();
     this.renderer.init(surfaceId);
-    this.renderer?.setVideoTrack(this.track);
-    this.renderer?.setMirror(this.mirror);
-    this.renderer?.setMirrorVertically(this.mirrorVertically);
-    this.renderer?.setScalingMode(this.mode);
+    // 先 detach 再 attach，确保 surface 重建时 sink 正确重挂
+    this.renderer.setVideoTrack(null);
+    this.renderer.setVideoTrack(this.track);
+    this.renderer.setMirror(this.mirror);
+    this.renderer.setMirrorVertically(this.mirrorVertically);
+    this.renderer.setScalingMode(this.mode);
   }
 
   onSurfaceChanged(surfaceId: string, rect: SurfaceRect): void
@@ -66,6 +68,7 @@ export class VideoRenderController extends XComponentController {
   onSurfaceDestroyed(surfaceId: string): void
   {
     Logging.d(TAG, 'onSurfaceDestroyed surfaceId: ' + surfaceId);
+    this.renderer?.setVideoTrack(null);
     this.renderer?.release();
     this.renderer = undefined;
   }
