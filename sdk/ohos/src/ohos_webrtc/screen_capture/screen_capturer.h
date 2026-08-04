@@ -23,6 +23,7 @@
 #include "../helper/screen_capture.h"
 #include "../helper/display_manager.h"
 
+#include <atomic>
 #include <memory>
 #include <cstdint>
 #include <mutex>
@@ -66,6 +67,7 @@ public:
 protected:
     void SetupConfig(int32_t width, int32_t height, OH_AVScreenCaptureConfig& config);
     bool SetupContentFilter(ohos::AVScreenCaptureContentFilter& contentFilter);
+    bool SetupCapture();
 
     void NotifyCaptureStart(bool success);
     void NotifyCaptureStop();
@@ -100,7 +102,10 @@ private:
     const std::shared_ptr<SystemAudioReceiver> systemAudioReceiver_;
 
     bool isInitialized_{false};
-    bool isStarted_{false};
+    // The OH_AVScreenCapture instance is single-use: once started it cannot be reused.
+    std::atomic<bool> startedOnce_{false};
+    std::atomic<bool> isStarted_{false};
+    std::atomic<bool> isReleased_{false};
 
     uint32_t initDisplayRotation_{0};
     std::atomic<uint32_t> displayRotation_{0};
