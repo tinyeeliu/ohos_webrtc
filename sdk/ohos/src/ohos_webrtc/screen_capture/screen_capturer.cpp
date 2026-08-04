@@ -28,6 +28,7 @@ namespace {
 
 constexpr int32_t kVideoFrameWidth_Default = 720;
 constexpr int32_t kVideoFrameHeight_Default = 1280;
+constexpr int32_t kStopConfirmTimeoutMs = 500;
 
 } // namespace
 
@@ -190,6 +191,12 @@ void ScreenCapturer::Start()
             return;
         }
         startedOnce_ = false;
+        // Clear the stop-confirmation flag from a previous stop so a fresh instance's Stop()
+        // waits for its own confirmation before releasing.
+        {
+            std::lock_guard<std::mutex> lock(stopMutex_);
+            stopConfirmed_ = false;
+        }
     }
 
     uint64_t surfaceId = dataReceiver_->GetSurfaceId();
@@ -224,20 +231,23 @@ void ScreenCapturer::Stop()
     }
 
     // Stop also when the engine already stopped externally; release in all cases.
-    bool stopFailed = false;
+    bool stopRequested = false;
     if (isStarted_) {
         OH_AVSCREEN_CAPTURE_ErrCode ret = OH_AVScreenCapture_StopScreenCapture(screenCapture_.Raw());
-        if (ret != AV_SCREEN_CAPTURE_ERR_OK) {
+        if (ret == AV_SCREEN_CAPTURE_ERR_OK) {
+            stopRequested = true;
+        } else {
             RTC_LOG(LS_ERROR) << "Failed to stop screen capture: " << ret;
-            stopFailed = true;
         }
         isStarted_ = false;
     }
 
-    // Release the single-use instance only when the engine is confirmed stopped. Releasing a
-    // still-running capture (stopFailed) risks use-after-free on its callback thread; the
-    // instance is reclaimed by the next Start() (startedOnce_) or Release() instead.
-    if (!stopFailed) {
+    if (stopRequested) {
+        std::unique_lock<std::mutex> lock(stopMutex_);
+        stopCond_.wait_for(lock, std::chrono::milliseconds(kStopConfirmTimeoutMs),
+            [this] { return stopConfirmed_.load(); });
+    }
+    if (stopConfirmed_.load()) {
         screenCapture_.Reset();
     }
 
@@ -462,6 +472,11 @@ void ScreenCapturer::OnStateChange(struct OH_AVScreenCapture* capture, OH_AVScre
         case OH_SCREEN_CAPTURE_STATE_CANCELED:
         case OH_SCREEN_CAPTURE_STATE_STOPPED_BY_USER: {
             isStarted_ = false;
+            {
+                std::lock_guard<std::mutex> lock(stopMutex_);
+                stopConfirmed_ = true;
+            }
+            stopCond_.notify_all();
             NotifyCaptureStop();
             if (systemAudioReceiver_) {
                 systemAudioReceiver_->OnStopped();

@@ -24,6 +24,8 @@
 #include "../helper/display_manager.h"
 
 #include <atomic>
+#include <chrono>
+#include <condition_variable>
 #include <memory>
 #include <cstdint>
 #include <mutex>
@@ -106,6 +108,15 @@ private:
     std::atomic<bool> startedOnce_{false};
     std::atomic<bool> isStarted_{false};
     std::atomic<bool> isReleased_{false};
+
+    // Set by the engine callback thread (OnStateChange STOPPED_BY_USER/CANCELED) once it confirms
+    // the capture stopped. Stop() (on the v-track-source thread) waits on stopCond_ for this flag
+    // before releasing screenCapture_, so the single-use instance is only destroyed after the
+    // engine stopped (no CFI crash) and never from the callback thread itself (no use-after-free
+    // with Stop() calling screenCapture_.Raw() concurrently).
+    std::atomic<bool> stopConfirmed_{false};
+    std::mutex stopMutex_;
+    std::condition_variable stopCond_;
 
     uint32_t initDisplayRotation_{0};
     std::atomic<uint32_t> displayRotation_{0};
