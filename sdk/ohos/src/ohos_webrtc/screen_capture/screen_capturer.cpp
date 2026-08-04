@@ -224,21 +224,12 @@ void ScreenCapturer::Stop()
     }
 
     // Stop also when the engine already stopped externally; release in all cases.
-    bool stopFailed = false;
     if (isStarted_) {
         OH_AVSCREEN_CAPTURE_ErrCode ret = OH_AVScreenCapture_StopScreenCapture(screenCapture_.Raw());
         if (ret != AV_SCREEN_CAPTURE_ERR_OK) {
             RTC_LOG(LS_ERROR) << "Failed to stop screen capture: " << ret;
-            stopFailed = true;
         }
         isStarted_ = false;
-    }
-
-    // Release the single-use instance only when the engine is confirmed stopped. Releasing a
-    // still-running capture (stopFailed) risks use-after-free on its callback thread; the
-    // instance is reclaimed by the next Start() (startedOnce_) or Release() instead.
-    if (!stopFailed) {
-        screenCapture_.Reset();
     }
 
     // No state change callback, notify manually.
@@ -462,6 +453,7 @@ void ScreenCapturer::OnStateChange(struct OH_AVScreenCapture* capture, OH_AVScre
         case OH_SCREEN_CAPTURE_STATE_CANCELED:
         case OH_SCREEN_CAPTURE_STATE_STOPPED_BY_USER: {
             isStarted_ = false;
+            screenCapture_.Reset();
             NotifyCaptureStop();
             if (systemAudioReceiver_) {
                 systemAudioReceiver_->OnStopped();
