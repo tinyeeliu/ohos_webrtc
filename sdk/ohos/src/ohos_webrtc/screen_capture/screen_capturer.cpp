@@ -28,6 +28,7 @@ namespace {
 
 constexpr int32_t kVideoFrameWidth_Default = 720;
 constexpr int32_t kVideoFrameHeight_Default = 1280;
+constexpr int32_t kStopConfirmTimeoutMs = 500;
 
 } // namespace
 
@@ -190,6 +191,12 @@ void ScreenCapturer::Start()
             return;
         }
         startedOnce_ = false;
+        // Clear the stop-confirmation flag from a previous stop so a fresh instance's Stop()
+        // waits for its own confirmation before releasing.
+        {
+            std::lock_guard<std::mutex> lock(stopMutex_);
+            stopConfirmed_ = false;
+        }
     }
 
     uint64_t surfaceId = dataReceiver_->GetSurfaceId();
@@ -224,27 +231,32 @@ void ScreenCapturer::Stop()
     }
 
     // Stop also when the engine already stopped externally; release in all cases.
-    bool stopFailed = false;
+    bool stopRequested = false;
     if (isStarted_) {
         OH_AVSCREEN_CAPTURE_ErrCode ret = OH_AVScreenCapture_StopScreenCapture(screenCapture_.Raw());
-        if (ret != AV_SCREEN_CAPTURE_ERR_OK) {
+        if (ret == AV_SCREEN_CAPTURE_ERR_OK) {
+            stopRequested = true;
+        } else {
             RTC_LOG(LS_ERROR) << "Failed to stop screen capture: " << ret;
-            stopFailed = true;
         }
         isStarted_ = false;
     }
 
-    // Release the single-use instance only when the engine is confirmed stopped. Releasing a
-    // still-running capture (stopFailed) risks use-after-free on its callback thread; the
-    // instance is reclaimed by the next Start() (startedOnce_) or Release() instead.
-    if (!stopFailed) {
+    if (stopRequested) {
+        std::unique_lock<std::mutex> lock(stopMutex_);
+        stopCond_.wait_for(lock, std::chrono::milliseconds(kStopConfirmTimeoutMs),
+            [this] { return stopConfirmed_.load(); });
+    }
+    if (stopConfirmed_.load()) {
         screenCapture_.Reset();
     }
 
-    // No state change callback, notify manually.
-    NotifyCaptureStop();
-    if (systemAudioReceiver_) {
-        systemAudioReceiver_->OnStopped();
+    if (!stopConfirmed_.load()) {
+        // No state change callback, notify manually.
+        NotifyCaptureStop();
+        if (systemAudioReceiver_) {
+            systemAudioReceiver_->OnStopped();
+        }
     }
 }
 
@@ -438,48 +450,65 @@ void ScreenCapturer::OnStateChange(struct OH_AVScreenCapture* capture, OH_AVScre
     (void)capture;
 
     switch (stateCode) {
-        case OH_SCREEN_CAPTURE_STATE_STARTED: {
-            displayRotation_ = initDisplayRotation_ = GetDefaultDisplayRotation();
-            RTC_DLOG(LS_INFO) << "Display rotation: " << displayRotation_;
-            if (displayRotation_ == kVideoRotation_90 || displayRotation_ == kVideoRotation_270) {
-                // Swap width and height in landscape
-                int32_t width = GetVideoFrameWidth();
-                int32_t height = GetVideoFrameHeight();
-                std::swap(width, height);
-                RTC_DLOG(LS_INFO) << "Video frame size: " << width << "x" << height;
-
-                dataReceiver_->SetVideoFrameSize(width, height);
-                OH_AVSCREEN_CAPTURE_ErrCode ret = OH_AVScreenCapture_ResizeCanvas(screenCapture_.Raw(), width, height);
-                RTC_LOG_IF(LS_ERROR, ret != AV_SCREEN_CAPTURE_ERR_OK) << "Failed to resize canvas: " << ret;
-            }
-
-            NotifyCaptureStart(true);
-            if (systemAudioReceiver_) {
-                systemAudioReceiver_->OnStarted(true);
-            }
+        case OH_SCREEN_CAPTURE_STATE_STARTED:
+            HandleCaptureStarted();
             break;
-        }
         case OH_SCREEN_CAPTURE_STATE_CANCELED:
-        case OH_SCREEN_CAPTURE_STATE_STOPPED_BY_USER: {
-            isStarted_ = false;
-            NotifyCaptureStop();
-            if (systemAudioReceiver_) {
-                systemAudioReceiver_->OnStopped();
-            }
+        case OH_SCREEN_CAPTURE_STATE_STOPPED_BY_USER:
+            HandleCaptureStopped();
             break;
-        }
         case OH_SCREEN_CAPTURE_STATE_INTERRUPTED_BY_OTHER:
         case OH_SCREEN_CAPTURE_STATE_STOPPED_BY_CALL:
-        case OH_SCREEN_CAPTURE_STATE_STOPPED_BY_USER_SWITCHES: {
-            isStarted_ = false;
-            NotifyCaptureStop();
-            if (systemAudioReceiver_) {
-                systemAudioReceiver_->OnError(0, "Interrupted");
-            }
+        case OH_SCREEN_CAPTURE_STATE_STOPPED_BY_USER_SWITCHES:
+            HandleCaptureInterrupted();
             break;
-        }
         default:
             break;
+    }
+}
+
+void ScreenCapturer::HandleCaptureStarted()
+{
+    displayRotation_ = initDisplayRotation_ = GetDefaultDisplayRotation();
+    RTC_DLOG(LS_INFO) << "Display rotation: " << displayRotation_;
+    if (displayRotation_ == kVideoRotation_90 || displayRotation_ == kVideoRotation_270) {
+        // Swap width and height in landscape
+        int32_t width = GetVideoFrameWidth();
+        int32_t height = GetVideoFrameHeight();
+        std::swap(width, height);
+        RTC_DLOG(LS_INFO) << "Video frame size: " << width << "x" << height;
+
+        dataReceiver_->SetVideoFrameSize(width, height);
+        OH_AVSCREEN_CAPTURE_ErrCode ret = OH_AVScreenCapture_ResizeCanvas(screenCapture_.Raw(), width, height);
+        RTC_LOG_IF(LS_ERROR, ret != AV_SCREEN_CAPTURE_ERR_OK) << "Failed to resize canvas: " << ret;
+    }
+
+    NotifyCaptureStart(true);
+    if (systemAudioReceiver_) {
+        systemAudioReceiver_->OnStarted(true);
+    }
+}
+
+void ScreenCapturer::HandleCaptureStopped()
+{
+    isStarted_ = false;
+    {
+        std::lock_guard<std::mutex> lock(stopMutex_);
+        stopConfirmed_ = true;
+    }
+    stopCond_.notify_all();
+    NotifyCaptureStop();
+    if (systemAudioReceiver_) {
+        systemAudioReceiver_->OnStopped();
+    }
+}
+
+void ScreenCapturer::HandleCaptureInterrupted()
+{
+    isStarted_ = false;
+    NotifyCaptureStop();
+    if (systemAudioReceiver_) {
+        systemAudioReceiver_->OnError(0, "Interrupted");
     }
 }
 
