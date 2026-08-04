@@ -225,6 +225,13 @@ MediaSourceInterface::SourceState OhosVideoTrackSource::state() const
     return state_.load();
 }
 
+bool OhosVideoTrackSource::IsEnded() const
+{
+    RTC_LOG(LS_VERBOSE) << __FUNCTION__;
+
+    return state_.load() == MediaSourceInterface::kEnded;
+}
+
 bool OhosVideoTrackSource::remote() const
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;

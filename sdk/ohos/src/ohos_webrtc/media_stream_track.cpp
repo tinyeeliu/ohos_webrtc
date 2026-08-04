@@ -325,11 +325,8 @@ Napi::Value NapiMediaStreamTrack::Stop(const Napi::CallbackInfo& info)
     }
 
     // MediaStreamTrack.stop(): end underlying source; observers then set track ended and stop RTP.
-    // NAPI calls arrive off signaling thread: BlockingCall source->Stop() to ensure state
-    // transitions (kEnded + FireOnChanged) complete before returning to JS, so applyConstraints()
-    // and readyState see the track as ended immediately. RtpSender::OnChanged() defers ClearSend
-    // via PostTask, so no BlockingCall nests inside the observer chain.
-    // Video sinks are removed synchronously to avoid dangling sink pointers.
+    // NAPI calls arrive off signaling thread: PostTask source->Stop() there (no BlockingCall).
+    // Video sinks are removed synchronously to avoid dangling sink pointers in PostTask.
     auto signalingThread = factory_->GetSignalingThread();
     if (IsAudioTrack()) {
         auto source = factory_->GetAudioSource(track_);
@@ -650,6 +647,10 @@ Napi::Value NapiMediaStreamTrack::ApplyConstraints(const Napi::CallbackInfo& inf
         if (!videoSource) {
             RTC_LOG(LS_ERROR) << __FUNCTION__ << ": videoSource is null";
             deferred.Reject(Error::New(env, "Video source is not available").Value());
+            return deferred.Promise();
+        }
+        if (videoSource->IsEnded()) {
+            deferred.Reject(Error::New(env, "Cannot apply constraints to an ended track").Value());
             return deferred.Promise();
         }
         VideoConstraints videoConstraints;
