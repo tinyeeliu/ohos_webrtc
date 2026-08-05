@@ -52,12 +52,6 @@ struct ApplyConstraintsTestPage {
   private localVideoTrack?: webrtc.MediaStreamTrack;
   private mXComponentController: VideoRenderController = new VideoRenderController();
 
-  // 屏幕捕捉
-  @State isScreenCapturing: boolean = false;
-  private screenCaptureTrack?: webrtc.MediaStreamTrack;
-  private screenCaptureSource?: webrtc.VideoSource;
-  private screenCaptureController: VideoRenderController = new VideoRenderController();
-
   aboutToAppear(): void {
     Logging.enableLogThreads();
     Logging.enableLogTimeStamps();
@@ -85,54 +79,7 @@ struct ApplyConstraintsTestPage {
   aboutToDisappear(): void {
     this.localVideoTrack?.stop();
     this.localVideoSource?.release();
-    this.stopScreenCapture();
     this.pcf = undefined;
-  }
-
-  // 开始屏幕捕捉
-  async startScreenCapture() {
-    this.setStatus('开始屏幕捕捉...');
-    try {
-      let mediaDevices = new webrtc.MediaDevices();
-      let screenStream = await mediaDevices.getDisplayMedia({
-        video: {
-          width: 1280,
-          height: 720,
-          frameRate: 30
-        }
-      });
-
-      if (screenStream.getVideoTracks().length > 0) {
-        this.screenCaptureTrack = screenStream.getVideoTracks()[0];
-        this.screenCaptureController.setVideoTrack(this.screenCaptureTrack);
-        this.screenCaptureController.setScalingMode(ScalingMode.AspectFit);
-        this.isScreenCapturing = true;
-        this.setStatus('屏幕捕捉进行中');
-        this.addResult('✓ startScreenCapture: 屏幕捕捉已开始');
-      } else {
-        this.setStatus('屏幕捕捉失败：未获取到视频轨道');
-        this.addResult('✗ startScreenCapture: 未获取到视频轨道');
-      }
-    } catch (e) {
-      this.setStatus(`屏幕捕捉失败: ${e}`);
-      this.addResult(`✗ startScreenCapture: 失败 - ${e}`);
-    }
-  }
-
-  // 停止屏幕捕捉
-  stopScreenCapture() {
-    if (this.screenCaptureTrack) {
-      this.screenCaptureTrack.stop();
-      this.screenCaptureTrack = undefined;
-    }
-    if (this.screenCaptureSource) {
-      this.screenCaptureSource.release();
-      this.screenCaptureSource = undefined;
-    }
-    this.screenCaptureController.setVideoTrack(null);
-    this.isScreenCapturing = false;
-    this.setStatus('屏幕捕捉已停止');
-    this.addResult('✓ stopScreenCapture: 屏幕捕捉已停止');
   }
 
   createPeerConnectionFactory() {
@@ -579,48 +526,6 @@ struct ApplyConstraintsTestPage {
           .margin({ bottom: 8 })
 
         Text('提示: 默认使用后置摄像头。双指捏合实时变焦，已自动限制在设备支持范围内（达到极限会提示）。若 zoom 不生效，查看日志中 "SetZoomRatio" 的 clamp 范围。')
-          .fontSize(12)
-          .fontColor(0x999999)
-          .margin({ bottom: 16 })
-
-        // ===== 屏幕捕捉测试 =====
-        Text('屏幕捕捉测试')
-          .fontSize(18)
-          .fontWeight(FontWeight.Bold)
-          .alignSelf(ItemAlign.Start)
-          .margin({ bottom: 8 })
-
-        Text(`状态: ${this.isScreenCapturing ? '屏幕捕捉中' : '未开始'}`)
-          .fontSize(16)
-          .fontColor(this.isScreenCapturing ? 0x00AA00 : 0x999999)
-          .margin({ bottom: 8 })
-
-        Button(this.isScreenCapturing ? '停止截屏' : '开始截屏')
-          .width('100%')
-          .height(44)
-          .fontSize(16)
-          .fontColor(this.isScreenCapturing ? 0xFF0000 : 0xFFFFFF)
-          .backgroundColor(this.isScreenCapturing ? 0xFFCCCC : 0x007DFF)
-          .onClick(() => {
-            if (this.isScreenCapturing) {
-              this.stopScreenCapture();
-            } else {
-              this.startScreenCapture();
-            }
-          })
-          .margin({ bottom: 16 })
-
-        XComponent({
-          id: 'screen-capture',
-          type: XComponentType.SURFACE,
-          controller: this.screenCaptureController
-        })
-          .width('100%')
-          .height(200)
-          .margin({ bottom: 8 })
-          .backgroundColor(0xFF000000)
-
-        Text('提示: 点击"开始截屏"按钮开始捕捉屏幕内容，下方显示框将显示当前屏幕画面。点击"停止截屏"结束捕捉。')
           .fontSize(12)
           .fontColor(0x999999)
           .margin({ bottom: 16 })
