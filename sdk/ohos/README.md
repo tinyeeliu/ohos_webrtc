@@ -2,36 +2,6 @@
 
 This project is based on [WebRTC](https://webrtc.googlesource.com/src).
 
-## Recommended Versions
-
-| Version | Release Date | Status | Notes |
-|---------|--------------|--------|-------|
-| v1.0.2 | 2026-06-11 | ✅ Recommended (latest stable) | Recommended for new projects and general upgrades |
-| v1.0.1 | 2026-04-21 | Stable (older) | Safe to stay on if not upgrading |
-
-## v1.0.2 Compatible Upgrade — Stability & Quality Improvements <sub>2026-06-11</sub>
-
-We recommend upgrading to v1.0.2, which brings improvements in both stability and quality and fixes known memory leak and crash issues.
-
-> **Note:** Upgrading to v1.0.2 from v1.0.0 onwards is a compatible upgrade; no code changes are required.
-
-This upgrade focuses on stability and quality improvements of the library.
-
-### 🔧 Stability Improvements
-- Fix memory leak in the hardware video encoder [#95](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/95), avoiding continuous memory growth during long call sessions
-- Fix camera capturer crash on API level 7.0.0 [#99](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/99)
-
-### ✨ Quality Improvements
-- Support real-time dynamic changes of the local resolution [#94](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/94)
-- Implement the audio track pause and volume adjustment interface [#104](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/104)
-- Fix multiple code quality issues in sdk/ohos webrtc and update OAT.xml [#96](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/96)
-
-### 🔄 Compatibility Notes
-- No Breaking Changes; API interfaces remain unchanged
-- This release mainly includes bug fixes, code quality improvements, and additive capabilities; no changes required to existing code
-
-> 📄 **For the full change history and issue fix details, see:** [CHANGELOG.md](./CHANGELOG.md)
-
 ## Introduction
 
 This directory provides ArkTS interface bindings for WebRTC, and adapts the video capture, rendering, and codec modules at the C++ layer. Most interface designs follow the [WebRTC specification](https://www.w3.org/TR/webrtc/). Additional interfaces such as PeerConnectionFactory and AudioDeviceModule are also provided based on practical needs.
