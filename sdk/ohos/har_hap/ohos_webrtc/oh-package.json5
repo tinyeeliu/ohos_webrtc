@@ -1,10 +1,14 @@
 {
   "name": "@ohos/webrtc",
-  "version": "1.0.3-rc.4",
+  "version": "1.0.3",
   "description": "ArkTS interfaces of webrtc for OpenHarmony.",
   "keywords": ["webrtc"],
   "main": "Index.ets",
-  "author": "ohos_tpc",
+  "author": {
+    "name": "ohos_tpc",
+    "email": "mahange@huawei.com",
+    "url": "https://gitcode.com/CPF-ApplicationTPC"
+  },
   "homepage": "https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc",
   "repository": "https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc",
   "license": "Apache-2.0",
