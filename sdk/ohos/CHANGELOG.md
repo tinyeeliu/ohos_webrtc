@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.3 (2026-07-29)
+
+- Support camera zoom via applyConstraints({ zoom }) and getZoomRange() [#121](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/121)
+- Add camera flip/mirror interface and fix libohos_webrtc.so multiple loading resource contention [#128](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/128)
+- Fix NapiMediaStreamTrack GC causing camera switch failure [#129](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/129)
+- Fix local preview double mirror and GetVideoSource crash [#130](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/130)
+- Migrate ohosTest module from HAR to entry module and fix import references [#131](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/131)
+- Add video capture test coverage [#134](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/134)
+- Fix AddSink failure when setVideoTrack is called before surface creation, and correctly re-attach sink on surface rebuild [#135](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/135)
+- Fix screen capture instability [#136](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/136)
+- Fix CFI detection issue during screen recording [#137](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/137)
+- Remove video capture demo [#138](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/138)
+- Remove version recommendation and upgrade notice from README [#139](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/139)
+
 ## 1.0.3-rc.4 (2026-07-24)
 
 - Add applyConstraints XTS [#127](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/127)
@@ -14,11 +28,6 @@
 - Add v1.0.2 upgrade notice and version recommendation table to sdk/ohos README [#117](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/117)
 - Fix audio builder memory leaks and add null checks for NAPI Unwrap [#120](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/120)
 - Add missing interface test coverage (VideoEncoderFactory, VideoRenderController), fix existing test races, and remove the non-existent getDefault declaration from webrtc.d.ts [#122](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/122)
-
-## Unreleased
-
-- Support camera zoom via applyConstraints({ zoom }) and getZoomRange() [#121](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/merge_requests/121)
-- Support applyConstraints for video track (resolution/frameRate/facingMode) [#119](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/119)
 
 ## 1.0.2 (2026-06-11)
 - Support real-time dynamic changes of the local resolution [#94](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/94)
