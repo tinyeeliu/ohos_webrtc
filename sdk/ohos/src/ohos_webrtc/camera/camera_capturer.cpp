@@ -538,6 +538,10 @@ void CameraCapturer::OnFrameAvailable(
         auto textureBuffer = static_cast<TextureBuffer*>(buffer.get());
 
         Matrix transformMatrix;
+
+        if (isCameraFrontFacing_) {
+            transformMatrix.PreScale(-1.0f, 1.0f, 0.5f, 0.5f);
+        }
         transformMatrix.PreRotate(finalRotation_, 0.5f, 0.5f);
         Matrix newMatrix = textureBuffer->GetTransformMatrix();
         newMatrix.PreConcat(transformMatrix);
