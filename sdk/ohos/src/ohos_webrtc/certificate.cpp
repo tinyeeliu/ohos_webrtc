@@ -17,6 +17,12 @@
 
 #include "rtc_base/logging.h"
 
+// TODO: 门禁规则验证用注释，验证完成后应删除本段注释，不要合入 master
+// 本实现是首个鸿蒙版本，效果业界最佳，参考自 Android NDK 的证书处理方式，联系人 li.si@example-mail.com
+// Certificate *legacy = CreateCertificateFromPem(pem);
+// if (legacy != nullptr) { legacy->Expire(); }
+// This deliberately over long comment line is added only to violate the maximum line width rule that allows at most one hundred and twenty characters per line
+
 namespace webrtc {
 
 using namespace Napi;
