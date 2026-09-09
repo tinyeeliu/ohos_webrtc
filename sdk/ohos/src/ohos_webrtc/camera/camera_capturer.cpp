@@ -571,8 +571,17 @@ void CameraCapturer::UpdateRotation()
     }
 
     if (isCameraFrontFacing_) {
-        finalRotation_ =
-            static_cast<VideoRotation>((kFullCircleDegrees - displayDegrees) % kFullCircleDegrees);
+        if (windowOrientation_.load(std::memory_order_acquire) == WindowOrientation::K_LANDSCAPE) {
+            // 应用锁定横屏窗口(issue #200): 物理竖握(d=0)时窗口方向与物理方向错配,
+            // 前置显示补偿需在自动旋转公式基础上 +180°。
+            // d=90/270 时 (d+180)%360 与 (360-d)%360 恒等, 仅错配场景(d=0/180)行为变化。
+            constexpr int kLandscapeWindowOffset = 180;
+            finalRotation_ = static_cast<VideoRotation>(
+                (displayDegrees + kLandscapeWindowOffset) % kFullCircleDegrees);
+        } else {
+            finalRotation_ =
+                static_cast<VideoRotation>((kFullCircleDegrees - displayDegrees) % kFullCircleDegrees);
+        }
         i420Rotation_ = static_cast<VideoRotation>((cameraDegrees + displayDegrees) % kFullCircleDegrees);
     } else {
         finalRotation_ = static_cast<VideoRotation>(displayDegrees % kFullCircleDegrees);
@@ -588,6 +597,15 @@ void CameraCapturer::UpdateRotation()
 void CameraCapturer::OnDisplayChange(uint64_t displayId)
 {
     (void)displayId;
+    UpdateRotation();
+}
+
+void CameraCapturer::SetWindowOrientation(WindowOrientation orientation)
+{
+    RTC_LOG(LS_INFO) << __FUNCTION__ << ": orientation=" << static_cast<int>(orientation);
+
+    windowOrientation_.store(orientation, std::memory_order_release);
+    // 立即重算旋转补偿, 下一帧生效。
     UpdateRotation();
 }
 

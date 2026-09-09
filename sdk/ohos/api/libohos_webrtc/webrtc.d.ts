@@ -810,6 +810,13 @@ export interface VideoSource extends MediaSource {
   switchCamera(): void;
   // 切换到指定 cameraId 的摄像头; cameraId 不存在时触发 oncameraswitcherror。
   switchCamera(cameraId: string): void;
+
+  // 声明应用窗口方向(issue #200)。应用通过 window.setPreferredOrientation 锁定
+  // 窗口方向后应同步调用本方法, 使前置摄像头在窗口方向与设备物理方向不一致时
+  // (如锁定横屏但竖握设备)得到正确的旋转补偿。
+  // 'auto'(默认): 窗口方向跟随物理方向, 行为与既往版本一致;
+  // 'landscape': 应用锁定横屏窗口; 'portrait': 应用锁定竖屏窗口。
+  setWindowOrientation(orientation: 'auto' | 'landscape' | 'portrait'): void;
 }
 
 // https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack

@@ -58,6 +58,8 @@ public:
     void SetZoomRatio(double ratio) override;
     bool GetZoomRatioRange(float* minZoom, float* maxZoom) override;
 
+    void SetWindowOrientation(WindowOrientation orientation) override;
+
 protected:
     void NotifyCapturedStart(bool success);
     void NotifyCapturedStop();
@@ -110,6 +112,9 @@ private:
     std::mutex obsMutex_;
     std::atomic<VideoRotation> finalRotation_{kVideoRotation_0};
     std::atomic<VideoRotation> i420Rotation_{kVideoRotation_0};
+    // 应用声明的窗口方向(issue #200): source 线程写入, DisplayManager 回调线程的
+    // UpdateRotation 读取, 故用 atomic。
+    std::atomic<WindowOrientation> windowOrientation_{WindowOrientation::K_AUTO};
 };
 
 } // namespace webrtc

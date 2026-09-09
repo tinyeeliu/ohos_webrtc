@@ -85,6 +85,7 @@ public:
     NAPI_METHOD_NAME_DECLARE(StartCapture, startCapture);
     NAPI_METHOD_NAME_DECLARE(StopCapture, stopCapture);
     NAPI_METHOD_NAME_DECLARE(SwitchCamera, switchCamera);
+    NAPI_METHOD_NAME_DECLARE(SetWindowOrientation, setWindowOrientation);
 
     static void Init(Napi::Env env, Napi::Object exports);
 
@@ -109,6 +110,7 @@ protected:
     Napi::Value StartCapture(const Napi::CallbackInfo& info);
     Napi::Value StopCapture(const Napi::CallbackInfo& info);
     Napi::Value SwitchCamera(const Napi::CallbackInfo& info);
+    Napi::Value SetWindowOrientation(const Napi::CallbackInfo& info);
     Napi::Value ToJson(const Napi::CallbackInfo& info);
 
 protected:

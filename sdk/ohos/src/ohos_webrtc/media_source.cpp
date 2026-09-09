@@ -159,6 +159,7 @@ void NapiVideoSource::Init(Napi::Env env, Napi::Object exports)
             InstanceMethod<&NapiVideoSource::StartCapture>(kMethodNameStartCapture),
             InstanceMethod<&NapiVideoSource::StopCapture>(kMethodNameStopCapture),
             InstanceMethod<&NapiVideoSource::SwitchCamera>(kMethodNameSwitchCamera),
+            InstanceMethod<&NapiVideoSource::SetWindowOrientation>(kMethodNameSetWindowOrientation),
             InstanceMethod<&NapiVideoSource::ToJson>(kMethodNameToJson),
         });
     exports.Set(kClassName, func);
@@ -373,6 +374,33 @@ Napi::Value NapiVideoSource::SwitchCamera(const Napi::CallbackInfo& info)
         source_->SwitchCamera();
     }
 
+    return info.Env().Undefined();
+}
+
+Napi::Value NapiVideoSource::SetWindowOrientation(const Napi::CallbackInfo& info)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    if (!source_) {
+        NAPI_THROW(Error::New(info.Env(), "Illegal state"), info.Env().Undefined());
+    }
+
+    if (info.Length() < 1 || !info[0].IsString()) {
+        NAPI_THROW(TypeError::New(info.Env(), "orientation must be a string"), info.Env().Undefined());
+    }
+
+    std::string orientation = info[0].As<String>().Utf8Value();
+    WindowOrientation windowOrientation = WindowOrientation::K_AUTO;
+    if (orientation == "landscape") {
+        windowOrientation = WindowOrientation::K_LANDSCAPE;
+    } else if (orientation == "portrait") {
+        windowOrientation = WindowOrientation::K_PORTRAIT;
+    } else if (orientation != "auto") {
+        NAPI_THROW(TypeError::New(info.Env(), "orientation must be 'auto', 'landscape' or 'portrait'"),
+            info.Env().Undefined());
+    }
+
+    source_->SetWindowOrientation(windowOrientation);
     return info.Env().Undefined();
 }
 

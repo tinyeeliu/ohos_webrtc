@@ -101,6 +101,10 @@ public:
     // Set camera zoom ratio (dispatched to source thread, then forwarded to capturer)
     void SetZoomRatio(double ratio);
     bool GetZoomRatioRange(float* minZoom, float* maxZoom);
+
+    // Declare app window orientation (dispatched to source thread, then forwarded to capturer).
+    // See webrtc::WindowOrientation (issue #200).
+    void SetWindowOrientation(WindowOrientation orientation);
     bool IsEnded() const;
 
 protected:

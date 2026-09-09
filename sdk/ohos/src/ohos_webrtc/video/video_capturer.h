@@ -26,6 +26,16 @@
 
 namespace webrtc {
 
+// 应用窗口方向声明。采集器无法从系统 API 获知应用通过
+// window.setPreferredOrientation 锁定的窗口方向, 需由应用显式告知,
+// 用于窗口方向与设备物理方向不一致时(如锁定横屏但竖握设备)的前置摄像头
+// 旋转补偿 (issue #200)。
+enum class WindowOrientation {
+    K_AUTO = 0,      // 未声明/自动旋转: 窗口方向跟随物理方向(默认, 保持既有行为)
+    K_LANDSCAPE = 1, // 应用锁定横屏窗口
+    K_PORTRAIT = 2,  // 应用锁定竖屏窗口
+};
+
 class VideoCapturer {
 public:
     class Observer {
@@ -65,6 +75,10 @@ public:
 
     virtual void SwitchCamera() {}
     virtual void SwitchCamera(const std::string& cameraId) { (void)cameraId; }
+
+    // 应用声明窗口方向。默认 no-op, 仅 CameraCapturer override;
+    // 录屏等其他采集器无需处理。
+    virtual void SetWindowOrientation(WindowOrientation orientation) { (void)orientation; }
 };
 
 } // namespace webrtc
