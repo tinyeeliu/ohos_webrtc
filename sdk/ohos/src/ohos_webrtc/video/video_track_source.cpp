@@ -329,6 +329,22 @@ bool OhosVideoTrackSource::GetZoomRatioRange(float* minZoom, float* maxZoom)
     return capturer_->GetZoomRatioRange(minZoom, maxZoom);
 }
 
+void OhosVideoTrackSource::SetWindowOrientation(WindowOrientation orientation)
+{
+    RTC_LOG(LS_INFO) << __FUNCTION__ << ": orientation=" << static_cast<int>(orientation);
+    thread_->PostTask([this, orientation] {
+        if (is_destroying_.load(std::memory_order_acquire)) {
+            RTC_LOG(LS_WARNING) << "SetWindowOrientation: source destroying, skip";
+            return;
+        }
+        if (capturer_) {
+            capturer_->SetWindowOrientation(orientation);
+        } else {
+            RTC_LOG(LS_WARNING) << "SetWindowOrientation: capturer_ is null, skip";
+        }
+    });
+}
+
 void OhosVideoTrackSource::SwitchCapturer(std::shared_ptr<VideoCapturer> capturer)
 {
     RTC_LOG(LS_INFO) << __FUNCTION__;
