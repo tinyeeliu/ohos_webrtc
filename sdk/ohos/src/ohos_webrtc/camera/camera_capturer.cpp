@@ -544,6 +544,20 @@ void CameraCapturer::OnFrameAvailable(
         }
         transformMatrix.PreRotate(finalRotation_, 0.5f, 0.5f);
         Matrix newMatrix = textureBuffer->GetTransformMatrix();
+        // issue #200 诊断: 相机服务下发的系统变换矩阵(OH_NativeImage_GetTransformMatrixV2,
+        // 每帧由 VideoFrameReceiverGl 从 NativeImage 获取)变化时打印数值,
+        // 用于确认其是否随设备物理姿态变化(锁定窗口方向场景)。
+        // 函数内 static 仅用于诊断变化检测, 单相机实例场景下访问无竞争。
+        static Matrix lastSystemMatrix;
+        if (!newMatrix.IsEqual(lastSystemMatrix)) {
+            float mv[Matrix::kMatrixSize];
+            newMatrix.GetAll(mv);
+            RTC_LOG(LS_INFO) << "OnFrameAvailable: system matrix changed: [" << mv[0] << "," << mv[1] << "," << mv[2]
+                             << "," << mv[3] << "," << mv[4] << "," << mv[5] << "," << mv[6] << "," << mv[7] << ","
+                             << mv[8] << "], finalRotation=" << finalRotation_
+                             << ", isFrontFacing=" << isCameraFrontFacing_;
+            lastSystemMatrix = newMatrix;
+        }
         newMatrix.PreConcat(transformMatrix);
         buffer = TextureBuffer::Create(
             textureBuffer->GetTexture(), textureBuffer->width(), textureBuffer->height(), newMatrix);
@@ -561,6 +575,8 @@ void CameraCapturer::OnFrameAvailable(
 void CameraCapturer::UpdateRotation()
 {
     NativeDisplayManager_Rotation displayRotation = ohos::DisplayManager::GetInstance().GetDefaultDisplayRotation();
+    NativeDisplayManager_Orientation displayOrientation =
+        ohos::DisplayManager::GetInstance().GetDefaultDisplayOrientation();
     constexpr int kDegreesPerRotationUnit = 90;
     constexpr int kFullCircleDegrees = 360;
     int displayDegrees = displayRotation * kDegreesPerRotationUnit;
@@ -580,13 +596,15 @@ void CameraCapturer::UpdateRotation()
             (cameraDegrees - displayDegrees + kFullCircleDegrees) % kFullCircleDegrees);
     }
 
-    RTC_DLOG(LS_VERBOSE) << "UpdateRotation: camera=" << cameraDegrees << ", display=" << displayDegrees
-                         << ", finalRotation=" << finalRotation_ << ", i420Rotation=" << i420Rotation_
-                         << ", isFrontFacing=" << isCameraFrontFacing_;
+    RTC_LOG(LS_INFO) << "UpdateRotation: camera=" << cameraDegrees << ", display=" << displayDegrees
+                     << ", orientation=" << static_cast<int>(displayOrientation)
+                     << ", finalRotation=" << finalRotation_ << ", i420Rotation=" << i420Rotation_
+                     << ", isFrontFacing=" << isCameraFrontFacing_;
 }
 
 void CameraCapturer::OnDisplayChange(uint64_t displayId)
 {
+    RTC_LOG(LS_INFO) << "OnDisplayChange: displayId=" << displayId;
     (void)displayId;
     UpdateRotation();
 }
