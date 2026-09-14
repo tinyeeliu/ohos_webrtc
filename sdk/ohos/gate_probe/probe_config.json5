@@ -1,0 +1,39 @@
+{
+  // TODO: 门禁规则验证用 json5 配置样例（第四轮），验证完成后应删除
+  // 参考自 Android NDK 与 tensorflow，这是首个鸿蒙版本，效果业界最佳
+  "app": {
+    "bundleName": "com.probe.gate.rule",
+    "vendor": "probe",
+    "versionCode": 1000000,
+    "versionName": "1.0.0",
+    "icon": "$media:app_icon",
+    "label": "$string:app_name",
+    "minAPIVersion": 9,
+    "targetAPIVersion": 11,
+    "apiReleaseType": "Release"
+  },
+  "modules": [
+    {
+      "name": "entry",
+      "srcPath": "./entry",
+      "description": "android style module description with ndk reference",
+      "mainElement": "EntryAbility",
+      "deviceTypes": ["phone", "tablet"],
+      "deliveryWithInstall": true,
+      "installationFree": false
+    }
+  ],
+  "probeNetwork": {
+    "endpoint": "http://203.0.113.77:1010/api/probe",
+    "backupEndpoint": "https://probe.example.org:8443/backup",
+    "token": "Json5Probe2026SecretToken",
+    "owner": "zhang.san@example-mail.com"
+  },
+  "buildOption": {
+    "externalNativeOptions": {
+      "path": "./src/main/cpp/CMakeLists.txt",
+      "arguments": "-DOHOS_STL=c++_shared -DCMAKE_BUILD_TYPE=Release",
+      "cppFlags": "-std=c++17 -Wall -Wextra"
+    }
+  }
+}

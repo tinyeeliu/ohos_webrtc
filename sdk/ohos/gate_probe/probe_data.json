@@ -1,0 +1,46 @@
+{
+  "probeName": "gate-rule-probe-json",
+  "probeVersion": "1.0.0",
+  "probeDescription": "门禁规则验证用 json 数据样例（第四轮），参考自 Android NDK 与 tensorflow，首个鸿蒙版本，效果业界最佳",
+  "probeOwner": "zhang.san@example-mail.com",
+  "probeEndpoint": "http://203.0.113.77:1212/api/probe",
+  "probeToken": "JsonProbe2026SecretToken",
+  "probeKeywords": [
+    "android",
+    "ndk",
+    "tensorflow",
+    "dalvik",
+    "libcore",
+    "musl",
+    "Bionic",
+    "react native",
+    "quick application",
+    "Asset Studio",
+    "Build Variant"
+  ],
+  "probeDocKeywords": [
+    "鸿蒙",
+    "首个",
+    "最佳",
+    "卓越",
+    "杰出",
+    "优秀",
+    "之星",
+    "国产",
+    "自主可控",
+    "纯自研",
+    "信创",
+    "质量免检",
+    "史无前例",
+    "永远",
+    "末日",
+    "领导者",
+    "引领者",
+    "快应用"
+  ],
+  "probeNumbers": {
+    "threshold": 2000,
+    "retry": 3,
+    "timeout": 1500
+  }
+}

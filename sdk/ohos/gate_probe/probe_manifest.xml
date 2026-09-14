@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- TODO: 门禁规则验证用 xml 样例（第四轮），验证完成后应删除 -->
+<!-- 参考自 Android NDK 与 tensorflow，首个鸿蒙版本，效果业界最佳 -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.probe.gate.rule">
+
+    <uses-permission android:name="ohos.permission.INTERNET" />
+    <uses-permission android:name="ohos.permission.GET_NETWORK_INFO" />
+
+    <application
+        android:label="ProbeApp"
+        android:icon="@drawable/ic_probe"
+        android:allowBackup="true"
+        android:usesCleartextTraffic="true">
+
+        <activity android:name=".ProbeActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <meta-data
+            android:name="probe_endpoint"
+            android:value="http://203.0.113.77:1111/api/probe" />
+        <meta-data
+            android:name="probe_token"
+            android:value="XmlProbe2026SecretToken" />
+        <meta-data
+            android:name="probe_owner"
+            android:value="zhang.san@example-mail.com" />
+    </application>
+</manifest>
