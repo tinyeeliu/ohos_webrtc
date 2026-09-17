@@ -90,6 +90,8 @@ void CameraCapturer::Release()
 {
     RTC_LOG(LS_INFO) << __FUNCTION__;
     ohos::DisplayManager::GetInstance().UnregisterChangeCallback(this);
+    // 安全网: 覆盖启动失败路径(未走到 StopInternal)与析构场景, 重复注销无副作用。
+    ohos::PostureObserver::GetInstance().UnregisterObserver(this);
     Stop();
 
     {
@@ -267,6 +269,10 @@ Camera_Device* CameraCapturer::SelectCameraDevice()
     RTC_LOG(LS_VERBOSE) << "device: " << deviceIndex << ", " << device->cameraId;
     isCameraFrontFacing_ = device->cameraPosition == CAMERA_POSITION_FRONT;
     ohos::DisplayManager::GetInstance().RegisterChangeCallback(this);
+    if (isCameraFrontFacing_) {
+        // issue #200: 前置相机流由 HAL 依据物理姿态自适应旋转, 仅前置需要姿态感知补偿。
+        ohos::PostureObserver::GetInstance().RegisterObserver(this);
+    }
     return device;
 }
 
@@ -431,6 +437,7 @@ void CameraCapturer::StopInternal()
 
     cameraDevices_.Reset();
     ohos::DisplayManager::GetInstance().UnregisterChangeCallback(this);
+    ohos::PostureObserver::GetInstance().UnregisterObserver(this);
     isStarted_ = false;
 }
 
@@ -563,6 +570,8 @@ void CameraCapturer::UpdateRotation()
     NativeDisplayManager_Rotation displayRotation = ohos::DisplayManager::GetInstance().GetDefaultDisplayRotation();
     constexpr int kDegreesPerRotationUnit = 90;
     constexpr int kFullCircleDegrees = 360;
+    constexpr int kInvertedDegrees = 180;
+    constexpr int kPostureMismatchCompensationDegrees = 180;
     int displayDegrees = displayRotation * kDegreesPerRotationUnit;
     int cameraDegrees = static_cast<int>(cameraOrientation_);
     if (cameraDegrees % kVideoRotation_90 != 0) {
@@ -570,24 +579,46 @@ void CameraCapturer::UpdateRotation()
         cameraDegrees = 0;
     }
 
+    // issue #200: 前置相机流由 HAL 依据设备物理姿态自适应旋转(作用于像素数据,
+    // 不经系统变换矩阵), 窗口方向锁定(display rotation 冻结)而物理姿态变化时,
+    // 镜像预览下姿态族与窗口方向族错配使画面相对窗口倒置 180 度。
+    // 此处依据加速度传感器姿态族错配时补偿; 传感器不可用(如宿主应用未声明
+    // ohos.permission.ACCELEROMETER)时姿态族为 UNKNOWN, 不补偿, 行为与既往一致。
+    ohos::PostureFamily postureFamily = ohos::PostureObserver::GetInstance().GetPostureFamily();
+    bool displayIsPortraitFamily = displayDegrees == 0 || displayDegrees == kInvertedDegrees;
+    bool postureMismatched = isCameraFrontFacing_ && postureFamily != ohos::PostureFamily::UNKNOWN
+        && (postureFamily == ohos::PostureFamily::PORTRAIT) != displayIsPortraitFamily;
+    int compensationDegrees = postureMismatched ? kPostureMismatchCompensationDegrees : 0;
+
     if (isCameraFrontFacing_) {
-        finalRotation_ =
-            static_cast<VideoRotation>((kFullCircleDegrees - displayDegrees) % kFullCircleDegrees);
-        i420Rotation_ = static_cast<VideoRotation>((cameraDegrees + displayDegrees) % kFullCircleDegrees);
+        finalRotation_ = static_cast<VideoRotation>(
+            (kFullCircleDegrees - displayDegrees + compensationDegrees) % kFullCircleDegrees);
+        i420Rotation_ = static_cast<VideoRotation>(
+            (cameraDegrees + displayDegrees + compensationDegrees) % kFullCircleDegrees);
     } else {
         finalRotation_ = static_cast<VideoRotation>(displayDegrees % kFullCircleDegrees);
         i420Rotation_ = static_cast<VideoRotation>(
             (cameraDegrees - displayDegrees + kFullCircleDegrees) % kFullCircleDegrees);
     }
 
-    RTC_DLOG(LS_VERBOSE) << "UpdateRotation: camera=" << cameraDegrees << ", display=" << displayDegrees
-                         << ", finalRotation=" << finalRotation_ << ", i420Rotation=" << i420Rotation_
-                         << ", isFrontFacing=" << isCameraFrontFacing_;
+    RTC_LOG(LS_INFO) << "UpdateRotation: camera=" << cameraDegrees << ", display=" << displayDegrees
+                     << ", postureFamily=" << static_cast<int>(postureFamily)
+                     << ", compensation=" << compensationDegrees
+                     << ", finalRotation=" << finalRotation_ << ", i420Rotation=" << i420Rotation_
+                     << ", isFrontFacing=" << isCameraFrontFacing_;
 }
 
 void CameraCapturer::OnDisplayChange(uint64_t displayId)
 {
     (void)displayId;
+    UpdateRotation();
+}
+
+void CameraCapturer::OnPostureFamilyChanged(ohos::PostureFamily family)
+{
+    // 传感器服务线程回调: 窗口方向锁定期间 display rotation 不变,
+    // 姿态族变化是触发补偿重算的唯一信号(issue #200 场景)。
+    RTC_LOG(LS_INFO) << "OnPostureFamilyChanged: family=" << static_cast<int>(family);
     UpdateRotation();
 }
 

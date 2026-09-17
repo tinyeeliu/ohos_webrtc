@@ -22,6 +22,7 @@
 #include "../render/egl_context.h"
 #include "../helper/camera.h"
 #include "helper/display_manager.h"
+#include "../helper/posture_observer.h"
 
 #include <memory>
 #include <cstdint>
@@ -39,7 +40,8 @@ class CameraCapturer : public VideoCapturer,
                        public VideoFrameReceiver::Callback,
                        public ohos::CameraPreviewOutput::Observer,
                        public ohos::CameraVideoOutput::Observer,
-                       public ohos::DisplayManager::ChangeObserver {
+                       public ohos::DisplayManager::ChangeObserver,
+                       public ohos::PostureObserver::Observer {
 public:
     static std::unique_ptr<CameraCapturer> Create(std::string deviceId, video::VideoProfile profile);
 
@@ -77,6 +79,7 @@ protected:
     void
     OnFrameAvailable(rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation) override;
     void OnDisplayChange(uint64_t displayId) override;
+    void OnPostureFamilyChanged(ohos::PostureFamily family) override;
 
 private:
     Camera_Device* SelectCameraDevice();
