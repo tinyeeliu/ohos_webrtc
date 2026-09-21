@@ -159,6 +159,7 @@ void NapiVideoSource::Init(Napi::Env env, Napi::Object exports)
             InstanceMethod<&NapiVideoSource::StartCapture>(kMethodNameStartCapture),
             InstanceMethod<&NapiVideoSource::StopCapture>(kMethodNameStopCapture),
             InstanceMethod<&NapiVideoSource::SwitchCamera>(kMethodNameSwitchCamera),
+            InstanceMethod<&NapiVideoSource::SetZoom>(kMethodNameSetZoom),
             InstanceMethod<&NapiVideoSource::ToJson>(kMethodNameToJson),
         });
     exports.Set(kClassName, func);
@@ -373,6 +374,27 @@ Napi::Value NapiVideoSource::SwitchCamera(const Napi::CallbackInfo& info)
         source_->SwitchCamera();
     }
 
+    return info.Env().Undefined();
+}
+
+Napi::Value NapiVideoSource::SetZoom(const Napi::CallbackInfo& info)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    if (info.Length() < 1 || !info[0].IsNumber()) {
+        NAPI_THROW(TypeError::New(info.Env(), "zoom ratio must be a number"), info.Env().Undefined());
+    }
+
+    double ratio = info[0].As<Number>().DoubleValue();
+    if (ratio <= 0.0) {
+        NAPI_THROW(RangeError::New(info.Env(), "zoom ratio must be positive"), info.Env().Undefined());
+    }
+
+    if (!source_) {
+        NAPI_THROW(Error::New(info.Env(), "Illegal state"), info.Env().Undefined());
+    }
+
+    source_->SetZoomRatio(ratio);
     return info.Env().Undefined();
 }
 

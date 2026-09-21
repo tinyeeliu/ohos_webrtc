@@ -130,7 +130,7 @@ int HardwareVideoEncoder::InitEncode(const VideoCodec* codec_settings, const Set
         OH_AVFormat_SetIntValue(format.Raw(), OH_MD_KEY_I_FRAME_INTERVAL, codecSettings_.H264()->keyFrameInterval);
         auto profileLevelId = ParseSdpForH264ProfileLevelId(format_.parameters);
         if (profileLevelId && (profileLevelId->profile == H264Profile::kProfileConstrainedHigh &&
-                               profileLevelId->level == H264Level::kLevel3_1)) {
+                               profileLevelId->level == H264Level::kLevel4_1)) {
             OH_AVFormat_SetIntValue(format.Raw(), OH_MD_KEY_PROFILE, AVC_PROFILE_HIGH);
             // OH_MD_KEY_LEVEL ?
         }

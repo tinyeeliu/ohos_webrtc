@@ -85,6 +85,83 @@ export default function PeerConnectionFactoryTest() {
       webrtc.PeerConnectionFactory.setDefault(factory);
     })
 
+    it('createFactoryWithVpnNetworkIgnoreMaskCreatesUsablePc', 0, () => {
+      // ADAPTER_TYPE_VPN = 1 << 3
+      const factory = new webrtc.PeerConnectionFactory({ networkIgnoreMask: 1 << 3 });
+      const pc = factory.createPeerConnection({ iceServers: [] });
+      expect(pc.signalingState).assertEqual('stable');
+      pc.close();
+    })
+
+    it('createFactoryWithCombinedNetworkIgnoreMaskCreatesUsablePc', 0, () => {
+      // WIFI | CELLULAR | VPN = 0x0E
+      const factory = new webrtc.PeerConnectionFactory({ networkIgnoreMask: 0x0E });
+      const pc = factory.createPeerConnection({ iceServers: [] });
+      expect(pc.iceConnectionState).assertEqual('new');
+      pc.close();
+    })
+
+    it('createFactoryWithZeroNetworkIgnoreMaskKeepsDefaultBehavior', 0, () => {
+      const factory = new webrtc.PeerConnectionFactory({ networkIgnoreMask: 0 });
+      const pc = factory.createPeerConnection({ iceServers: [] });
+      expect(pc.signalingState).assertEqual('stable');
+      pc.close();
+    })
+
+    it('createFactoryWithNegativeNetworkIgnoreMaskDoesNotThrow', 0, () => {
+      // -1 sets all adapter bits; construction itself must stay valid (cross-platform).
+      const factory = new webrtc.PeerConnectionFactory({ networkIgnoreMask: -1 });
+      expect(factory).not().assertNull();
+    })
+
+    it('createFactoryWithStringNetworkIgnoreMaskThrows', 0, () => {
+      let thrown = false;
+      try {
+        const options: ESObject = {};
+        options.networkIgnoreMask = 'vpn';
+        new webrtc.PeerConnectionFactory(options);
+      } catch (e) {
+        thrown = true;
+      }
+      expect(thrown).assertTrue();
+    })
+
+    it('createFactoryWithBooleanNetworkIgnoreMaskThrows', 0, () => {
+      let thrown = false;
+      try {
+        const options: ESObject = {};
+        options.networkIgnoreMask = true;
+        new webrtc.PeerConnectionFactory(options);
+      } catch (e) {
+        thrown = true;
+      }
+      expect(thrown).assertTrue();
+    })
+
+    it('createFactoryWithObjectNetworkIgnoreMaskThrows', 0, () => {
+      let thrown = false;
+      try {
+        const options: ESObject = {};
+        options.networkIgnoreMask = {};
+        new webrtc.PeerConnectionFactory(options);
+      } catch (e) {
+        thrown = true;
+      }
+      expect(thrown).assertTrue();
+    })
+
+    it('createFactoryWithNullNetworkIgnoreMaskThrows', 0, () => {
+      let thrown = false;
+      try {
+        const options: ESObject = {};
+        options.networkIgnoreMask = null;
+        new webrtc.PeerConnectionFactory(options);
+      } catch (e) {
+        thrown = true;
+      }
+      expect(thrown).assertTrue();
+    })
+
     // audio-only 双端完整 SDP 协商（x86 无摄像头降级场景核心路径）
     it('audioOnly_SDPNegotiation_shouldSucceed', 0, async () => {
       const factory = new webrtc.PeerConnectionFactory();

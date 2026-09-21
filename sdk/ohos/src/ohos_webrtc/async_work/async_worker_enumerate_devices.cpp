@@ -15,9 +15,65 @@
 
 #include "async_worker_enumerate_devices.h"
 
+#include <algorithm>
+
 #include "rtc_base/logging.h"
 
 namespace webrtc {
+
+namespace {
+
+// {min,max} range object shared by width/height/frameRate.
+Napi::Object MakeRange(Napi::Env env, double min, double max)
+{
+    auto range = Napi::Object::New(env);
+    range.Set("min", Napi::Number::New(env, min));
+    range.Set("max", Napi::Number::New(env, max));
+    return range;
+}
+
+// Aggregates all camera preview profiles of a device into
+// MediaTrackCapabilities-style ranges (#4). frameRate follows the raw range
+// reported by the enumerator; {0, UINT_MAX} means "unrestricted".
+Napi::Object MakeVideoInputCapabilities(Napi::Env env, const std::vector<video::VideoProfile>& profiles)
+{
+    uint32_t minWidth = 0, maxWidth = 0, minHeight = 0, maxHeight = 0;
+    uint32_t minFps = 0, maxFps = 0;
+    bool first = true;
+    for (const auto& profile : profiles) {
+        if (first) {
+            minWidth = maxWidth = profile.resolution.width;
+            minHeight = maxHeight = profile.resolution.height;
+            minFps = profile.frameRateRange.min;
+            maxFps = profile.frameRateRange.max;
+            first = false;
+            continue;
+        }
+        minWidth = std::min(minWidth, profile.resolution.width);
+        maxWidth = std::max(maxWidth, profile.resolution.width);
+        minHeight = std::min(minHeight, profile.resolution.height);
+        maxHeight = std::max(maxHeight, profile.resolution.height);
+        minFps = std::min(minFps, profile.frameRateRange.min);
+        maxFps = std::max(maxFps, profile.frameRateRange.max);
+    }
+
+    auto caps = Napi::Object::New(env);
+    caps.Set("width", MakeRange(env, minWidth, maxWidth));
+    caps.Set("height", MakeRange(env, minHeight, maxHeight));
+    caps.Set("frameRate", MakeRange(env, minFps, maxFps));
+    return caps;
+}
+
+// Audio devices expose no capability data source on OHOS yet; both input and
+// output report that honestly instead of an empty capability object.
+Napi::Value AudioCapabilitiesNotAvailable(const Napi::CallbackInfo& info)
+{
+    NAPI_THROW(
+        Napi::Error::New(info.Env(), "Not implemented: audio device capabilities are not available"),
+        info.Env().Undefined());
+}
+
+} // namespace
 
 using namespace Napi;
 
@@ -52,10 +108,12 @@ void AsyncWorkerEnumerateDevices::OnOK()
         obj.Set("groupId", String::New(Env(), cameraDevices_[index].groupId));
         obj.Set("label", String::New(Env(), cameraDevices_[index].label));
         obj.Set("kind", String::New(Env(), "videoinput"));
-        obj.Set("getCapabilities", Function::New(Env(), [](const CallbackInfo& info) {
-                    RTC_DLOG(LS_VERBOSE) << "getCapabilities";
-                    NAPI_THROW(Error::New(info.Env(), "Not implemented"), info.Env().Undefined());
-                }));
+        obj.Set("getCapabilities", Function::New(
+                                        Env(),
+                                        [capabilities = Napi::ObjectReference::New(MakeVideoInputCapabilities(
+                                             Env(), cameraDevices_[index].profiles))](const CallbackInfo& info) {
+                                            return capabilities.Value();
+                                        }));
         result.Set(index, obj);
     }
 
@@ -66,12 +124,10 @@ void AsyncWorkerEnumerateDevices::OnOK()
         obj.Set("label", String::New(Env(), audioDevices_[index].label));
         if (audioDevices_[index].role == AudioDeviceRole::Input) {
             obj.Set("kind", String::New(Env(), "audioinput"));
-            obj.Set("getCapabilities", Function::New(Env(), [](const CallbackInfo& info) {
-                        RTC_DLOG(LS_VERBOSE) << "getCapabilities";
-                        NAPI_THROW(Error::New(info.Env(), "Not implemented"), info.Env().Undefined());
-                    }));
+            obj.Set("getCapabilities", Function::New(Env(), AudioCapabilitiesNotAvailable));
         } else if (audioDevices_[index].role == AudioDeviceRole::Output) {
             obj.Set("kind", String::New(Env(), "audiooutput"));
+            obj.Set("getCapabilities", Function::New(Env(), AudioCapabilitiesNotAvailable));
         } else {
             RTC_LOG(LS_WARNING) << "Invalid audio device role";
         }

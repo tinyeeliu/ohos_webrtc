@@ -1421,5 +1421,89 @@ export default function PeerConnectionTest() {
       audioSource.release();
     })
 
+    // ---- #2/#3: onaddstream / onremovestream / onselectedcandidatepairchange ----
+
+    it("legacyStreamAndPairHandlersDefaultToNull", DEFAULT, () => {
+      const pc = pcf.createPeerConnection({ iceServers: [] });
+      expect(pc.onaddstream).assertNull();
+      expect(pc.onremovestream).assertNull();
+      expect(pc.onselectedcandidatepairchange).assertNull();
+      pc.close();
+    })
+
+    it("legacyStreamAndPairHandlersAreSettableAndResettable", DEFAULT, () => {
+      const pc = pcf.createPeerConnection({ iceServers: [] });
+      pc.onaddstream = (ev: webrtc.MediaStreamEvent) => {};
+      pc.onremovestream = (ev: webrtc.MediaStreamEvent) => {};
+      pc.onselectedcandidatepairchange = (ev: webrtc.SelectedCandidatePairChangeEvent) => {};
+      expect(pc.onaddstream).not().assertNull();
+      expect(pc.onremovestream).not().assertNull();
+      expect(pc.onselectedcandidatepairchange).not().assertNull();
+      pc.onaddstream = null;
+      expect(pc.onaddstream).assertNull();
+      pc.close();
+    })
+
+    it("setRemoteDescriptionWithMsidFiresAddStreamWithStreamId", DEFAULT, async () => {
+      const pc = pcf.createPeerConnection({ iceServers: [] });
+      let streamId = '';
+      pc.onaddstream = (ev: webrtc.MediaStreamEvent) => {
+        streamId = ev.stream.id;
+      };
+      await pc.setRemoteDescription({ type: 'offer', sdp: sdp });
+      await sleep(200); // event is dispatched asynchronously
+      expect(streamId).assertEqual('stream1');
+      pc.close();
+    })
+
+    it("loopbackFiresSelectedCandidatePairChangeEvent", DEFAULT, async () => {
+      const pc1 = pcf.createPeerConnection({ iceServers: [] });
+      const pc2 = pcf.createPeerConnection({ iceServers: [] });
+      let pairChanged = false;
+      let localCandidate = '';
+      pc1.onselectedcandidatepairchange = (ev: webrtc.SelectedCandidatePairChangeEvent) => {
+        pairChanged = true;
+        localCandidate = ev.selectedCandidatePair.local.candidate;
+      };
+      pc1.onicecandidate = (ev: webrtc.RTCPeerConnectionIceEvent) => {
+        if (ev.candidate) {
+          pc2.addIceCandidate(ev.candidate);
+        }
+      };
+      pc2.onicecandidate = (ev: webrtc.RTCPeerConnectionIceEvent) => {
+        if (ev.candidate) {
+          pc1.addIceCandidate(ev.candidate);
+        }
+      };
+
+      const audioSource = pcf.createAudioSource();
+      const audioTrack = pcf.createAudioTrack('pair-audio', audioSource);
+      pc1.addTrack(audioTrack);
+
+      const offer = await pc1.createOffer();
+      await pc1.setLocalDescription(offer);
+      await pc2.setRemoteDescription(offer);
+      const answer = await pc2.createAnswer();
+      await pc2.setLocalDescription(answer);
+      await pc1.setRemoteDescription(answer);
+
+      let elapsed = 0;
+      while (elapsed < 10000 && !pairChanged) {
+        await sleep(200);
+        elapsed += 200;
+      }
+
+      if (!isX86()) {
+        expect(pairChanged).assertTrue();
+        expect(localCandidate.length).assertLarger(0);
+      } else {
+        expect(pc1.signalingState).assertEqual('stable');
+      }
+
+      audioSource.release();
+      pc1.close();
+      pc2.close();
+    })
+
   })
 }

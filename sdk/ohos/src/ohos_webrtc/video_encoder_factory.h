@@ -18,6 +18,7 @@
 
 #include "render/egl_context.h"
 #include "utils/marcos.h"
+#include "video_codec/codec_force_lists.h"
 
 #include <napi.h>
 
@@ -30,6 +31,8 @@ public:
     NAPI_CLASS_NAME_DECLARE(HardwareVideoEncoderFactory);
     NAPI_ATTRIBUTE_NAME_DECLARE(SharedContext, sharedContext);
     NAPI_ATTRIBUTE_NAME_DECLARE(EnableH264HighProfile, enableH264HighProfile);
+    NAPI_ATTRIBUTE_NAME_DECLARE(ForceSWCodecList, forceSWCodecList);
+    NAPI_ATTRIBUTE_NAME_DECLARE(ForceHWCodecList, forceHWCodecList);
     NAPI_METHOD_NAME_DECLARE(ToJson, toJSON);
     NAPI_TYPE_TAG_DECLARE(0x0d9878cc5e534620, 0xb005829df9cc4eb5);
 
@@ -45,11 +48,26 @@ public:
     {
         return enableH264HighProfile_;
     }
+    const adapter::CodecForceLists& GetForceLists() const
+    {
+        return forceLists_;
+    }
+    bool HasForceLists() const
+    {
+        return forceListsSet_;
+    }
 
 protected:
     friend class ObjectWrap;
 
     explicit NapiHardwareVideoEncoderFactory(const Napi::CallbackInfo& info);
+
+    // Parses the object-form options ({enableH264HighProfile?, sharedContext?,
+    // forceSWCodecList?, forceHWCodecList?}); throws on malformed fields.
+    void ApplyEncoderFactoryOptions(const Napi::Object& jsOptions);
+    // Parses the two codec list options into forceLists_; throws on malformed
+    // fields.
+    void ApplyCodecForceListOptions(const Napi::Object& jsOptions);
 
     Napi::Value GetEnableH264HighProfile(const Napi::CallbackInfo& info);
     Napi::Value GetSharedContext(const Napi::CallbackInfo& info);
@@ -60,6 +78,8 @@ private:
 
     std::shared_ptr<EglContext> sharedContext_;
     bool enableH264HighProfile_{false};
+    adapter::CodecForceLists forceLists_;
+    bool forceListsSet_{false};
 };
 
 class NapiSoftwareVideoEncoderFactory : public Napi::ObjectWrap<NapiSoftwareVideoEncoderFactory> {

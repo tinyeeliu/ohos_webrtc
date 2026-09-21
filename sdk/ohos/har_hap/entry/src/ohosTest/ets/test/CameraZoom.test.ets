@@ -168,5 +168,68 @@ export default function CameraZoomTest() {
       videoTrack.stop();
       videoSource.release();
     })
+
+    // ========== #4: VideoSource.setZoom ==========
+
+    it('setZoomWithValidRatioOnVideoSource', 0, () => {
+      let videoSource = pcf.createVideoSource({ facingMode: 'environment' });
+      try {
+        videoSource.setZoom(2.0);
+        expect(true).assertTrue();
+      } catch (e) {
+        console.error(TAG, 'setZoom(2.0) threw: ' + e);
+        expect(false).assertTrue();
+      }
+      videoSource.release();
+    })
+
+    it('setZoomWithStringRatioThrowsTypeError', 0, () => {
+      let videoSource = pcf.createVideoSource({ facingMode: 'environment' });
+      let thrown = false;
+      try {
+        const ratio: ESObject = '2.0';
+        videoSource.setZoom(ratio);
+      } catch (e) {
+        thrown = true;
+      }
+      expect(thrown).assertTrue();
+      videoSource.release();
+    })
+
+    it('setZoomWithZeroRatioThrowsRangeError', 0, () => {
+      let videoSource = pcf.createVideoSource({ facingMode: 'environment' });
+      let thrown = false;
+      try {
+        videoSource.setZoom(0);
+      } catch (e) {
+        thrown = true;
+      }
+      expect(thrown).assertTrue();
+      videoSource.release();
+    })
+
+    it('setZoomWithNegativeRatioThrowsRangeError', 0, () => {
+      let videoSource = pcf.createVideoSource({ facingMode: 'environment' });
+      let thrown = false;
+      try {
+        videoSource.setZoom(-1.5);
+      } catch (e) {
+        thrown = true;
+      }
+      expect(thrown).assertTrue();
+      videoSource.release();
+    })
+
+    it('setZoomWithNoArgumentThrowsTypeError', 0, () => {
+      let videoSource = pcf.createVideoSource({ facingMode: 'environment' });
+      let thrown = false;
+      try {
+        videoSource.setZoom();
+      } catch (e) {
+        thrown = true;
+      }
+      expect(thrown).assertTrue();
+      videoSource.release();
+    })
   })
 }

@@ -19,6 +19,7 @@
 #include "api/audio_codecs/builtin_audio_encoder_factory.h"
 #include "api/create_peerconnection_factory.h"
 #include "api/scoped_refptr.h"
+#include "pc/peer_connection_factory.h"
 #include "rtc_base/physical_socket_server.h"
 
 #include "configuration.h"
@@ -61,7 +62,65 @@ public:
     NAPI_ATTRIBUTE_NAME_DECLARE(VideoEncoderFactory, videoEncoderFactory);
     NAPI_ATTRIBUTE_NAME_DECLARE(VideoDecoderFactory, videoDecoderFactory);
     NAPI_ATTRIBUTE_NAME_DECLARE(AudioProcessing, audioProcessing);
+    NAPI_ATTRIBUTE_NAME_DECLARE(NetworkIgnoreMask, networkIgnoreMask);
 };
+
+// Reads options.networkIgnoreMask, an AdapterType bit mask (rtc_base/network.h)
+// selecting network types the factory should ignore when gathering candidates.
+// Returns nullopt when the field is absent; throws TypeError when present but
+// not a number.
+absl::optional<int32_t> TryReadNetworkIgnoreMask(const Napi::Object& jsOptions)
+{
+    if (!jsOptions.Has(NapiPeerConnectionFactoryOptions::kAttributeNameNetworkIgnoreMask)) {
+        return absl::nullopt;
+    }
+
+    auto jsMask = jsOptions.Get(NapiPeerConnectionFactoryOptions::kAttributeNameNetworkIgnoreMask);
+    if (!jsMask.IsNumber()) {
+        NAPI_THROW(
+            TypeError::New(jsOptions.Env(), "networkIgnoreMask must be a number"), absl::optional<int32_t>());
+    }
+
+    return jsMask.As<Napi::Number>().Int32Value();
+}
+
+// Starts one named factory thread; returns null when the thread fails to start.
+std::unique_ptr<rtc::Thread> StartNamedThread(rtc::SocketServer* socketServer, const char* name)
+{
+    auto thread = socketServer ? std::make_unique<rtc::Thread>(socketServer) : rtc::Thread::Create();
+    thread->SetName(name, nullptr);
+    if (!thread->Start()) {
+        return nullptr;
+    }
+    return thread;
+}
+
+// Applies native factory options on the signaling thread: the setter only
+// lives on the internal factory implementation and asserts it runs there.
+void ApplyNativeFactoryOptions(
+    rtc::scoped_refptr<PeerConnectionFactoryInterface>& factory, rtc::Thread* signalingThread,
+    const PeerConnectionFactoryInterface::Options& options)
+{
+    signalingThread->BlockingCall([&factory, &options]() {
+        static_cast<PeerConnectionFactory*>(factory.get())->SetOptions(options);
+    });
+}
+
+// Converts the JS factory options that map to native
+// PeerConnectionFactoryInterface::Options, following the same conversion
+// pattern the sibling platform SDK uses in its jni layer.
+// Returns nullopt when no native option is present.
+absl::optional<PeerConnectionFactoryInterface::Options> ParseFactoryOptions(const Napi::Object& jsOptions)
+{
+    auto networkIgnoreMask = TryReadNetworkIgnoreMask(jsOptions);
+    if (!networkIgnoreMask) {
+        return absl::nullopt;
+    }
+
+    PeerConnectionFactoryInterface::Options nativeOptions;
+    nativeOptions.network_ignore_mask = *networkIgnoreMask;
+    return nativeOptions;
+}
 
 std::mutex PeerConnectionFactoryWrapper::mutex_;
 std::shared_ptr<PeerConnectionFactoryWrapper> PeerConnectionFactoryWrapper::defaultFactory_;
@@ -87,10 +146,12 @@ void PeerConnectionFactoryWrapper::SetDefault(std::shared_ptr<PeerConnectionFact
 
 std::shared_ptr<PeerConnectionFactoryWrapper> PeerConnectionFactoryWrapper::Create(
     rtc::scoped_refptr<OhosAudioDeviceModule> adm, std::unique_ptr<VideoEncoderFactory> videoEncoderFactory,
-    std::unique_ptr<VideoDecoderFactory> videoDecoderFactory, rtc::scoped_refptr<AudioProcessing> audioProcessing)
+    std::unique_ptr<VideoDecoderFactory> videoDecoderFactory, rtc::scoped_refptr<AudioProcessing> audioProcessing,
+    absl::optional<PeerConnectionFactoryInterface::Options> options)
 {
     auto wrapper = std::make_shared<PeerConnectionFactoryWrapper>();
-    if (!wrapper->Init(adm, std::move(videoEncoderFactory), std::move(videoDecoderFactory), audioProcessing)) {
+    if (!wrapper->Init(
+            adm, std::move(videoEncoderFactory), std::move(videoDecoderFactory), audioProcessing, options)) {
         return nullptr;
     }
     return wrapper;
@@ -172,7 +233,9 @@ rtc::scoped_refptr<OhosVideoTrackSource> PeerConnectionFactoryWrapper::GetVideoS
                 static_cast<VideoTrackSourceProxyWithInternal<VideoTrackSourceInterface>*>(
                     sourceProxy)
                     ->internal();
-            if (internal) {
+            // Stop() 非虚:强转后在非本类对象上执行会按本类布局访问成员(UB)。
+            // 远端 track 的 source 是上游远端源,必须用 remote() 拦截。
+            if (internal && !internal->remote()) {
                 return rtc::scoped_refptr<OhosVideoTrackSource>(
                     static_cast<OhosVideoTrackSource*>(internal));
             }
@@ -194,31 +257,19 @@ void PeerConnectionFactoryWrapper::RemoveVideoSource(rtc::scoped_refptr<MediaStr
 
 bool PeerConnectionFactoryWrapper::Init(
     rtc::scoped_refptr<OhosAudioDeviceModule> adm, std::unique_ptr<VideoEncoderFactory> videoEncoderFactory,
-    std::unique_ptr<VideoDecoderFactory> videoDecoderFactory, rtc::scoped_refptr<AudioProcessing> audioProcessing)
+    std::unique_ptr<VideoDecoderFactory> videoDecoderFactory, rtc::scoped_refptr<AudioProcessing> audioProcessing,
+    absl::optional<PeerConnectionFactoryInterface::Options> options)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
     rtc::ThreadManager::Instance()->WrapCurrentThread();
 
     auto socketServer = std::make_unique<rtc::PhysicalSocketServer>();
-    auto networkThread = std::make_unique<rtc::Thread>(socketServer.get());
-    networkThread->SetName("network_thread", nullptr);
-    if (!networkThread->Start()) {
-        RTC_LOG(LS_ERROR) << "Failed to start network thread";
-        return false;
-    }
-
-    auto workerThread = rtc::Thread::Create();
-    workerThread->SetName("worker_thread", nullptr);
-    if (!workerThread->Start()) {
-        RTC_LOG(LS_ERROR) << "Failed to start worker thread";
-        return false;
-    }
-
-    auto signalingThread = rtc::Thread::Create();
-    signalingThread->SetName("signaling_thread", NULL);
-    if (!signalingThread->Start()) {
-        RTC_LOG(LS_ERROR) << "Failed to start signaling thread";
+    auto networkThread = StartNamedThread(socketServer.get(), "network_thread");
+    auto workerThread = StartNamedThread(nullptr, "worker_thread");
+    auto signalingThread = StartNamedThread(nullptr, "signaling_thread");
+    if (!networkThread || !workerThread || !signalingThread) {
+        RTC_LOG(LS_ERROR) << "Failed to start factory threads";
         return false;
     }
 
@@ -235,6 +286,10 @@ bool PeerConnectionFactoryWrapper::Init(
     if (!pcFactory_) {
         RTC_LOG(LS_ERROR) << "Failed to create PeerConnectionFactory";
         return false;
+    }
+
+    if (options) {
+        ApplyNativeFactoryOptions(pcFactory_, signalingThread.get(), *options);
     }
 
     adm_ = adm;
@@ -261,8 +316,13 @@ NapiPeerConnectionFactory::NapiPeerConnectionFactory(const CallbackInfo& info)
     std::unique_ptr<VideoEncoderFactory> videoEncoderFactory;
     std::unique_ptr<VideoDecoderFactory> videoDecoderFactory;
     rtc::scoped_refptr<AudioProcessing> audioProcessing;
+    absl::optional<PeerConnectionFactoryInterface::Options> nativeOptions;
     if (info.Length() > 0 && info[0].IsObject()) {
         auto jsOptions = info[0].As<Object>();
+        nativeOptions = ParseFactoryOptions(jsOptions);
+        if (info.Env().IsExceptionPending()) {
+            NAPI_THROW_VOID(info.Env().GetAndClearPendingException());
+        }
         if (jsOptions.Has(NapiPeerConnectionFactoryOptions::kAttributeNameAdm)) {
             auto jsAdm = jsOptions.Get(NapiPeerConnectionFactoryOptions::kAttributeNameAdm).As<Object>();
             auto napiAdm = NapiAudioDeviceModule::Unwrap(jsAdm);
@@ -293,7 +353,7 @@ NapiPeerConnectionFactory::NapiPeerConnectionFactory(const CallbackInfo& info)
     }
 
     wrapper_ = PeerConnectionFactoryWrapper::Create(
-        adm, std::move(videoEncoderFactory), std::move(videoDecoderFactory), audioProcessing);
+        adm, std::move(videoEncoderFactory), std::move(videoDecoderFactory), audioProcessing, nativeOptions);
 }
 
 void NapiPeerConnectionFactory::Init(Napi::Env env, Object exports)

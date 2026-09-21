@@ -104,5 +104,82 @@ export default function VideoEncoderFactoryTest() {
         expect(ap).not().assertNull();
       })
     })
+
+    // ---- #9: 强软/禁硬 codec 名单 ----
+
+    describe('CodecForceLists', () => {
+      it('constructEncoderFactoryWithForceSWList', 0, () => {
+        const encoderFactory = new webrtc.HardwareVideoEncoderFactory({ forceSWCodecList: ['H264'] });
+        expect(encoderFactory).not().assertNull();
+        expect(encoderFactory.enableH264HighProfile).assertFalse();
+      })
+
+      it('constructEncoderFactoryWithBothListsAndHighProfile', 0, () => {
+        const encoderFactory = new webrtc.HardwareVideoEncoderFactory({
+          enableH264HighProfile: true,
+          forceSWCodecList: ['h264'],
+          forceHWCodecList: ['VP8'],
+        });
+        expect(encoderFactory.enableH264HighProfile).assertTrue();
+      })
+
+      it('forceSWH264StillNegotiatesVideoOffer', 0, async () => {
+        // H264 被强软后应由软编兜底,视频协商仍然成立
+        const encoderFactory = new webrtc.HardwareVideoEncoderFactory({ forceSWCodecList: ['H264'] });
+        const factory = new webrtc.PeerConnectionFactory({ videoEncoderFactory: encoderFactory });
+        const videoSource = factory.createVideoSource();
+        const videoTrack = factory.createVideoTrack('force-sw-video', videoSource);
+        const pc = factory.createPeerConnection({});
+        pc.addTrack(videoTrack);
+        const offer = await pc.createOffer();
+        expect(offer.sdp ?? '').assertContain('m=video');
+        pc.close();
+        try {
+          videoSource.release();
+        } catch (e) {
+        }
+      })
+
+      it('constructDecoderFactoryWithLists', 0, () => {
+        const decoderFactory = new webrtc.HardwareVideoDecoderFactory({ forceSWCodecList: ['H265'] });
+        expect(decoderFactory).not().assertNull();
+      })
+
+      it('nonArrayForceSWListThrows', 0, () => {
+        let thrown = false;
+        try {
+          const options: ESObject = {};
+          options.forceSWCodecList = 'H264';
+          new webrtc.HardwareVideoEncoderFactory(options);
+        } catch (e) {
+          thrown = true;
+        }
+        expect(thrown).assertTrue();
+      })
+
+      it('nonStringEntryInForceHWListThrows', 0, () => {
+        let thrown = false;
+        try {
+          const options: ESObject = {};
+          options.forceHWCodecList = ['H264', 42];
+          new webrtc.HardwareVideoEncoderFactory(options);
+        } catch (e) {
+          thrown = true;
+        }
+        expect(thrown).assertTrue();
+      })
+
+      it('nonArrayDecoderForceSWListThrows', 0, () => {
+        let thrown = false;
+        try {
+          const options: ESObject = {};
+          options.forceSWCodecList = { codec: 'H264' };
+          new webrtc.HardwareVideoDecoderFactory(options);
+        } catch (e) {
+          thrown = true;
+        }
+        expect(thrown).assertTrue();
+      })
+    })
   })
 }

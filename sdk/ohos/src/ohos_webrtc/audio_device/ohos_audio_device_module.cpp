@@ -1006,6 +1006,37 @@ bool GetOption(const Object& obj, const char* key, std::optional<bool>* valueOut
     return false;
 }
 
+// Reads useHardwareAcousticEchoCanceler/useHardwareNoiseSuppressor (#11).
+// The AEC option selects the capture source type (system AEC follows it);
+// the NS option is accepted for cross-platform parity but has no system NS to
+// drive on OHOS. Returns false after throwing on a malformed field.
+bool TryReadHardwareEffectOptions(const Napi::CallbackInfo& info, const Napi::Object& options,
+    AudioInputOptions& inputOptions)
+{
+    if (options.Has(kAttributeNameUseHardwareAcousticEchoCanceler)) {
+        auto val = options.Get(kAttributeNameUseHardwareAcousticEchoCanceler);
+        if (!val.IsBoolean()) {
+            TypeError::New(info.Env(), "useHardwareAcousticEchoCanceler must be a boolean")
+                .ThrowAsJavaScriptException();
+            return false;
+        }
+        inputOptions.source = val.As<Boolean>().Value() ? AUDIOSTREAM_SOURCE_TYPE_VOICE_COMMUNICATION
+                                                        : AUDIOSTREAM_SOURCE_TYPE_MIC;
+    }
+
+    if (options.Has(kAttributeNameUseHardwareNoiseSuppressor)) {
+        auto val = options.Get(kAttributeNameUseHardwareNoiseSuppressor);
+        if (!val.IsBoolean()) {
+            TypeError::New(info.Env(), "useHardwareNoiseSuppressor must be a boolean").ThrowAsJavaScriptException();
+            return false;
+        }
+        RTC_LOG(LS_INFO) << "useHardwareNoiseSuppressor ignored: no system NS API on OHOS,"
+                            " software APM provides suppression";
+    }
+
+    return true;
+}
+
 bool ParseAudioOptions(const Napi::CallbackInfo& info, AudioInputOptions& inputOptions,
                        AudioOutputOptions& outputOptions)
 {
@@ -1063,18 +1094,8 @@ bool ParseAudioOptions(const Napi::CallbackInfo& info, AudioInputOptions& inputO
         }
     }
 
-    if (options.Has(kAttributeNameUseHardwareAcousticEchoCanceler)) {
-        auto val = options.Get(kAttributeNameUseHardwareAcousticEchoCanceler);
-        if (val.IsBoolean()) {
-            RTC_DLOG(LS_INFO) << "useHardwareAcousticEchoCanceler: " << val.As<Boolean>().Value();
-        }
-    }
-
-    if (options.Has(kAttributeNameUseHardwareNoiseSuppressor)) {
-        auto val = options.Get(kAttributeNameUseHardwareNoiseSuppressor);
-        if (val.IsBoolean()) {
-            RTC_DLOG(LS_INFO) << "useHardwareNoiseSuppressor: " << val.As<Boolean>().Value();
-        }
+    if (!TryReadHardwareEffectOptions(info, options, inputOptions)) {
+        return false;
     }
 
     return true;
@@ -1186,7 +1207,9 @@ Napi::Value NapiAudioDeviceModule::SetNoiseSuppressorEnabled(const Napi::Callbac
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    // Noise suppressor is not supported.
+    // OHOS (API 12) has no system-level noise suppressor API; suppression is
+    // provided by the software APM and cannot be toggled here. Returns false
+    // honestly instead of pretending the switch took effect.
     return Boolean::New(info.Env(), false);
 }
 
@@ -1226,6 +1249,12 @@ Napi::Value NapiAudioDeviceModule::isBuiltInAcousticEchoCancelerSupported(const 
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
+    // The per-device query (OH_AudioStreamManager_IsAcousticEchoCancelerSupported)
+    // only exists from API 20 and is absent from the API 12 sysroot this module
+    // builds against. System AEC itself follows the capture source type: it is
+    // active for the VOICE_COMMUNICATION source used by default (and selected
+    // via the useHardwareAcousticEchoCanceler option), but per-device support
+    // cannot be confirmed, so report false honestly.
     return Boolean::New(info.Env(), false);
 }
 
@@ -1233,6 +1262,8 @@ Napi::Value NapiAudioDeviceModule::isBuiltInNoiseSuppressorSupported(const Napi:
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
+    // No system-level noise suppressor exists on OHOS (any API level so far);
+    // suppression is provided by the software APM.
     return Boolean::New(info.Env(), false);
 }
 

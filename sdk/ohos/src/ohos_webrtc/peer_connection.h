@@ -108,12 +108,22 @@ protected:
     void OnRemoveTrack(rtc::scoped_refptr<RtpReceiverInterface> receiver) override;
 
 private:
+    // Returns the JS wrapper for a remote stream, creating (and caching) it on
+    // first use. Must be called on the JS thread so that the wrapper creation
+    // and the cache stay single-threaded.
+    Napi::Object GetOrCreateRemoteStream(rtc::scoped_refptr<MediaStreamInterface> stream);
+
     static thread_local Napi::FunctionReference constructor_;
 
     std::shared_ptr<PeerConnectionFactoryWrapper> factory_;
     rtc::scoped_refptr<PeerConnectionInterface> pc_;
 
     Napi::ObjectReference sctpTransportRef_;
+
+    // JS-thread only (see GetOrCreateRemoteStream); keeps addstream and
+    // removestream delivering the same JS stream object, mirroring the
+    // stream cache the sibling platform SDK keeps on its jni side.
+    std::map<MediaStreamInterface*, Napi::ObjectReference> remoteStreams_;
 };
 
 } // namespace webrtc

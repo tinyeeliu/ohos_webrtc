@@ -56,6 +56,40 @@ struct Index {
       .alignSelf(ItemAlign.Center)
       .padding({ top: 24 })
 
+      Row() {
+        Button("camera & video test page")
+          .width(300)
+          .height(60)
+          .fontSize(20)
+          .fontWeight(FontWeight.Bold)
+          .margin({ top: 20 })
+          .onClick(() => {
+            console.log(TAG, "switch to camera & video test page!");
+            router.pushUrl({ url: "pages/CameraVideoPage"})
+          })
+          .margin({ left: 10, right: 20 })
+
+      }
+      .alignSelf(ItemAlign.Center)
+      .padding({ top: 24 })
+
+      Row() {
+        Button("media checks test page")
+          .width(300)
+          .height(60)
+          .fontSize(20)
+          .fontWeight(FontWeight.Bold)
+          .margin({ top: 20 })
+          .onClick(() => {
+            console.log(TAG, "switch to media checks test page!");
+            router.pushUrl({ url: "pages/MediaChecksPage"})
+          })
+          .margin({ left: 10, right: 20 })
+
+      }
+      .alignSelf(ItemAlign.Center)
+      .padding({ top: 24 })
+
     }
     .width('100%')
     .height('100%')

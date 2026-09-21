@@ -20,6 +20,8 @@
 
 #include "napi.h"
 
+#include <optional>
+
 #include "api/media_stream_interface.h"
 #include "api/peer_connection_interface.h"
 
@@ -78,7 +80,11 @@ protected:
     Napi::Value GetSource(const Napi::CallbackInfo& info);
     Napi::Value ApplyConstraints(const Napi::CallbackInfo& info);
     Napi::Value GetZoomRange(const Napi::CallbackInfo& info);
+    Napi::Value CaptureFrame(const Napi::CallbackInfo& info);
     Napi::Value ToJson(const Napi::CallbackInfo& info);
+
+    Napi::Value GetAudioSamplesHandler(const Napi::CallbackInfo& info);
+    void SetAudioSamplesHandler(const Napi::CallbackInfo& info, const Napi::Value& value);
 
 private:
     // Validate track state and input arguments for ApplyConstraints.
@@ -145,6 +151,39 @@ public:
 
     std::mutex sinksMutex_;
     std::set<rtc::VideoSinkInterface<VideoFrame>*> videoSinks_;
+
+    // ---- captureFrame (#6): one-shot sink + tsfn delivery ----
+    class CaptureSink;
+    friend class CaptureSink;
+
+    // Called on the video thread by CaptureSink; converts and forwards.
+    void HandleCapturedFrame(const VideoFrame& frame);
+    // JS-thread only: resolves/rejects the pending promise and detaches the sink.
+    void FinishCapture(Napi::Value result, bool ok);
+    // Video-thread helper rejecting a capture that could not be converted.
+    void RejectCapture(const std::string& message);
+
+    std::unique_ptr<CaptureSink> captureSink_;
+    std::optional<Napi::Promise::Deferred> captureDeferred_;
+    Napi::ThreadSafeFunction captureTsfn_;
+    std::mutex captureMutex_;
+    bool capturePending_{false};
+
+    // ---- onaudiosamplesready (#5): playout-side per-sample events ----
+    class AudioSampleSink;
+    friend class AudioSampleSink;
+
+    // Audio thread: called by AudioSampleSink with interleaved PCM.
+    void HandleAudioSampleData(
+        const void* audioData, int bitsPerSample, int sampleRate, size_t channels, size_t frames);
+    // JS thread: attach/detach the native sink and the tsfn.
+    void StartAudioSamples(Napi::Env env);
+    void StopAudioSamples();
+
+    std::unique_ptr<AudioSampleSink> audioSampleSink_;
+    Napi::ThreadSafeFunction audioSamplesTsfn_;
+    Napi::FunctionReference audioSamplesHandlerRef_;
+    bool audioSamplesHandlerSet_{false};
 };
 
 } // namespace webrtc

@@ -619,6 +619,9 @@ WebRTC 连接的配置选项
 | onconnectionstatechange    | EventHandler \| null   | 是   | 是   | 该事件处理器的事件类型为 connectionstatechange               |
 | ontrack                    | EventHandler \| null   | 是   | 是   | 该事件处理器的事件类型为 track                               |
 | ondatachannel              | EventHandler \| null   | 是   | 是   | 该事件处理器的事件类型为 datachannel                         |
+| onaddstream                | EventHandler \| null   | 是   | 是   | 该事件处理器的事件类型为 addstream(远端流到达,跨端对齐 onAddStream;payload 含 stream,add/remove 成对返回同一 stream 对象) |
+| onremovestream             | EventHandler \| null   | 是   | 是   | 该事件处理器的事件类型为 removestream(远端流移除,跨端对齐 onRemoveStream) |
+| onselectedcandidatepairchange | EventHandler \| null | 是   | 是   | 该事件处理器的事件类型为 selectedcandidatepairchange(ICE 选中候选对切换,payload 含 selectedCandidatePair.local/remote.candidate SDP 串与 reason) |
 
 ### 事件
 
@@ -633,6 +636,9 @@ WebRTC 连接的配置选项
 | connectionstatechange  | Event                  | 当 RTCPeerConnection 的连接状态改变时触发 |
 | track                  | RTCTrackEvent          | 当已经为特定的 RTCRtpReceiver 协商了新的传入媒体，并且该 RTCRtpReceiver 的轨道已添加到任意相关的远程 MediaStream 中时触发 |
 | datachannel            | RTCDataChannelEvent    | 当远程对等端创建了一个 RTCDataChannel 时触发 |
+| addstream              | MediaStreamEvent       | 远端 MediaStream 到达时触发(跨端对齐 onAddStream;与 removestream 成对返回同一 stream 对象) |
+| removestream           | MediaStreamEvent       | 远端 MediaStream 移除时触发(跨端对齐 onRemoveStream) |
+| selectedcandidatepairchange | SelectedCandidatePairChangeEvent | ICE 选中候选对切换时触发(WiFi↔蜂窝、直连↔中继 failover),payload 携带 selectedCandidatePair.local/remote.candidate(SDP 候选串)与 reason |
 
 ### addTrack
 
@@ -1110,6 +1116,21 @@ getSource(): MediaSource | null
 
 返回值
 
+### captureFrame
+
+captureFrame(): Promise<TrackFrame>
+
+单帧抓取(仅活动中的视频轨道)。resolve 的 TrackFrame 为 {width, height, format:'rgba', data:ArrayBuffer(RGBA_8888 字节序,width*height*4)},可直接用 @ohos.multimedia.image createPixelMap 构造 PixelMap。音频轨道、已 ended 的视频轨道 reject;同一时刻只允许一个在途请求,并发第二个调用 reject。
+
+### TrackFrame
+
+| 名称 | 类型 | 说明 |
+|---|---|---|
+| width | number | 帧宽(像素) |
+| height | number | 帧高(像素) |
+| format | string | 固定 'rgba' |
+| data | ArrayBuffer | RGBA_8888 字节序像素数据 |
+
 | 类型                                  | 说明  |
 |---------------------------------------|-------------|
 | [MediaSource](#mediasource)           | 媒体源  |
@@ -1443,6 +1464,7 @@ RTCPeerConnection 的数据通道
 | bufferedAmountLowThreshold | number           | 是   | 是   | 当 bufferedAmount 低于该值时，将触发 bufferedamountlow 事件 |
 | binaryType                 | BinaryType       | 是   | 是   | 指定二进制数据的类型（当前未使用） |
 | onbufferedamountlow        | EventHandler \| null  | 是   | 是   | 该事件处理器的事件类型为 bufferedamountlow |
+| onbufferedamountchange     | EventHandler \| null  | 是   | 是   | 该事件处理器的事件类型为 bufferedamountchange(每次 native 缓冲区变化通知都派发、无阈值过滤,跨端对齐 onBufferedAmountChange;payload 含 bufferedAmount 当前积压字节与 sentDataSize 本次冲刷增量,用于大文件流控/背压感知) |
 | onclose                    | EventHandler \| null  | 是   | 是   | 该事件处理器的事件类型为 close |
 | onclosing                  | EventHandler \| null  | 是   | 是   | 该事件处理器的事件类型为 closing |
 | onopen                     | EventHandler \| null  | 是   | 是   | 该事件处理器的事件类型为 open |
@@ -2386,6 +2408,7 @@ stopAecDump(): void;
 | videoEncoderFactory    | VideoEncoderFactory | 否   | 视频编码器工厂  |
 | videoDecoderFactory    | VideoDecoderFactory | 否   | 视频解码器工厂  |
 | audioProcessing        | AudioProcessing        | 否   | 音频处理实例   |
+| networkIgnoreMask      | number              | 否   | 收集候选时忽略的网络类型位掩码(AdapterType 位:ETHERNET=1<<0, WIFI=1<<1, CELLULAR=1<<2, VPN=1<<3, LOOPBACK=1<<4, ANY=1<<5;如 1<<3 表示媒体不走 VPN 网卡)。默认 0 表示不忽略;传入非数值抛 TypeError |
 
 ## AudioDeviceModule
 
@@ -2926,6 +2949,7 @@ static v(tag: string, message: string): void
 | kind     | [MediaDeviceKind](#mediadevicekind) | 是   | 否   | 用于接收媒体数据的传输机制。                        |
 | label    | string                              | 是   | 否   | 用于描述该设备（如”External USB Webcam“）。      |
 | groupId  | string                              | 是   | 否   | 设备的组ID，如果两个设备属于同一个物理设备，则它们的groupId相同。 |
+| getCapabilities | () => MediaTrackCapabilities  | 是   | 否   | videoinput:返回该相机全部采集档位聚合出的 width/height/frameRate min-max 范围;audioinput/audiooutput 暂无能力数据源,调用抛 "Not implemented"。 |
 
 ## MediaDevices
 
