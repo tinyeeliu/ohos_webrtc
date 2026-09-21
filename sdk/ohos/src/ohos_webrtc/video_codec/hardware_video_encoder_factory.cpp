@@ -29,8 +29,8 @@ namespace webrtc {
 namespace adapter {
 
 HardwareVideoEncoderFactory::HardwareVideoEncoderFactory(
-    std::shared_ptr<EglContext> sharedContext, bool enableH264HighProfile)
-    : sharedContext_(sharedContext), enableH264HighProfile_(enableH264HighProfile)
+    std::shared_ptr<EglContext> sharedContext, bool enableH264HighProfile, CodecForceLists forceLists)
+    : sharedContext_(sharedContext), enableH264HighProfile_(enableH264HighProfile), forceLists_(std::move(forceLists))
 {
 }
 
@@ -61,13 +61,13 @@ std::vector<SdpVideoFormat> HardwareVideoEncoderFactory::GetSupportedFormats() c
 
         if (type == VideoCodecMimeType::H264) {
             if (enableH264HighProfile_ &&
-                OH_AVCapability_AreProfileAndLevelSupported(capability, AVC_PROFILE_HIGH, AVC_LEVEL_31)) {
+                OH_AVCapability_AreProfileAndLevelSupported(capability, AVC_PROFILE_HIGH, AVC_LEVEL_41)) {
                 supportedFormats.push_back(
-                    CreateH264Format(H264Profile::kProfileConstrainedHigh, H264Level::kLevel3_1, "1"));
+                    CreateH264Format(H264Profile::kProfileConstrainedHigh, H264Level::kLevel4_1, "1"));
             }
 
             supportedFormats.push_back(
-                CreateH264Format(H264Profile::kProfileConstrainedBaseline, H264Level::kLevel3_1, "1"));
+                CreateH264Format(H264Profile::kProfileConstrainedBaseline, H264Level::kLevel4_1, "1"));
         } else {
             supportedFormats.push_back(SdpVideoFormat(type.name()));
         }
@@ -83,6 +83,13 @@ std::unique_ptr<VideoEncoder> HardwareVideoEncoderFactory::CreateVideoEncoder(co
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
     RTC_DLOG(LS_VERBOSE) << "format: " << format.ToString();
 
+    // #9: force-SW codecs are refused here so the wrapping default factory
+    // falls back to its software implementation.
+    if (forceLists_.IsForceSoftware(format)) {
+        RTC_LOG(LS_INFO) << "Codec " << format.name << " forced to software by list";
+        return nullptr;
+    }
+
     VideoCodecMimeType type = VideoCodecMimeType::valueOf(format.name);
     OH_AVCapability* capability = OH_AVCodec_GetCapabilityByCategory(type.mimeType(), true, HARDWARE);
     if (!capability) {
@@ -91,9 +98,9 @@ std::unique_ptr<VideoEncoder> HardwareVideoEncoderFactory::CreateVideoEncoder(co
 
     if (type == VideoCodecMimeType::H264) {
         bool isHighProfile =
-            format.IsSameCodec(CreateH264Format(H264Profile::kProfileConstrainedHigh, H264Level::kLevel3_1, "1"));
+            format.IsSameCodec(CreateH264Format(H264Profile::kProfileConstrainedHigh, H264Level::kLevel4_1, "1"));
         bool isBaselineProfile =
-            format.IsSameCodec(CreateH264Format(H264Profile::kProfileConstrainedBaseline, H264Level::kLevel3_1, "1"));
+            format.IsSameCodec(CreateH264Format(H264Profile::kProfileConstrainedBaseline, H264Level::kLevel4_1, "1"));
         if (!isHighProfile && !isBaselineProfile) {
             return nullptr;
         }

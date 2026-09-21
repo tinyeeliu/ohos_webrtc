@@ -98,5 +98,50 @@ export default function AudioDeviceModuleTest() {
       expect(adm.onrenderererror).assertNull();
       expect(adm.onrendererstatechange).assertNull();
     })
+
+    // ---- #11: 硬件 AEC/NS options 诚实化 ----
+
+    it('constructAdmWithHardwareAecOptions', 0, () => {
+      const admOn = new webrtc.AudioDeviceModule({ useHardwareAcousticEchoCanceler: true });
+      expect(admOn).not().assertNull();
+      const admOff = new webrtc.AudioDeviceModule({ useHardwareAcousticEchoCanceler: false });
+      expect(admOff).not().assertNull();
+    })
+
+    it('constructAdmWithStringHardwareAecThrows', 0, () => {
+      let thrown = false;
+      try {
+        const options: ESObject = {};
+        options.useHardwareAcousticEchoCanceler = 'yes';
+        new webrtc.AudioDeviceModule(options);
+      } catch (e) {
+        thrown = true;
+      }
+      expect(thrown).assertTrue();
+    })
+
+    it('constructAdmWithNumberNoiseSuppressorThrows', 0, () => {
+      let thrown = false;
+      try {
+        const options: ESObject = {};
+        options.useHardwareNoiseSuppressor = 1;
+        new webrtc.AudioDeviceModule(options);
+      } catch (e) {
+        thrown = true;
+      }
+      expect(thrown).assertTrue();
+    })
+
+    it('builtInEffectSupportQueriesReturnFalseOnApi12Devices', 0, () => {
+      // API12 无法按设备查询系统 AEC、且无系统 NS 接口,如实返回 false
+      expect(webrtc.AudioDeviceModule.isBuiltInAcousticEchoCancelerSupported()).assertFalse();
+      expect(webrtc.AudioDeviceModule.isBuiltInNoiseSuppressorSupported()).assertFalse();
+    })
+
+    it('setNoiseSuppressorEnabledReturnsFalseHonestly', 0, () => {
+      let adm = new webrtc.AudioDeviceModule();
+      expect(adm.setNoiseSuppressorEnabled(true)).assertFalse();
+      expect(adm.setNoiseSuppressorEnabled(false)).assertFalse();
+    })
   })
 }

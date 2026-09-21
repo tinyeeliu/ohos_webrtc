@@ -69,6 +69,7 @@ NapiNativeVideoRenderer::NapiNativeVideoRenderer(const Napi::CallbackInfo& info)
 NapiNativeVideoRenderer::~NapiNativeVideoRenderer()
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+    RemoveAllEventHandlers();
     RemoveSink();
 }
 

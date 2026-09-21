@@ -501,5 +501,62 @@ export default function DataChannelTest() {
       channel.binaryType = "arraybuffer";
       expect(channel.binaryType).assertEqual("arraybuffer");
     })
+
+    // ---- #7: onbufferedamountchange 事件保真 ----
+
+    it("bufferedAmountChangeHandlerDefaultsToNull", 0, () => {
+      const pc = pcf.createPeerConnection({ iceServers: [] });
+      const channel = pc.createDataChannel("defaults");
+      expect(channel.onbufferedamountchange).assertNull();
+      channel.close();
+      pc.close();
+    })
+
+    it("bufferedAmountChangeHandlerIsSettableAndResettable", 0, () => {
+      const pc = pcf.createPeerConnection({ iceServers: [] });
+      const channel = pc.createDataChannel("settable");
+      channel.onbufferedamountchange = (ev: webrtc.RTCBufferedAmountChangeEvent) => {};
+      expect(channel.onbufferedamountchange).not().assertNull();
+      channel.onbufferedamountchange = null;
+      expect(channel.onbufferedamountchange).assertNull();
+      channel.close();
+      pc.close();
+    })
+
+    it("sendingLargePayloadFiresBufferedAmountChangeEvents", 0, async () => {
+      const pc1 = pcf.createPeerConnection({ iceServers: [] });
+      const pc2 = pcf.createPeerConnection({ iceServers: [] });
+      exchangeIceCandidates(pc1, pc2);
+      const channel = pc1.createDataChannel("backpressure");
+      const payload = "x".repeat(16 * 1024);
+
+      let changeEvents = 0;
+      let sawNonZeroBuffered = false;
+      channel.onbufferedamountchange = (ev: webrtc.RTCBufferedAmountChangeEvent) => {
+        changeEvents++;
+        if (ev.bufferedAmount > 0) {
+          sawNonZeroBuffered = true;
+        }
+      };
+
+      await exchangeOfferAnswer(pc1, pc2);
+      await sleep(500);
+
+      for (let i = 0; i < 32; i++) {
+        channel.send(payload); // 512KB total, exceeds the SCTP send buffer
+      }
+
+      let elapsed = 0;
+      while (elapsed < 8000 && changeEvents === 0) {
+        await sleep(200);
+        elapsed += 200;
+      }
+      expect(changeEvents).assertLarger(0);
+      console.info(TAG, `bufferedamountchange events: ${changeEvents}, sawNonZeroBuffered: ${sawNonZeroBuffered}`);
+
+      channel.close();
+      pc1.close();
+      pc2.close();
+    })
   })
 }

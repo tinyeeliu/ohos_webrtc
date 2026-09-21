@@ -16,6 +16,7 @@
 #include "video_frame_receiver_gl.h"
 #include "../render/egl_config_attributes.h"
 #include "../render/yuv_converter.h"
+#include "../utils/thread_utils.h"
 
 #include "rtc_base/logging.h"
 #include "rtc_base/time_utils.h"
@@ -47,11 +48,17 @@ VideoFrameReceiverGl::VideoFrameReceiverGl(const std::string& threadName, std::s
 
 VideoFrameReceiverGl::~VideoFrameReceiverGl()
 {
-    thread_->PostTask([this] {
-        ReleaseNativeImage();
-        eglEnv_.reset();
+    auto textureId = textureData_ ? textureData_->GetId() : 0;
+    auto textureData = textureData_;
+    thread_->PostTask([textureId, textureData, yuv = std::move(yuvConverter_),
+                       env = std::move(eglEnv_)]() mutable {
+        if (textureId != 0) {
+            glDeleteTextures(1, &textureId);
+        }
+        yuv.reset();
+        env.reset();
     });
-    thread_->Stop();
+    StopThreadWithDeadline(thread_, "~VideoFrameReceiverGl");
 }
 
 uint64_t VideoFrameReceiverGl::GetSurfaceId() const
@@ -92,21 +99,6 @@ bool VideoFrameReceiverGl::CreateNativeImage()
     textureData_ = std::make_shared<TextureData>(textureId, TextureData::Type::OES, thread_.get(), yuvConverter_.get());
 
     return true;
-}
-
-void VideoFrameReceiverGl::ReleaseNativeImage()
-{
-    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
-
-    nativeImage_.UnsetOnFrameAvailableListener();
-    nativeImage_.Reset();
-
-    std::shared_ptr<TextureData> temp;
-    textureData_.swap(temp);
-    auto textureId = temp->GetId();
-    glDeleteTextures(1, &textureId);
-
-    yuvConverter_.reset();
 }
 
 void VideoFrameReceiverGl::SetTextureSize(int32_t textureWidth, int32_t textureHeight)

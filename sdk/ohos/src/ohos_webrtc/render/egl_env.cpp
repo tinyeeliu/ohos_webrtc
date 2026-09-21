@@ -356,7 +356,9 @@ void EglEnv::Release()
     }
 
     eglReleaseThread();
-    eglTerminate(eglDisplay_);
+    // 默认 display 为进程级共享资源（宿主 UI 渲染栈也在使用），这里不能 eglTerminate：
+    // 规范上它会删除该 display 上全部上下文/表面，还会使图形插件工作线程在无人 join 的状态下失控结束，
+    // 引发 TSAN thread leak；display 生命周期由进程退出时统一回收。
     eglDisplay_ = EGL_NO_DISPLAY;
 }
 

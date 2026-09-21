@@ -22,6 +22,7 @@
 
 #include "render/gl_drawer.h"
 #include "rtc_base/logging.h"
+#include "../utils/thread_utils.h"
 
 namespace webrtc {
 namespace adapter {
@@ -122,8 +123,8 @@ NativeWindowRendererGl::NativeWindowRendererGl(
 
 NativeWindowRendererGl::~NativeWindowRendererGl()
 {
-    thread_->PostTask([this] { eglEnv_.reset(); });
-    thread_->Stop();
+    thread_->PostTask([env = std::move(eglEnv_)]() mutable { env.reset(); });
+    StopThreadWithDeadline(thread_, "~NativeWindowRendererGl");
 }
 
 void NativeWindowRendererGl::SetMirrorHorizontally(bool mirror)

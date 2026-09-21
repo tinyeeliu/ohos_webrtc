@@ -127,7 +127,7 @@ struct ApplyConstraintsTestPage {
 
   queryZoomRange() {
     try {
-      let range = this.localVideoTrack?.getZoomRange();
+      let range: webrtc.ZoomRange | undefined = this.localVideoTrack?.getZoomRange();
       if (range) {
         this.zoomMin = range.min;
         this.zoomMax = range.max;

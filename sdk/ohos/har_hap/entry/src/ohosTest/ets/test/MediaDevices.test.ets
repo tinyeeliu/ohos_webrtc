@@ -82,5 +82,50 @@ export default function MediaDevicesTest() {
       expect(typeof constraints.deviceId).assertEqual('boolean');
       expect(typeof constraints.groupId).assertEqual('boolean');
     })
+    // ---- #4: MediaDeviceInfo.getCapabilities ----
+
+    it('videoInputDeviceGetCapabilitiesReturnsRanges', 0, async () => {
+      const devices = await new webrtc.MediaDevices().enumerateDevices();
+      const cameras = devices.filter((d: webrtc.MediaDeviceInfo) => d.kind === 'videoinput');
+      expect(cameras.length).assertLarger(0);
+
+      const caps = cameras[0].getCapabilities();
+      expect(typeof caps.width!.min).assertEqual('number');
+      expect(typeof caps.width!.max).assertEqual('number');
+      expect(typeof caps.height!.min).assertEqual('number');
+      expect(typeof caps.height!.max).assertEqual('number');
+      expect(typeof caps.frameRate!.min).assertEqual('number');
+      expect(typeof caps.frameRate!.max).assertEqual('number');
+      expect(caps.width!.max).assertLarger(0);
+      expect(caps.height!.max).assertLarger(0);
+      expect(caps.width!.max).assertLargerOrEqual(caps.width!.min);
+      expect(caps.height!.max).assertLargerOrEqual(caps.height!.min);
+    })
+
+    it('videoInputGetCapabilitiesIsStableAcrossCalls', 0, async () => {
+      const devices = await new webrtc.MediaDevices().enumerateDevices();
+      const cameras = devices.filter((d: webrtc.MediaDeviceInfo) => d.kind === 'videoinput');
+      expect(cameras.length).assertLarger(0);
+
+      const first = cameras[0].getCapabilities();
+      const second = cameras[0].getCapabilities();
+      expect(first.width!.max).assertEqual(second.width!.max);
+      expect(first.height!.max).assertEqual(second.height!.max);
+    })
+
+    it('audioInputDeviceGetCapabilitiesThrows', 0, async () => {
+      const devices = await new webrtc.MediaDevices().enumerateDevices();
+      const mics = devices.filter((d: webrtc.MediaDeviceInfo) => d.kind === 'audioinput');
+      if (mics.length === 0) {
+        return; // 无麦克风设备时跳过(不视为失败)
+      }
+      let thrown = false;
+      try {
+        mics[0].getCapabilities();
+      } catch (e) {
+        thrown = true;
+      }
+      expect(thrown).assertTrue();
+    })
   })
 }

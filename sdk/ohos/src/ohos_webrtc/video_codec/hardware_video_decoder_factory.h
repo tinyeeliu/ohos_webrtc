@@ -18,6 +18,8 @@
 
 #include "../render/egl_context.h"
 
+#include "codec_force_lists.h"
+
 #include "api/video_codecs/video_decoder_factory.h"
 
 namespace webrtc {
@@ -25,7 +27,8 @@ namespace adapter {
 
 class HardwareVideoDecoderFactory : public VideoDecoderFactory {
 public:
-    explicit HardwareVideoDecoderFactory(std::shared_ptr<EglContext> sharedContext);
+    explicit HardwareVideoDecoderFactory(std::shared_ptr<EglContext> sharedContext,
+        CodecForceLists forceLists = CodecForceLists());
     ~HardwareVideoDecoderFactory() override;
 
     std::vector<SdpVideoFormat> GetSupportedFormats() const override;
@@ -34,6 +37,7 @@ public:
 
 private:
     const std::shared_ptr<EglContext> sharedContext_;
+    const CodecForceLists forceLists_;
 };
 
 } // namespace adapter

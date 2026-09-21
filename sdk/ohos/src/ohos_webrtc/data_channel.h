@@ -99,6 +99,8 @@ protected:
 
     void HandleStateChange(DataChannelInterface::DataState state);
     void HandleMessage(const DataBuffer& buffer);
+    void HandleBufferedAmountChange(uint64_t sentDataSize);
+    void DispatchBufferedAmountLow(uint64_t bufferedAmount);
 
 private:
     static thread_local Napi::FunctionReference constructor_;

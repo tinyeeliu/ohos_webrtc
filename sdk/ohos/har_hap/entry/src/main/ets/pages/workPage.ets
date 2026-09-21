@@ -76,7 +76,7 @@ struct Index {
   private recvChannel?: webrtc.RTCDataChannel;
   private sendChannel?: webrtc.RTCDataChannel;
   private displayMediaStream?: webrtc.MediaStream;
-  private mediaDevices = new webrtc.MediaDevices();
+  private mediaDevices: webrtc.MediaDevices = new webrtc.MediaDevices();
   private onDataChannelMessageReceived = (event: webrtc.MessageEvent<string | ArrayBuffer>) => {
     // this is Index
     console.info(TAG, "dataChannel.OnMessage: ", event);
@@ -517,19 +517,19 @@ struct Index {
 
   async createAudioDeviceModule() {
     this.adm = new webrtc.AudioDeviceModule({ useStereoInput: true, useStereoOutput: true });
-    this.adm.oncapturererror = (event) => {
+    this.adm.oncapturererror = (event: webrtc.AudioErrorEvent) => {
       console.error(TAG, 'oncapturererror: ' + JSON.stringify(event));
     };
-    this.adm.oncapturerstatechange = (event) => {
+    this.adm.oncapturerstatechange = (event: webrtc.AudioStateChangeEvent) => {
       console.info(TAG, 'oncapturerstatechange: ' + JSON.stringify(event));
     };
-    this.adm.oncapturersamplesready = (event) => {
+    this.adm.oncapturersamplesready = (event: webrtc.AudioCapturerSamplesReadyEvent) => {
       console.debug(TAG, 'oncapturersamplesready: ' + JSON.stringify(event));
     };
-    this.adm.onrenderererror = (event) => {
+    this.adm.onrenderererror = (event: webrtc.AudioErrorEvent) => {
       console.error(TAG, 'onrenderererror: ' + JSON.stringify(event));
     };
-    this.adm.onrendererstatechange = (event) => {
+    this.adm.onrendererstatechange = (event: webrtc.AudioStateChangeEvent) => {
       console.info(TAG, 'onrendererstatechange: ' + JSON.stringify(event));
     };
     Logging.d(TAG, 'this.adm: ' + JSON.stringify(this.adm));
@@ -621,13 +621,14 @@ struct Index {
       });
 
       this.displayMediaStream.getTracks()
-        .forEach((track) => console.info(TAG, 'display media Stream track: ' + JSON.stringify(track)));
+        .forEach((track: webrtc.MediaStreamTrack) =>
+          console.info(TAG, 'display media Stream track: ' + JSON.stringify(track)));
 
       this.localVideoTrack = this.displayMediaStream.getVideoTracks()[0];
       console.info(TAG, 'videoTrack: ' + JSON.stringify(this.localVideoTrack));
 
       if (this.localVideoTrack) {
-        let videoSource = this.localVideoTrack.getSource();
+        let videoSource: webrtc.MediaSource | null = this.localVideoTrack.getSource();
         if (videoSource) {
           this.localVideoSource = videoSource as webrtc.VideoSource;
           console.info(TAG, 'videoSource: ' + JSON.stringify(this.localVideoSource));
@@ -643,7 +644,7 @@ struct Index {
         this.mXComponentController1.setScalingMode(ScalingMode.AspectFit);
       }
 
-      let audioTracks = this.displayMediaStream.getAudioTracks();
+      let audioTracks: webrtc.MediaStreamTrack[] = this.displayMediaStream.getAudioTracks();
       if (audioTracks.length > 0) {
         this.localAudioTrack = audioTracks[0];
         console.info(TAG, 'audioTrack: ' + JSON.stringify(this.localAudioTrack));
@@ -682,10 +683,10 @@ struct Index {
         this.remoteAudioTrack = event.track;
       }
     };
-    this.pc.onsignalingstatechange = (event) => {
+    this.pc.onsignalingstatechange = (event: webrtc.Event) => {
       console.info(TAG, 'onsignalingstatechange: ' + this.pc?.signalingState);
     }
-    this.pc.onconnectionstatechange = (event) => {
+    this.pc.onconnectionstatechange = (event: webrtc.Event) => {
       console.info(TAG, 'onconnectionstatechange: ' + this.pc?.connectionState);
       if (this.pc?.connectionState == 'connected') {
         // 连接建立后开始获取统计信息
@@ -704,7 +705,7 @@ struct Index {
         this.canChangeResolution = false;
       }
     }
-    this.pc.onnegotiationneeded = (event) => {
+    this.pc.onnegotiationneeded = (event: webrtc.Event) => {
       // this is Index
       console.info(TAG, 'onnegotiationneeded: this=' + JSON.stringify(this.pc));
       console.info(TAG, 'onnegotiationneeded: event=' + JSON.stringify(event));
@@ -716,23 +717,23 @@ struct Index {
       }
     }
 
-    this.pc.onicecandidate = (event) => {
+    this.pc.onicecandidate = (event: webrtc.RTCPeerConnectionIceEvent) => {
       console.info(TAG, 'onicecandidate: event=' + JSON.stringify(event));
       if (event.candidate) {
         this.sendMessage(JSON.stringify({ ice: event.candidate }));
       }
     };
-    this.pc.onicecandidateerror = (event) => {
+    this.pc.onicecandidateerror = (event: webrtc.RTCPeerConnectionIceErrorEvent) => {
       console.error(TAG, 'onicecandidateerror: event=' + JSON.stringify(event));
     };
-    this.pc.oniceconnectionstatechange = (event) => {
+    this.pc.oniceconnectionstatechange = (event: webrtc.Event) => {
       console.info(TAG, 'oniceconnectionstatechange: ' + this.pc?.iceConnectionState);
       if (this.pc?.iceConnectionState === 'failed') {
         this.setError("Ice connection failed");
         this.ws.close();
       }
     };
-    this.pc.onicegatheringstatechange = (event) => {
+    this.pc.onicegatheringstatechange = (event: webrtc.Event) => {
       console.info(TAG, 'onicegatheringstatechange: ' + this.pc?.iceGatheringState);
       switch (this.pc?.iceGatheringState) {
         case "new":
@@ -746,26 +747,29 @@ struct Index {
           break;
       }
     };
-    this.pc.ondatachannel = (event) => {
+    this.pc.ondatachannel = (event: webrtc.RTCDataChannelEvent) => {
       console.info(TAG, 'ondatachannel: event=' + JSON.stringify(event));
       this.setStatus("Data channel created");
       this.recvChannel = event.channel;
-      this.recvChannel.onopen = this.onDataChannelOpen;
+      this.recvChannel.onopen = (event: webrtc.Event) => {
+        this.onDataChannelOpen(event);
+        this.recvChannel?.send("Hi! (from ArkTS)");
+      };
       this.recvChannel.onmessage = this.onDataChannelMessageReceived;
       this.recvChannel.onerror = this.onDataChannelError;
       this.recvChannel.onclose = this.onDataChannelClose;
     }
 
     if (this.localAudioTrack) {
-      let rtpSender1 = this.pc.addTrack(this.localAudioTrack);
+      let rtpSender1: webrtc.RTCRtpSender = this.pc.addTrack(this.localAudioTrack);
       console.info(TAG, 'rtpSender1: ' + JSON.stringify(rtpSender1));
     }
     if (this.localAudioTrack2) {
-      let rtpSender2 = this.pc.addTrack(this.localAudioTrack2);
+      let rtpSender2: webrtc.RTCRtpSender = this.pc.addTrack(this.localAudioTrack2);
       console.info(TAG, 'rtpSender2: ' + JSON.stringify(rtpSender2));
     }
     if (this.localVideoTrack) {
-      let rtpSender3 = this.pc.addTrack(this.localVideoTrack);
+      let rtpSender3: webrtc.RTCRtpSender = this.pc.addTrack(this.localVideoTrack);
       console.info(TAG, 'rtpSender3: ' + JSON.stringify(rtpSender3));
     }
 
@@ -773,7 +777,7 @@ struct Index {
 
     this.sendChannel = this.pc.createDataChannel("send");
     console.info(TAG, 'sendChannel: ' + JSON.stringify(this.sendChannel));
-    this.sendChannel.onopen = (event) => {
+    this.sendChannel.onopen = (event: webrtc.Event) => {
       // this is Index
       console.info(TAG, "=dataChannel.OnOpen: ", event);
 
@@ -795,11 +799,7 @@ struct Index {
   }
 
   onDataChannelOpen(event: webrtc.Event) {
-    // this is webrtc.RTCDataChannel
     console.info(TAG, "dataChannel.OnOpen: ", event);
-    if (this instanceof webrtc.RTCDataChannel) {
-      this.send("Hi! (from ArkTS)");
-    }
   }
 
   async onDataChannelError(event: webrtc.Event) {
@@ -814,7 +814,7 @@ struct Index {
 
   async sendOffer() {
     try {
-      let offer = await this.pc?.createOffer();
+      let offer: webrtc.RTCSessionDescriptionInit | undefined = await this.pc?.createOffer();
       console.info(TAG, 'createOffer: ' + JSON.stringify(offer));
 
       this.pc?.setLocalDescription(offer);
@@ -828,7 +828,7 @@ struct Index {
   async sendAnswer() {
     this.setStatus("Got SDP offer, creating answer");
 
-    this.pc?.createAnswer().then((desc) => {
+    this.pc?.createAnswer().then((desc: webrtc.RTCSessionDescriptionInit) => {
       console.info(TAG, 'Success to create answer: ' + JSON.stringify(desc));
       this.pc?.setLocalDescription(desc).then(() => {
         this.setStatus("Sending SDP answer");
@@ -896,15 +896,16 @@ struct Index {
     const label = `${width} x ${height}`;
     console.info(TAG, `Changing resolution to ${label}`);
 
-    const prevVideoTrack = this.localVideoTrack;
-    const prevVideoSource = this.localVideoSource;
+    const prevVideoTrack: webrtc.MediaStreamTrack | undefined = this.localVideoTrack;
+    const prevVideoSource: webrtc.VideoSource | undefined = this.localVideoSource;
     let newVideoSource: webrtc.VideoSource | undefined = undefined;
     let newVideoTrack: webrtc.VideoTrack | undefined = undefined;
     let senderSwappedToNew = false;
 
     try {
-      const senders = this.pc.getSenders();
-      const videoSender = senders.find(sender => sender.track && sender.track.kind === 'video');
+      const senders: webrtc.RTCRtpSender[] = this.pc.getSenders();
+      const videoSender: webrtc.RTCRtpSender | undefined = senders.find(
+        (sender: webrtc.RTCRtpSender): boolean => sender.track !== null && sender.track.kind === 'video');
 
       if (!videoSender) {
         console.error(TAG, "Video sender not found");
@@ -946,8 +947,9 @@ struct Index {
       newVideoSource?.release();
       if (senderSwappedToNew && this.pc) {
         try {
-          const senders = this.pc.getSenders();
-          const rollbackSender = senders.find(sender => sender.track && sender.track.kind === 'video');
+          const senders: webrtc.RTCRtpSender[] = this.pc.getSenders();
+          const rollbackSender: webrtc.RTCRtpSender | undefined = senders.find(
+            (sender: webrtc.RTCRtpSender): boolean => sender.track !== null && sender.track.kind === 'video');
           if (rollbackSender) {
             await rollbackSender.replaceTrack(prevVideoTrack);
           }
@@ -999,7 +1001,7 @@ struct Index {
     }
 
     try {
-      const statsReport = await this.pc.getStats();
+      const statsReport: webrtc.RTCStatsReport = await this.pc.getStats();
 
       let localWidth = 0;
       let localHeight = 0;
@@ -1007,7 +1009,7 @@ struct Index {
       let remoteWidth = 0;
       let remoteHeight = 0;
 
-      statsReport.stats.forEach((stats, id) => {
+      statsReport.stats.forEach((stats: webrtc.RTCStats, id: string) => {
         if (stats.type === 'outbound-rtp') {
           const outboundStats = stats as RtpStats;
           if (outboundStats.kind === 'video') {

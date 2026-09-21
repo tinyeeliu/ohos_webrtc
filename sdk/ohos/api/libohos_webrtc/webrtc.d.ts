@@ -153,6 +153,36 @@ export interface RTCDataChannelEvent extends Event {
   readonly channel: RTCDataChannel;
 }
 
+// Buffered amount notification forwarded from the native observer without
+// threshold filtering (cross-platform parity backpressure signal).
+export interface RTCBufferedAmountChangeEvent extends Event {
+  readonly bufferedAmount: number;
+  readonly sentDataSize: number;
+}
+
+// Legacy stream-level add/remove notifications (mirrors the cross-platform
+// observer callbacks onAddStream/onRemoveStream); stream is the same JS
+// object across the paired addstream/removestream events.
+export interface MediaStreamEvent extends Event {
+  readonly stream: MediaStream;
+}
+
+// Selected ICE candidate pair changed (WiFi<->cellular, direct<->relay
+// failover). candidate strings use the SDP candidate syntax.
+export interface CandidateDescription {
+  readonly candidate: string;
+}
+
+export interface SelectedCandidatePair {
+  readonly local: CandidateDescription;
+  readonly remote: CandidateDescription;
+}
+
+export interface SelectedCandidatePairChangeEvent extends Event {
+  readonly selectedCandidatePair: SelectedCandidatePair;
+  readonly reason: string;
+}
+
 // https://www.w3.org/TR/webrtc/#rtcdtmftonechangeevent
 export interface RTCDTMFToneChangeEvent extends Event {
   readonly tone: string;
@@ -259,6 +289,13 @@ export interface RTCDataChannel {
   binaryType: BinaryType;
 
   onbufferedamountlow: ((this: RTCDataChannel, ev: Event) => any) | null;
+  /**
+   * Fired on every native buffered-amount notification (no threshold
+   * filtering), mirroring the cross-platform observer callback.
+   * payload.bufferedAmount is the current queued byte count and
+   * payload.sentDataSize is the delta just flushed.
+   */
+  onbufferedamountchange: ((this: RTCDataChannel, ev: RTCBufferedAmountChangeEvent) => any) | null;
   onclose: ((this: RTCDataChannel, ev: Event) => any) | null;
   onclosing: ((this: RTCDataChannel, ev: Event) => any) | null;
   onopen: ((this: RTCDataChannel, ev: Event) => any) | null;
@@ -344,6 +381,9 @@ export interface RTCPeerConnection extends EventTarget {
   onconnectionstatechange: ((this: RTCPeerConnection, ev: Event) => any) | null;
   ontrack: ((this: RTCPeerConnection, ev: RTCTrackEvent) => any) | null;
   ondatachannel: ((this: RTCPeerConnection, ev: RTCDataChannelEvent) => any) | null;
+  onaddstream: ((this: RTCPeerConnection, ev: MediaStreamEvent) => any) | null;
+  onremovestream: ((this: RTCPeerConnection, ev: MediaStreamEvent) => any) | null;
+  onselectedcandidatepairchange: ((this: RTCPeerConnection, ev: SelectedCandidatePairChangeEvent) => any) | null;
 
   addTrack(track: MediaStreamTrack, ...streams: MediaStream[]): RTCRtpSender;
   removeTrack(sender: RTCRtpSender): void;
@@ -810,6 +850,9 @@ export interface VideoSource extends MediaSource {
   switchCamera(): void;
   // 切换到指定 cameraId 的摄像头; cameraId 不存在时触发 oncameraswitcherror。
   switchCamera(cameraId: string): void;
+  // 直达硬件变焦(等效于 track.applyConstraints({zoom}));ratio 必须 > 0,
+  // 非数值抛 TypeError、非正值抛 RangeError。
+  setZoom(ratio: number): void;
 }
 
 // https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
@@ -821,6 +864,28 @@ export interface MediaStreamTrack extends EventTarget {
 
   stop(): void;
   getSource(): MediaSource | null;
+  // 单帧抓取(仅活动中的视频轨道):抓到一帧后 resolve {width,height,
+  // format:'rgba',data:ArrayBuffer(RGBA_8888)},可直接构造 PixelMap。
+  // 音频轨道或已 ended 轨道 reject;同一时刻只允许一个在途请求。
+  captureFrame(): Promise<TrackFrame>;
+  // 播放侧逐样本回调(#5):仅音频轨道生效,设为函数即开始订阅(10ms 帧,
+  // 交错 S16),置 null 停止;payload.samples 与 ADM AudioSamples 同构。
+  // 视频轨道上设置不报错但保持静默;JS 消费跟不上时自动丢帧。
+  onaudiosamplesready: ((this: MediaStreamTrack, ev: AudioTrackSamplesEvent) => any) | null;
+}
+
+// onaudiosamplesready 的载荷;samples 与 AudioDeviceModule 的
+// oncapturersamplesready 事件载荷同构(播放侧)。
+export interface AudioTrackSamplesEvent extends Event {
+  readonly samples: AudioSamples;
+}
+
+// captureFrame 的单帧载荷;data 为 RGBA_8888 字节序(width*height*4)。
+export interface TrackFrame {
+  width: number;
+  height: number;
+  format: string;
+  data: ArrayBuffer;
 }
 
 export declare var MediaStreamTrack: {
@@ -859,6 +924,23 @@ export interface MediaDeviceInfo {
   readonly kind: MediaDeviceKind;
   readonly label: string;
   readonly groupId: string;
+  // videoinput: 该相机全部采集档位聚合出的能力范围(width/height/frameRate
+  // 的 min/max);audioinput/audiooutput 暂无能力数据源,调用会抛
+  // "Not implemented"。
+  getCapabilities(): MediaTrackCapabilities;
+}
+
+// 数值能力范围(width/height/frameRate 共用)。
+export interface MediaTrackRange {
+  min: number;
+  max: number;
+}
+
+// 相机能力范围(由该设备全部 preview 档位聚合)。
+export interface MediaTrackCapabilities {
+  width: MediaTrackRange;
+  height: MediaTrackRange;
+  frameRate: MediaTrackRange;
 }
 
 export interface DeviceChangeEvent extends Event {
@@ -940,12 +1022,16 @@ export interface AudioDeviceModuleOptions {
   // enable low latency capturing and rendering, default is false
   useLowLatency?: boolean;
 
-  // Control if the built-in HW acoustic echo canceler should be used or not, default is false.
-  // It is possible to query support by calling AudioDeviceModule.isBuiltInAcousticEchoCancelerSupported()
+  // Control if the built-in HW acoustic echo canceler should be used or not.
+  // OHOS applies system AEC by capture stream source type, so this option
+  // selects the source: true (or omitting it) uses the VOICE_COMMUNICATION
+  // source (system AEC active on supporting devices), false uses the plain
+  // MIC source. Non-boolean values throw TypeError.
   useHardwareAcousticEchoCanceler?: boolean;
 
-  // Control if the built-in HW noise suppressor should be used or not, default is false.
-  // It is possible to query support by calling AudioDeviceModule.isBuiltInNoiseSuppressorSupported()
+  // Accepted for cross-platform option-surface parity but intentionally not
+  // applied: OHOS exposes no system-level noise suppressor API, suppression
+  // stays in the software APM. Non-boolean values throw TypeError.
   useHardwareNoiseSuppressor?: boolean;
 }
 
@@ -1005,9 +1091,20 @@ export interface HardwareVideoEncoderFactory extends VideoEncoderFactory {
   readonly enableH264HighProfile: boolean;
 }
 
+// #9 强软/禁硬 codec 名单选项:名单内 codec 名大小写不敏感。
+// - forceSWCodecList: 命中 codec 硬编/硬解工厂拒建,自动回落软编/软解;
+// - forceHWCodecList: 命中 codec 禁止回落软件,硬路径建不出即无编解码器;
+// 非法值(非字符串数组/非字符串元素)抛 TypeError。
+export interface HardwareVideoEncoderFactoryOptions {
+  enableH264HighProfile?: boolean;
+  forceSWCodecList?: string[];
+  forceHWCodecList?: string[];
+}
+
 declare var HardwareVideoEncoderFactory: {
   prototype: HardwareVideoEncoderFactory;
   new(enableH264HighProfile?: boolean): HardwareVideoEncoderFactory;
+  new(options: HardwareVideoEncoderFactoryOptions): HardwareVideoEncoderFactory;
 };
 
 export interface SoftwareVideoEncoderFactory extends VideoEncoderFactory {
@@ -1021,9 +1118,15 @@ declare var SoftwareVideoEncoderFactory: {
 export interface HardwareVideoDecoderFactory extends VideoDecoderFactory {
 }
 
+export interface HardwareVideoDecoderFactoryOptions {
+  forceSWCodecList?: string[];
+  forceHWCodecList?: string[];
+}
+
 declare var HardwareVideoDecoderFactory: {
   prototype: HardwareVideoDecoderFactory;
   new(): HardwareVideoDecoderFactory;
+  new(options: HardwareVideoDecoderFactoryOptions): HardwareVideoDecoderFactory;
 };
 
 export interface SoftwareVideoDecoderFactory extends VideoDecoderFactory {
@@ -1039,6 +1142,14 @@ export interface PeerConnectionFactoryOptions {
   videoEncoderFactory?: VideoEncoderFactory;
   videoDecoderFactory?: VideoDecoderFactory;
   audioProcessing?: AudioProcessing;
+  /**
+   * AdapterType bit mask of network types to ignore when gathering candidates.
+   * Bits (see rtc_base/network.h): ETHERNET = 1<<0, WIFI = 1<<1,
+   * CELLULAR = 1<<2, VPN = 1<<3, LOOPBACK = 1<<4, ANY = 1<<5.
+   * Example: networkIgnoreMask: (1<<3) keeps media off VPN interfaces.
+   * Default 0 ignores nothing. Non-number values throw TypeError.
+   */
+  networkIgnoreMask?: number;
 }
 
 export interface PeerConnectionFactory {

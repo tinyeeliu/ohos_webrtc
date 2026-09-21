@@ -44,7 +44,6 @@ public:
 
 protected:
     bool CreateNativeImage();
-    void ReleaseNativeImage();
     void SetTextureSize(int textureWidth, int textureHeight);
 
     static void OnNativeImageFrameAvailable1(void* data);

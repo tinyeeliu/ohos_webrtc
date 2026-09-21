@@ -4829,18 +4829,23 @@ inline napi_value ObjectWrap<T>::ConstructorCallbackWrapper(
     if (callbackInfo.Env().IsExceptionPending()) {
       // We need to clear the exception so that removing the wrap might work.
       Error e = callbackInfo.Env().GetAndClearPendingException();
+#if defined(__OHOS__)
+      // napi_wrap returns a strong reference; deleting it while the
+      // JS wrapper is still alive crashes ArkNativeReference. Unref first, then
+      // delete the instance, mirroring the success path below.
+      instance->Unref();
+#endif
       delete instance;
       e.ThrowAsJavaScriptException();
     } else {
       instance->_construction_failed = false;
+#if defined(__OHOS__)
+      // napi_wrap return a strong reference in OpenHarmony, so we unref it here to stay consistent with the standards.
+      // see https://docs.openharmony.cn/pages/v5.0/zh-cn/application-dev/reference/native-lib/napi.md#napiwrap
+      instance->Unref();
+#endif
     }
 #endif  // NAPI_CPP_EXCEPTIONS
-
-#if defined(__OHOS__)
-    // napi_wrap return a strong reference in OpenHarmony, so we unref it here to stay consistent with the standards.
-    // see https://docs.openharmony.cn/pages/v5.0/zh-cn/application-dev/reference/native-lib/napi.md#napiwrap
-    instance->Unref();
-#endif
 
     return callbackInfo.This();
   });

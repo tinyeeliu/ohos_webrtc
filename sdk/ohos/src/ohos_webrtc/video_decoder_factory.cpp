@@ -25,6 +25,35 @@ namespace webrtc {
 
 using namespace Napi;
 
+namespace {
+
+// Same string-array codec list reader as the encoder side (#9).
+bool ReadCodecList(const Napi::Object& jsOptions, const char* attributeName, std::vector<std::string>& out)
+{
+    if (!jsOptions.Has(attributeName)) {
+        return false;
+    }
+
+    auto jsList = jsOptions.Get(attributeName);
+    if (!jsList.IsArray()) {
+        NAPI_THROW(TypeError::New(jsOptions.Env(), std::string(attributeName) + " must be an array of strings"),
+                   false);
+    }
+
+    auto array = jsList.As<Napi::Array>();
+    for (uint32_t i = 0; i < array.Length(); i++) {
+        auto item = array.Get(i);
+        if (!item.IsString()) {
+            NAPI_THROW(
+                TypeError::New(jsOptions.Env(), std::string(attributeName) + " must be an array of strings"), false);
+        }
+        out.push_back(item.As<Napi::String>().Utf8Value());
+    }
+    return true;
+}
+
+} // namespace
+
 thread_local FunctionReference NapiHardwareVideoDecoderFactory::constructor_;
 
 void NapiHardwareVideoDecoderFactory::Init(Napi::Env env, Napi::Object exports)
@@ -46,18 +75,50 @@ NapiHardwareVideoDecoderFactory::~NapiHardwareVideoDecoderFactory() = default;
 
 NapiHardwareVideoDecoderFactory::NapiHardwareVideoDecoderFactory(const Napi::CallbackInfo& info) : ObjectWrap(info)
 {
-    if (info.Length() > 0) {
-        if (info[0].IsObject()) {
-            auto napiCtx = NapiEglContext::Unwrap(info[0].As<Object>());
-            if (napiCtx) {
-                sharedContext_ = napiCtx->Get();
-            }
+    if (info.Length() > 0 && info[0].IsObject()) {
+        auto jsArg = info[0].As<Object>();
+        auto napiCtx = NapiEglContext::Unwrap(jsArg);
+        if (napiCtx) {
+            // Legacy form: a bare EglContext instance.
+            sharedContext_ = napiCtx->Get();
+        } else {
+            ApplyDecoderFactoryOptions(jsArg);
         }
-    } else {
+    }
+
+    if (!sharedContext_) {
         sharedContext_ = EglEnv::GetDefault().GetContext();
     }
 
     info.This().As<Object>().TypeTag(&kTypeTag);
+}
+
+void NapiHardwareVideoDecoderFactory::ApplyDecoderFactoryOptions(const Napi::Object& jsOptions)
+{
+    auto env = jsOptions.Env();
+
+    if (jsOptions.Has(NapiHardwareVideoDecoderFactory::kAttributeNameSharedContext)) {
+        auto napiCtx = NapiEglContext::Unwrap(
+            jsOptions.Get(NapiHardwareVideoDecoderFactory::kAttributeNameSharedContext).As<Object>());
+        if (napiCtx) {
+            sharedContext_ = napiCtx->Get();
+        }
+    }
+
+    std::vector<std::string> forceSW;
+    std::vector<std::string> forceHW;
+    bool hasSW = ReadCodecList(jsOptions, NapiHardwareVideoDecoderFactory::kAttributeNameForceSWCodecList, forceSW);
+    if (env.IsExceptionPending()) {
+        NAPI_THROW_VOID(env.GetAndClearPendingException());
+    }
+    bool hasHW = ReadCodecList(jsOptions, NapiHardwareVideoDecoderFactory::kAttributeNameForceHWCodecList, forceHW);
+    if (env.IsExceptionPending()) {
+        NAPI_THROW_VOID(env.GetAndClearPendingException());
+    }
+    if (hasSW || hasHW) {
+        forceLists_ = adapter::CodecForceLists(std::move(forceSW), std::move(forceHW));
+        forceListsSet_ = true;
+    }
 }
 
 Napi::Value NapiHardwareVideoDecoderFactory::GetSharedContext(const Napi::CallbackInfo& info)
@@ -113,7 +174,16 @@ std::unique_ptr<VideoDecoderFactory> CreateVideoDecoderFactory(const Napi::Objec
     if (NAPI_CHECK_TYPE_TAG(jsVideoDecoderFactory, NapiHardwareVideoDecoderFactory)) {
         auto napiFactory = NapiHardwareVideoDecoderFactory::Unwrap(jsVideoDecoderFactory);
         auto sharedContext = napiFactory->GetSharedContext();
-        return std::make_unique<adapter::HardwareVideoDecoderFactory>(sharedContext);
+        auto hardwareFactory =
+            std::make_unique<adapter::HardwareVideoDecoderFactory>(sharedContext, napiFactory->GetForceLists());
+        // With force lists in play the factory is wrapped by the default
+        // factory so force-SW falls back to software and force-HW skips the
+        // fallback; without lists the legacy hardware-only behavior is kept.
+        if (napiFactory->HasForceLists()) {
+            return std::make_unique<adapter::DefaultVideoDecoderFactory>(
+                std::move(hardwareFactory), napiFactory->GetForceLists());
+        }
+        return hardwareFactory;
     } else if (NAPI_CHECK_TYPE_TAG(jsVideoDecoderFactory, NapiSoftwareVideoDecoderFactory)) {
         return std::make_unique<adapter::SoftwareVideoDecoderFactory>();
     }

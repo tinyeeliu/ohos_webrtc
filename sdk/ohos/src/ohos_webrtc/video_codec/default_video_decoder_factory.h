@@ -18,6 +18,8 @@
 
 #include "../render/egl_context.h"
 
+#include "codec_force_lists.h"
+
 #include "api/video_codecs/video_decoder.h"
 #include "api/video_codecs/video_decoder_factory.h"
 
@@ -28,7 +30,8 @@ class DefaultVideoDecoderFactory : public VideoDecoderFactory {
 public:
     explicit DefaultVideoDecoderFactory(std::shared_ptr<EglContext> sharedEglContext);
 
-    explicit DefaultVideoDecoderFactory(std::unique_ptr<VideoDecoderFactory> hardwareVideoDecoderFactory);
+    explicit DefaultVideoDecoderFactory(std::unique_ptr<VideoDecoderFactory> hardwareVideoDecoderFactory,
+        CodecForceLists forceLists = CodecForceLists());
 
     std::vector<SdpVideoFormat> GetSupportedFormats() const override;
 
@@ -37,6 +40,7 @@ public:
 private:
     std::unique_ptr<VideoDecoderFactory> hardwareVideoDecoderFactory_;
     std::unique_ptr<VideoDecoderFactory> softwareVideoDecoderFactory_;
+    CodecForceLists forceLists_;
 };
 
 } // namespace adapter

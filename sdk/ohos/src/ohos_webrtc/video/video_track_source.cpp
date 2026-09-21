@@ -22,6 +22,7 @@
 
 #include "api/video/i420_buffer.h"
 #include "rtc_base/logging.h"
+#include "../utils/thread_utils.h"
 
 namespace webrtc {
 
@@ -75,17 +76,19 @@ OhosVideoTrackSource::~OhosVideoTrackSource()
 {
     RTC_LOG(LS_INFO) << __FUNCTION__;
     is_destroying_.store(true, std::memory_order_release);
-    thread_->PostTask([this] {
-        if (capturer_) {
-            capturer_->Stop();
-            capturer_->Release();
+    auto capturer = capturer_;
+    auto pending = pendingSwitchCapturer_;
+    thread_->PostTask([capturer, pending]() mutable {
+        if (capturer) {
+            capturer->Stop();
+            capturer->Release();
         }
-        if (pendingSwitchCapturer_) {
-            pendingSwitchCapturer_->Stop();
-            pendingSwitchCapturer_->Release();
+        if (pending) {
+            pending->Stop();
+            pending->Release();
         }
     });
-    thread_->Stop();
+    StopThreadWithDeadline(thread_, "~OhosVideoTrackSource");
 }
 
 void OhosVideoTrackSource::Start()
