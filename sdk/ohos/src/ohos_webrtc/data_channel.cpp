@@ -44,6 +44,7 @@ const char kAttributeNameBufferedAmount[] = "bufferedAmount";
 const char kAttributeNameBufferedAmountLowThreshold[] = "bufferedAmountLowThreshold";
 const char kAttributeNameBinaryType[] = "binaryType";
 const char kAttributeNameOnBufferedAmountLow[] = "onbufferedamountlow";
+const char kAttributeNameOnBufferedAmountChange[] = "onbufferedamountchange";
 const char kAttributeNameOnClose[] = "onclose";
 const char kAttributeNameOnClosing[] = "onclosing";
 const char kAttributeNameOnOpen[] = "onopen";
@@ -55,6 +56,7 @@ const char kMethodNameSend[] = "send";
 const char kMethodNameToJson[] = "toJSON";
 
 const char kEventNameBufferedAmountLow[] = "bufferedamountlow";
+const char kEventNameBufferedAmountChange[] = "bufferedamountchange";
 const char kEventNameClose[] = "close";
 const char kEventNameClosing[] = "closing";
 const char kEventNameOpen[] = "open";
@@ -124,6 +126,8 @@ void NapiDataChannel::Init(Napi::Env env, Napi::Object exports)
                 kAttributeNameBinaryType),
             InstanceAccessor<&NapiDataChannel::GetEventHandler, &NapiDataChannel::SetEventHandler>(
                 kAttributeNameOnBufferedAmountLow, napi_default, (void*)kEventNameBufferedAmountLow),
+            InstanceAccessor<&NapiDataChannel::GetEventHandler, &NapiDataChannel::SetEventHandler>(
+                kAttributeNameOnBufferedAmountChange, napi_default, (void*)kEventNameBufferedAmountChange),
             InstanceAccessor<&NapiDataChannel::GetEventHandler, &NapiDataChannel::SetEventHandler>(
                 kAttributeNameOnClose, napi_default, (void*)kEventNameClose),
             InstanceAccessor<&NapiDataChannel::GetEventHandler, &NapiDataChannel::SetEventHandler>(
@@ -442,9 +446,30 @@ void NapiDataChannel::OnBufferedAmountChange(uint64_t sentDataSize)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    (void)sentDataSize;
+    // Every native notification is forwarded: unlike the previous behavior the
+    // delta (sentDataSize) is no longer dropped and no threshold filtering is
+    // applied, matching the cross-platform observer callback semantics.
+    Dispatch(CallbackEvent<NapiDataChannel>::Create(
+        [sentDataSize](NapiDataChannel& channel) { channel.HandleBufferedAmountChange(sentDataSize); }));
+}
+
+void NapiDataChannel::HandleBufferedAmountChange(uint64_t sentDataSize)
+{
+    auto env = Env();
+    Napi::HandleScope scope(env);
 
     auto bufferedAmount = dataChannel_->buffered_amount();
+    auto jsEvent = Object::New(env);
+    jsEvent.Set("type", String::New(env, kEventNameBufferedAmountChange));
+    jsEvent.Set("bufferedAmount", Number::New(env, static_cast<double>(bufferedAmount)));
+    jsEvent.Set("sentDataSize", Number::New(env, static_cast<double>(sentDataSize)));
+    MakeCallback(kEventNameBufferedAmountChange, {jsEvent});
+
+    DispatchBufferedAmountLow(bufferedAmount);
+}
+
+void NapiDataChannel::DispatchBufferedAmountLow(uint64_t bufferedAmount)
+{
     auto bufferedAmountLowThreshold = bufferedAmountLowThreshold_.load();
     if (bufferedAmount > bufferedAmountLowThreshold) {
         RTC_LOG(LS_VERBOSE) << "Buffered amount is greater than threshold: " << bufferedAmount << " > "
@@ -452,15 +477,10 @@ void NapiDataChannel::OnBufferedAmountChange(uint64_t sentDataSize)
         return;
     }
 
-    Dispatch(CallbackEvent<NapiDataChannel>::Create([](NapiDataChannel& channel) {
-        RTC_LOG(LS_VERBOSE) << "Dispatched: " << kEventNameBufferedAmountLow;
-
-        auto env = channel.Env();
-        Napi::HandleScope scope(env);
-        auto jsEvent = Object::New(env);
-        jsEvent.Set("type", String::New(env, kEventNameBufferedAmountLow));
-        channel.MakeCallback(kEventNameBufferedAmountLow, {jsEvent});
-    }));
+    auto env = Env();
+    auto jsEvent = Object::New(env);
+    jsEvent.Set("type", String::New(env, kEventNameBufferedAmountLow));
+    MakeCallback(kEventNameBufferedAmountLow, {jsEvent});
 }
 
 void NapiDataChannel::HandleStateChange(DataChannelInterface::DataState state)

@@ -24,6 +24,7 @@
 
 #include "napi.h"
 
+#include "absl/types/optional.h"
 #include "api/peer_connection_interface.h"
 #include "rtc_base/socket_server.h"
 
@@ -39,7 +40,8 @@ public:
         rtc::scoped_refptr<OhosAudioDeviceModule> adm = nullptr,
         std::unique_ptr<VideoEncoderFactory> videoEncoderFactory = nullptr,
         std::unique_ptr<VideoDecoderFactory> videoDecoderFactory = nullptr,
-        rtc::scoped_refptr<AudioProcessing> audioProcessing = nullptr);
+        rtc::scoped_refptr<AudioProcessing> audioProcessing = nullptr,
+        absl::optional<PeerConnectionFactoryInterface::Options> options = absl::nullopt);
 
     // Do not use this constructor directly, use 'Create' above.
     PeerConnectionFactoryWrapper() = default;
@@ -93,7 +95,8 @@ public:
 protected:
     bool Init(
         rtc::scoped_refptr<OhosAudioDeviceModule> adm, std::unique_ptr<VideoEncoderFactory> videoEncoderFactory,
-        std::unique_ptr<VideoDecoderFactory> videoDecoderFactory, rtc::scoped_refptr<AudioProcessing> audioProcessing);
+        std::unique_ptr<VideoDecoderFactory> videoDecoderFactory, rtc::scoped_refptr<AudioProcessing> audioProcessing,
+        absl::optional<PeerConnectionFactoryInterface::Options> options = absl::nullopt);
 
 private:
     static std::mutex mutex_;

@@ -18,6 +18,7 @@
 
 #include "render/egl_env.h"
 #include "utils/marcos.h"
+#include "video_codec/codec_force_lists.h"
 
 #include <napi.h>
 
@@ -29,6 +30,8 @@ class NapiHardwareVideoDecoderFactory : public Napi::ObjectWrap<NapiHardwareVide
 public:
     NAPI_CLASS_NAME_DECLARE(HardwareVideoDecoderFactory);
     NAPI_ATTRIBUTE_NAME_DECLARE(SharedContext, sharedContext);
+    NAPI_ATTRIBUTE_NAME_DECLARE(ForceSWCodecList, forceSWCodecList);
+    NAPI_ATTRIBUTE_NAME_DECLARE(ForceHWCodecList, forceHWCodecList);
     NAPI_METHOD_NAME_DECLARE(ToJson, toJSON);
     NAPI_TYPE_TAG_DECLARE(0xd8917b4837764a46, 0xb69d705ec2e65b37);
 
@@ -40,11 +43,23 @@ public:
     {
         return sharedContext_;
     }
+    const adapter::CodecForceLists& GetForceLists() const
+    {
+        return forceLists_;
+    }
+    bool HasForceLists() const
+    {
+        return forceListsSet_;
+    }
 
 protected:
     friend class ObjectWrap;
 
     explicit NapiHardwareVideoDecoderFactory(const Napi::CallbackInfo& info);
+
+    // Parses the object-form options ({sharedContext?, forceSWCodecList?,
+    // forceHWCodecList?}); throws on malformed fields.
+    void ApplyDecoderFactoryOptions(const Napi::Object& jsOptions);
 
     Napi::Value GetSharedContext(const Napi::CallbackInfo& info);
     Napi::Value ToJson(const Napi::CallbackInfo& info);
@@ -53,6 +68,8 @@ private:
     static thread_local Napi::FunctionReference constructor_;
 
     std::shared_ptr<EglContext> sharedContext_;
+    adapter::CodecForceLists forceLists_;
+    bool forceListsSet_{false};
 };
 
 class NapiSoftwareVideoDecoderFactory : public Napi::ObjectWrap<NapiSoftwareVideoDecoderFactory> {

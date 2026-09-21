@@ -18,6 +18,8 @@
 
 #include "../render/egl_context.h"
 
+#include "codec_force_lists.h"
+
 #include "api/video_codecs/video_encoder_factory.h"
 
 namespace webrtc {
@@ -27,7 +29,8 @@ class DefaultVideoEncoderFactory : public VideoEncoderFactory {
 public:
     DefaultVideoEncoderFactory(std::shared_ptr<EglContext> sharedEglContext, bool enableH264HighProfile);
 
-    explicit DefaultVideoEncoderFactory(std::unique_ptr<VideoEncoderFactory> hardwareVideoEncoderFactory);
+    explicit DefaultVideoEncoderFactory(std::unique_ptr<VideoEncoderFactory> hardwareVideoEncoderFactory,
+        CodecForceLists forceLists = CodecForceLists());
 
     std::vector<SdpVideoFormat> GetSupportedFormats() const override;
 
@@ -36,6 +39,7 @@ public:
 private:
     std::unique_ptr<VideoEncoderFactory> hardwareVideoEncoderFactory_;
     std::unique_ptr<VideoEncoderFactory> softwareVideoEncoderFactory_;
+    CodecForceLists forceLists_;
 };
 
 } // namespace adapter

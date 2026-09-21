@@ -29,9 +29,10 @@ DefaultVideoEncoderFactory::DefaultVideoEncoderFactory(
 {
 }
 
-DefaultVideoEncoderFactory::DefaultVideoEncoderFactory(std::unique_ptr<VideoEncoderFactory> hardwareVideoEncoderFactory)
+DefaultVideoEncoderFactory::DefaultVideoEncoderFactory(
+    std::unique_ptr<VideoEncoderFactory> hardwareVideoEncoderFactory, CodecForceLists forceLists)
     : hardwareVideoEncoderFactory_(std::move(hardwareVideoEncoderFactory)),
-      softwareVideoEncoderFactory_(std::make_unique<SoftwareVideoEncoderFactory>())
+      softwareVideoEncoderFactory_(std::make_unique<SoftwareVideoEncoderFactory>()), forceLists_(std::move(forceLists))
 {
 }
 
@@ -57,6 +58,12 @@ std::vector<SdpVideoFormat> DefaultVideoEncoderFactory::GetSupportedFormats() co
 std::unique_ptr<VideoEncoder> DefaultVideoEncoderFactory::CreateVideoEncoder(const SdpVideoFormat& format)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    // #9: force-HW codecs must not silently fall back to software; if the
+    // hardware path cannot create them there is no encoder.
+    if (forceLists_.IsForceHardware(format)) {
+        return hardwareVideoEncoderFactory_->CreateVideoEncoder(format);
+    }
 
     auto hardwareEncoder = hardwareVideoEncoderFactory_->CreateVideoEncoder(format);
     auto softwareEncoder = softwareVideoEncoderFactory_->CreateVideoEncoder(format);

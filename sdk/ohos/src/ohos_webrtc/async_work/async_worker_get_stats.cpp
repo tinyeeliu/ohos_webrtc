@@ -38,6 +38,101 @@ public:
     }
 };
 
+namespace {
+
+// Scalar overloads instead of Napi::Value::From: std::vector<bool> yields a
+// bit reference proxy that From cannot convert, so bool needs an exact match.
+// Integer members go through the double overload (Numbers lose precision
+// beyond 2^53).
+Napi::Value ScalarToJs(Napi::Env env, bool value)
+{
+    return Napi::Boolean::New(env, value);
+}
+
+Napi::Value ScalarToJs(Napi::Env env, const std::string& value)
+{
+    return Napi::String::New(env, value);
+}
+
+Napi::Value ScalarToJs(Napi::Env env, double value)
+{
+    return Napi::Number::New(env, value);
+}
+
+Napi::Value ScalarToJs(Napi::Env env, int32_t value)
+{
+    return Napi::Number::New(env, value);
+}
+
+Napi::Value ScalarToJs(Napi::Env env, uint32_t value)
+{
+    return Napi::Number::New(env, value);
+}
+
+Napi::Value ScalarToJs(Napi::Env env, int64_t value)
+{
+    return Napi::Number::New(env, value);
+}
+
+Napi::Value ScalarToJs(Napi::Env env, uint64_t value)
+{
+    return Napi::Number::New(env, value);
+}
+
+// Converts a sequence member to a real Napi array.
+template <typename T>
+Napi::Value VectorToArray(Napi::Env env, const std::vector<T>& values)
+{
+    auto array = Napi::Array::New(env, values.size());
+    for (size_t index = 0; index < values.size(); index++) {
+        array[static_cast<uint32_t>(index)] = ScalarToJs(env, values[index]);
+    }
+    return array;
+}
+
+// Converts a map member to a real Napi object.
+template <typename T>
+Napi::Value MapToObject(Napi::Env env, const std::map<std::string, T>& values)
+{
+    auto object = Napi::Object::New(env);
+    for (const auto& entry : values) {
+        object.Set(entry.first, ScalarToJs(env, entry.second));
+    }
+    return object;
+}
+
+// Sequence/map members become real arrays/objects instead of JSON strings,
+// consistent with the member conversion the sibling platform SDK performs
+// in its jni stats collector.
+Napi::Value StatsMemberToJs(Napi::Env env, const RTCStatsMemberInterface& member)
+{
+    switch (member.type()) {
+        case RTCStatsMemberInterface::kSequenceBool:
+            return VectorToArray(env, *member.cast_to<RTCStatsMember<std::vector<bool>>>());
+        case RTCStatsMemberInterface::kSequenceInt32:
+            return VectorToArray(env, *member.cast_to<RTCStatsMember<std::vector<int32_t>>>());
+        case RTCStatsMemberInterface::kSequenceUint32:
+            return VectorToArray(env, *member.cast_to<RTCStatsMember<std::vector<uint32_t>>>());
+        case RTCStatsMemberInterface::kSequenceInt64:
+            return VectorToArray(env, *member.cast_to<RTCStatsMember<std::vector<int64_t>>>());
+        case RTCStatsMemberInterface::kSequenceUint64:
+            return VectorToArray(env, *member.cast_to<RTCStatsMember<std::vector<uint64_t>>>());
+        case RTCStatsMemberInterface::kSequenceDouble:
+            return VectorToArray(env, *member.cast_to<RTCStatsMember<std::vector<double>>>());
+        case RTCStatsMemberInterface::kSequenceString:
+            return VectorToArray(env, *member.cast_to<RTCStatsMember<std::vector<std::string>>>());
+        case RTCStatsMemberInterface::kMapStringUint64:
+            return MapToObject(env, *member.cast_to<RTCStatsMember<std::map<std::string, uint64_t>>>());
+        case RTCStatsMemberInterface::kMapStringDouble:
+            return MapToObject(env, *member.cast_to<RTCStatsMember<std::map<std::string, double>>>());
+        default:
+            // Exotic member types still degrade to their JSON text.
+            return Napi::String::New(env, member.ValueToJson());
+    }
+}
+
+} // namespace
+
 class GetStatsCallback : public RTCStatsCollectorCallback {
 public:
     explicit GetStatsCallback(AsyncWorkerGetStats* asyncWorker) : asyncWorker_(asyncWorker) {}
@@ -131,7 +226,8 @@ void AsyncWorkerGetStats::OnOK()
                         jsStats.Set(member->name(), Napi::String::New(Env(), member->ValueToString()));
                         break;
                     default:
-                        jsStats.Set(member->name(), Napi::String::New(Env(), member->ValueToJson()));
+                        // Sequence/map members become real arrays/objects (#8).
+                        jsStats.Set(member->name(), StatsMemberToJs(Env(), *member));
                         break;
                 }
             }

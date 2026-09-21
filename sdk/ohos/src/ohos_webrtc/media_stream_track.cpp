@@ -23,6 +23,12 @@
 #include "camera/camera_capturer.h"
 #include "camera/camera_enumerator.h"
 
+#include "third_party/libyuv/include/libyuv.h"
+
+#include <ohaudio/native_audiostream_base.h>
+
+#include <vector>
+
 #include "rtc_base/logging.h"
 #include "utils/marcos.h"
 
@@ -47,6 +53,10 @@ const char kMethodNameGetSource[] = "getSource";
 const char kMethodNameToJson[] = "toJSON";
 const char kMethodNameApplyConstraints[] = "applyConstraints";
 const char kMethodNameGetZoomRange[] = "getZoomRange";
+const char kMethodNameCaptureFrame[] = "captureFrame";
+
+const char kAttributeNameOnAudioSamplesReady[] = "onaudiosamplesready";
+const char kEventNameAudioSamplesReady[] = "audiosamplesready";
 
 const char kEnumMediaStreamTrackStateLive[] = "live";
 const char kEnumMediaStreamTrackStateEnded[] = "ended";
@@ -69,6 +79,9 @@ void NapiMediaStreamTrack::Init(Napi::Env env, Object exports)
             InstanceMethod<&NapiMediaStreamTrack::GetSource>(kMethodNameGetSource),
             InstanceMethod<&NapiMediaStreamTrack::ApplyConstraints>(kMethodNameApplyConstraints),
             InstanceMethod<&NapiMediaStreamTrack::GetZoomRange>(kMethodNameGetZoomRange),
+            InstanceMethod<&NapiMediaStreamTrack::CaptureFrame>(kMethodNameCaptureFrame),
+            InstanceAccessor<&NapiMediaStreamTrack::GetAudioSamplesHandler,
+                &NapiMediaStreamTrack::SetAudioSamplesHandler>(kAttributeNameOnAudioSamplesReady, napi_default),
             InstanceMethod<&NapiMediaStreamTrack::ToJson>(kMethodNameToJson),
         });
     exports.Set(kClassName, func);
@@ -232,6 +245,246 @@ void NapiMediaStreamTrack::RemoveAllVideoSinks()
         if (sink) {
             videoTrack->RemoveSink(sink);
         }
+    }
+}
+
+// ---- captureFrame (#6) ----
+
+// One-shot sink attached while a captureFrame() promise is pending; frames are
+// handed back to the owning track object.
+class NapiMediaStreamTrack::CaptureSink : public rtc::VideoSinkInterface<VideoFrame> {
+public:
+    explicit CaptureSink(NapiMediaStreamTrack* track)
+        : track_(track)
+    {
+    }
+
+    ~CaptureSink() override = default;
+
+    void OnFrame(const VideoFrame& frame) override
+    {
+        track_->HandleCapturedFrame(frame);
+    }
+
+private:
+    NapiMediaStreamTrack* track_;
+};
+
+Napi::Value NapiMediaStreamTrack::CaptureFrame(const Napi::CallbackInfo& info)
+{
+    auto deferred = Napi::Promise::Deferred::New(info.Env());
+
+    if (!IsVideoTrack() || track_->state() == MediaStreamTrackInterface::kEnded) {
+        deferred.Reject(Napi::Error::New(info.Env(), "captureFrame requires a live video track").Value());
+        return deferred.Promise();
+    }
+
+    {
+        UNUSED std::lock_guard<std::mutex> lock(captureMutex_);
+        if (capturePending_) {
+            deferred.Reject(Napi::Error::New(info.Env(), "captureFrame already in progress").Value());
+            return deferred.Promise();
+        }
+        capturePending_ = true;
+    }
+
+    captureDeferred_ = deferred;
+    captureTsfn_ = Napi::ThreadSafeFunction::New(
+        info.Env(), Napi::Function::New(info.Env(), [](const Napi::CallbackInfo& cbInfo) {
+            return cbInfo.Env().Undefined();
+        }),
+        "captureFrame", 0, 1);
+    captureSink_ = std::make_unique<CaptureSink>(this);
+    AddVideoSink(captureSink_.get());
+
+    return deferred.Promise();
+}
+
+void NapiMediaStreamTrack::HandleCapturedFrame(const VideoFrame& frame)
+{
+    // Snapshot on the video thread; libyuv "ABGR" is memory-order R,G,B,A,
+    // matching ArkTS image.PixelFormat.RGBA_8888. Rotation is not applied: the
+    // capturer already delivers upright frames.
+    rtc::scoped_refptr<I420BufferInterface> i420 = frame.video_frame_buffer()->ToI420();
+    if (!i420) {
+        RejectCapture("frame has no I420 representation");
+        return;
+    }
+
+    int width = i420->width();
+    int height = i420->height();
+    constexpr int kRgbaBytesPerPixel = 4;
+    // Sole ownership moves to the ArrayBuffer finalizer below. A shared_ptr here
+    // would free the buffer when the tsfn lambda is destroyed right after the
+    // promise resolves, leaving JS a dangling ArrayBuffer (see crash2).
+    auto rgba =
+        new std::vector<uint8_t>(static_cast<size_t>(width) * height * kRgbaBytesPerPixel);
+    libyuv::I420ToABGR(
+        i420->DataY(), i420->StrideY(), i420->DataU(), i420->StrideU(), i420->DataV(), i420->StrideV(),
+        rgba->data(), width * kRgbaBytesPerPixel, width, height);
+
+    auto status = captureTsfn_.NonBlockingCall([this, rgba, width, height](Napi::Env env, Napi::Function /*jsCallback*/) {
+        auto data = Napi::ArrayBuffer::New(
+            env, rgba->data(), rgba->size(),
+            [](Napi::Env, void* /*data*/, std::vector<uint8_t>* hint) { delete hint; }, rgba);
+        auto payload = Napi::Object::New(env);
+        payload.Set("width", Napi::Number::New(env, width));
+        payload.Set("height", Napi::Number::New(env, height));
+        payload.Set("format", Napi::String::New(env, "rgba"));
+        payload.Set("data", data);
+        FinishCapture(payload, true);
+    });
+    if (status != napi_ok) {
+        delete rgba;
+        // tsfn full or shutting down: clean up must still happen on JS thread;
+        // posting failed so detach the sink here and reject via a fresh call.
+        RemoveVideoSink(captureSink_.get());
+        captureSink_.reset();
+        {
+            UNUSED std::lock_guard<std::mutex> lock(captureMutex_);
+            capturePending_ = false;
+        }
+        RTC_LOG(LS_ERROR) << "captureFrame: tsfn call failed: " << status;
+    }
+}
+
+void NapiMediaStreamTrack::RejectCapture(const std::string& message)
+{
+    auto status = captureTsfn_.NonBlockingCall([this, message](Napi::Env env, Napi::Function /*jsCallback*/) {
+        FinishCapture(Napi::Error::New(env, message).Value(), false);
+    });
+    if (status != napi_ok) {
+        RTC_LOG(LS_ERROR) << "captureFrame: tsfn call failed: " << status;
+    }
+}
+
+void NapiMediaStreamTrack::FinishCapture(Napi::Value result, bool ok)
+{
+    // JS thread only.
+    RemoveVideoSink(captureSink_.get());
+    captureSink_.reset();
+    {
+        UNUSED std::lock_guard<std::mutex> lock(captureMutex_);
+        capturePending_ = false;
+    }
+    if (ok) {
+        captureDeferred_->Resolve(result);
+    } else {
+        captureDeferred_->Reject(result);
+    }
+    captureTsfn_.Release();
+    captureTsfn_ = Napi::ThreadSafeFunction();
+}
+
+// ---- onaudiosamplesready (#5) ----
+
+// Sink attached to the core AudioTrack while the JS handler is set; receives
+// interleaved PCM on the audio thread.
+class NapiMediaStreamTrack::AudioSampleSink : public AudioTrackSinkInterface {
+public:
+    explicit AudioSampleSink(NapiMediaStreamTrack* track)
+        : track_(track)
+    {
+    }
+
+    ~AudioSampleSink() override = default;
+
+    void OnData(const void* audioData, int bitsPerSample, int sampleRate, size_t numberOfChannels,
+        size_t numberOfFrames) override
+    {
+        track_->HandleAudioSampleData(audioData, bitsPerSample, sampleRate, numberOfChannels, numberOfFrames);
+    }
+
+private:
+    NapiMediaStreamTrack* track_;
+};
+
+Napi::Value NapiMediaStreamTrack::GetAudioSamplesHandler(const Napi::CallbackInfo& info)
+{
+    if (!audioSamplesHandlerSet_) {
+        return info.Env().Null();
+    }
+    return audioSamplesHandlerRef_.Value();
+}
+
+void NapiMediaStreamTrack::SetAudioSamplesHandler(const Napi::CallbackInfo& info, const Napi::Value& value)
+{
+    if (!value.IsNull() && !value.IsFunction()) {
+        NAPI_THROW_VOID(TypeError::New(info.Env(), "onaudiosamplesready must be a function or null"));
+    }
+
+    if (value.IsFunction()) {
+        // Explicit base-class call: FunctionReference's own New hides the
+        // static Reference<T>::New(value).
+        audioSamplesHandlerRef_ = Napi::Reference<Napi::Function>::New(value.As<Function>());
+        audioSamplesHandlerSet_ = true;
+        StartAudioSamples(info.Env());
+    } else {
+        audioSamplesHandlerSet_ = false;
+        audioSamplesHandlerRef_ = Napi::FunctionReference();
+        StopAudioSamples();
+    }
+}
+
+void NapiMediaStreamTrack::StartAudioSamples(Napi::Env env)
+{
+    // Video tracks never carry audio; the handler is stored but stays silent.
+    auto audioTrack = GetAudioTrack();
+    if (!audioTrack || audioSampleSink_) {
+        return;
+    }
+
+    audioSamplesTsfn_ = Napi::ThreadSafeFunction::New(
+        env, audioSamplesHandlerRef_.Value(), kEventNameAudioSamplesReady, 0, 1);
+    audioSampleSink_ = std::make_unique<AudioSampleSink>(this);
+    audioTrack->AddSink(audioSampleSink_.get());
+}
+
+void NapiMediaStreamTrack::StopAudioSamples()
+{
+    // The tsfn exists exactly while the sink does (see StartAudioSamples).
+    if (audioSampleSink_) {
+        auto audioTrack = GetAudioTrack();
+        if (audioTrack) {
+            audioTrack->RemoveSink(audioSampleSink_.get());
+        }
+        audioSampleSink_.reset();
+        audioSamplesTsfn_.Release();
+        audioSamplesTsfn_ = Napi::ThreadSafeFunction();
+    }
+}
+
+void NapiMediaStreamTrack::HandleAudioSampleData(
+    const void* audioData, int bitsPerSample, int sampleRate, size_t channels, size_t frames)
+{
+    constexpr int kBitsPerSampleS16 = 16;
+    if (bitsPerSample != kBitsPerSampleS16) {
+        return; // core delivers S16 today; anything else is dropped honestly
+    }
+
+    // Queue depth is capped at 1 (see ThreadSafeFunction::New): when JS cannot
+    // keep up, NonBlockingCall fails and the frame is dropped here.
+    auto data = new rtc::CopyOnWriteBuffer(
+        static_cast<const uint8_t*>(audioData), frames * channels * sizeof(int16_t));
+    auto status = audioSamplesTsfn_.NonBlockingCall(
+        [data, sampleRate, channels](Napi::Env env, Napi::Function jsCallback) {
+            auto arrayBuffer = Napi::ArrayBuffer::New(
+                env, data->MutableData(), data->size(),
+                [](Napi::Env, void*, rtc::CopyOnWriteBuffer* hint) { delete hint; }, data);
+
+            auto samples = Napi::Object::New(env);
+            samples.Set("sampleRate", Napi::Number::New(env, sampleRate));
+            samples.Set("audioFormat", Napi::Number::New(env, AUDIOSTREAM_SAMPLE_S16LE));
+            samples.Set("channelCount", Napi::Number::New(env, static_cast<double>(channels)));
+            samples.Set("data", arrayBuffer);
+
+            auto jsEvent = Napi::Object::New(env);
+            jsEvent.Set("type", Napi::String::New(env, kEventNameAudioSamplesReady));
+            jsEvent.Set("samples", samples);
+            jsCallback.Call({jsEvent});
+        });
+    if (status != napi_ok) {
+        delete data;
     }
 }
 

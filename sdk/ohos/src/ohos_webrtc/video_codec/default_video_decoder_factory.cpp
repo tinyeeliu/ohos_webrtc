@@ -28,9 +28,10 @@ DefaultVideoDecoderFactory::DefaultVideoDecoderFactory(std::shared_ptr<EglContex
 {
 }
 
-DefaultVideoDecoderFactory::DefaultVideoDecoderFactory(std::unique_ptr<VideoDecoderFactory> hardwareVideoDecoderFactory)
+DefaultVideoDecoderFactory::DefaultVideoDecoderFactory(
+    std::unique_ptr<VideoDecoderFactory> hardwareVideoDecoderFactory, CodecForceLists forceLists)
     : hardwareVideoDecoderFactory_(std::move(hardwareVideoDecoderFactory)),
-      softwareVideoDecoderFactory_(std::make_unique<SoftwareVideoDecoderFactory>())
+      softwareVideoDecoderFactory_(std::make_unique<SoftwareVideoDecoderFactory>()), forceLists_(std::move(forceLists))
 {
 }
 
@@ -56,6 +57,12 @@ std::vector<SdpVideoFormat> DefaultVideoDecoderFactory::GetSupportedFormats() co
 std::unique_ptr<VideoDecoder> DefaultVideoDecoderFactory::CreateVideoDecoder(const SdpVideoFormat& format)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    // #9: force-HW codecs must not silently fall back to software; if the
+    // hardware path cannot create them there is no decoder.
+    if (forceLists_.IsForceHardware(format)) {
+        return hardwareVideoDecoderFactory_->CreateVideoDecoder(format);
+    }
 
     auto hardwareDecoder = hardwareVideoDecoderFactory_->CreateVideoDecoder(format);
     auto softwareDecoder = softwareVideoDecoderFactory_->CreateVideoDecoder(format);
