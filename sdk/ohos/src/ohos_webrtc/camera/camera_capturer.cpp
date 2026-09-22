@@ -539,7 +539,8 @@ void CameraCapturer::OnFrameAvailable(
     // Native buffers receive their orientation through the NativeImage
     // transform matrix. CPU/I420 buffers have no texture matrix and carry the
     // orientation as VideoFrame metadata.
-    VideoRotation frameRotation = rotation;
+    (void)rotation;
+    VideoRotation frameRotation = kVideoRotation_0;
 
     if (buffer->type() == VideoFrameBuffer::Type::kNative) {
         auto textureBuffer = static_cast<TextureBuffer*>(buffer.get());
