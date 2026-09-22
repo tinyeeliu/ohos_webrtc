@@ -84,6 +84,9 @@ private:
     Camera_Profile* FindPreviewProfile(ohos::CameraOutputCapability& capability, Camera_Device* device);
     bool StartCaptureSession(Camera_Profile* previewProfile);
     void UpdateRotation();
+    // issue #200: 官方预览旋转适配(OH_PreviewOutput_Get/SetPreviewRotation, API 12+):
+    // CommitConfig 后与窗口旋转时向相机服务声明预览旋转角度。
+    void ApplyPreviewRotation();
 
     // 切换摄像头时需更新为新的设备 ID, 故非 const。
     std::string deviceId_;
