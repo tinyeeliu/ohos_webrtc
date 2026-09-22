@@ -19,8 +19,7 @@
 
 #include <ohcamera/camera_device.h>
 #include <ohcamera/capture_session.h>
-
-#include <algorithm>
+#include <ohcamera/preview_output.h>
 
 #include "rtc_base/logging.h"
 
@@ -343,6 +342,12 @@ bool CameraCapturer::StartCaptureSession(Camera_Profile* previewProfile)
         return false;
     }
 
+    // The preview producer owns the rotation metadata consumed by
+    // OH_NativeImage_GetTransformMatrixV2(). Query and apply the real
+    // preview rotation after the session is configured instead of deriving a
+    // second, incomplete rotation in CameraCapturer.
+    UpdatePreviewRotation();
+
     if (!captureSession_.Start()) {
         RTC_LOG(LS_ERROR) << "Failed to start capture session";
         NotifyCapturedStart(false);
@@ -531,8 +536,10 @@ void CameraCapturer::OnFrameAvailable(
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    (void)rotation;
-    VideoRotation frameRotation = kVideoRotation_0;
+    // Native buffers receive their orientation through the NativeImage
+    // transform matrix. CPU/I420 buffers have no texture matrix and carry the
+    // orientation as VideoFrame metadata.
+    VideoRotation frameRotation = rotation;
 
     if (buffer->type() == VideoFrameBuffer::Type::kNative) {
         auto textureBuffer = static_cast<TextureBuffer*>(buffer.get());
@@ -542,11 +549,25 @@ void CameraCapturer::OnFrameAvailable(
         if (isCameraFrontFacing_) {
             transformMatrix.PreScale(-1.0f, 1.0f, 0.5f, 0.5f);
         }
-        transformMatrix.PreRotate(finalRotation_, 0.5f, 0.5f);
         Matrix newMatrix = textureBuffer->GetTransformMatrix();
         newMatrix.PreConcat(transformMatrix);
+
+        // GetTransformMatrixV2() already contains the rotation set on the
+        // PreviewOutput. The underlying texture storage remains in its
+        // producer geometry, but the logical frame presented to WebRTC has
+        // transposed dimensions for a quarter-turn rotation.
+        int frameWidth = textureBuffer->width();
+        int frameHeight = textureBuffer->height();
+        const VideoRotation previewRotation = previewRotation_.load();
+        if (previewRotation == kVideoRotation_90 || previewRotation == kVideoRotation_270) {
+            const int originalWidth = frameWidth;
+            frameWidth = frameHeight;
+            frameHeight = originalWidth;
+        }
+
         buffer = TextureBuffer::Create(
-            textureBuffer->GetTexture(), textureBuffer->width(), textureBuffer->height(), newMatrix);
+            textureBuffer->GetTexture(), frameWidth, frameHeight, newMatrix);
+        frameRotation = kVideoRotation_0;
     } else {
         // CPU 路径（x86_64 模拟器 ImageReceiver）：无系统变换矩阵，通过 rotation 元数据上报。
         frameRotation = i420Rotation_;
@@ -571,24 +592,50 @@ void CameraCapturer::UpdateRotation()
     }
 
     if (isCameraFrontFacing_) {
-        finalRotation_ =
-            static_cast<VideoRotation>((kFullCircleDegrees - displayDegrees) % kFullCircleDegrees);
         i420Rotation_ = static_cast<VideoRotation>((cameraDegrees + displayDegrees) % kFullCircleDegrees);
     } else {
-        finalRotation_ = static_cast<VideoRotation>(displayDegrees % kFullCircleDegrees);
         i420Rotation_ = static_cast<VideoRotation>(
             (cameraDegrees - displayDegrees + kFullCircleDegrees) % kFullCircleDegrees);
     }
 
     RTC_DLOG(LS_VERBOSE) << "UpdateRotation: camera=" << cameraDegrees << ", display=" << displayDegrees
-                         << ", finalRotation=" << finalRotation_ << ", i420Rotation=" << i420Rotation_
-                         << ", isFrontFacing=" << isCameraFrontFacing_;
+                         << ", i420Rotation=" << i420Rotation_ << ", isFrontFacing=" << isCameraFrontFacing_;
+}
+
+void CameraCapturer::UpdatePreviewRotation()
+{
+    if (previewOutput_.IsEmpty()) {
+        return;
+    }
+
+    constexpr int kDegreesPerRotationUnit = 90;
+    const int displayDegrees =
+        ohos::DisplayManager::GetInstance().GetDefaultDisplayRotation() * kDegreesPerRotationUnit;
+
+    Camera_ImageRotation imageRotation = static_cast<Camera_ImageRotation>(0);
+    Camera_ErrorCode ret = OH_PreviewOutput_GetPreviewRotation(
+        previewOutput_.Raw(), displayDegrees, &imageRotation);
+    if (ret != CAMERA_OK) {
+        RTC_LOG(LS_ERROR) << "Failed to get preview rotation: " << ret;
+        return;
+    }
+
+    ret = OH_PreviewOutput_SetPreviewRotation(previewOutput_.Raw(), imageRotation, false);
+    if (ret != CAMERA_OK) {
+        RTC_LOG(LS_ERROR) << "Failed to set preview rotation: " << ret;
+        return;
+    }
+
+    previewRotation_.store(static_cast<VideoRotation>(imageRotation));
+    RTC_LOG(LS_INFO) << "Preview rotation: display=" << displayDegrees
+                     << ", image=" << static_cast<int>(imageRotation);
 }
 
 void CameraCapturer::OnDisplayChange(uint64_t displayId)
 {
     (void)displayId;
     UpdateRotation();
+    UpdatePreviewRotation();
 }
 
 } // namespace webrtc

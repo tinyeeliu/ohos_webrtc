@@ -84,6 +84,7 @@ private:
     Camera_Profile* FindPreviewProfile(ohos::CameraOutputCapability& capability, Camera_Device* device);
     bool StartCaptureSession(Camera_Profile* previewProfile);
     void UpdateRotation();
+    void UpdatePreviewRotation();
 
     // 切换摄像头时需更新为新的设备 ID, 故非 const。
     std::string deviceId_;
@@ -108,7 +109,10 @@ private:
 
     VideoCapturer::Observer* observer_{};
     std::mutex obsMutex_;
-    std::atomic<VideoRotation> finalRotation_{kVideoRotation_0};
+    // NativeImage's transform matrix is driven by the Camera PreviewOutput
+    // rotation. Keep the corresponding logical frame rotation so the
+    // TextureBuffer dimensions describe the rotated image as well.
+    std::atomic<VideoRotation> previewRotation_{kVideoRotation_0};
     std::atomic<VideoRotation> i420Rotation_{kVideoRotation_0};
 };
 
