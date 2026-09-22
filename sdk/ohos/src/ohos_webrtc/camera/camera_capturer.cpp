@@ -426,6 +426,9 @@ void CameraCapturer::StopInternal()
         RTC_LOG(LS_ERROR) << "Failed to stop capture session";
         return;
     }
+
+    // Wait for any in-flight display callback before releasing previewOutput_.
+    ohos::DisplayManager::GetInstance().UnregisterChangeCallback(this);
     captureSession_.Reset();
 
     previewOutput_.RemoveObserver(this);
@@ -435,7 +438,6 @@ void CameraCapturer::StopInternal()
     input_.Reset();
 
     cameraDevices_.Reset();
-    ohos::DisplayManager::GetInstance().UnregisterChangeCallback(this);
     isStarted_ = false;
 }
 
