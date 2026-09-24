@@ -19,8 +19,10 @@
 
 #include <ohcamera/camera_device.h>
 #include <ohcamera/capture_session.h>
+#include <ohcamera/preview_output.h>
 
 #include <algorithm>
+#include <chrono>
 
 #include "rtc_base/logging.h"
 
@@ -90,6 +92,8 @@ void CameraCapturer::Release()
 {
     RTC_LOG(LS_INFO) << __FUNCTION__;
     ohos::DisplayManager::GetInstance().UnregisterChangeCallback(this);
+    // 安全网: 覆盖启动失败路径(未走到 StopInternal)与析构场景, 重复注销无副作用。
+    ohos::PostureObserver::GetInstance().UnregisterObserver(this);
     Stop();
 
     {
@@ -267,6 +271,10 @@ Camera_Device* CameraCapturer::SelectCameraDevice()
     RTC_LOG(LS_VERBOSE) << "device: " << deviceIndex << ", " << device->cameraId;
     isCameraFrontFacing_ = device->cameraPosition == CAMERA_POSITION_FRONT;
     ohos::DisplayManager::GetInstance().RegisterChangeCallback(this);
+    if (isCameraFrontFacing_) {
+        // issue #200: 相机侧姿态跟随像素旋转仅作用于前置流, 仅前置需要姿态感知补偿。
+        ohos::PostureObserver::GetInstance().RegisterObserver(this);
+    }
     return device;
 }
 
@@ -342,6 +350,11 @@ bool CameraCapturer::StartCaptureSession(Camera_Profile* previewProfile)
         RTC_LOG(LS_ERROR) << "Failed to commit capture session config";
         return false;
     }
+
+    // issue #200: 官方《适配相机旋转角度(C/C++)》规定, CommitConfig 之后、Start 之前
+    // 必须声明预览旋转角度, 否则相机服务对预览流采用默认的姿态跟随调整
+    // (锁定窗口方向时导致画面相对窗口倒置)。
+    ApplyPreviewRotation();
 
     if (!captureSession_.Start()) {
         RTC_LOG(LS_ERROR) << "Failed to start capture session";
@@ -431,6 +444,7 @@ void CameraCapturer::StopInternal()
 
     cameraDevices_.Reset();
     ohos::DisplayManager::GetInstance().UnregisterChangeCallback(this);
+    ohos::PostureObserver::GetInstance().UnregisterObserver(this);
     isStarted_ = false;
 }
 
@@ -533,6 +547,9 @@ void CameraCapturer::OnFrameAvailable(
 
     (void)rotation;
     VideoRotation frameRotation = kVideoRotation_0;
+    // issue #200: 姿态错配补偿逐帧评估(含持续性确认, 仅官方声明成功路径生效)。
+    int compensationDegrees = EvaluatePostureCompensation();
+    constexpr int kFullCircleDegrees = 360;
 
     if (buffer->type() == VideoFrameBuffer::Type::kNative) {
         auto textureBuffer = static_cast<TextureBuffer*>(buffer.get());
@@ -542,14 +559,16 @@ void CameraCapturer::OnFrameAvailable(
         if (isCameraFrontFacing_) {
             transformMatrix.PreScale(-1.0f, 1.0f, 0.5f, 0.5f);
         }
-        transformMatrix.PreRotate(finalRotation_, 0.5f, 0.5f);
+        transformMatrix.PreRotate(
+            (static_cast<int>(finalRotation_.load()) + compensationDegrees) % kFullCircleDegrees, 0.5f, 0.5f);
         Matrix newMatrix = textureBuffer->GetTransformMatrix();
         newMatrix.PreConcat(transformMatrix);
         buffer = TextureBuffer::Create(
             textureBuffer->GetTexture(), textureBuffer->width(), textureBuffer->height(), newMatrix);
     } else {
         // CPU 路径（x86_64 模拟器 ImageReceiver）：无系统变换矩阵，通过 rotation 元数据上报。
-        frameRotation = i420Rotation_;
+        frameRotation = static_cast<VideoRotation>(
+            (static_cast<int>(i420Rotation_.load()) + compensationDegrees) % kFullCircleDegrees);
     }
 
     UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
@@ -580,15 +599,113 @@ void CameraCapturer::UpdateRotation()
             (cameraDegrees - displayDegrees + kFullCircleDegrees) % kFullCircleDegrees);
     }
 
-    RTC_DLOG(LS_VERBOSE) << "UpdateRotation: camera=" << cameraDegrees << ", display=" << displayDegrees
-                         << ", finalRotation=" << finalRotation_ << ", i420Rotation=" << i420Rotation_
-                         << ", isFrontFacing=" << isCameraFrontFacing_;
+    RTC_LOG(LS_INFO) << "UpdateRotation: camera=" << cameraDegrees << ", display=" << displayDegrees
+                     << ", finalRotation=" << finalRotation_ << ", i420Rotation=" << i420Rotation_
+                     << ", isFrontFacing=" << isCameraFrontFacing_;
+}
+
+void CameraCapturer::ApplyPreviewRotation()
+{
+    if (previewOutput_.IsEmpty()) {
+        return;
+    }
+
+    constexpr int kDegreesPerRotationUnit = 90;
+    constexpr int kInvertedDegrees = 180;
+    NativeDisplayManager_Rotation displayRotation = ohos::DisplayManager::GetInstance().GetDefaultDisplayRotation();
+    int displayDegrees = displayRotation * kDegreesPerRotationUnit;
+    // issue #200: 记录窗口方向族归属, 供帧回调的姿态错配补偿评估使用。
+    displayIsPortraitFamily_.store(displayDegrees == 0 || displayDegrees == kInvertedDegrees,
+        std::memory_order_relaxed);
+
+    Camera_ImageRotation previewRotation = IAMGE_ROTATION_0;
+    Camera_ErrorCode ret = OH_PreviewOutput_GetPreviewRotation(previewOutput_.Raw(), displayDegrees, &previewRotation);
+    if (ret != CAMERA_OK) {
+        RTC_LOG(LS_WARNING) << "OH_PreviewOutput_GetPreviewRotation failed, code=" << ret
+                            << ", fallback to legacy rotation formula";
+        previewRotationApplied_.store(false, std::memory_order_relaxed);
+        UpdateRotation();
+        return;
+    }
+
+    // isDisplayLocked: Surface 在屏幕旋转时是否锁定方向。本库渲染 Surface(NativeImage)
+    // 不随窗口旋转联动, 按官方示例取 false。
+    bool isDisplayLocked = false;
+    ret = OH_PreviewOutput_SetPreviewRotation(previewOutput_.Raw(), previewRotation, isDisplayLocked);
+    if (ret == CAMERA_OK) {
+        // issue #200: 声明生效后, 相机服务输出的预览流已由系统按当前显示转正,
+        // 渲染端不再叠加旋转(真机实测: 自动旋转各姿态画面正向且无闪跳),
+        // 前置仅保留镜像; 旧经验公式作废。锁定窗口期间相机侧仍存在姿态跟随
+        // 的像素旋转, 由 EvaluatePostureCompensation 的姿态错配补偿覆盖。
+        previewRotationApplied_.store(true, std::memory_order_relaxed);
+        finalRotation_ = kVideoRotation_0;
+        i420Rotation_ = kVideoRotation_0;
+    } else {
+        RTC_LOG(LS_WARNING) << "OH_PreviewOutput_SetPreviewRotation failed, code=" << ret
+                            << ", fallback to legacy rotation formula";
+        previewRotationApplied_.store(false, std::memory_order_relaxed);
+        UpdateRotation();
+    }
+    RTC_LOG(LS_INFO) << "ApplyPreviewRotation: displayDegrees=" << displayDegrees
+                     << ", previewRotation=" << static_cast<int>(previewRotation)
+                     << ", isDisplayLocked=" << isDisplayLocked << ", setResult=" << ret
+                     << ", applied=" << previewRotationApplied_.load(std::memory_order_relaxed);
+}
+
+int CameraCapturer::EvaluatePostureCompensation()
+{
+    constexpr int kPostureMismatchCompensationDegrees = 180;
+    constexpr int64_t kMismatchConfirmMs = 300;
+    constexpr int kNoCompensation = 0;
+
+    // 仅官方声明成功路径叠加姿态补偿; 回退路径保持旧公式原行为(零变更)。
+    if (!isCameraFrontFacing_ || !previewRotationApplied_.load(std::memory_order_relaxed)) {
+        return kNoCompensation;
+    }
+
+    // issue #200: 声明生效后相机侧仍依据物理姿态对前置流做像素级旋转(真机实测:
+    // 锁横屏竖握画面倒置 180 度, 横握正常), 姿态族与窗口方向族错配时补偿。
+    // 传感器不可用(宿主未声明 ohos.permission.ACCELEROMETER 等)时姿态族为
+    // UNKNOWN, 不补偿, 优雅降级。
+    ohos::PostureFamily postureFamily = ohos::PostureObserver::GetInstance().GetPostureFamily();
+    bool mismatched = postureFamily != ohos::PostureFamily::UNKNOWN
+        && (postureFamily == ohos::PostureFamily::PORTRAIT) != displayIsPortraitFamily_.load(std::memory_order_relaxed);
+
+    int64_t nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+    if (!mismatched) {
+        postureMismatchSinceMs_ = 0;
+    } else if (postureMismatchSinceMs_ == 0) {
+        postureMismatchSinceMs_ = nowMs;
+    }
+
+    // 持续性确认: 自动旋转时传感器与 display 变化存在先后, 产生瞬态错配
+    // (实测 <=146ms), 不应补偿; 窗口锁定场景错配为持久状态, 确认后稳定补偿。
+    int compensation = (mismatched && nowMs - postureMismatchSinceMs_ >= kMismatchConfirmMs)
+        ? kPostureMismatchCompensationDegrees
+        : kNoCompensation;
+
+    if (compensation != compensationDegrees_) {
+        compensationDegrees_ = compensation;
+        RTC_LOG(LS_INFO) << "EvaluatePostureCompensation: compensation=" << compensation
+                         << ", postureFamily=" << static_cast<int>(postureFamily)
+                         << ", displayIsPortraitFamily=" << displayIsPortraitFamily_.load(std::memory_order_relaxed);
+    }
+    return compensation;
 }
 
 void CameraCapturer::OnDisplayChange(uint64_t displayId)
 {
     (void)displayId;
-    UpdateRotation();
+    // issue #200: 官方要求窗口旋转时重新声明预览旋转角度;
+    // 声明失败时内部回退旧公式(UpdateRotation)。
+    ApplyPreviewRotation();
+}
+
+void CameraCapturer::OnPostureFamilyChanged(ohos::PostureFamily family)
+{
+    // 传感器服务线程回调: 补偿由帧回调逐帧评估(含持续性确认), 此处仅记录事件。
+    RTC_LOG(LS_INFO) << "OnPostureFamilyChanged: family=" << static_cast<int>(family);
 }
 
 } // namespace webrtc
