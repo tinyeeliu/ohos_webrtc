@@ -19,6 +19,7 @@
 
 #include <ohcamera/camera_device.h>
 #include <ohcamera/capture_session.h>
+#include <ohcamera/preview_output.h>
 
 #include <algorithm>
 
@@ -343,6 +344,11 @@ bool CameraCapturer::StartCaptureSession(Camera_Profile* previewProfile)
         return false;
     }
 
+    // issue #200: 官方《适配相机旋转角度(C/C++)》规定, CommitConfig 之后、Start 之前
+    // 必须声明预览旋转角度, 否则相机服务对预览流采用默认的姿态跟随调整
+    // (锁定窗口方向时导致画面相对窗口倒置)。
+    ApplyPreviewRotation();
+
     if (!captureSession_.Start()) {
         RTC_LOG(LS_ERROR) << "Failed to start capture session";
         NotifyCapturedStart(false);
@@ -580,15 +586,58 @@ void CameraCapturer::UpdateRotation()
             (cameraDegrees - displayDegrees + kFullCircleDegrees) % kFullCircleDegrees);
     }
 
-    RTC_DLOG(LS_VERBOSE) << "UpdateRotation: camera=" << cameraDegrees << ", display=" << displayDegrees
-                         << ", finalRotation=" << finalRotation_ << ", i420Rotation=" << i420Rotation_
-                         << ", isFrontFacing=" << isCameraFrontFacing_;
+    RTC_LOG(LS_INFO) << "UpdateRotation: camera=" << cameraDegrees << ", display=" << displayDegrees
+                     << ", finalRotation=" << finalRotation_ << ", i420Rotation=" << i420Rotation_
+                     << ", isFrontFacing=" << isCameraFrontFacing_;
+}
+
+void CameraCapturer::ApplyPreviewRotation()
+{
+    if (previewOutput_.IsEmpty()) {
+        return;
+    }
+
+    constexpr int kDegreesPerRotationUnit = 90;
+    NativeDisplayManager_Rotation displayRotation = ohos::DisplayManager::GetInstance().GetDefaultDisplayRotation();
+    int displayDegrees = displayRotation * kDegreesPerRotationUnit;
+
+    Camera_ImageRotation previewRotation = IAMGE_ROTATION_0;
+    Camera_ErrorCode ret = OH_PreviewOutput_GetPreviewRotation(previewOutput_.Raw(), displayDegrees, &previewRotation);
+    if (ret != CAMERA_OK) {
+        RTC_LOG(LS_WARNING) << "OH_PreviewOutput_GetPreviewRotation failed, code=" << ret
+                            << ", fallback to legacy rotation formula";
+        UpdateRotation();
+        return;
+    }
+
+    // isDisplayLocked: Surface 在屏幕旋转时是否锁定方向。本库渲染 Surface(NativeImage)
+    // 不随窗口旋转联动, 按官方示例取 false。
+    bool isDisplayLocked = false;
+    ret = OH_PreviewOutput_SetPreviewRotation(previewOutput_.Raw(), previewRotation, isDisplayLocked);
+    if (ret == CAMERA_OK) {
+        // issue #200: 声明生效后, 相机服务输出的预览流已由系统按当前显示转正,
+        // 且不再做姿态跟随的像素级旋转(真机实测: 锁横屏 d=270 时前置
+        // previewRotation=180/后置=0, 渲染端旋转归零后画面与窗口方向一致),
+        // 渲染端不再叠加旋转, 前置仅保留镜像; 旧经验公式作废。
+        finalRotation_ = kVideoRotation_0;
+        i420Rotation_ = kVideoRotation_0;
+    } else {
+        RTC_LOG(LS_WARNING) << "OH_PreviewOutput_SetPreviewRotation failed, code=" << ret
+                            << ", fallback to legacy rotation formula";
+        UpdateRotation();
+    }
+    RTC_LOG(LS_INFO) << "ApplyPreviewRotation: displayDegrees=" << displayDegrees
+                     << ", previewRotation=" << static_cast<int>(previewRotation)
+                     << ", isDisplayLocked=" << isDisplayLocked << ", setResult=" << ret
+                     << ", finalRotation=" << finalRotation_;
 }
 
 void CameraCapturer::OnDisplayChange(uint64_t displayId)
 {
     (void)displayId;
-    UpdateRotation();
+    // issue #200: 官方要求窗口旋转时重新声明预览旋转角度;
+    // 声明失败时内部回退旧公式(UpdateRotation)。
+    ApplyPreviewRotation();
 }
 
 } // namespace webrtc
