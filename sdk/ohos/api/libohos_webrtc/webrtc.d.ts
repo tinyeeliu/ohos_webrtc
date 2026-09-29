@@ -810,6 +810,17 @@ export interface VideoSource extends MediaSource {
   switchCamera(): void;
   // 切换到指定 cameraId 的摄像头; cameraId 不存在时触发 oncameraswitcherror。
   switchCamera(cameraId: string): void;
+  /**
+   * OHOS 扩展：由应用的窗口适配层同步当前已生效的显示角度（0/90/180/270 度）。
+   * 设置后由宿主持续提供角度，默认显示器事件不会覆盖它。传 -1 恢复自动模式。
+   * 允许在开流前设置；不要传入尚未生效的目标角度。
+   * 该调用异步提交给采集线程，不负责设置窗口方向，也不代表拍照方向。
+   * 对外可见，需使用实现此方法的配套 native 库。
+   */
+  // Optional for legacy implementations; calling opts into enhanced native preview.
+  applyDisplayRotation?(displayRotationDegree: number): void;
+  /** Optional native extension: lifetime count of captured frames before adaptation/dropping. */
+  getCaptureFrameCount?(): number;
 }
 
 // https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
@@ -880,6 +891,17 @@ declare var MediaDevices: {
   new(): MediaDevices;
 };
 
+/** 视频帧尺寸或旋转角度变化事件。 */
+export interface FrameResolutionChangedEvent extends Event {
+  /** 新版 Native 固定发送 "frameResolutionChanged"；旧版可能未提供此字段。 */
+  readonly type: string;
+  /** 帧自身的像素尺寸；显示宽高还需结合 rotation 计算。 */
+  readonly width: number;
+  readonly height: number;
+  /** 帧旋转角度，单位为度：0、90、180 或 270。 */
+  readonly rotation: number;
+}
+
 export interface NativeVideoRenderer {
   readonly surfaceId?: string;
   readonly videoTrack?: MediaStreamTrack;
@@ -889,12 +911,26 @@ export interface NativeVideoRenderer {
   setMirror(mirrorHorizontally: boolean): void;
   setMirrorVertically(mirrorVertically: boolean): void;
   setScalingMode(mode: number): void;
+  /**
+   * OHOS 底层渲染扩展：init 后同步 Surface 的显示尺寸，单位为物理像素。
+   * 宽高应为正整数。使用 VideoRenderController 时由控制器负责调用；
+   * 直接使用 NativeVideoRenderer 的调用方需在 Surface 尺寸变化后同步。
+   * 对外可见，并非私有方法；需使用实现此方法的配套 native 库。
+   */
+  // Optional for legacy implementations; check availability before calling.
+  setSurfaceSize?(width: number, height: number): void;
   release(): void;
 
+  /**
+   * 视频帧尺寸或旋转角度变化时触发，事件内容见 FrameResolutionChangedEvent。
+   * 使用 VideoRenderController 时可通过 onFrameSizeChanged 获取旋转后的显示宽高。
+   */
   onFrameResolutionChanged: ((this: NativeVideoRenderer, ev: Event) => any) | null;
 }
 
 declare var NativeVideoRenderer: {
+  /** Version 1: camera preview/rotation/resizing. Version 2 also provides capture frame counts. */
+  readonly cameraPreviewApiVersion?: number;
   prototype: NativeVideoRenderer;
   new(): NativeVideoRenderer;
 };

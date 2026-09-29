@@ -25,7 +25,7 @@ OpenHarmony ohpm 环境配置等更多内容，请参考[如何安装 OpenHarmon
 
 ### 兼容性
 
-在下述版本验证通过：
+既有版本的验证环境：
 
 - DevEco Studio: NEXT Beta2(5.0.3.900)，SDK: API12 Release(5.0.0.71)，ROM：5.0.0.71
 
@@ -124,6 +124,60 @@ await peerConnection.setLocalDescription(offer);
 
 完整接口定义见 `api/libohos_webrtc/webrtc.d.ts`，完整说明请参阅[接口文档](./api/libwebrtc.md)。
 
+## 多设备相机预览
+
+当前本地增量提供 `CameraPreviewSession`，统一管理手机、折叠/三折叠设备及多显示器场景中的相机选择、前后台恢复、有限重试和宿主窗口方向同步。发布状态见 [CHANGELOG](./CHANGELOG.md#1.0.4)。
+
+### 接入与生命周期
+
+先申请相机权限，再创建会话；将同一个 `VideoRenderController` 挂到 XComponent。以下 `context`、`factory` 和 `hostWindow` 由宿主提供：
+
+```typescript
+import { CameraPreviewSession, VideoRenderController } from '@ohos/webrtc';
+
+const controller = new VideoRenderController();
+const session = new CameraPreviewSession(context, factory, controller, {
+  front: true,
+  allowFallback: true,
+  autoRecover: true,
+  maxRetries: 3
+});
+session.attachWindow(hostWindow);
+session.setActive(true);
+
+// 页面隐藏：session.setActive(false)
+// 页面恢复：session.setActive(true)
+// 切换后置偏好：session.setCameraPreference(false)
+// 显式重试：session.retry()
+// 页面销毁：session.release()
+```
+
+- 默认请求 1280×720、后置相机、AspectFit；尺寸为采集请求，显示布局应使用 `controller.onFrameSizeChanged` 返回的旋转后实际宽高。
+- 非空 `deviceId` 严格匹配，缺失时报告错误；未指定 ID 时按前后置偏好选择，`allowFallback` 决定是否允许回退到当前列表首项。
+- 库监听窗口显隐、显示器变化和相机/折叠事件。页面仍需通过 `setActive` 表达是否使用相机，并负责权限、布局和状态提示。
+- 恢复或切换镜头可能重建轨道。用于通话时，应通过 `onTrackChanged` 更新发送端绑定，并处理轨道为 `undefined` 的情况。
+- `frameStallTimeoutMs` 默认 0（关闭），可设置为 1000–60000 毫秒，通过采集帧计数检测停帧并触发有限重试；它不检测静止画面或下游渲染停滞。
+
+### 配套 Native 库
+
+| 能力版本 | 会话行为 |
+| --- | --- |
+| `NativeVideoRenderer.cameraPreviewApiVersion` 缺失或小于 1 | 报告 `incompatible`，不创建视频源、不自动重试 |
+| 1 | 支持增强预览、窗口角度同步及 Surface 尺寸适配；保持停帧监测关闭 |
+| 2 及以上 | 增加 `VideoSource.getCaptureFrameCount()`；可显式启用停帧监测 |
+
+当前 Native 源码声明能力版本 2。使用停帧监测需从当前源码整库重编并替换对应 ABI 的 `libohos_webrtc.so`；仅更新 ArkTS 文件不足以提供新增能力。显式请求监测但缺少帧计数方法时报告 `incompatible`。
+
+低层 `VideoSource` 接口继续可用。`applyDisplayRotation(0/90/180/270)` 启用宿主角度模式，`-1` 恢复默认显示器自动模式；`CameraPreviewSession` 负责同步角度，无需页面重复补偿。控制器负责 Surface 尺寸与等比渲染，Native 按运行时能力处理安装角和 HAL 旋转回退。
+
+### 示例与验证
+
+从示例首页进入“多设备相机实验室（A–F）”，检查断点布局、相机设备、预览比例、预览方向、悬停页面和本地/对端视频。操作方法及自动测试命令见[示例工程 README](./har_hap/README.md#多设备相机实验室af)。
+
+预览截图用于检查合成画面的方向与裁剪；本机回环用于检查编码/解码链路，F 项用于双端视频验证。仍需在目标设备上核对四向持握、前后置切换、折叠/展开、前后台恢复、显示器迁移及停帧恢复。当前增量不包含图像或扫码识别引擎。
+
+更多配置和接口约定见[多设备相机预览接入说明](./api/camera-preview-session.md)。
+
 ## 关于混淆
 
 有关代码混淆的详细信息，请查看[代码混淆简介](https://developer.huawei.com/consumer/cn/doc/harmonyos-guides/source-obfuscation)。
@@ -147,12 +201,15 @@ sdk/ohos/
 │   │   ├── log
 │   │   │   └── Logging.ets             # 日志工具
 │   │   └── xcomponent
+│   │       ├── CameraPreviewSession.ets  # 多设备相机预览与恢复
 │   │       └── VideoRenderController.ets # 视频渲染控制器（封装 NativeVideoRenderer）
 │   ├── libohos_webrtc
 │   │   ├── index.d.ts                  # 接口入口（re-export webrtc.d.ts）
 │   │   └── webrtc.d.ts                 # 完整接口类型定义
+│   ├── camera-preview-session.md       # 多设备预览接入说明
 │   └── libwebrtc.md                    # 接口说明文档
 ├── har_hap             # DevEco Studio 示例工程（含 HAR 模块和示例 HAP 模块）
+├── tests               # 相机会话、布局、通话与 Native 旋转策略测试
 └── src
     ├── node-addon-api  # 辅助 NAPI 开发的三方库（node-addon-api）
     └── ohos_webrtc     # C++ 实现源码

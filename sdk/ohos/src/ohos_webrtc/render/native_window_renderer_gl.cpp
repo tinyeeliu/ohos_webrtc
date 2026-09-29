@@ -15,6 +15,7 @@
 
 #include "native_window_renderer_gl.h"
 #include "egl_config_attributes.h"
+#include "preview_viewport.h"
 
 #include <GLES2/gl2ext.h>
 #include <GLES3/gl3.h>
@@ -147,6 +148,27 @@ void NativeWindowRendererGl::SetScalingMode(ScalingMode scaleMode)
     thread_->PostTask([this, scaleMode] { scaleMode_ = scaleMode; });
 }
 
+void NativeWindowRendererGl::SetSurfaceSize(int width, int height)
+{
+    if (width <= 0 || height <= 0) {
+        return;
+    }
+    thread_->PostTask([this, width, height] {
+        if (surfaceWidth_ == width && surfaceHeight_ == height) {
+            return;
+        }
+        // Keep EGL operations and buffer geometry updates on the rendering thread.
+        const int ret = OH_NativeWindow_NativeWindowHandleOpt(window_.Raw(), SET_BUFFER_GEOMETRY, width, height);
+        if (ret != 0) {
+            RTC_LOG(LS_ERROR) << "Failed to resize render buffer: " << ret;
+        }
+        surfaceWidth_ = width;
+        surfaceHeight_ = height;
+        RTC_LOG(LS_INFO) << "[PreviewResize] target=" << width << "x" << height
+                         << " egl=" << eglEnv_->GetSurfaceWidth() << "x" << eglEnv_->GetSurfaceHeight();
+    });
+}
+
 void NativeWindowRendererGl::OnFrame(const VideoFrame& frame)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " this=" << this;
@@ -197,31 +219,44 @@ void NativeWindowRendererGl::RenderFrame(const VideoFrame& frame)
         return;
     }
 
-    float drawnAspectRatio = 1.0f * viewportWidth / viewportHeight;
-    float frameAspectRatio = 1.0f * GetRotatedWidth(frame) / GetRotatedHeight(frame);
-    switch (scaleMode_) {
-        case ScalingMode::ASPECT_FILL: {
-            if (frameAspectRatio > drawnAspectRatio) {
-                viewportX = (viewportWidth - viewportHeight * frameAspectRatio) / 2.0f;
-                viewportWidth = viewportHeight * frameAspectRatio;
-            } else {
-                viewportY = (viewportHeight - viewportWidth / frameAspectRatio) / 2.0f;
-                viewportHeight = viewportWidth / frameAspectRatio;
+    if (surfaceWidth_ <= 0 || surfaceHeight_ <= 0) {
+        float drawnAspectRatio = 1.0f * viewportWidth / viewportHeight;
+        float frameAspectRatio = 1.0f * GetRotatedWidth(frame) / GetRotatedHeight(frame);
+        switch (scaleMode_) {
+            case ScalingMode::ASPECT_FILL: {
+                if (frameAspectRatio > drawnAspectRatio) {
+                    viewportX = (viewportWidth - viewportHeight * frameAspectRatio) / 2.0f;
+                    viewportWidth = viewportHeight * frameAspectRatio;
+                } else {
+                    viewportY = (viewportHeight - viewportWidth / frameAspectRatio) / 2.0f;
+                    viewportHeight = viewportWidth / frameAspectRatio;
+                }
+                break;
             }
-            break;
-        }
-        case ScalingMode::ASPECT_FIT: {
-            if (frameAspectRatio > drawnAspectRatio) {
-                viewportY = (viewportHeight - viewportWidth / frameAspectRatio) / 2.0f;
-                viewportHeight = viewportWidth / frameAspectRatio;
-            } else {
-                viewportX = (viewportWidth - viewportHeight * frameAspectRatio) / 2.0f;
-                viewportWidth = viewportHeight * frameAspectRatio;
+            case ScalingMode::ASPECT_FIT: {
+                if (frameAspectRatio > drawnAspectRatio) {
+                    viewportY = (viewportHeight - viewportWidth / frameAspectRatio) / 2.0f;
+                    viewportHeight = viewportWidth / frameAspectRatio;
+                } else {
+                    viewportX = (viewportWidth - viewportHeight * frameAspectRatio) / 2.0f;
+                    viewportWidth = viewportHeight * frameAspectRatio;
+                }
+                break;
             }
-            break;
+            default:
+                break;
         }
-        default:
-            break;
+    } else {
+        if (scaleMode_ == ScalingMode::ASPECT_FILL || scaleMode_ == ScalingMode::ASPECT_FIT) {
+            const auto viewport = ComputePreviewViewport(viewportWidth, viewportHeight,
+                surfaceWidth_ > 0 ? surfaceWidth_ : viewportWidth,
+                surfaceHeight_ > 0 ? surfaceHeight_ : viewportHeight,
+                GetRotatedWidth(frame), GetRotatedHeight(frame), scaleMode_ == ScalingMode::ASPECT_FILL);
+            viewportX = viewport.x;
+            viewportY = viewport.y;
+            viewportWidth = viewport.width;
+            viewportHeight = viewport.height;
+        }
     }
 
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);

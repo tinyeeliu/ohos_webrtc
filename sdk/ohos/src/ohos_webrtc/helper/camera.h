@@ -25,8 +25,11 @@
 #include <memory>
 #include <vector>
 #include <mutex>
+#include <dlfcn.h>
 
 #include <ohcamera/camera_manager.h>
+#include <ohcamera/camera_input.h>
+#include <ohcamera/preview_output.h>
 
 namespace ohos {
 
@@ -129,6 +132,9 @@ public:
 
     bool Close();
 
+    // 折叠屏可变安装角时启用物理镜头角，避免系统裁切导致 FOV 损失。
+    void UsePhysicalCameraOrientationIfVariable();
+
 private:
     using PointerWrapper::PointerWrapper;
 };
@@ -164,6 +170,9 @@ public:
 
     void Start();
     void Stop();
+
+    bool GetPreviewRotation(int displayRotationDegrees, Camera_ImageRotation* imageRotation) const;
+    bool SetPreviewRotation(Camera_ImageRotation previewRotation, bool isDisplayLocked);
 
     void AddObserver(Observer* observer);
     void RemoveObserver(Observer* observer);
@@ -451,6 +460,33 @@ inline bool CameraInput::Close()
     return true;
 }
 
+inline void CameraInput::UsePhysicalCameraOrientationIfVariable()
+{
+    if (IsEmpty()) {
+        return;
+    }
+    // Resolve optional API 22 symbols at runtime. Older SDKs/devices retain the
+    // default camera behavior without a compile-time switch or hard dependency.
+    using IsVariable = Camera_ErrorCode (*)(Camera_Input*, bool*);
+    using UsePhysical = Camera_ErrorCode (*)(Camera_Input*, bool);
+    static const auto isOrientationVariable = reinterpret_cast<IsVariable>(
+        dlsym(RTLD_DEFAULT, "OH_CameraInput_IsPhysicalCameraOrientationVariable"));
+    static const auto usePhysicalOrientation = reinterpret_cast<UsePhysical>(
+        dlsym(RTLD_DEFAULT, "OH_CameraInput_UsePhysicalCameraOrientation"));
+    if (!isOrientationVariable || !usePhysicalOrientation) {
+        return;
+    }
+    bool isVariable = false;
+    Camera_ErrorCode ret = isOrientationVariable(Raw(), &isVariable);
+    if (ret != CAMERA_OK || !isVariable) {
+        return;
+    }
+    ret = usePhysicalOrientation(Raw(), true);
+    if (ret != CAMERA_OK) {
+        NativeError::Create(ret, "OH_Camera", "Failed to use physical camera orientation").PrintToLog();
+    }
+}
+
 inline CameraPreviewOutput CameraPreviewOutput::TakeOwnership(Camera_PreviewOutput* output)
 {
     NATIVE_THROW_IF_FAILED(output != nullptr, -1, "OH_Camera", "Null argument", CameraPreviewOutput());
@@ -471,6 +507,24 @@ inline void CameraPreviewOutput::Stop()
 {
     Camera_ErrorCode ret = OH_PreviewOutput_Stop(Raw());
     NATIVE_THROW_IF_FAILED_VOID(ret == CAMERA_OK, ret, "OH_Camera", "Failed to stop camera preview output");
+}
+
+inline bool CameraPreviewOutput::GetPreviewRotation(int displayRotationDegrees, Camera_ImageRotation* imageRotation) const
+{
+    if (IsEmpty() || imageRotation == nullptr) {
+        return false;
+    }
+    Camera_ErrorCode ret = OH_PreviewOutput_GetPreviewRotation(Raw(), displayRotationDegrees, imageRotation);
+    return ret == CAMERA_OK;
+}
+
+inline bool CameraPreviewOutput::SetPreviewRotation(Camera_ImageRotation previewRotation, bool isDisplayLocked)
+{
+    if (IsEmpty()) {
+        return false;
+    }
+    Camera_ErrorCode ret = OH_PreviewOutput_SetPreviewRotation(Raw(), previewRotation, isDisplayLocked);
+    return ret == CAMERA_OK;
 }
 
 inline void CameraPreviewOutput::RegisterCallback(PreviewOutput_Callbacks* callback)
