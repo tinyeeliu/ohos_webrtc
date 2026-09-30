@@ -65,6 +65,9 @@ public:
 
     virtual void SwitchCamera() {}
     virtual void SwitchCamera(const std::string& cameraId) { (void)cameraId; }
+
+    // 宿主提供当前已生效的显示角度；-1 恢复默认显示器自动模式。
+    virtual void ApplyDisplayRotation(int displayDegrees) { (void)displayDegrees; }
 };
 
 } // namespace webrtc

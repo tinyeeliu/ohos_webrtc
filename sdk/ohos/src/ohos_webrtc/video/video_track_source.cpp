@@ -467,6 +467,16 @@ void OhosVideoTrackSource::SwitchCamera(const std::string& cameraId)
     thread_->PostTask([capturer = capturer_, cameraId] { capturer->SwitchCamera(cameraId); });
 }
 
+void OhosVideoTrackSource::ApplyDisplayRotation(int displayDegrees)
+{
+    if (is_destroying_.load(std::memory_order_acquire)) {
+        RTC_LOG(LS_WARNING) << "ApplyDisplayRotation: source destroying, skip";
+        return;
+    }
+    RTC_LOG(LS_VERBOSE) << __FUNCTION__ << ": displayDegrees=" << displayDegrees;
+    thread_->PostTask([capturer = capturer_, displayDegrees] { capturer->ApplyDisplayRotation(displayDegrees); });
+}
+
 void OhosVideoTrackSource::OnCameraSwitchDone(const std::string& newCameraId)
 {
     if (is_destroying_.load(std::memory_order_acquire)) {
@@ -503,6 +513,9 @@ void OhosVideoTrackSource::OnCameraSwitchError(const std::string& errorMessage)
 void OhosVideoTrackSource::OnFrameCaptured(
     rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation)
 {
+    if (buffer && buffer->width() > 0 && buffer->height() > 0) {
+        captureFrameCount_.fetch_add(1, std::memory_order_relaxed);
+    }
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " timestampUs=" << timestampUs << ", rotation=" << rotation;
     auto alignedTimestampUs = timestampAligner_.TranslateTimestamp(timestampUs, rtc::TimeMicros());
     RTC_DLOG(LS_VERBOSE) << "alignedTimestampUs=" << alignedTimestampUs;

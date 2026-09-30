@@ -39,6 +39,7 @@ public:
     NAPI_METHOD_NAME_DECLARE(SetMirror, setMirror);
     NAPI_METHOD_NAME_DECLARE(SetMirrorVertically, setMirrorVertically);
     NAPI_METHOD_NAME_DECLARE(SetScalingMode, setScalingMode);
+    NAPI_METHOD_NAME_DECLARE(SetSurfaceSize, setSurfaceSize);
     NAPI_METHOD_NAME_DECLARE(Release, release);
     NAPI_METHOD_NAME_DECLARE(ToJson, toJSON);
 
@@ -67,6 +68,7 @@ protected:
     Napi::Value SetMirror(const Napi::CallbackInfo& info);
     Napi::Value SetMirrorVertically(const Napi::CallbackInfo& info);
     Napi::Value SetScalingMode(const Napi::CallbackInfo& info);
+    Napi::Value SetSurfaceSize(const Napi::CallbackInfo& info);
     Napi::Value ToJson(const Napi::CallbackInfo& info);
     bool GetEventHandler(const std::string& type, Napi::ThreadSafeFunction& tsfn);
 
@@ -81,6 +83,7 @@ private:
 
     // weak reference
     Napi::ObjectReference jsTrackRef_;
+    bool surfaceSizeConfigured_{false};
 
     std::unique_ptr<adapter::NativeWindowRenderer> renderer_;
 
