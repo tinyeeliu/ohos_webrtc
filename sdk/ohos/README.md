@@ -10,7 +10,6 @@ This directory provides ArkTS interface bindings for WebRTC, and adapts the vide
 
 ![architecture](./img/webrtc-arch.png)
 
-
 ## Installation
 
 ```bash
@@ -25,7 +24,7 @@ To integrate `libwebrtc.a` directly in an NDK C++ project, see [Integrating the 
 
 ### Compatibility
 
-Verified on the following versions:
+Earlier releases were verified in the following environment:
 
 - DevEco Studio: NEXT Beta2(5.0.3.900), SDK: API12 Release(5.0.0.71), ROM: 5.0.0.71
 
@@ -124,6 +123,58 @@ The implementation code is in the `src/ohos_webrtc` directory. NAPI interface bi
 
 Full type definitions are in `api/libohos_webrtc/webrtc.d.ts`. For detailed documentation, see the [API Documentation](./api/libwebrtc.md).
 
+## Multi-device Camera Preview
+
+The current local changes add `CameraPreviewSession` to manage camera selection, foreground/background recovery, bounded retries, and host-window orientation for phones, foldable/trifold devices, and multiple displays. See the changelog for release status.
+
+### Integration and Lifecycle
+
+Grant camera permission first and attach the same `VideoRenderController` to your XComponent. The host supplies `context`, `factory`, and `hostWindow` below:
+
+```typescript
+import { CameraPreviewSession, VideoRenderController } from '@ohos/webrtc';
+
+const controller = new VideoRenderController();
+const session = new CameraPreviewSession(context, factory, controller, {
+  front: true,
+  allowFallback: true,
+  autoRecover: true,
+  maxRetries: 3
+});
+session.attachWindow(hostWindow);
+session.setActive(true);
+
+// Page hidden: session.setActive(false)
+// Page visible again: session.setActive(true)
+// Prefer the rear camera: session.setCameraPreference(false)
+// Retry explicitly: session.retry()
+// Page destroyed: session.release()
+```
+
+- Defaults are a 1280×720 capture request, rear camera, and AspectFit. Size is a capture request; use `controller.onFrameSizeChanged` for the actual oriented frame dimensions when laying out the preview.
+- A nonempty `deviceId` is strict: a missing device reports an error. Without an ID, selection follows the front/rear preference; `allowFallback` permits falling back to the first currently available camera.
+- The library observes window visibility, display changes, and camera/fold events. The page still owns permissions, layout, status messages, and its capture activation request through `setActive`.
+- Recovery or camera switching can replace the track. For calls, update the sender binding through `onTrackChanged`, including the case where the track is `undefined`.
+- `frameStallTimeoutMs` defaults to 0 (disabled). Set 1000–60000 milliseconds to detect stalled capture through frame counts and trigger bounded recovery. It does not detect static image content or downstream rendering stalls.
+
+### Matching Native Library
+
+| Capability version | Session behavior |
+| --- | --- |
+| Missing `NativeVideoRenderer.cameraPreviewApiVersion`, or below 1 | Reports `incompatible`; does not create a video source or retry automatically |
+| 1 | Enhanced preview, host-window rotation, and Surface sizing; keep frame-stall monitoring disabled |
+| 2 or later | Adds `VideoSource.getCaptureFrameCount()` for explicitly enabled frame-stall monitoring |
+
+The current Native source declares version 2. To use frame-stall monitoring, rebuild the entire Native library from the current source and replace `libohos_webrtc.so` for the target ABI. Updating ArkTS files alone does not provide this capability. Explicitly requesting monitoring without the frame-count method reports `incompatible`.
+
+The low-level `VideoSource` API remains available. `applyDisplayRotation(0/90/180/270)` enables host-supplied rotation; `-1` restores automatic default-display rotation. `CameraPreviewSession` synchronizes the angle. The controller handles Surface sizing and aspect-preserving rendering, while Native probes installation-angle support and handles HAL rotation fallback.
+
+### Demo and Validation
+
+Open “多设备相机实验室（A–F）” from the demo home page to inspect responsive layout, camera devices, preview ratios, preview orientation, hover layout, and local/remote video. See the [demo guide](./har_hap/README.md#多设备相机实验室af) for steps and test commands.
+
+Preview snapshots check composited orientation and cropping; local loopback checks the encode/decode path, and section F supports two-peer video checks. Validate all four holding orientations, front/rear switching, folding/unfolding, foreground/background recovery, display migration, and capture-stall recovery on target devices. These changes do not include an image or barcode recognition engine.
+
 ## Code Obfuscation
 
 For details on code obfuscation, see [Code Obfuscation](https://developer.huawei.com/consumer/cn/doc/harmonyos-guides/source-obfuscation).
@@ -145,12 +196,14 @@ sdk/ohos/
 │   │   ├── log
 │   │   │   └── Logging.ets             # Logging utility
 │   │   └── xcomponent
+│   │       ├── CameraPreviewSession.ets  # Multi-device preview and recovery
 │   │       └── VideoRenderController.ets # Video render controller (wraps NativeVideoRenderer)
 │   ├── libohos_webrtc
 │   │   ├── index.d.ts                  # Entry point (re-exports webrtc.d.ts)
 │   │   └── webrtc.d.ts                 # Full type definitions
 │   └── libwebrtc.md                    # API documentation
 ├── har_hap             # DevEco Studio demo project (HAR module + demo HAP module)
+├── tests               # Session, layout, call, and native rotation policy tests
 └── src
     ├── node-addon-api  # Third-party library for NAPI development
     └── ohos_webrtc     # C++ implementation
