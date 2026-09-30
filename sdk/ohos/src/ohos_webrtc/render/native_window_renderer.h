@@ -47,6 +47,7 @@ public:
     virtual void SetMirrorHorizontally(bool mirror) {}
     virtual void SetMirrorVertically(bool mirror) {}
     virtual void SetScalingMode(ScalingMode scaleMode) {}
+    virtual void SetSurfaceSize(int width, int height) {}
 
     void SetFrameSizeChangeCallback(FrameSizeChangeCallback callback)
     {
