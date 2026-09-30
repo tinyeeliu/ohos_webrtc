@@ -86,6 +86,29 @@ NativeWindowRendererRaster::~NativeWindowRendererRaster()
     thread_->Stop();
 }
 
+void NativeWindowRendererRaster::SetMirrorHorizontally(bool mirror)
+{
+    thread_->PostTask([this, mirror] { mirrorHorizontally_ = mirror; });
+}
+
+void NativeWindowRendererRaster::SetMirrorVertically(bool mirror)
+{
+    thread_->PostTask([this, mirror] { mirrorVertically_ = mirror; });
+}
+
+void NativeWindowRendererRaster::SetScalingMode(ScalingMode mode)
+{
+    thread_->PostTask([this, mode] { scaleMode_ = mode; });
+}
+
+void NativeWindowRendererRaster::SetSurfaceSize(int width, int height)
+{
+    if (width <= 0 || height <= 0) { return; }
+    // Raster buffers retain frame dimensions. The compositor scales them into
+    // the actual Surface bounds, including subsequent window resizes.
+    thread_->PostTask([this] { previewAdaptation_ = true; });
+}
+
 void NativeWindowRendererRaster::OnFrame(const VideoFrame& frame)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " this=" << this;
@@ -123,6 +146,31 @@ void NativeWindowRendererRaster::RenderFrame(const VideoFrame& frame)
     rtc::scoped_refptr<I420BufferInterface> buffer = i420;
     if (frame.rotation() != kVideoRotation_0) {
         buffer = I420Buffer::Rotate(*i420, frame.rotation());
+    }
+
+    if (previewAdaptation_) {
+        const auto mode = scaleMode_ == ScalingMode::ASPECT_FIT ? OH_SCALING_MODE_SCALE_FIT_V2 :
+            scaleMode_ == ScalingMode::ASPECT_FILL ? OH_SCALING_MODE_SCALE_CROP_V2 :
+            OH_SCALING_MODE_SCALE_TO_WINDOW_V2;
+        if (OH_NativeWindow_NativeWindowSetScalingModeV2(window_.Raw(), mode) != 0) {
+            RTC_LOG(LS_ERROR) << "Failed to apply raster preview scaling mode";
+            return;
+        }
+        if (mirrorHorizontally_ || mirrorVertically_) {
+            auto mirrored = I420Buffer::Create(buffer->width(), buffer->height());
+            const int sourceHeight = mirrorVertically_ ? -buffer->height() : buffer->height();
+            const int result = mirrorHorizontally_ ? libyuv::I420Mirror(
+                    buffer->DataY(), buffer->StrideY(), buffer->DataU(), buffer->StrideU(),
+                    buffer->DataV(), buffer->StrideV(), mirrored->MutableDataY(), mirrored->StrideY(),
+                    mirrored->MutableDataU(), mirrored->StrideU(), mirrored->MutableDataV(), mirrored->StrideV(),
+                    buffer->width(), sourceHeight) : libyuv::I420Copy(
+                    buffer->DataY(), buffer->StrideY(), buffer->DataU(), buffer->StrideU(),
+                    buffer->DataV(), buffer->StrideV(), mirrored->MutableDataY(), mirrored->StrideY(),
+                    mirrored->MutableDataU(), mirrored->StrideU(), mirrored->MutableDataV(), mirrored->StrideV(),
+                    buffer->width(), sourceHeight);
+            if (result != 0) { return; }
+            buffer = mirrored;
+        }
     }
 
     RenderByteBuffer(buffer);

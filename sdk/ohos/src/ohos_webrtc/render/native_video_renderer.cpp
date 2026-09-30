@@ -24,6 +24,8 @@
 
 #include <cerrno>
 #include <cstdlib>
+#include <cmath>
+#include <limits>
 
 namespace webrtc {
 
@@ -32,6 +34,9 @@ using namespace adapter;
 using namespace Napi;
 
 const char kAttributeNameOnFrameResolutionChanged[] = "onFrameResolutionChanged";
+constexpr int kCameraPreviewApiVersion = 2;
+constexpr size_t kSurfaceSizeArgumentCount = 2;
+
 const char kEventFrameResolutionChanged[] = "frameResolutionChanged";
 
 thread_local FunctionReference NapiNativeVideoRenderer::constructor_;
@@ -48,12 +53,14 @@ void NapiNativeVideoRenderer::Init(Napi::Env env, Napi::Object exports)
             InstanceMethod<&NapiNativeVideoRenderer::SetMirror>(kMethodNameSetMirror),
             InstanceMethod<&NapiNativeVideoRenderer::SetMirrorVertically>(kMethodNameSetMirrorVertically),
             InstanceMethod<&NapiNativeVideoRenderer::SetScalingMode>(kMethodNameSetScalingMode),
+            InstanceMethod<&NapiNativeVideoRenderer::SetSurfaceSize>(kMethodNameSetSurfaceSize),
             InstanceMethod<&NapiNativeVideoRenderer::Init>(kMethodNameInit),
             InstanceMethod<&NapiNativeVideoRenderer::Release>(kMethodNameRelease),
             InstanceMethod<&NapiNativeVideoRenderer::ToJson>(kMethodNameToJson),
             InstanceAccessor<&NapiNativeVideoRenderer::GetEventHandler, &NapiNativeVideoRenderer::SetEventHandler>(
                 kAttributeNameOnFrameResolutionChanged, napi_default, (void*)kEventFrameResolutionChanged),
         });
+    func.Set("cameraPreviewApiVersion", Number::New(env, kCameraPreviewApiVersion));
     exports.Set(kClassName, func);
 
     constructor_ = Persistent(func);
@@ -129,6 +136,12 @@ Napi::Value NapiNativeVideoRenderer::SetVideoTrack(const Napi::CallbackInfo& inf
         NAPI_THROW(Error::New(info.Env(), "Invalid argument"), Value());
     }
 
+    // Resizing a Surface must not detach the same track. Removing the last
+    // sink stops capture, so a redundant binding otherwise restarts the camera.
+    if (surfaceSizeConfigured_ && !jsTrackRef_.IsEmpty() && jsTrackRef_.Value().StrictEquals(jsTrack)) {
+        return info.Env().Undefined();
+    }
+
     RemoveSink();
     jsTrackRef_ = Weak(jsTrack);
     AddSink();
@@ -190,6 +203,7 @@ Napi::Value NapiNativeVideoRenderer::Init(const Napi::CallbackInfo& info)
             napi_status status =
                 tsfn.BlockingCall([context, width, height, rotation](Napi::Env env, Napi::Function jsCallback) {
                     auto jsEvent = Object::New(env);
+                    jsEvent.Set("type", String::New(env, kEventFrameResolutionChanged));
                     jsEvent.Set("width", Number::New(env, width));
                     jsEvent.Set("height", Number::New(env, height));
                     jsEvent.Set("rotation", Number::New(env, rotation));
@@ -316,6 +330,7 @@ Napi::Value NapiNativeVideoRenderer::Release(const Napi::CallbackInfo& info)
 
     surfaceId_.reset();
     renderer_.reset();
+    surfaceSizeConfigured_ = false;
     jsTrackRef_.Reset();
 
     return info.Env().Undefined();
@@ -376,6 +391,24 @@ Napi::Value NapiNativeVideoRenderer::SetScalingMode(const Napi::CallbackInfo& in
         renderer_->SetScalingMode(static_cast<NativeWindowRenderer::ScalingMode>(mode));
     }
 
+    return info.Env().Undefined();
+}
+
+Napi::Value NapiNativeVideoRenderer::SetSurfaceSize(const Napi::CallbackInfo& info)
+{
+    if (info.Length() < kSurfaceSizeArgumentCount || !info[0].IsNumber() || !info[1].IsNumber()) {
+        NAPI_THROW(Error::New(info.Env(), "Expected surface width and height in pixels"), info.Env().Undefined());
+    }
+    const double width = info[0].As<Number>().DoubleValue();
+    const double height = info[1].As<Number>().DoubleValue();
+    if (!std::isfinite(width) || !std::isfinite(height) || width < 1 || height < 1 ||
+        width > std::numeric_limits<int>::max() || height > std::numeric_limits<int>::max()) {
+        NAPI_THROW(Error::New(info.Env(), "Invalid surface dimensions"), info.Env().Undefined());
+    }
+    if (renderer_) {
+        surfaceSizeConfigured_ = true;
+        renderer_->SetSurfaceSize(static_cast<int>(width), static_cast<int>(height));
+    }
     return info.Env().Undefined();
 }
 
