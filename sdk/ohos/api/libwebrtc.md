@@ -1,5 +1,32 @@
 # ohos_webrtc
 
+## 多设备预览扩展的使用边界
+
+`libohos_webrtc/index.d.ts` 通过 `export * from './webrtc'` 导出声明；原生模块也注册了对应方法。
+因此，下面两个扩展方法均对 SDK 使用方可见，不能因为当前只有 SDK 控制器调用就视为私有 API。
+以下调用方结论来自本仓库的生产代码，不代表仓库外的应用没有直接使用这些接口。
+
+| 接口 | 本仓库中的调用方 | 使用边界与修改原因 |
+| --- | --- | --- |
+| `VideoSource.applyDisplayRotation(degrees)` | 示例应用 `MultiDeviceRtcLabPage` 的窗口适配逻辑 | 对外的 OHOS 扩展。同步所在窗口当前已生效的显示角度，让采集层更新预览旋转。 |
+| `NativeVideoRenderer.setSurfaceSize(width, height)` | SDK `VideoRenderController` | 对外可见的底层渲染扩展。控制器用它同步 Surface 显示尺寸；直接管理渲染器的应用也可以调用。 |
+| `NativeVideoRenderer.onFrameResolutionChanged` | 原生渲染器触发，SDK 控制器订阅；另有测试注册 | 原有公开事件，不是新增方法。保留 `(ev: Event) => any` 签名，帧字段由控制器内部解析。 |
+| `VideoRenderController.onFrameSizeChanged` | 示例应用订阅 | 控制器对应用提供的通知，返回旋转后的显示帧宽高，用于等比布局。 |
+
+调用链：应用同步显示角度 → VideoSource 原生绑定 → 采集线程 → CameraCapturer；
+Surface 生命周期/页面尺寸变化 → VideoRenderController → NativeVideoRenderer → 原生渲染线程。
+反向通知链：原生帧尺寸变化 → 原有 Event 回调 → 控制器内部解析 → `onFrameSizeChanged`。
+C++ 层的转发与实现属于内部调用，但 ArkTS 可见的绑定入口不是内部私有接口。
+
+原先新增的公开 `FrameResolutionChangedEvent` 已移除，恢复既有回调声明。
+控制器使用未导出的 `FrameResolutionPayload` 读取并校验原生已有的 `width`、`height`、`rotation` 字段。
+此调整不改变原生事件载荷，也不要求现有订阅者修改回调参数类型。
+
+两个扩展方法需搭配实现它们的 `.so`。更新声明不会使旧二进制自动支持新方法。
+控制器对缺少 `setSurfaceSize` 的旧库会记录错误并跳过调用，不代表旧库具备相同的尺寸适配能力。
+这两个方法仍是接口中的必需成员，手工实现这些接口的适配层或测试替身也需要补齐；不能把这些新增概括为对所有接入方式完全兼容。
+本次只澄清边界并恢复事件原签名，没有隐藏或删除已经暴露的两个扩展方法。
+
 ## RTCErrorDetailType
 
 表示 WebRTC 中可能出现的错误详细类型。
@@ -2194,6 +2221,15 @@ setVolume(volume: number);
 | capturerstarted | VideoCapturerStartedEvent | 该视频源开始采集（成功或失败）时触发 |
 | capturerstopped | Event                     | 视频源停止采集时触发         |
 
+### applyDisplayRotation（OHOS 扩展）
+
+`applyDisplayRotation(displayRotationDegree: number): void`
+
+在开流、旋转或折叠状态稳定后，同步应用所在窗口当前显示屏的角度，单位为度，使用 0、90、180、270。
+不要直接传 `Display.rotation` 的枚举数值，应转换为角度；不要提前提交尚未生效的目标角度。
+方法向采集线程异步提交更新，返回时不保证新方向的帧已经到达。它不设置窗口旋转策略，也不设置照片方向。
+原生采集器已有显示变化监听；此入口用于应用明确同步其窗口所对应的显示状态，当前不是每个普通接入方都必须手工调用的步骤。
+
 ## VideoTrack
 
 继承自 MediaStreamTrack，表示一个视频轨道，配合VideoRenderController使用可实现视频的渲染。
@@ -3014,6 +3050,14 @@ let mediaStream = await mediaDevices.getDisplayMedia({video: {width: 720, height
 ## NativeVideoRenderer
 
 用于在对应窗口中渲染本地或远端的视频流。
+
+### setSurfaceSize（OHOS 扩展）
+
+`setSurfaceSize(width: number, height: number): void`
+
+在 `init` 后传入 Surface 显示区域的实际宽高（正整数，单位 px，不是 vp，也不是相机采集分辨率）。
+原生渲染器在渲染线程更新 buffer 几何和用于等比渲染的显示尺寸；它不替代 ArkUI 组件布局。
+使用 `VideoRenderController` 时由控制器调用，应用无需重复调用底层方法；直接使用 `NativeVideoRenderer` 时由调用方负责同步尺寸。
 
 ### 属性
 

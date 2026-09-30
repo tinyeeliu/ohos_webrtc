@@ -43,6 +43,7 @@ public:
     void SetMirrorHorizontally(bool mirror) override;
     void SetMirrorVertically(bool mirror) override;
     void SetScalingMode(ScalingMode scaleMode) override;
+    void SetSurfaceSize(int width, int height) override;
 
 protected:
     NativeWindowRendererGl(
@@ -57,6 +58,8 @@ protected:
 private:
     int32_t width_{};
     int32_t height_{};
+    int surfaceWidth_ = 0;
+    int surfaceHeight_ = 0;
     int32_t format_{};
     int32_t transform_{};
     uint64_t usage_{};

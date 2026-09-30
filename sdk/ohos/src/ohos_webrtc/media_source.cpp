@@ -159,6 +159,8 @@ void NapiVideoSource::Init(Napi::Env env, Napi::Object exports)
             InstanceMethod<&NapiVideoSource::StartCapture>(kMethodNameStartCapture),
             InstanceMethod<&NapiVideoSource::StopCapture>(kMethodNameStopCapture),
             InstanceMethod<&NapiVideoSource::SwitchCamera>(kMethodNameSwitchCamera),
+            InstanceMethod<&NapiVideoSource::ApplyDisplayRotation>(kMethodNameApplyDisplayRotation),
+            InstanceMethod<&NapiVideoSource::GetCaptureFrameCount>(kMethodNameGetCaptureFrameCount),
             InstanceMethod<&NapiVideoSource::ToJson>(kMethodNameToJson),
         });
     exports.Set(kClassName, func);
@@ -374,6 +376,38 @@ Napi::Value NapiVideoSource::SwitchCamera(const Napi::CallbackInfo& info)
     }
 
     return info.Env().Undefined();
+}
+
+Napi::Value NapiVideoSource::ApplyDisplayRotation(const Napi::CallbackInfo& info)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    if (!source_) {
+        NAPI_THROW(Error::New(info.Env(), "Illegal state"), info.Env().Undefined());
+    }
+    if (info.Length() < 1 || !info[0].IsNumber()) {
+        NAPI_THROW(TypeError::New(info.Env(), "Invalid argument"), info.Env().Undefined());
+    }
+    const double degrees = info[0].As<Number>().DoubleValue();
+    constexpr int kAutomaticRotation = -1;
+    constexpr int kQuarterTurn = 90;
+    constexpr int kHalfTurn = 180;
+    constexpr int kThreeQuarterTurn = 270;
+    if (degrees != kAutomaticRotation && degrees != 0 && degrees != kQuarterTurn &&
+        degrees != kHalfTurn && degrees != kThreeQuarterTurn) {
+        NAPI_THROW(TypeError::New(info.Env(), "Expected -1, 0, 90, 180 or 270 degrees"), info.Env().Undefined());
+    }
+    int displayDegrees = static_cast<int>(degrees);
+    source_->ApplyDisplayRotation(displayDegrees);
+    return info.Env().Undefined();
+}
+
+Napi::Value NapiVideoSource::GetCaptureFrameCount(const Napi::CallbackInfo& info)
+{
+    if (!source_) {
+        NAPI_THROW(Error::New(info.Env(), "Illegal state"), info.Env().Undefined());
+    }
+    return Number::New(info.Env(), static_cast<double>(source_->GetCaptureFrameCount()));
 }
 
 void NapiVideoSource::OnCameraSwitchDone(const std::string& newCameraId)
