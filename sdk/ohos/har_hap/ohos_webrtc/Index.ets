@@ -19,3 +19,5 @@ export default webrtc;
 
 export { Logging, LoggingSeverity } from './src/main/ets/log/Logging';
 export { VideoRenderController, ScalingMode } from './src/main/ets/xcomponent/VideoRenderController';
+
+export { CameraPreviewSession, CameraPreviewOptions, CameraPreviewStatus } from './src/main/ets/xcomponent/CameraPreviewSession';
