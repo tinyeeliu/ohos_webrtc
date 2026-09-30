@@ -34,6 +34,11 @@ public:
     explicit NativeWindowRendererRaster(ohos::NativeWindow window);
     ~NativeWindowRendererRaster() override;
 
+    void SetMirrorHorizontally(bool mirror) override;
+    void SetMirrorVertically(bool mirror) override;
+    void SetScalingMode(ScalingMode mode) override;
+    void SetSurfaceSize(int width, int height) override;
+
 protected:
     void OnFrame(const VideoFrame& frame) override;
     void OnDiscardedFrame() override;
@@ -50,6 +55,10 @@ private:
     uint64_t usage_{};
 
     std::unique_ptr<rtc::Thread> thread_;
+    bool previewAdaptation_ = false;
+    bool mirrorHorizontally_ = false;
+    bool mirrorVertically_ = false;
+    ScalingMode scaleMode_ = ScalingMode::FILL;
 
     int lastFrameWidth_ = 0;
     int lastFrameHeight_ = 0;

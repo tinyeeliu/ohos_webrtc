@@ -221,4 +221,31 @@ void CameraManager::OnCameraManagerStatusCallback(Camera_StatusInfo* status)
     }
 }
 
+void CameraInput::UsePhysicalCameraOrientationIfVariable()
+{
+    if (IsEmpty()) {
+        return;
+    }
+    // Resolve optional API 22 symbols at runtime. Older SDKs/devices retain the
+    // default camera behavior without a compile-time switch or hard dependency.
+    using IsVariable = Camera_ErrorCode (*)(Camera_Input*, bool*);
+    using UsePhysical = Camera_ErrorCode (*)(Camera_Input*, bool);
+    static const auto isOrientationVariable = reinterpret_cast<IsVariable>(
+        dlsym(RTLD_DEFAULT, "OH_CameraInput_IsPhysicalCameraOrientationVariable"));
+    static const auto usePhysicalOrientation = reinterpret_cast<UsePhysical>(
+        dlsym(RTLD_DEFAULT, "OH_CameraInput_UsePhysicalCameraOrientation"));
+    if (!isOrientationVariable || !usePhysicalOrientation) {
+        return;
+    }
+    bool isVariable = false;
+    Camera_ErrorCode ret = isOrientationVariable(Raw(), &isVariable);
+    if (ret != CAMERA_OK || !isVariable) {
+        return;
+    }
+    ret = usePhysicalOrientation(Raw(), true);
+    if (ret != CAMERA_OK) {
+        NativeError::Create(ret, "OH_Camera", "Failed to use physical camera orientation").PrintToLog();
+    }
+}
+
 } // namespace ohos
