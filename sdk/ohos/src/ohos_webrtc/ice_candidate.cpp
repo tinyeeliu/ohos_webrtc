@@ -37,6 +37,62 @@ const char kEnumIceCandidateRtcp[] = "rtcp";
 
 thread_local FunctionReference NapiIceCandidate::constructor_;
 
+static void SetStringIfNotEmpty(Napi::Env env, Napi::Object& obj, const char* name, const std::string& value)
+{
+    if (!value.empty()) {
+        obj.Set(name, String::New(env, value));
+    }
+}
+
+static void SetPortIfPositive(Napi::Env env, Napi::Object& obj, const char* name, int port)
+{
+    if (port > 0) {
+        obj.Set(name, Number::New(env, port));
+    }
+}
+
+static void SetComponentIfValid(Napi::Env env, Napi::Object& obj, int component)
+{
+    if (component == kComponentIdRtp) {
+        obj.Set("component", String::New(env, kEnumIceCandidateRtp));
+    }
+    if (component == kComponentIdRtcp) {
+        obj.Set("component", String::New(env, kEnumIceCandidateRtcp));
+    }
+}
+
+static void SetTypeIfValid(Napi::Env env, Napi::Object& obj, const std::string& type)
+{
+    if (type == cricket::LOCAL_PORT_TYPE) {
+        obj.Set("type", String::New(env, kEnumIceCandidateTypeHost));
+    } else if (type == cricket::STUN_PORT_TYPE) {
+        obj.Set("type", String::New(env, kEnumIceCandidateTypeSrflx));
+    } else if (type == cricket::RELAY_PORT_TYPE) {
+        obj.Set("type", String::New(env, kEnumIceCandidateTypeRelay));
+    } else if (type == cricket::PRFLX_PORT_TYPE) {
+        obj.Set("type", String::New(env, kEnumIceCandidateTypePrflx));
+    }
+}
+
+static void SetCandidateToJson(Napi::Env env, Napi::Object& obj)
+{
+    obj.Set("toJSON", Function::New(env, [](const CallbackInfo& info) {
+                auto from = info.This().As<Object>();
+                auto to = Object::New(info.Env());
+                RTC_LOG(LS_VERBOSE) << __FUNCTION__ << " toJson";
+
+                to.Set("candidate", from.Get("candidate"));
+                if (from.Has("sdpMLineIndex"))
+                    to.Set("sdpMLineIndex", from.Get("sdpMLineIndex"));
+                if (from.Has("sdpMid"))
+                    to.Set("sdpMid", from.Get("sdpMid"));
+                if (from.Has("usernameFragment"))
+                    to.Set("usernameFragment", from.Get("usernameFragment"));
+
+                return to;
+            }));
+}
+
 void NapiIceCandidate::Init(class Env env, Object exports)
 {
     Function func = DefineClass(
@@ -297,57 +353,31 @@ Napi::Object NativeToJsCandidate(
     }
 
     auto obj = Object::New(env);
-    obj.Set("sdpMLineIndex", Number::New(env, sdpMLineIndex));
-    obj.Set("sdpMid", String::New(env, sdpMid));
     obj.Set("candidate", String::New(env, sdp));
-    obj.Set("foundation", String::New(env, candidate.foundation()));
-    if (candidate.component() == kComponentIdRtp) {
-        obj.Set("component", String::New(env, kEnumIceCandidateRtp));
+    if (sdpMLineIndex >= 0) {
+        obj.Set("sdpMLineIndex", Number::New(env, sdpMLineIndex));
     }
-    if (candidate.component() == kComponentIdRtcp) {
-        obj.Set("component", String::New(env, kEnumIceCandidateRtcp));
+    SetStringIfNotEmpty(env, obj, "sdpMid", sdpMid);
+    SetStringIfNotEmpty(env, obj, "foundation", candidate.foundation());
+    SetComponentIfValid(env, obj, candidate.component());
+    if (candidate.priority() > 0) {
+        obj.Set("priority", Number::New(env, candidate.priority()));
     }
-    obj.Set("priority", Number::New(env, candidate.priority()));
-    obj.Set("address", String::New(env, candidate.address().hostname()));
-    obj.Set("protocol", String::New(env, candidate.protocol()));
-    obj.Set("port", Number::New(env, candidate.address().port()));
-    obj.Set("tcpType", String::New(env, candidate.tcptype()));
-    obj.Set("relatedAddress", String::New(env, candidate.related_address().hostname()));
-    obj.Set("relatedPort", Number::New(env, candidate.related_address().port()));
-    obj.Set("usernameFragment", String::New(env, candidate.username()));
-
-    if (candidate.type() == cricket::LOCAL_PORT_TYPE) {
-        obj.Set("type", String::New(env, kEnumIceCandidateTypeHost));
-    } else if (candidate.type() == cricket::STUN_PORT_TYPE) {
-        obj.Set("type", String::New(env, kEnumIceCandidateTypeSrflx));
-    } else if (candidate.type() == cricket::RELAY_PORT_TYPE) {
-        obj.Set("type", String::New(env, kEnumIceCandidateTypeRelay));
-    } else if (candidate.type() == cricket::PRFLX_PORT_TYPE) {
-        obj.Set("type", String::New(env, kEnumIceCandidateTypePrflx));
-    } else {
-        // invalid type
-    }
+    SetStringIfNotEmpty(env, obj, "address", candidate.address().hostname());
+    SetStringIfNotEmpty(env, obj, "protocol", candidate.protocol());
+    SetPortIfPositive(env, obj, "port", candidate.address().port());
+    SetStringIfNotEmpty(env, obj, "tcpType", candidate.tcptype());
+    SetStringIfNotEmpty(env, obj, "relatedAddress", candidate.related_address().hostname());
+    SetPortIfPositive(env, obj, "relatedPort", candidate.related_address().port());
+    SetStringIfNotEmpty(env, obj, "usernameFragment", candidate.username());
+    SetTypeIfValid(env, obj, candidate.type());
 
     // extension attribute
-    obj.Set("adapterType", String::New(env, rtc::AdapterTypeToString(candidate.network_type())));
-    obj.Set("serverUrl", String::New(env, candidate.url()));
+    SetStringIfNotEmpty(env, obj, "adapterType", rtc::AdapterTypeToString(candidate.network_type()));
+    SetStringIfNotEmpty(env, obj, "serverUrl", candidate.url());
 
     // instance method of IceCandidate
-    obj.Set("toJSON", Function::New(env, [](const CallbackInfo& info) {
-                auto from = info.This().As<Object>();
-                auto to = Object::New(info.Env());
-                RTC_LOG(LS_VERBOSE) << __FUNCTION__ << " toJson";
-
-                to.Set("candidate", from.Get("candidate"));
-                if (from.Has("sdpMLineIndex"))
-                    to.Set("sdpMLineIndex", from.Get("sdpMLineIndex"));
-                if (from.Has("sdpMid"))
-                    to.Set("sdpMid", from.Get("sdpMid"));
-                if (from.Has("usernameFragment"))
-                    to.Set("usernameFragment", from.Get("usernameFragment"));
-
-                return to;
-            }));
+    SetCandidateToJson(env, obj);
 
     return obj;
 }
@@ -357,54 +387,26 @@ Napi::Object NativeToJsCandidate(Napi::Env env, const cricket::Candidate& candid
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
     auto obj = Object::New(env);
 
-    obj.Set("foundation", String::New(env, candidate.foundation()));
-    if (candidate.component() == kComponentIdRtp) {
-        obj.Set("component", String::New(env, kEnumIceCandidateRtp));
+    SetStringIfNotEmpty(env, obj, "foundation", candidate.foundation());
+    SetComponentIfValid(env, obj, candidate.component());
+    if (candidate.priority() > 0) {
+        obj.Set("priority", Number::New(env, candidate.priority()));
     }
-    if (candidate.component() == kComponentIdRtcp) {
-        obj.Set("component", String::New(env, kEnumIceCandidateRtcp));
-    }
-    obj.Set("priority", Number::New(env, candidate.priority()));
-    obj.Set("address", String::New(env, candidate.address().hostname()));
-    obj.Set("protocol", String::New(env, candidate.protocol()));
-    obj.Set("port", Number::New(env, candidate.address().port()));
-    obj.Set("tcpType", String::New(env, candidate.tcptype()));
-    obj.Set("relatedAddress", String::New(env, candidate.related_address().hostname()));
-    obj.Set("relatedPort", Number::New(env, candidate.related_address().port()));
-    obj.Set("usernameFragment", String::New(env, candidate.username()));
-
-    if (candidate.type() == cricket::LOCAL_PORT_TYPE) {
-        obj.Set("type", String::New(env, kEnumIceCandidateTypeHost));
-    } else if (candidate.type() == cricket::STUN_PORT_TYPE) {
-        obj.Set("type", String::New(env, kEnumIceCandidateTypeSrflx));
-    } else if (candidate.type() == cricket::RELAY_PORT_TYPE) {
-        obj.Set("type", String::New(env, kEnumIceCandidateTypeRelay));
-    } else if (candidate.type() == cricket::PRFLX_PORT_TYPE) {
-        obj.Set("type", String::New(env, kEnumIceCandidateTypePrflx));
-    } else {
-        // invalid type
-    }
+    SetStringIfNotEmpty(env, obj, "address", candidate.address().hostname());
+    SetStringIfNotEmpty(env, obj, "protocol", candidate.protocol());
+    SetPortIfPositive(env, obj, "port", candidate.address().port());
+    SetStringIfNotEmpty(env, obj, "tcpType", candidate.tcptype());
+    SetStringIfNotEmpty(env, obj, "relatedAddress", candidate.related_address().hostname());
+    SetPortIfPositive(env, obj, "relatedPort", candidate.related_address().port());
+    SetStringIfNotEmpty(env, obj, "usernameFragment", candidate.username());
+    SetTypeIfValid(env, obj, candidate.type());
 
     // extension attribute
-    obj.Set("adapterType", String::New(env, rtc::AdapterTypeToString(candidate.network_type())));
-    obj.Set("serverUrl", String::New(env, candidate.url()));
+    SetStringIfNotEmpty(env, obj, "adapterType", rtc::AdapterTypeToString(candidate.network_type()));
+    SetStringIfNotEmpty(env, obj, "serverUrl", candidate.url());
 
     // instance method of IceCandidate
-    obj.Set("toJSON", Function::New(env, [](const CallbackInfo& info) {
-                auto from = info.This().As<Object>();
-                auto to = Object::New(info.Env());
-                RTC_LOG(LS_VERBOSE) << __FUNCTION__ << " toJson";
-
-                to.Set("candidate", from.Get("candidate"));
-                if (from.Has("sdpMLineIndex"))
-                    to.Set("sdpMLineIndex", from.Get("sdpMLineIndex"));
-                if (from.Has("sdpMid"))
-                    to.Set("sdpMid", from.Get("sdpMid"));
-                if (from.Has("usernameFragment"))
-                    to.Set("usernameFragment", from.Get("usernameFragment"));
-
-                return to;
-            }));
+    SetCandidateToJson(env, obj);
 
     return obj;
 }
@@ -419,27 +421,15 @@ Napi::Object NativeToJsIceCandidate(Napi::Env env, const IceCandidateInterface& 
     }
 
     auto obj = Object::New(env);
-    obj.Set("sdpMLineIndex", Number::New(env, candidate.sdp_mline_index()));
-    obj.Set("sdpMid", String::New(env, candidate.sdp_mid()));
     obj.Set("candidate", String::New(env, sdp));
+    if (candidate.sdp_mline_index() >= 0) {
+        obj.Set("sdpMLineIndex", Number::New(env, candidate.sdp_mline_index()));
+    }
+    SetStringIfNotEmpty(env, obj, "sdpMid", candidate.sdp_mid());
 
     RTC_LOG(LS_VERBOSE) << __FUNCTION__ << " xxx";
     // instance method of IceCandidate
-    obj.Set("toJSON", Function::New(env, [](const CallbackInfo& info) {
-                auto from = info.This().As<Object>();
-                auto to = Object::New(info.Env());
-                RTC_LOG(LS_VERBOSE) << __FUNCTION__ << " toJson";
-
-                to.Set("candidate", from.Get("candidate"));
-                if (from.Has("sdpMLineIndex"))
-                    to.Set("sdpMLineIndex", from.Get("sdpMLineIndex"));
-                if (from.Has("sdpMid"))
-                    to.Set("sdpMid", from.Get("sdpMid"));
-                if (from.Has("usernameFragment"))
-                    to.Set("usernameFragment", from.Get("usernameFragment"));
-
-                return to;
-            }));
+    SetCandidateToJson(env, obj);
 
     RTC_LOG(LS_VERBOSE) << __FUNCTION__ << " exit";
 
