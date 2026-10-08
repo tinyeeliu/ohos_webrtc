@@ -400,6 +400,7 @@ export interface RTCRtpCodingParameters {
 export interface RTCRtpEncodingParameters extends RTCRtpCodingParameters {
   active?: boolean;
   maxBitrate?: number;
+  minBitrate?: number;
   maxFramerate?: number;
   scaleResolutionDownBy?: number;
   // networkPriority?: RTCPriorityType;

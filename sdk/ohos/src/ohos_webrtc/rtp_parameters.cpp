@@ -27,6 +27,7 @@ const char kAttributeNameRid[] = "rid";
 
 const char kAttributeNameActive[] = "active";
 const char kAttributeNameMaxBitrate[] = "maxBitrate";
+const char kAttributeNameMinBitrate[] = "minBitrate";
 const char kAttributeNameMaxFramerate[] = "maxFramerate";
 const char kAttributeNameScaleResolutionDownBy[] = "scaleResolutionDownBy";
 
@@ -657,6 +658,13 @@ void NapiRtpEncodingParameters::JsToNative(const Napi::Object& js, RtpEncodingPa
         }
     }
 
+    if (js.Has(kAttributeNameMinBitrate)) {
+        auto jsMinBitrate = js.Get(kAttributeNameMinBitrate);
+        if (jsMinBitrate.IsNumber()) {
+            native.min_bitrate_bps = jsMinBitrate.As<Number>().Int32Value();
+        }
+    }
+
     if (js.Has(kAttributeNameMaxFramerate)) {
         auto jsMaxFramerate = js.Get(kAttributeNameMaxFramerate);
         if (jsMaxFramerate.IsNumber()) {
@@ -685,6 +693,9 @@ void NapiRtpEncodingParameters::NativeToJs(const RtpEncodingParameters& native, 
     js.Set(kAttributeNameActive, Boolean::New(js.Env(), native.active));
     if (native.max_bitrate_bps) {
         js.Set(kAttributeNameMaxBitrate, Number::New(js.Env(), native.max_bitrate_bps.value()));
+    }
+    if (native.min_bitrate_bps) {
+        js.Set(kAttributeNameMinBitrate, Number::New(js.Env(), native.min_bitrate_bps.value()));
     }
     if (native.max_framerate) {
         js.Set(kAttributeNameMaxFramerate, Number::New(js.Env(), native.max_framerate.value()));
