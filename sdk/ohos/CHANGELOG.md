@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.0.4-rc.1 (2026-10-09)
+## 1.0.4 (2026-10-09)
 
 Current local changes for multi-device camera adaptation; no package release is assigned yet.
 
