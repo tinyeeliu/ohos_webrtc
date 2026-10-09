@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.0.4-rc.1 (2026-10-09)
+## 1.0.4 (2026-10-09)
 
 Current local changes for multi-device camera adaptation; no package release is assigned yet.
 
@@ -28,7 +28,7 @@ Current local changes for multi-device camera adaptation; no package release is 
 - Rebuild the complete Native library and replace the target ABI binary to use the current Native additions. Existing low-level API signatures remain available, and new optional declarations allow legacy implementations to remain valid.
 - Automated tests and local loopback do not establish cross-device HAL, orientation, or recovery correctness. Preview snapshots capture the composited view; no raw-frame export or recognition engine is added. Two-peer demo calls use STUN without TURN, so restricted networks may prevent connection.
 
-## 1.0.3 (2026-07-29)
+## 1.0.4 (2026-07-29)
 
 - Support camera zoom via applyConstraints({ zoom }) and getZoomRange() [#121](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/121)
 - Add camera flip/mirror interface and fix libohos_webrtc.so multiple loading resource contention [#128](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/128)
@@ -42,11 +42,11 @@ Current local changes for multi-device camera adaptation; no package release is 
 - Remove video capture demo [#138](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/138)
 - Remove version recommendation and upgrade notice from README [#139](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/139)
 
-## 1.0.3-rc.4 (2026-07-24)
+## 1.0.4-rc.4 (2026-07-24)
 
 - Add applyConstraints XTS [#127](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/127)
 
-## 1.0.3-rc.1 (2026-07-20)
+## 1.0.4-rc.1 (2026-07-20)
 
 - Support MediaStreamTrack.applyConstraints [#119](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/119)
 - Fix crash and memory leak caused by connection [#125](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/125)
