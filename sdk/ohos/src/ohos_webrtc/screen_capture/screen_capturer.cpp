@@ -247,9 +247,17 @@ void ScreenCapturer::Stop()
         stopCond_.wait_for(lock, std::chrono::milliseconds(kStopConfirmTimeoutMs),
             [this] { return stopConfirmed_.load(); });
     }
-    if (stopConfirmed_.load()) {
-        screenCapture_.Reset();
+    if (!stopConfirmed_.load()) {
+        // The engine does not emit a state callback for an app-initiated stop (or it may
+        // arrive after this function has returned), so the confirmation can decide only
+        // WHEN to release, never WHETHER. A leaked single-use instance keeps the capture
+        // session alive and makes every subsequent StartScreenCapture fail silently (no
+        // permission dialog, black frames). StopScreenCapture already returned OK above
+        // (engine stopped) plus this wait is a settle buffer, and the state callbacks do
+        // not touch the instance, so releasing unconditionally here is safe.
+        RTC_LOG(LS_WARNING) << "Stop confirmation not received, force releasing screen capture";
     }
+    screenCapture_.Reset();
 
     if (!stopConfirmed_.load()) {
         // No state change callback, notify manually.
