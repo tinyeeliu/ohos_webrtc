@@ -2,6 +2,7 @@
   "src": [
     "pages/Index",
     "pages/workPage",
-    "pages/ApplyConstraintsTestPage"
+    "pages/ApplyConstraintsTestPage",
+    "pages/MultiDeviceRtcLabPage"
   ]
 }

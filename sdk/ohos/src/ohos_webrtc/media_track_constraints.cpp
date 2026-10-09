@@ -167,7 +167,7 @@ bool ValidateStringSeq(const std::vector<std::string>& strs, std::string& errorM
     return true;
 }
 
-bool ValidateStringConstraint(const Value& jsValue, std::string& errorMessage)
+bool ValidateStringConstraint(const Value& jsValue, std::string& errorMessage, bool allowDictionary = true)
 {
     if (jsValue.IsString()) {
         return ValidateString(jsValue.As<String>().Utf8Value(), errorMessage);
@@ -179,24 +179,30 @@ bool ValidateStringConstraint(const Value& jsValue, std::string& errorMessage)
         }
 
         for (uint32_t index = 0; index < jsArray.Length(); index++) {
-            if (!ValidateString(jsArray.Get(index).As<String>().Utf8Value(), errorMessage)) {
+            auto element = jsArray.Get(index);
+            if (!element.IsString()) {
+                errorMessage = "Constraint string sequence must contain only strings.";
+                return false;
+            }
+            if (!ValidateString(element.As<String>().Utf8Value(), errorMessage)) {
                 return false;
             }
         }
         return true;
-    } else if (jsValue.IsObject()) {
+    } else if (allowDictionary && jsValue.IsObject()) {
         auto jsObject = jsValue.As<Object>();
         if (jsObject.Has(kConstraintsIdeal) &&
-            !ValidateStringConstraint(jsObject.Get(kConstraintsIdeal).As<String>(), errorMessage)) {
+            !ValidateStringConstraint(jsObject.Get(kConstraintsIdeal), errorMessage, false)) {
             return false;
         }
         if (jsObject.Has(kConstraintsExact) &&
-            !ValidateStringConstraint(jsObject.Get(kConstraintsExact).As<String>(), errorMessage)) {
+            !ValidateStringConstraint(jsObject.Get(kConstraintsExact), errorMessage, false)) {
             return false;
         }
         return true;
     }
 
+    errorMessage = "String constraint must be a string or a sequence of strings.";
     return false;
 }
 
@@ -237,10 +243,10 @@ bool ValidateAndCopyStringConstraint(
         if (jsObject.Has(kConstraintsIdeal)) {
             auto jsIdeal = jsObject.Get(kConstraintsIdeal);
             if (jsIdeal.IsString()) {
-                nativeValue.SetIdeal(std::vector<std::string>(1, jsValue.As<String>().Utf8Value()));
+                nativeValue.SetIdeal(std::vector<std::string>(1, jsIdeal.As<String>().Utf8Value()));
             } else if (jsIdeal.IsArray()) {
                 std::vector<std::string> nativeArray;
-                auto jsArray = jsValue.As<Array>();
+                auto jsArray = jsIdeal.As<Array>();
                 for (uint32_t index = 0; index < jsArray.Length(); index++) {
                     nativeArray.push_back(((Napi::Value)jsArray[index]).As<String>().Utf8Value());
                 }
@@ -248,12 +254,12 @@ bool ValidateAndCopyStringConstraint(
             }
         }
         if (jsObject.Has(kConstraintsExact)) {
-            auto jsIdeal = jsObject.Get(kConstraintsExact);
-            if (jsIdeal.IsString()) {
-                nativeValue.SetExact(std::vector<std::string>(1, jsValue.As<String>().Utf8Value()));
-            } else if (jsIdeal.IsArray()) {
+            auto jsExact = jsObject.Get(kConstraintsExact);
+            if (jsExact.IsString()) {
+                nativeValue.SetExact(std::vector<std::string>(1, jsExact.As<String>().Utf8Value()));
+            } else if (jsExact.IsArray()) {
                 std::vector<std::string> nativeArray;
-                auto jsArray = jsValue.As<Array>();
+                auto jsArray = jsExact.As<Array>();
                 for (uint32_t index = 0; index < jsArray.Length(); index++) {
                     nativeArray.push_back(((Napi::Value)jsArray[index]).As<String>().Utf8Value());
                 }
