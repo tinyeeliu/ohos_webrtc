@@ -562,6 +562,8 @@ void CameraCapturer::OnFrameAvailable(
 
     (void)rotation;
     VideoRotation frameRotation = kVideoRotation_0;
+    // captureThread_ may flip this flag mid-frame; one snapshot keeps rotation and dimensions consistent.
+    const bool halApplied = previewRotationAppliedByHal_.load();
 
     if (buffer->type() == VideoFrameBuffer::Type::kNative) {
         auto textureBuffer = static_cast<TextureBuffer*>(buffer.get());
@@ -573,7 +575,7 @@ void CameraCapturer::OnFrameAvailable(
             transformMatrix.PreScale(-1.0f, 1.0f, 0.5f, 0.5f);
         }
         // Software fallback retains the original texture transform.
-        if (!previewRotationAppliedByHal_.load()) {
+        if (!halApplied) {
             transformMatrix.PreRotate(previewRotation, 0.5f, 0.5f);
         }
         Matrix newMatrix = textureBuffer->GetTransformMatrix();
@@ -585,7 +587,7 @@ void CameraCapturer::OnFrameAvailable(
         // Use the camera preview rotation for logical frame dimensions, while
         // retaining the producer matrix for sampling. Otherwise landscape can
         // remain tagged as 720x1280 and every downstream aspect-fit stretches it.
-        const bool swapDimensions = previewRotationAppliedByHal_.load() &&
+        const bool swapDimensions = halApplied &&
             (previewRotation == kVideoRotation_90 || previewRotation == kVideoRotation_270);
         const int frameWidth = swapDimensions ? textureBuffer->height() : textureBuffer->width();
         const int frameHeight = swapDimensions ? textureBuffer->width() : textureBuffer->height();
@@ -594,7 +596,7 @@ void CameraCapturer::OnFrameAvailable(
             deliveredHeight_ = frameHeight;
             RTC_LOG(LS_INFO) << "[CameraFrameGeometry] profile=" << textureBuffer->width() << "x"
                              << textureBuffer->height() << ", previewRotation=" << previewRotation
-                             << ", halApplied=" << previewRotationAppliedByHal_.load()
+                             << ", halApplied=" << halApplied
                              << ", frame=" << frameWidth << "x" << frameHeight
                              << ", samplingMatrix=" << newMatrix;
         }
@@ -602,7 +604,7 @@ void CameraCapturer::OnFrameAvailable(
             textureBuffer->GetTexture(), frameWidth, frameHeight, newMatrix);
     } else {
         // CPU 路径：若 HAL 未写入旋转，则通过 rotation 元数据上报。
-        if (!previewRotationAppliedByHal_.load()) {
+        if (!halApplied) {
             frameRotation = i420Rotation_;
         }
     }

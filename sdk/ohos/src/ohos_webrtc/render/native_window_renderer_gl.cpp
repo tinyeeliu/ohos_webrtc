@@ -161,6 +161,7 @@ void NativeWindowRendererGl::SetSurfaceSize(int width, int height)
         const int ret = OH_NativeWindow_NativeWindowHandleOpt(window_.Raw(), SET_BUFFER_GEOMETRY, width, height);
         if (ret != 0) {
             RTC_LOG(LS_ERROR) << "Failed to resize render buffer: " << ret;
+            return;
         }
         surfaceWidth_ = width;
         surfaceHeight_ = height;
