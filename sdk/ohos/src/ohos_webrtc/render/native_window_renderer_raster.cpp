@@ -158,6 +158,7 @@ void NativeWindowRendererRaster::RenderFrame(const VideoFrame& frame)
         }
         if (mirrorHorizontally_ || mirrorVertically_) {
             auto mirrored = I420Buffer::Create(buffer->width(), buffer->height());
+            // Negative height flips vertically; I420Mirror and I420Copy both honour it in libyuv 04821d1e.
             const int sourceHeight = mirrorVertically_ ? -buffer->height() : buffer->height();
             int result;
             if (mirrorHorizontally_) {
