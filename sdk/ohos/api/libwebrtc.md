@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | `VideoSource.applyDisplayRotation(degrees)` | 示例应用 `MultiDeviceRtcLabPage` 的窗口适配逻辑 | 对外的 OHOS 扩展。同步所在窗口当前已生效的显示角度，让采集层更新预览旋转。 |
 | `NativeVideoRenderer.setSurfaceSize(width, height)` | SDK `VideoRenderController` | 对外可见的底层渲染扩展。控制器用它同步 Surface 显示尺寸；直接管理渲染器的应用也可以调用。 |
-| `NativeVideoRenderer.onFrameResolutionChanged` | 原生渲染器触发，SDK 控制器订阅；另有测试注册 | 原有公开事件，不是新增方法。保留 `(ev: Event) => any` 签名，帧字段由控制器内部解析。 |
+| `NativeVideoRenderer.onFrameResolutionChanged` | 原生渲染器触发，SDK 控制器订阅；另有测试注册 | 原有公开事件，不是新增方法。保留 `(ev: Event) => any` 签名，帧字段通过 `FrameResolutionChangedEvent` 读取。 |
 | `VideoRenderController.onFrameSizeChanged` | 示例应用订阅 | 控制器对应用提供的通知，返回旋转后的显示帧宽高，用于等比布局。 |
 
 调用链：应用同步显示角度 → VideoSource 原生绑定 → 采集线程 → CameraCapturer；
@@ -18,14 +18,14 @@ Surface 生命周期/页面尺寸变化 → VideoRenderController → NativeVide
 反向通知链：原生帧尺寸变化 → 原有 Event 回调 → 控制器内部解析 → `onFrameSizeChanged`。
 C++ 层的转发与实现属于内部调用，但 ArkTS 可见的绑定入口不是内部私有接口。
 
-原先新增的公开 `FrameResolutionChangedEvent` 已移除，恢复既有回调声明。
-控制器使用未导出的 `FrameResolutionPayload` 读取并校验原生已有的 `width`、`height`、`rotation` 字段。
-此调整不改变原生事件载荷，也不要求现有订阅者修改回调参数类型。
+`webrtc.d.ts` 导出 `FrameResolutionChangedEvent`（继承 `Event`），描述原生已有的 `type`、`width`、`height`、`rotation` 字段。
+`onFrameResolutionChanged` 的回调参数仍声明为 `Event`；订阅者需要读取帧字段时，将事件断言为 `FrameResolutionChangedEvent`，`VideoRenderController` 即按此方式读取并校验。
+此类型不改变原生事件载荷，也不要求现有订阅者修改回调参数类型。
 
 两个扩展方法需搭配实现它们的 `.so`。更新声明不会使旧二进制自动支持新方法。
 控制器对缺少 `setSurfaceSize` 的旧库会记录错误并跳过调用，不代表旧库具备相同的尺寸适配能力。
-这两个方法仍是接口中的必需成员，手工实现这些接口的适配层或测试替身也需要补齐；不能把这些新增概括为对所有接入方式完全兼容。
-本次只澄清边界并恢复事件原签名，没有隐藏或删除已经暴露的两个扩展方法。
+这两个方法在接口中声明为可选成员（`applyDisplayRotation?`、`setSurfaceSize?`），调用前需判断是否存在；手工实现这些接口的适配层或测试替身可以不实现，但不实现时不具备对应的预览适配能力。
+本次只澄清边界并保留事件原签名，没有隐藏或删除已经暴露的两个扩展方法。
 
 ## RTCErrorDetailType
 

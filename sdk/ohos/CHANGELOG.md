@@ -12,6 +12,7 @@ Current local changes for multi-device camera adaptation; no package release is 
 - Add opt-in capture-stall monitoring (`frameStallTimeoutMs`, disabled by default), using captured-frame counts and the session's bounded recovery policy.
 - Add controller preview sizing and oriented frame-size notifications, plus the A–F multi-device camera lab: responsive layout, camera selection, aspect-ratio cropping, preview snapshots and local encode/decode loopback, crease-aware hover layout, and two-peer video calls.
 - Add host-side session, layout, loopback, peer-call, and Native rotation/viewport regression tests, plus string-constraint cases in the device test suite.
+- PR:[#145](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/145).
 
 ### Changed / Fixed
 
