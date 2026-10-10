@@ -65,6 +65,7 @@ if (is_ohos) {
         "$ohos_webrtc_src_path/camera/camera_enumerator.cpp",
         "$ohos_webrtc_src_path/helper/camera.cpp",
         "$ohos_webrtc_src_path/helper/display_manager.cpp",
+        "$ohos_webrtc_src_path/helper/posture_observer.cpp",
         "$ohos_webrtc_src_path/logging/hilog_sink.cpp",
         "$ohos_webrtc_src_path/logging/log_sink.cpp",
         "$ohos_webrtc_src_path/logging/native_logging.cpp",
@@ -131,6 +132,7 @@ if (is_ohos) {
       "native_avscreen_capture",
       "native_drawing",
       "native_display_manager",
+      "ohsensor",
     ]
 
     deps = [

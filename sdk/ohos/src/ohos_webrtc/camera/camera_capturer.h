@@ -22,6 +22,7 @@
 #include "../render/egl_context.h"
 #include "../helper/camera.h"
 #include "helper/display_manager.h"
+#include "../helper/posture_observer.h"
 
 #include <memory>
 #include <cstdint>
@@ -40,7 +41,8 @@ class CameraCapturer : public VideoCapturer,
                        public VideoFrameReceiver::Callback,
                        public ohos::CameraPreviewOutput::Observer,
                        public ohos::CameraVideoOutput::Observer,
-                       public ohos::DisplayManager::ChangeObserver {
+                       public ohos::DisplayManager::ChangeObserver,
+                       public ohos::PostureObserver::Observer {
 public:
     static std::unique_ptr<CameraCapturer> Create(std::string deviceId, video::VideoProfile profile);
 
@@ -79,6 +81,7 @@ protected:
     void
     OnFrameAvailable(rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation) override;
     void OnDisplayChange(uint64_t displayId) override;
+    void OnPostureFamilyChanged(ohos::PostureFamily family) override;
 
 private:
     Camera_Device* SelectCameraDevice();
@@ -89,6 +92,11 @@ private:
     void ApplyPreviewRotation();
     void ApplyPreviewRotation(int displayDegrees);
     void CancelDisplayRotationTasks();
+    // issue #200: 前置姿态错配补偿评估(帧回调线程逐帧调用)。相机 HAL 对前置流
+    // 存在姿态跟随的像素级旋转(真机实测, 不经系统变换矩阵/帧元数据, 预览旋转
+    // 声明亦不废除), 窗口方向锁定时姿态族与窗口族错配使画面相对窗口倒置 180 度;
+    // 含持续性确认以过滤自动旋转时传感器与 display 变化的瞬态错配。
+    int EvaluatePostureCompensation();
 
     // Written only while the display observer is unregistered. Unregister waits
     // for in-flight callbacks; queued tasks use a fresh safety flag per session.
@@ -126,6 +134,12 @@ private:
     std::atomic<VideoRotation> finalRotation_{kVideoRotation_0};
     std::atomic<VideoRotation> i420Rotation_{kVideoRotation_0};
     std::atomic<bool> previewRotationAppliedByHal_{false};
+    // issue #200: display rotation 的族归属(0/180 为竖族), capture 线程写入,
+    // 帧回调线程读取。
+    std::atomic<bool> displayIsPortraitFamily_{true};
+    // 姿态错配持续性确认状态, 仅帧回调线程访问。
+    int64_t postureMismatchSinceMs_{0};
+    int postureCompensationDegrees_{0};
     // Accessed only by the frame receiver callback thread.
     int deliveredWidth_{0};
     int deliveredHeight_{0};
