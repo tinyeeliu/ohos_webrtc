@@ -201,6 +201,12 @@ void ScreenCapturer::Start()
 
     uint64_t surfaceId = dataReceiver_->GetSurfaceId();
     RTC_DLOG(LS_INFO) << "surfaceId: " << surfaceId;
+    if (surfaceId == 0) {
+        // VideoFrameReceiver is in degraded mode (EglEnv creation failed).
+        RTC_LOG(LS_ERROR) << "ScreenCapturer: video receiver has no surface, cannot start capture";
+        NotifyCaptureStart(false);
+        return;
+    }
 
     OHNativeWindow* window = nullptr;
     int32_t ret = OH_NativeWindow_CreateNativeWindowFromSurfaceId(surfaceId, &window);

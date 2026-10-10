@@ -39,6 +39,15 @@ VideoFrameReceiverGl::VideoFrameReceiverGl(const std::string& threadName, std::s
     thread_->Start();
     thread_->BlockingCall([this, sharedContext] {
         eglEnv_ = EglEnv::Create(sharedContext, EglConfigAttributes::RGBA_PIXEL_BUFFER);
+        if (!eglEnv_) {
+            // EglEnv creation failed (logged inside EglEnv::Create). Stay in
+            // degraded mode: no surface/texture will exist, GetSurfaceId()
+            // returns 0 and incoming frames are dropped. Must NOT continue:
+            // eglEnv_->CreatePbufferSurface(...) would dereference null.
+            RTC_LOG(LS_ERROR) << "VideoFrameReceiverGl: EglEnv creation failed, receiver is degraded "
+                                 "(no frames will be produced)";
+            return;
+        }
         eglEnv_->CreatePbufferSurface(1, 1);
         eglEnv_->MakeCurrent();
         CreateNativeImage();
@@ -56,6 +65,12 @@ VideoFrameReceiverGl::~VideoFrameReceiverGl()
 
 uint64_t VideoFrameReceiverGl::GetSurfaceId() const
 {
+    if (!eglEnv_) {
+        // Degraded mode (EglEnv creation failed): nativeImage_ was never created,
+        // calling NativeImage::GetSurfaceId() on the empty wrapper would pass
+        // nullptr to OH_NativeImage_GetSurfaceId. Report "no surface" instead.
+        return 0;
+    }
     return nativeImage_.GetSurfaceId();
 }
 
@@ -103,8 +118,10 @@ void VideoFrameReceiverGl::ReleaseNativeImage()
 
     std::shared_ptr<TextureData> temp;
     textureData_.swap(temp);
-    auto textureId = temp->GetId();
-    glDeleteTextures(1, &textureId);
+    if (temp) { // null in degraded mode (CreateNativeImage never ran)
+        auto textureId = temp->GetId();
+        glDeleteTextures(1, &textureId);
+    }
 
     yuvConverter_.reset();
 }
@@ -112,6 +129,10 @@ void VideoFrameReceiverGl::ReleaseNativeImage()
 void VideoFrameReceiverGl::SetTextureSize(int32_t textureWidth, int32_t textureHeight)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    if (!eglEnv_) { // degraded mode: no native image / window to resize
+        return;
+    }
 
     if (textureWidth <= 0 || textureHeight <= 0) {
         RTC_LOG(LS_ERROR) << "Texture size must be positive: " << textureWidth << "x" << textureHeight;
@@ -147,6 +168,10 @@ void VideoFrameReceiverGl::OnNativeImageFrameAvailable1(void* data)
 void VideoFrameReceiverGl::OnNativeImageFrameAvailable()
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    if (!textureData_) { // degraded mode (EglEnv failed) or already released
+        return;
+    }
 
     if (!thread_->IsCurrent()) {
         thread_->PostTask([this] { OnNativeImageFrameAvailable(); });

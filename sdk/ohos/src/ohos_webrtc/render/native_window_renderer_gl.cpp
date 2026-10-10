@@ -116,6 +116,15 @@ NativeWindowRendererGl::NativeWindowRendererGl(
     thread_->Start();
     thread_->BlockingCall([this, sharedContext] {
         eglEnv_ = EglEnv::Create(sharedContext, EglConfigAttributes::RGBA);
+        if (!eglEnv_) {
+            // EglEnv creation failed (logged inside EglEnv::Create). Stay in
+            // degraded mode: no surface exists, frames are discarded in
+            // RenderFrame(). Must NOT continue: eglEnv_->CreateWindowSurface(...)
+            // would dereference null.
+            RTC_LOG(LS_ERROR) << "NativeWindowRendererGl: EglEnv creation failed, renderer is degraded "
+                                 "(frames will be discarded)";
+            return;
+        }
         eglEnv_->CreateWindowSurface(window_);
         eglEnv_->MakeCurrent();
     });
@@ -256,6 +265,10 @@ static PreviewViewport ComputeLegacyViewport(int viewportWidth, int viewportHeig
 
 void NativeWindowRendererGl::RenderFrame(const VideoFrame& frame)
 {
+    if (!eglEnv_) { // degraded mode (EglEnv creation failed): drop the frame
+        return;
+    }
+
     int viewportX = 0;
     int viewportY = 0;
     int viewportWidth = eglEnv_->GetSurfaceWidth();

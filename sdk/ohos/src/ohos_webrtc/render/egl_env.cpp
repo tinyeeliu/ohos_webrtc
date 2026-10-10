@@ -106,6 +106,17 @@ private:
 EglEnv& EglEnv::GetDefault()
 {
     static std::unique_ptr<EglEnv> _eglEnv = Create(EglConfigAttributes::DEFAULT);
+    if (!_eglEnv) {
+        // Default EglEnv creation failed (e.g. resource exhaustion).
+        // Never dereference the null pointer here: return a shared empty EglEnv
+        // instead. Its GetContext() yields EGL_NO_CONTEXT, and dependent
+        // EglEnv::Create(sharedContext) calls will still try to create their own
+        // display/context and are null-checked by their callers
+        // (see VideoFrameReceiverGl / NativeWindowRendererGl constructors).
+        RTC_LOG(LS_ERROR) << "EglEnv::GetDefault: default EglEnv creation failed, using empty EglEnv";
+        static EglEnv emptyEnv;
+        return emptyEnv;
+    }
     return *_eglEnv;
 }
 
@@ -356,7 +367,15 @@ void EglEnv::Release()
     }
 
     eglReleaseThread();
-    eglTerminate(eglDisplay_);
+    // NOTE: Do NOT call eglTerminate(eglDisplay_).
+    // The display is process-wide (eglGetDisplay(EGL_DEFAULT_DISPLAY)) and shared
+    // by every EglEnv instance (including EglEnv::GetDefault()). Terminating it
+    // here marks contexts/surfaces of unrelated live EglEnv objects for deletion
+    // and leaves the display uninitialized for subsequent users, which makes later
+    // eglCreateContext calls fail ("Failed to init egl context" -> null EglEnv ->
+    // SIGSEGV in callers that do not expect null). Display-level resources
+    // (config cache etc.) are bounded and shared; keep them for the process
+    // lifetime (same model as iOS, where no global teardown exists).
     eglDisplay_ = EGL_NO_DISPLAY;
 }
 

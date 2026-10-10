@@ -365,7 +365,13 @@ bool HardwareVideoDecoder::InitDecode()
         videoFrameReceiver_ = VideoFrameReceiverGl::Create("decoder-texture-thread", sharedContext_);
         videoFrameReceiver_->SetVideoFrameSize(resolution.Width(), resolution.Height());
         videoFrameReceiver_->SetCallback(this);
-        nativeWindow_ = ohos::NativeWindow::CreateFromSurfaceId(videoFrameReceiver_->GetSurfaceId());
+        auto receiverSurfaceId = videoFrameReceiver_->GetSurfaceId();
+        if (receiverSurfaceId == 0) {
+            // VideoFrameReceiver is in degraded mode (EglEnv creation failed).
+            RTC_LOG(LS_ERROR) << "HardwareVideoDecoder: video receiver has no surface, cannot set decoder surface";
+            return false;
+        }
+        nativeWindow_ = ohos::NativeWindow::CreateFromSurfaceId(receiverSurfaceId);
         ret = OH_VideoDecoder_SetSurface(decoder_.Raw(), nativeWindow_.Raw());
         if (ret != AV_ERR_OK) {
             RTC_LOG(LS_ERROR) << "Failed to set surface: " << ret;

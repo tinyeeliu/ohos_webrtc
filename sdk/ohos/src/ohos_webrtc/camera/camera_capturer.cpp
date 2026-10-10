@@ -324,7 +324,13 @@ Camera_Profile* CameraCapturer::FindPreviewProfile(CameraOutputCapability& capab
 
 bool CameraCapturer::StartCaptureSession(Camera_Profile* previewProfile)
 {
-    auto surfaceId = std::to_string(dataReceiver_->GetSurfaceId());
+    auto receiverSurfaceId = dataReceiver_->GetSurfaceId();
+    if (receiverSurfaceId == 0) {
+        // VideoFrameReceiver is in degraded mode (EglEnv creation failed).
+        RTC_LOG(LS_ERROR) << "CameraCapturer: video receiver has no surface, cannot start capture session";
+        return false;
+    }
+    auto surfaceId = std::to_string(receiverSurfaceId);
 
     previewOutput_ = CameraManager::GetInstance().CreatePreviewOutput(previewProfile, surfaceId);
     previewRotationAppliedByHal_ = false;
