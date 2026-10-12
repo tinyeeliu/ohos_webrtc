@@ -422,7 +422,9 @@ void CameraCapturer::StartInternal()
     displayRotationSafety_ = PendingTaskSafetyFlag::Create();
     ohos::DisplayManager::GetInstance().RegisterChangeCallback(this);
     if (isCameraFrontFacing_) {
-        // issue #200: 前置流存在相机侧姿态跟随像素旋转, 注册姿态观察用于错配补偿。
+        // issue #200: the front stream carries a posture-following rotation
+        // applied on the camera side; observe the posture family for mismatch
+        // compensation.
         ohos::PostureObserver::GetInstance().RegisterObserver(this);
     }
     // Catch any display change that occurred while the session was starting.
@@ -437,7 +439,8 @@ void CameraCapturer::StopInternal()
     if (isInitialized_) {
         RTC_DCHECK_RUN_ON(captureThread_);
     }
-    // issue #200: 在 isStarted_ guard 之前注销姿态观察, 覆盖各早退路径(幂等)。
+    // issue #200: unregister the posture observer before the isStarted_ guard so
+    // every early-exit path is covered (idempotent).
     ohos::PostureObserver::GetInstance().UnregisterObserver(this);
 
     if (!isStarted_) {
@@ -571,8 +574,10 @@ void CameraCapturer::OnFrameAvailable(
     VideoRotation frameRotation = kVideoRotation_0;
     // captureThread_ may flip this flag mid-frame; one snapshot keeps rotation and dimensions consistent.
     const bool halApplied = previewRotationAppliedByHal_.load();
-    // issue #200: 前置姿态错配补偿逐帧评估(含持续性确认)。仅 kNative 真机路径
-    // 叠加; CPU 路径(模拟器 ImageReceiver)无 HAL 姿态旋转, 不叠加以避免误补偿。
+    // issue #200: evaluate the front-camera posture mismatch compensation per
+    // frame (with sustained confirmation). Only the kNative on-device path
+    // applies it; the CPU path (emulator ImageReceiver) has no HAL posture
+    // rotation and must not be compensated.
     const int postureCompensation = EvaluatePostureCompensation();
 
     if (buffer->type() == VideoFrameBuffer::Type::kNative) {
@@ -590,8 +595,10 @@ void CameraCapturer::OnFrameAvailable(
             transformMatrix.PreRotate(
                 (static_cast<int>(previewRotation) + postureCompensation) % kFullCircleDegrees, 0.5f, 0.5f);
         } else if (postureCompensation != 0) {
-            // HAL 已按声明转正预览流, 但其姿态跟随的像素旋转仍然存在(真机实测),
-            // 锁定窗口且姿态族错配时在此补偿。
+            // The HAL uprighted the preview stream as declared, but its
+            // posture-following pixel rotation is still present (measured on
+            // devices); compensate here when the window is locked and the
+            // posture family mismatches.
             transformMatrix.PreRotate(postureCompensation, 0.5f, 0.5f);
         }
         Matrix newMatrix = textureBuffer->GetTransformMatrix();
@@ -649,7 +656,8 @@ void CameraCapturer::ApplyPreviewRotation(int displayDegrees)
     constexpr int kFullCircleDegrees = 360;
     displayDegrees = ((displayDegrees % kFullCircleDegrees) + kFullCircleDegrees) % kFullCircleDegrees;
     displayDegrees = (displayDegrees / kDegreesPerRotationUnit) * kDegreesPerRotationUnit;
-    // issue #200: 记录窗口方向族归属, 供帧回调的姿态错配补偿评估使用。
+    // issue #200: record the window family for the per-frame posture mismatch
+    // evaluation on the frame callback thread.
     constexpr int kInvertedDegrees = 180;
     displayIsPortraitFamily_.store(displayDegrees == 0 || displayDegrees == kInvertedDegrees,
         std::memory_order_relaxed);
@@ -737,11 +745,15 @@ int CameraCapturer::EvaluatePostureCompensation()
         return kNoCompensation;
     }
 
-    // issue #200: 相机 HAL 对前置流做姿态跟随的像素级旋转(真机四象限实测:
-    // 窗口方向族与物理姿态族错配时画面相对窗口倒置 180 度, 一致时正常; 该旋转
-    // 不经系统变换矩阵/帧元数据, 预览旋转声明亦不将其废除; 后置流不受影响)。
-    // 传感器不可用(如宿主未声明 ohos.permission.ACCELEROMETER)时姿态族为
-    // UNKNOWN, 不补偿, 行为与既往一致(优雅降级)。
+    // issue #200: the camera HAL rotates the front stream pixels following the
+    // physical posture (four-quadrant measurements on devices: the image is
+    // inverted by 180 degrees relative to the window whenever the posture
+    // family mismatches the window family, and normal when they match). The
+    // rotation is invisible to the system transform matrix and frame metadata,
+    // and preview rotation declarations do not disable it; the rear stream is
+    // not affected. Without sensor data (e.g. the host app does not declare
+    // ohos.permission.ACCELEROMETER) the posture family is UNKNOWN and no
+    // compensation is applied, matching previous behavior.
     ohos::PostureFamily postureFamily = ohos::PostureObserver::GetInstance().GetPostureFamily();
     bool mismatched = postureFamily != ohos::PostureFamily::UNKNOWN
         && (postureFamily == ohos::PostureFamily::PORTRAIT) != displayIsPortraitFamily_.load(std::memory_order_relaxed);
@@ -754,8 +766,11 @@ int CameraCapturer::EvaluatePostureCompensation()
         postureMismatchSinceMs_ = nowMs;
     }
 
-    // 持续性确认: 自动旋转时传感器提交与 display 变化存在先后, 产生瞬态错配
-    // (实测 <=146ms), 不应补偿; 窗口锁定场景错配为持久状态, 确认后稳定补偿。
+    // Sustained confirmation: during auto-rotation the sensor commit and the
+    // display change are ordered in time, producing a transient mismatch
+    // (measured <=146 ms) that must not be compensated. With a locked window
+    // the mismatch is persistent, so confirming it once yields a stable
+    // compensation.
     int compensation = (mismatched && nowMs - postureMismatchSinceMs_ >= kMismatchConfirmMs)
         ? kPostureMismatchCompensationDegrees
         : kNoCompensation;
@@ -772,8 +787,9 @@ int CameraCapturer::EvaluatePostureCompensation()
 
 void CameraCapturer::OnPostureFamilyChanged(ohos::PostureFamily family)
 {
-    // 传感器服务线程回调: 仅记录事件。补偿由帧回调逐帧评估(含持续性确认),
-    // 不在此路径向 captureThread_ 派发任务, 避免与显示回调安全机制交叉。
+    // Sensor service thread callback; log only. Compensation is evaluated per
+    // frame with sustained confirmation, so no task is posted to captureThread_
+    // here, keeping this path clear of the display-callback safety scheme.
     RTC_LOG(LS_INFO) << "OnPostureFamilyChanged: family=" << static_cast<int>(family);
 }
 

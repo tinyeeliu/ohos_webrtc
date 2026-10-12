@@ -23,11 +23,11 @@ namespace ohos {
 
 namespace {
 
-// 加速度传感器数据轴下标(oh_sensor_type.h: data[0]/[1]/[2] 分别为 x/y/z 轴分量)。
+// Axis indices of accelerometer samples (oh_sensor_type.h: data[0..2] = x/y/z).
 constexpr uint32_t kAxisIndexX = 0;
 constexpr uint32_t kAxisIndexY = 1;
 constexpr uint32_t kAxisIndexZ = 2;
-// 加速度传感器数据分量个数。
+// Component count of one accelerometer sample.
 constexpr uint32_t kAccelerometerDataCount = 3;
 
 } // namespace
@@ -84,8 +84,9 @@ bool PostureObserver::SubscribeLocked()
         return false;
     }
 
-    // 宿主应用未声明 ohos.permission.ACCELEROMETER 时返回 SENSOR_PERMISSION_DENIED,
-    // 姿态族保持 UNKNOWN, 使用方据此退化为不补偿(与既往版本行为一致)。
+    // Fails with SENSOR_PERMISSION_DENIED when the host app does not declare
+    // ohos.permission.ACCELEROMETER; the family then stays UNKNOWN and the
+    // consumer degrades to no compensation (unchanged legacy behavior).
     Sensor_Result result = OH_Sensor_Subscribe(subscriptionId_, subscriptionAttribute_, subscriber_);
     if (result != SENSOR_SUCCESS) {
         RTC_LOG(LS_INFO) << "PostureObserver: accelerometer subscribe failed, result=" << result
@@ -100,7 +101,7 @@ void PostureObserver::UnsubscribeLocked()
     if (subscriptionId_ != nullptr && subscriber_ != nullptr) {
         OH_Sensor_Unsubscribe(subscriptionId_, subscriber_);
     }
-    // 订阅句柄保留复用, 单例生命周期内不销毁。
+    // Subscription handles are kept for reuse; the singleton never destroys them.
 }
 
 void PostureObserver::OnSensorEvent(Sensor_Event* event)
@@ -116,14 +117,16 @@ void PostureObserver::OnSensorEvent(Sensor_Event* event)
 
 void PostureObserver::HandleSensorData(float x, float y, float z)
 {
-    // 平放(重力沿屏幕法线方向)时水平两轴分量接近噪声, 样本无效不参与投票。
+    // Flat on a table the gravity follows the screen normal and the in-plane
+    // components are noise; the sample does not vote.
     float horizontalMagnitude = std::sqrt(x * x + y * y);
     if (std::fabs(z) > horizontalMagnitude) {
         return;
     }
 
-    // 主轴判定仅依据分量绝对值, 与加速度计坐标轴符号约定无关:
-    // 重力沿 Y 轴(设备长轴) => 竖握族; 沿 X 轴(设备短轴) => 横握族。
+    // The dominant-axis test uses absolute values only, so it does not depend
+    // on axis sign conventions: gravity on Y (device long axis) => portrait
+    // family, on X (device short axis) => landscape family.
     float absX = std::fabs(x);
     float absY = std::fabs(y);
 
@@ -134,7 +137,7 @@ void PostureObserver::HandleSensorData(float x, float y, float z)
         rawFamily = PostureFamily::LANDSCAPE;
     }
     if (rawFamily == PostureFamily::UNKNOWN) {
-        return; // 临界迟滞区: 样本不参与投票。
+        return; // Diagonal hysteresis band: the sample does not vote.
     }
 
     if (rawFamily == pendingFamily_) {
@@ -144,7 +147,8 @@ void PostureObserver::HandleSensorData(float x, float y, float z)
         pendingCount_ = 1;
     }
 
-    // 防抖: 连续 kFamilyConfirmCount 个样本一致才提交并通知。
+    // Debounce: commit and notify only after kFamilyConfirmCount consecutive
+    // agreeing samples.
     if (pendingCount_ >= kFamilyConfirmCount && rawFamily != currentFamily_.load(std::memory_order_relaxed)) {
         currentFamily_.store(rawFamily, std::memory_order_release);
         NotifyPostureFamilyChanged(rawFamily);

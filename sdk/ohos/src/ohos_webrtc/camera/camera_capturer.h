@@ -92,10 +92,14 @@ private:
     void ApplyPreviewRotation();
     void ApplyPreviewRotation(int displayDegrees);
     void CancelDisplayRotationTasks();
-    // issue #200: 前置姿态错配补偿评估(帧回调线程逐帧调用)。相机 HAL 对前置流
-    // 存在姿态跟随的像素级旋转(真机实测, 不经系统变换矩阵/帧元数据, 预览旋转
-    // 声明亦不废除), 窗口方向锁定时姿态族与窗口族错配使画面相对窗口倒置 180 度;
-    // 含持续性确认以过滤自动旋转时传感器与 display 变化的瞬态错配。
+    // issue #200: per-frame evaluation of the front-camera posture mismatch
+    // compensation, called on the frame callback thread. The camera HAL applies
+    // a posture-following pixel rotation to the front stream (measured on
+    // devices; invisible to the transform matrix, frame metadata and preview
+    // rotation declarations), which inverts the image by 180 degrees relative
+    // to the window whenever the physical posture family mismatches the locked
+    // window family. Includes a sustained-mismatch check that filters the
+    // transient mismatch between sensor and display changes during auto-rotation.
     int EvaluatePostureCompensation();
 
     // Written only while the display observer is unregistered. Unregister waits
@@ -134,10 +138,10 @@ private:
     std::atomic<VideoRotation> finalRotation_{kVideoRotation_0};
     std::atomic<VideoRotation> i420Rotation_{kVideoRotation_0};
     std::atomic<bool> previewRotationAppliedByHal_{false};
-    // issue #200: display rotation 的族归属(0/180 为竖族), capture 线程写入,
-    // 帧回调线程读取。
+    // issue #200: family of the display rotation (0/180 are portrait). Written
+    // on the capture thread, read on the frame callback thread.
     std::atomic<bool> displayIsPortraitFamily_{true};
-    // 姿态错配持续性确认状态, 仅帧回调线程访问。
+    // Sustained-mismatch confirmation state, accessed only on the frame callback thread.
     int64_t postureMismatchSinceMs_{0};
     int postureCompensationDegrees_{0};
     // Accessed only by the frame receiver callback thread.
