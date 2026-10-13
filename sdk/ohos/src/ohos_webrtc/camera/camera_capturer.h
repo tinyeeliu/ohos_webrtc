@@ -88,6 +88,8 @@ private:
     void GetCameraOrientationAndSceneMode(Camera_Device* device);
     Camera_Profile* FindPreviewProfile(ohos::CameraOutputCapability& capability, Camera_Device* device);
     bool StartCaptureSession(Camera_Profile* previewProfile);
+    // Logs the reason and reports the capture start failure to observers.
+    void NotifyStartFailed(const char* reason);
     void UpdateRotation();
     void ApplyPreviewRotation();
     void ApplyPreviewRotation(int displayDegrees);

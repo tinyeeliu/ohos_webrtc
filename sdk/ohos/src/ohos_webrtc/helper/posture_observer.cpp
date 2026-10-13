@@ -24,11 +24,11 @@ namespace ohos {
 namespace {
 
 // Axis indices of accelerometer samples (oh_sensor_type.h: data[0..2] = x/y/z).
-constexpr uint32_t kAxisIndexX = 0;
-constexpr uint32_t kAxisIndexY = 1;
-constexpr uint32_t kAxisIndexZ = 2;
+constexpr uint32_t K_AXIS_INDEX_X = 0;
+constexpr uint32_t K_AXIS_INDEX_Y = 1;
+constexpr uint32_t K_AXIS_INDEX_Z = 2;
 // Component count of one accelerometer sample.
-constexpr uint32_t kAccelerometerDataCount = 3;
+constexpr uint32_t K_ACCELEROMETER_DATA_COUNT = 3;
 
 } // namespace
 
@@ -109,10 +109,10 @@ void PostureObserver::OnSensorEvent(Sensor_Event* event)
     float* data = nullptr;
     uint32_t length = 0;
     if (OH_SensorEvent_GetData(event, &data, &length) != SENSOR_SUCCESS || data == nullptr
-        || length < kAccelerometerDataCount) {
+        || length < K_ACCELEROMETER_DATA_COUNT) {
         return;
     }
-    GetInstance().HandleSensorData(data[kAxisIndexX], data[kAxisIndexY], data[kAxisIndexZ]);
+    GetInstance().HandleSensorData(data[K_AXIS_INDEX_X], data[K_AXIS_INDEX_Y], data[K_AXIS_INDEX_Z]);
 }
 
 void PostureObserver::HandleSensorData(float x, float y, float z)

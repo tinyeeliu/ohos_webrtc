@@ -356,11 +356,16 @@ bool CameraCapturer::StartCaptureSession(Camera_Profile* previewProfile)
     ApplyPreviewRotation();
 
     if (!captureSession_.Start()) {
-        RTC_LOG(LS_ERROR) << "Failed to start capture session";
-        NotifyCapturedStart(false);
+        NotifyStartFailed("Failed to start capture session");
         return false;
     }
     return true;
+}
+
+void CameraCapturer::NotifyStartFailed(const char* reason)
+{
+    RTC_LOG(LS_ERROR) << reason;
+    NotifyCapturedStart(false);
 }
 
 void CameraCapturer::StartInternal()
@@ -368,8 +373,7 @@ void CameraCapturer::StartInternal()
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
     if (!isInitialized_) {
-        RTC_LOG(LS_ERROR) << "Not initialized";
-        NotifyCapturedStart(false);
+        NotifyStartFailed("Not initialized");
         return;
     }
 
@@ -382,8 +386,7 @@ void CameraCapturer::StartInternal()
 
     Camera_Device* device = SelectCameraDevice();
     if (device == nullptr) {
-        RTC_LOG(LS_ERROR) << "Failed to select camera device";
-        NotifyCapturedStart(false);
+        NotifyStartFailed("Failed to select camera device");
         return;
     }
 
@@ -392,21 +395,18 @@ void CameraCapturer::StartInternal()
     auto capability = CameraManager::GetInstance().GetSupportedCameraOutputCapability(device);
     Camera_Profile* previewProfile = FindPreviewProfile(capability, device);
     if (previewProfile == nullptr) {
-        RTC_LOG(LS_ERROR) << "Failed to find preview profile";
-        NotifyCapturedStart(false);
+        NotifyStartFailed("Failed to find preview profile");
         return;
     }
 
     input_ = CameraManager::GetInstance().CreateCameraInput(device);
     if (input_.IsEmpty()) {
-        RTC_LOG(LS_ERROR) << "Failed to create camera input";
-        NotifyCapturedStart(false);
+        NotifyStartFailed("Failed to create camera input");
         return;
     }
 
     if (!input_.Open()) {
-        RTC_LOG(LS_ERROR) << "Failed to open camera input";
-        NotifyCapturedStart(false);
+        NotifyStartFailed("Failed to open camera input");
         return;
     }
     if (multiDevicePreviewEnabled_.load()) {
