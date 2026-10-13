@@ -94,14 +94,8 @@ private:
     void ApplyPreviewRotation();
     void ApplyPreviewRotation(int displayDegrees);
     void CancelDisplayRotationTasks();
-    // issue #200: per-frame evaluation of the front-camera posture mismatch
-    // compensation, called on the frame callback thread. The camera HAL applies
-    // a posture-following pixel rotation to the front stream (measured on
-    // devices; invisible to the transform matrix, frame metadata and preview
-    // rotation declarations), which inverts the image by 180 degrees relative
-    // to the window whenever the physical posture family mismatches the locked
-    // window family. Includes a sustained-mismatch check that filters the
-    // transient mismatch between sensor and display changes during auto-rotation.
+    // Front-stream posture mismatch compensation, evaluated per frame on the
+    // frame callback thread.
     int EvaluatePostureCompensation();
 
     // Written only while the display observer is unregistered. Unregister waits
@@ -140,8 +134,8 @@ private:
     std::atomic<VideoRotation> finalRotation_{kVideoRotation_0};
     std::atomic<VideoRotation> i420Rotation_{kVideoRotation_0};
     std::atomic<bool> previewRotationAppliedByHal_{false};
-    // issue #200: family of the display rotation (0/180 are portrait). Written
-    // on the capture thread, read on the frame callback thread.
+    // Portrait family of the display rotation (0/180 degrees). Written on the
+    // capture thread, read on the frame callback thread.
     std::atomic<bool> displayIsPortraitFamily_{true};
     // Sustained-mismatch confirmation state, accessed only on the frame callback thread.
     int64_t postureMismatchSinceMs_{0};

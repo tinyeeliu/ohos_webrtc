@@ -422,9 +422,8 @@ void CameraCapturer::StartInternal()
     displayRotationSafety_ = PendingTaskSafetyFlag::Create();
     ohos::DisplayManager::GetInstance().RegisterChangeCallback(this);
     if (isCameraFrontFacing_) {
-        // issue #200: the front stream carries a posture-following rotation
-        // applied on the camera side; observe the posture family for mismatch
-        // compensation.
+        // The camera side rotates the front stream following the physical
+        // posture; observe the posture family for mismatch compensation.
         ohos::PostureObserver::GetInstance().RegisterObserver(this);
     }
     // Catch any display change that occurred while the session was starting.
@@ -439,8 +438,8 @@ void CameraCapturer::StopInternal()
     if (isInitialized_) {
         RTC_DCHECK_RUN_ON(captureThread_);
     }
-    // issue #200: unregister the posture observer before the isStarted_ guard so
-    // every early-exit path is covered (idempotent).
+    // Unregister before the isStarted_ guard so early-exit paths are covered
+    // as well; the call is idempotent.
     ohos::PostureObserver::GetInstance().UnregisterObserver(this);
 
     if (!isStarted_) {
@@ -574,10 +573,9 @@ void CameraCapturer::OnFrameAvailable(
     VideoRotation frameRotation = kVideoRotation_0;
     // captureThread_ may flip this flag mid-frame; one snapshot keeps rotation and dimensions consistent.
     const bool halApplied = previewRotationAppliedByHal_.load();
-    // issue #200: evaluate the front-camera posture mismatch compensation per
-    // frame (with sustained confirmation). Only the kNative on-device path
-    // applies it; the CPU path (emulator ImageReceiver) has no HAL posture
-    // rotation and must not be compensated.
+    // Per-frame posture mismatch compensation (with sustained confirmation).
+    // Only the kNative on-device path applies it; the CPU path (emulator
+    // ImageReceiver) has no camera-side posture rotation.
     const int postureCompensation = EvaluatePostureCompensation();
 
     if (buffer->type() == VideoFrameBuffer::Type::kNative) {
@@ -656,8 +654,7 @@ void CameraCapturer::ApplyPreviewRotation(int displayDegrees)
     constexpr int kFullCircleDegrees = 360;
     displayDegrees = ((displayDegrees % kFullCircleDegrees) + kFullCircleDegrees) % kFullCircleDegrees;
     displayDegrees = (displayDegrees / kDegreesPerRotationUnit) * kDegreesPerRotationUnit;
-    // issue #200: record the window family for the per-frame posture mismatch
-    // evaluation on the frame callback thread.
+    // Record the window family for the per-frame posture mismatch evaluation.
     constexpr int kInvertedDegrees = 180;
     displayIsPortraitFamily_.store(displayDegrees == 0 || displayDegrees == kInvertedDegrees,
         std::memory_order_relaxed);
@@ -745,15 +742,14 @@ int CameraCapturer::EvaluatePostureCompensation()
         return kNoCompensation;
     }
 
-    // issue #200: the camera HAL rotates the front stream pixels following the
-    // physical posture (four-quadrant measurements on devices: the image is
-    // inverted by 180 degrees relative to the window whenever the posture
-    // family mismatches the window family, and normal when they match). The
-    // rotation is invisible to the system transform matrix and frame metadata,
-    // and preview rotation declarations do not disable it; the rear stream is
-    // not affected. Without sensor data (e.g. the host app does not declare
-    // ohos.permission.ACCELEROMETER) the posture family is UNKNOWN and no
-    // compensation is applied, matching previous behavior.
+    // The camera HAL rotates the front stream pixels following the physical
+    // posture: on measured devices the image is inverted by 180 degrees
+    // relative to the window whenever the posture family mismatches the
+    // window family, and normal when they match. The rotation is invisible
+    // to the system transform matrix and frame metadata, and preview
+    // rotation declarations do not disable it; the rear stream is not
+    // affected. Without sensor data the posture family is UNKNOWN and no
+    // compensation is applied.
     ohos::PostureFamily postureFamily = ohos::PostureObserver::GetInstance().GetPostureFamily();
     bool mismatched = postureFamily != ohos::PostureFamily::UNKNOWN
         && (postureFamily == ohos::PostureFamily::PORTRAIT) != displayIsPortraitFamily_.load(std::memory_order_relaxed);

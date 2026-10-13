@@ -27,7 +27,7 @@ namespace ohos {
 
 // Physical posture of the device, derived from the dominant gravity axis of
 // the accelerometer. Independent of display rotation: it still follows the
-// physical hold while the window orientation is locked (issue #200).
+// physical hold while the window orientation is locked.
 enum class PostureFamily {
     UNKNOWN, // Sensor data unavailable (permission not declared, no sensor, service error).
     PORTRAIT, // Gravity along the device long axis (Y): upright or upside-down hold.
