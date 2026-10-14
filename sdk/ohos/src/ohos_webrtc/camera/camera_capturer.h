@@ -22,6 +22,7 @@
 #include "../render/egl_context.h"
 #include "../helper/camera.h"
 #include "helper/display_manager.h"
+#include "../helper/posture_observer.h"
 
 #include <memory>
 #include <cstdint>
@@ -40,7 +41,8 @@ class CameraCapturer : public VideoCapturer,
                        public VideoFrameReceiver::Callback,
                        public ohos::CameraPreviewOutput::Observer,
                        public ohos::CameraVideoOutput::Observer,
-                       public ohos::DisplayManager::ChangeObserver {
+                       public ohos::DisplayManager::ChangeObserver,
+                       public ohos::PostureObserver::Observer {
 public:
     static std::unique_ptr<CameraCapturer> Create(std::string deviceId, video::VideoProfile profile);
 
@@ -79,16 +81,22 @@ protected:
     void
     OnFrameAvailable(rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation) override;
     void OnDisplayChange(uint64_t displayId) override;
+    void OnPostureFamilyChanged(ohos::PostureFamily family) override;
 
 private:
     Camera_Device* SelectCameraDevice();
     void GetCameraOrientationAndSceneMode(Camera_Device* device);
     Camera_Profile* FindPreviewProfile(ohos::CameraOutputCapability& capability, Camera_Device* device);
     bool StartCaptureSession(Camera_Profile* previewProfile);
+    // Logs the reason and reports the capture start failure to observers.
+    void NotifyStartFailed(const char* reason);
     void UpdateRotation();
     void ApplyPreviewRotation();
     void ApplyPreviewRotation(int displayDegrees);
     void CancelDisplayRotationTasks();
+    // Front-stream posture mismatch compensation, evaluated per frame on the
+    // frame callback thread.
+    int EvaluatePostureCompensation();
 
     // Written only while the display observer is unregistered. Unregister waits
     // for in-flight callbacks; queued tasks use a fresh safety flag per session.
@@ -126,6 +134,12 @@ private:
     std::atomic<VideoRotation> finalRotation_{kVideoRotation_0};
     std::atomic<VideoRotation> i420Rotation_{kVideoRotation_0};
     std::atomic<bool> previewRotationAppliedByHal_{false};
+    // Portrait family of the display rotation (0/180 degrees). Written on the
+    // capture thread, read on the frame callback thread.
+    std::atomic<bool> displayIsPortraitFamily_{true};
+    // Sustained-mismatch confirmation state, accessed only on the frame callback thread.
+    int64_t postureMismatchSinceMs_{0};
+    int postureCompensationDegrees_{0};
     // Accessed only by the frame receiver callback thread.
     int deliveredWidth_{0};
     int deliveredHeight_{0};

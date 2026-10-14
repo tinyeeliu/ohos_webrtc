@@ -22,6 +22,7 @@
 #include <ohcamera/capture_session.h>
 
 #include <algorithm>
+#include <chrono>
 
 #include "rtc_base/logging.h"
 
@@ -329,7 +330,7 @@ bool CameraCapturer::StartCaptureSession(Camera_Profile* previewProfile)
     previewOutput_ = CameraManager::GetInstance().CreatePreviewOutput(previewProfile, surfaceId);
     previewRotationAppliedByHal_ = false;
     if (previewOutput_.IsEmpty()) {
-        RTC_LOG(LS_ERROR) << "Failed to create camera preview output";
+        NotifyStartFailed("Failed to create camera preview output");
         return false;
     }
     previewOutput_.AddObserver(this);
@@ -342,24 +343,29 @@ bool CameraCapturer::StartCaptureSession(Camera_Profile* previewProfile)
     }
 
     if (!captureSession_.BeginConfig()) {
-        RTC_LOG(LS_ERROR) << "Failed to begin capture session config";
+        NotifyStartFailed("Failed to begin capture session config");
         return false;
     }
 
     captureSession_.AddInput(input_);
     captureSession_.AddPreviewOutput(previewOutput_);
     if (!captureSession_.CommitConfig()) {
-        RTC_LOG(LS_ERROR) << "Failed to commit capture session config";
+        NotifyStartFailed("Failed to commit capture session config");
         return false;
     }
     ApplyPreviewRotation();
 
     if (!captureSession_.Start()) {
-        RTC_LOG(LS_ERROR) << "Failed to start capture session";
-        NotifyCapturedStart(false);
+        NotifyStartFailed("Failed to start capture session");
         return false;
     }
     return true;
+}
+
+void CameraCapturer::NotifyStartFailed(const char* reason)
+{
+    RTC_LOG(LS_ERROR) << reason;
+    NotifyCapturedStart(false);
 }
 
 void CameraCapturer::StartInternal()
@@ -367,8 +373,7 @@ void CameraCapturer::StartInternal()
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
 
     if (!isInitialized_) {
-        RTC_LOG(LS_ERROR) << "Not initialized";
-        NotifyCapturedStart(false);
+        NotifyStartFailed("Not initialized");
         return;
     }
 
@@ -381,8 +386,7 @@ void CameraCapturer::StartInternal()
 
     Camera_Device* device = SelectCameraDevice();
     if (device == nullptr) {
-        RTC_LOG(LS_ERROR) << "Failed to select camera device";
-        NotifyCapturedStart(false);
+        NotifyStartFailed("Failed to select camera device");
         return;
     }
 
@@ -391,21 +395,18 @@ void CameraCapturer::StartInternal()
     auto capability = CameraManager::GetInstance().GetSupportedCameraOutputCapability(device);
     Camera_Profile* previewProfile = FindPreviewProfile(capability, device);
     if (previewProfile == nullptr) {
-        RTC_LOG(LS_ERROR) << "Failed to find preview profile";
-        NotifyCapturedStart(false);
+        NotifyStartFailed("Failed to find preview profile");
         return;
     }
 
     input_ = CameraManager::GetInstance().CreateCameraInput(device);
     if (input_.IsEmpty()) {
-        RTC_LOG(LS_ERROR) << "Failed to create camera input";
-        NotifyCapturedStart(false);
+        NotifyStartFailed("Failed to create camera input");
         return;
     }
 
     if (!input_.Open()) {
-        RTC_LOG(LS_ERROR) << "Failed to open camera input";
-        NotifyCapturedStart(false);
+        NotifyStartFailed("Failed to open camera input");
         return;
     }
     if (multiDevicePreviewEnabled_.load()) {
@@ -413,13 +414,18 @@ void CameraCapturer::StartInternal()
     }
 
     if (!StartCaptureSession(previewProfile)) {
-        // StartCaptureSession already calls NotifyCapturedStart(false) on failure.
+        // StartCaptureSession reports every failure path via NotifyStartFailed.
         return;
     }
 
     isStarted_ = true;
     displayRotationSafety_ = PendingTaskSafetyFlag::Create();
     ohos::DisplayManager::GetInstance().RegisterChangeCallback(this);
+    if (isCameraFrontFacing_) {
+        // The camera side rotates the front stream following the physical
+        // posture; observe the posture family for mismatch compensation.
+        ohos::PostureObserver::GetInstance().RegisterObserver(this);
+    }
     // Catch any display change that occurred while the session was starting.
     UpdateRotation();
     NotifyCapturedStart(true);
@@ -432,6 +438,9 @@ void CameraCapturer::StopInternal()
     if (isInitialized_) {
         RTC_DCHECK_RUN_ON(captureThread_);
     }
+    // Unregister before the isStarted_ guard so early-exit paths are covered
+    // as well; the call is idempotent.
+    ohos::PostureObserver::GetInstance().UnregisterObserver(this);
 
     if (!isStarted_) {
         RTC_LOG(LS_ERROR) << "Capture session is not started";
@@ -564,6 +573,10 @@ void CameraCapturer::OnFrameAvailable(
     VideoRotation frameRotation = kVideoRotation_0;
     // captureThread_ may flip this flag mid-frame; one snapshot keeps rotation and dimensions consistent.
     const bool halApplied = previewRotationAppliedByHal_.load();
+    // Per-frame posture mismatch compensation (with sustained confirmation).
+    // Only the kNative on-device path applies it; the CPU path (emulator
+    // ImageReceiver) has no camera-side posture rotation.
+    const int postureCompensation = EvaluatePostureCompensation();
 
     if (buffer->type() == VideoFrameBuffer::Type::kNative) {
         auto textureBuffer = static_cast<TextureBuffer*>(buffer.get());
@@ -575,8 +588,16 @@ void CameraCapturer::OnFrameAvailable(
             transformMatrix.PreScale(-1.0f, 1.0f, 0.5f, 0.5f);
         }
         // Software fallback retains the original texture transform.
+        constexpr int kFullCircleDegrees = 360;
         if (!halApplied) {
-            transformMatrix.PreRotate(previewRotation, 0.5f, 0.5f);
+            transformMatrix.PreRotate(
+                (static_cast<int>(previewRotation) + postureCompensation) % kFullCircleDegrees, 0.5f, 0.5f);
+        } else if (postureCompensation != 0) {
+            // The HAL uprighted the preview stream as declared, but its
+            // posture-following pixel rotation is still present (measured on
+            // devices); compensate here when the window is locked and the
+            // posture family mismatches.
+            transformMatrix.PreRotate(postureCompensation, 0.5f, 0.5f);
         }
         Matrix newMatrix = textureBuffer->GetTransformMatrix();
         newMatrix.PreConcat(transformMatrix);
@@ -633,6 +654,10 @@ void CameraCapturer::ApplyPreviewRotation(int displayDegrees)
     constexpr int kFullCircleDegrees = 360;
     displayDegrees = ((displayDegrees % kFullCircleDegrees) + kFullCircleDegrees) % kFullCircleDegrees;
     displayDegrees = (displayDegrees / kDegreesPerRotationUnit) * kDegreesPerRotationUnit;
+    // Record the window family for the per-frame posture mismatch evaluation.
+    constexpr int kInvertedDegrees = 180;
+    displayIsPortraitFamily_.store(displayDegrees == 0 || displayDegrees == kInvertedDegrees,
+        std::memory_order_relaxed);
     int cameraDegrees = static_cast<int>(cameraOrientation_);
     if (cameraDegrees % kVideoRotation_90 != 0) {
         RTC_LOG(LS_WARNING) << "camera orientation must be a multiple of 90: " << cameraDegrees;
@@ -705,6 +730,63 @@ void CameraCapturer::CancelDisplayRotationTasks()
     ohos::DisplayManager::GetInstance().UnregisterChangeCallback(this);
     displayRotationSafety_->SetNotAlive();
     displayRotationSafety_ = nullptr;
+}
+
+int CameraCapturer::EvaluatePostureCompensation()
+{
+    constexpr int kPostureMismatchCompensationDegrees = 180;
+    constexpr int64_t kMismatchConfirmMs = 300;
+    constexpr int kNoCompensation = 0;
+
+    if (!isCameraFrontFacing_) {
+        return kNoCompensation;
+    }
+
+    // The camera HAL rotates the front stream pixels following the physical
+    // posture: on measured devices the image is inverted by 180 degrees
+    // relative to the window whenever the posture family mismatches the
+    // window family, and normal when they match. The rotation is invisible
+    // to the system transform matrix and frame metadata, and preview
+    // rotation declarations do not disable it; the rear stream is not
+    // affected. Without sensor data the posture family is UNKNOWN and no
+    // compensation is applied.
+    ohos::PostureFamily postureFamily = ohos::PostureObserver::GetInstance().GetPostureFamily();
+    bool mismatched = postureFamily != ohos::PostureFamily::UNKNOWN
+        && (postureFamily == ohos::PostureFamily::PORTRAIT) != displayIsPortraitFamily_.load(std::memory_order_relaxed);
+
+    int64_t nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+    if (!mismatched) {
+        postureMismatchSinceMs_ = 0;
+    } else if (postureMismatchSinceMs_ == 0) {
+        postureMismatchSinceMs_ = nowMs;
+    }
+
+    // Sustained confirmation: during auto-rotation the sensor commit and the
+    // display change are ordered in time, producing a transient mismatch
+    // (measured <=146 ms) that must not be compensated. With a locked window
+    // the mismatch is persistent, so confirming it once yields a stable
+    // compensation.
+    int compensation = (mismatched && nowMs - postureMismatchSinceMs_ >= kMismatchConfirmMs)
+        ? kPostureMismatchCompensationDegrees
+        : kNoCompensation;
+
+    if (compensation != postureCompensationDegrees_) {
+        postureCompensationDegrees_ = compensation;
+        RTC_LOG(LS_INFO) << "PostureCompensation: compensation=" << compensation
+                         << ", postureFamily=" << static_cast<int>(postureFamily)
+                         << ", displayIsPortraitFamily=" << displayIsPortraitFamily_.load(std::memory_order_relaxed)
+                         << ", halApplied=" << previewRotationAppliedByHal_.load(std::memory_order_relaxed);
+    }
+    return compensation;
+}
+
+void CameraCapturer::OnPostureFamilyChanged(ohos::PostureFamily family)
+{
+    // Sensor service thread callback; log only. Compensation is evaluated per
+    // frame with sustained confirmation, so no task is posted to captureThread_
+    // here, keeping this path clear of the display-callback safety scheme.
+    RTC_LOG(LS_INFO) << "OnPostureFamilyChanged: family=" << static_cast<int>(family);
 }
 
 } // namespace webrtc
