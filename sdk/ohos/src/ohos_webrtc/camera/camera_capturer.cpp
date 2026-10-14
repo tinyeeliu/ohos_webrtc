@@ -330,7 +330,7 @@ bool CameraCapturer::StartCaptureSession(Camera_Profile* previewProfile)
     previewOutput_ = CameraManager::GetInstance().CreatePreviewOutput(previewProfile, surfaceId);
     previewRotationAppliedByHal_ = false;
     if (previewOutput_.IsEmpty()) {
-        RTC_LOG(LS_ERROR) << "Failed to create camera preview output";
+        NotifyStartFailed("Failed to create camera preview output");
         return false;
     }
     previewOutput_.AddObserver(this);
@@ -343,14 +343,14 @@ bool CameraCapturer::StartCaptureSession(Camera_Profile* previewProfile)
     }
 
     if (!captureSession_.BeginConfig()) {
-        RTC_LOG(LS_ERROR) << "Failed to begin capture session config";
+        NotifyStartFailed("Failed to begin capture session config");
         return false;
     }
 
     captureSession_.AddInput(input_);
     captureSession_.AddPreviewOutput(previewOutput_);
     if (!captureSession_.CommitConfig()) {
-        RTC_LOG(LS_ERROR) << "Failed to commit capture session config";
+        NotifyStartFailed("Failed to commit capture session config");
         return false;
     }
     ApplyPreviewRotation();
@@ -414,7 +414,7 @@ void CameraCapturer::StartInternal()
     }
 
     if (!StartCaptureSession(previewProfile)) {
-        // StartCaptureSession already calls NotifyCapturedStart(false) on failure.
+        // StartCaptureSession reports every failure path via NotifyStartFailed.
         return;
     }
 
