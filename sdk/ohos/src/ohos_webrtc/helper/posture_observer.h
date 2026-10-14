@@ -41,11 +41,18 @@ enum class PostureFamily {
 // rotation compensation) gracefully degrade to doing nothing.
 class PostureObserver {
 public:
+    // Contract for OnPostureFamilyChanged:
+    // - Runs on the sensor service thread; keep it light, never block.
+    // - Never call RegisterObserver/UnregisterObserver from the callback:
+    //   the registry mutex is non-recursive and notification holds it.
+    // - Never destroy the observer from the callback.
+    // - The current family is not reported on registration; query
+    //   GetPostureFamily() once after registering if the initial value matters.
+    // - UnregisterObserver must be called before the observer is destroyed.
     class Observer {
     public:
         virtual ~Observer() = default;
 
-        // Notified when the posture family changes (sensor service thread; do not block).
         virtual void OnPostureFamilyChanged(PostureFamily family) = 0;
     };
 

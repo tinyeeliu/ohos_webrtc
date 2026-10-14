@@ -15,6 +15,7 @@
 
 #include "posture_observer.h"
 
+#include <algorithm>
 #include <cmath>
 
 #include "rtc_base/logging.h"
@@ -39,6 +40,9 @@ void PostureObserver::RegisterObserver(Observer* observer)
     }
 
     std::lock_guard<std::mutex> lock(mutex_);
+    if (std::find(observers_.begin(), observers_.end(), observer) != observers_.end()) {
+        return;
+    }
     observers_.push_back(observer);
     if (!subscribed_ && SubscribeLocked()) {
         subscribed_ = true;
@@ -89,7 +93,7 @@ bool PostureObserver::SubscribeLocked()
     // consumer degrades to no compensation (unchanged legacy behavior).
     Sensor_Result result = OH_Sensor_Subscribe(subscriptionId_, subscriptionAttribute_, subscriber_);
     if (result != SENSOR_SUCCESS) {
-        RTC_LOG(LS_INFO) << "PostureObserver: accelerometer subscribe failed, result=" << result
+        RTC_LOG(LS_WARNING) << "PostureObserver: accelerometer subscribe failed, result=" << result
                          << ", declare ohos.permission.ACCELEROMETER to enable posture compensation";
         return false;
     }
@@ -149,7 +153,7 @@ void PostureObserver::HandleSensorData(float x, float y, float z)
 
     // Debounce: commit and notify only after kFamilyConfirmCount consecutive
     // agreeing samples.
-    if (pendingCount_ >= kFamilyConfirmCount && rawFamily != currentFamily_.load(std::memory_order_relaxed)) {
+    if (pendingCount_ >= kFamilyConfirmCount && rawFamily != currentFamily_.load(std::memory_order_acquire)) {
         currentFamily_.store(rawFamily, std::memory_order_release);
         NotifyPostureFamilyChanged(rawFamily);
     }
