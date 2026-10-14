@@ -23,6 +23,23 @@ struct Index {
   build() {
     Column() {
       Row() {
+        Button("多设备相机实验室（A–F）")
+          .width(300)
+          .height(60)
+          .fontSize(20)
+          .fontWeight(FontWeight.Bold)
+          .margin({ top: 20 })
+          .onClick(() => {
+            console.log(TAG, "switch to multi-device rtc lab page!");
+            router.pushUrl({ url: "pages/MultiDeviceRtcLabPage"})
+          })
+          .margin({ left: 10, right: 20 })
+
+      }
+      .alignSelf(ItemAlign.Center)
+      .padding({ top: 24 })
+
+      Row() {
         Button("switch to working page")
           .width(300)
           .height(60)

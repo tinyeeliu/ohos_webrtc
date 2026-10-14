@@ -31,6 +31,7 @@
 #include <ohcamera/camera_manager.h>
 
 #include "api/video/video_frame_buffer.h"
+#include "api/task_queue/pending_task_safety_flag.h"
 #include "rtc_base/thread.h"
 
 namespace webrtc {
@@ -54,6 +55,7 @@ public:
     bool IsScreencast() override;
     void SwitchCamera() override;
     void SwitchCamera(const std::string& cameraId) override;
+    void ApplyDisplayRotation(int displayDegrees) override;
 
     void SetZoomRatio(double ratio) override;
     bool GetZoomRatioRange(float* minZoom, float* maxZoom) override;
@@ -114,6 +116,10 @@ private:
     // TextureBuffer dimensions describe the rotated image as well.
     std::atomic<VideoRotation> previewRotation_{kVideoRotation_0};
     std::atomic<VideoRotation> i420Rotation_{kVideoRotation_0};
+    std::atomic<bool> previewRotationAppliedByHal_{false};
+    // Accessed only by the frame receiver callback thread.
+    int deliveredWidth_{0};
+    int deliveredHeight_{0};
 };
 
 } // namespace webrtc

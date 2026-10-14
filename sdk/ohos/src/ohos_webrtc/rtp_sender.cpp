@@ -304,6 +304,7 @@ Napi::Value NapiRtpSender::SetParameters(const Napi::CallbackInfo& info)
         for (size_t i = 0; i < encCount; i++) {
             parameters.encodings[i].active = jsParams.encodings[i].active;
             parameters.encodings[i].max_bitrate_bps = jsParams.encodings[i].max_bitrate_bps;
+            parameters.encodings[i].min_bitrate_bps = jsParams.encodings[i].min_bitrate_bps;
             parameters.encodings[i].max_framerate = jsParams.encodings[i].max_framerate;
             parameters.encodings[i].scale_resolution_down_by = jsParams.encodings[i].scale_resolution_down_by;
         }
