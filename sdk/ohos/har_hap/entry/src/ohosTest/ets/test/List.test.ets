@@ -40,6 +40,13 @@ import VideoRenderControllerTest from './VideoRenderController.test';
 import VideoEncoderFactoryTest from './VideoEncoderFactory.test';
 import X86EmulatorFallbackTest from './X86EmulatorFallback.test';
 import CameraZoomTest from './CameraZoom.test';
+import NetworkIgnoreMaskTest from './NetworkIgnoreMask.test';
+import CaptureFrameTest from './CaptureFrame.test';
+import MediaDeviceGetCapabilitiesTest from './MediaDeviceGetCapabilities.test';
+import CameraTorchFocusTest from './CameraTorchFocus.test';
+import PeerConnectionStreamEventsTest from './PeerConnectionStreamEvents.test';
+import PeerConnectionRemoveTrackTest from './PeerConnectionRemoveTrack.test';
+import AudioProcessingFactoryTest from './AudioProcessingFactory.test';
 
 export default function testsuite() {
   abilityTest();
@@ -69,4 +76,11 @@ export default function testsuite() {
   VideoEncoderFactoryTest();
   X86EmulatorFallbackTest();
   CameraZoomTest();
+  NetworkIgnoreMaskTest();
+  CaptureFrameTest();
+  MediaDeviceGetCapabilitiesTest();
+  CameraTorchFocusTest();
+  PeerConnectionStreamEventsTest();
+  PeerConnectionRemoveTrackTest();
+  AudioProcessingFactoryTest();
 }

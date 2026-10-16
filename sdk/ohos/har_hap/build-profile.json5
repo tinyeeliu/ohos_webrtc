@@ -1,18 +1,31 @@
 {
   "app": {
-    "signingConfigs": [],
+    "signingConfigs": [
+      {
+        "name": "default",
+        "type": "HarmonyOS",
+        "material": {
+          "certpath": "C:\\Users\\myxua\\.ohos\\config\\default_har_hap_cxp9N9bul5rjEJ-uuNjk_RUxA4int4t4rArgYg56zrQ=.cer",
+          "keyAlias": "debugKey",
+          "keyPassword": "0000001B51A9498C1CB34B4A01A5C88D5CA650904AEBEBC8F5FBA556ABD2E82B02E055050A3446B39C5E37",
+          "profile": "C:\\Users\\myxua\\.ohos\\config\\default_har_hap_cxp9N9bul5rjEJ-uuNjk_RUxA4int4t4rArgYg56zrQ=.p7b",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "C:\\Users\\myxua\\.ohos\\config\\default_har_hap_cxp9N9bul5rjEJ-uuNjk_RUxA4int4t4rArgYg56zrQ=.p12",
+          "storePassword": "0000001BE7008208C5A401900C28CD439EC2AF80A7B3E1529C05E86C99E538818D69087977FFBCF10F3AB3"
+        }
+      }
+    ],
     "products": [
       {
         "name": "default",
         "signingConfig": "default",
-        "compileSdkVersion": 12,
-        "compatibleSdkVersion": 12,
-        "runtimeOS": "OpenHarmony"
+        "compatibleSdkVersion": "5.1.1(19)",
+        "runtimeOS": "HarmonyOS"
       }
     ],
     "buildModeSet": [
       {
-        "name": "debug",
+        "name": "debug"
       },
       {
         "name": "release"

@@ -129,8 +129,8 @@ int HardwareVideoEncoder::InitEncode(const VideoCodec* codec_settings, const Set
     if (codecSettings_.codecType == kVideoCodecH264) {
         OH_AVFormat_SetIntValue(format.Raw(), OH_MD_KEY_I_FRAME_INTERVAL, codecSettings_.H264()->keyFrameInterval);
         auto profileLevelId = ParseSdpForH264ProfileLevelId(format_.parameters);
-        if (profileLevelId && (profileLevelId->profile == H264Profile::kProfileConstrainedHigh &&
-                               profileLevelId->level == H264Level::kLevel3_1)) {
+        if (profileLevelId && profileLevelId->profile == H264Profile::kProfileConstrainedHigh) {
+            // Declared level now varies by device capability (3.1/4.1/5.1), match on profile only
             OH_AVFormat_SetIntValue(format.Raw(), OH_MD_KEY_PROFILE, AVC_PROFILE_HIGH);
             // OH_MD_KEY_LEVEL ?
         }

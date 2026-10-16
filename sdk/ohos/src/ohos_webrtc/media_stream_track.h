@@ -78,6 +78,7 @@ protected:
     Napi::Value GetSource(const Napi::CallbackInfo& info);
     Napi::Value ApplyConstraints(const Napi::CallbackInfo& info);
     Napi::Value GetZoomRange(const Napi::CallbackInfo& info);
+    Napi::Value CaptureFrame(const Napi::CallbackInfo& info);
     Napi::Value ToJson(const Napi::CallbackInfo& info);
 
 private:

@@ -65,6 +65,19 @@ public:
 
     virtual void SwitchCamera() {}
     virtual void SwitchCamera(const std::string& cameraId) { (void)cameraId; }
+
+    // Camera torch/focus/exposure. Return false when unsupported or failed; non-camera
+    // capturers need not override. Focus/exposure mode values are ohcamera enum values.
+    virtual bool HasTorch() { return false; }
+    virtual bool SetTorch(bool on) { (void)on; return false; }
+    virtual bool SetFocusMode(int32_t mode) { (void)mode; return false; }
+    virtual bool SetFocusPoint(double x, double y)
+    {
+        (void)x;
+        (void)y;
+        return false;
+    }
+    virtual bool SetExposureMode(int32_t mode) { (void)mode; return false; }
 };
 
 } // namespace webrtc

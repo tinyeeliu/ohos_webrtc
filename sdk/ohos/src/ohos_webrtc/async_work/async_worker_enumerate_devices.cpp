@@ -17,9 +17,56 @@
 
 #include "rtc_base/logging.h"
 
+#include <algorithm>
+#include <cstdint>
+
 namespace webrtc {
 
 using namespace Napi;
+
+namespace {
+
+// Real hardware capability ranges from profiles collected during enumeration;
+// empty Function when the device reported no profiles
+Napi::Function MakeCameraCapabilitiesFunction(Napi::Env env, const CameraDeviceInfo& device)
+{
+    int32_t minWidth = INT32_MAX;
+    int32_t maxWidth = 0;
+    int32_t minHeight = INT32_MAX;
+    int32_t maxHeight = 0;
+    for (const auto& profile : device.profiles) {
+        auto profileWidth = static_cast<int32_t>(profile.resolution.width);
+        auto profileHeight = static_cast<int32_t>(profile.resolution.height);
+        minWidth = std::min(minWidth, profileWidth);
+        maxWidth = std::max(maxWidth, profileWidth);
+        minHeight = std::min(minHeight, profileHeight);
+        maxHeight = std::max(maxHeight, profileHeight);
+    }
+    if (maxWidth <= 0 || maxHeight <= 0) {
+        return Napi::Function();
+    }
+
+    uint32_t minFps = device.frameRateRange.min;
+    uint32_t maxFps = device.frameRateRange.max;
+    auto makeRange = [](Env rangeEnv, double min, double max) {
+        auto range = Object::New(rangeEnv);
+        range.Set("min", Number::New(rangeEnv, min));
+        range.Set("max", Number::New(rangeEnv, max));
+        return range;
+    };
+    return Function::New(
+        env, [minWidth, maxWidth, minHeight, maxHeight, minFps, maxFps, makeRange](const CallbackInfo& info) {
+            auto capabilities = Object::New(info.Env());
+            capabilities.Set("width", makeRange(info.Env(), minWidth, maxWidth));
+            capabilities.Set("height", makeRange(info.Env(), minHeight, maxHeight));
+            if (minFps > 0 || maxFps > 0) {
+                capabilities.Set("frameRate", makeRange(info.Env(), minFps, maxFps));
+            }
+            return capabilities;
+        });
+}
+
+} // namespace
 
 AsyncWorkerEnumerateDevices* AsyncWorkerEnumerateDevices::Create(Napi::Env env, const char* resourceName)
 {
@@ -45,20 +92,31 @@ void AsyncWorkerEnumerateDevices::OnOK()
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
     auto result = Array::New(Env(), cameraDevices_.size() + audioDevices_.size());
+    FillCameraDevices(result);
+    FillAudioDevices(result);
 
+    deferred_.Resolve(result);
+}
+
+void AsyncWorkerEnumerateDevices::FillCameraDevices(Napi::Array& result)
+{
     for (uint32_t index = 0; index < cameraDevices_.size(); index++) {
+        auto& device = cameraDevices_[index];
         auto obj = Object::New(Env());
-        obj.Set("deviceId", String::New(Env(), cameraDevices_[index].deviceId));
-        obj.Set("groupId", String::New(Env(), cameraDevices_[index].groupId));
-        obj.Set("label", String::New(Env(), cameraDevices_[index].label));
+        obj.Set("deviceId", String::New(Env(), device.deviceId));
+        obj.Set("groupId", String::New(Env(), device.groupId));
+        obj.Set("label", String::New(Env(), device.label));
         obj.Set("kind", String::New(Env(), "videoinput"));
-        obj.Set("getCapabilities", Function::New(Env(), [](const CallbackInfo& info) {
-                    RTC_DLOG(LS_VERBOSE) << "getCapabilities";
-                    NAPI_THROW(Error::New(info.Env(), "Not implemented"), info.Env().Undefined());
-                }));
+        auto capabilities = MakeCameraCapabilitiesFunction(Env(), device);
+        if (!capabilities.IsEmpty()) {
+            obj.Set("getCapabilities", capabilities);
+        }
         result.Set(index, obj);
     }
+}
 
+void AsyncWorkerEnumerateDevices::FillAudioDevices(Napi::Array& result)
+{
     for (uint32_t index = 0; index < audioDevices_.size(); index++) {
         auto obj = Object::New(Env());
         obj.Set("deviceId", String::New(Env(), audioDevices_[index].deviceId));
@@ -66,10 +124,6 @@ void AsyncWorkerEnumerateDevices::OnOK()
         obj.Set("label", String::New(Env(), audioDevices_[index].label));
         if (audioDevices_[index].role == AudioDeviceRole::Input) {
             obj.Set("kind", String::New(Env(), "audioinput"));
-            obj.Set("getCapabilities", Function::New(Env(), [](const CallbackInfo& info) {
-                        RTC_DLOG(LS_VERBOSE) << "getCapabilities";
-                        NAPI_THROW(Error::New(info.Env(), "Not implemented"), info.Env().Undefined());
-                    }));
         } else if (audioDevices_[index].role == AudioDeviceRole::Output) {
             obj.Set("kind", String::New(Env(), "audiooutput"));
         } else {
@@ -77,8 +131,6 @@ void AsyncWorkerEnumerateDevices::OnOK()
         }
         result.Set(cameraDevices_.size() + index, obj);
     }
-
-    deferred_.Resolve(result);
 }
 
 void AsyncWorkerEnumerateDevices::OnError(const Napi::Error& e)

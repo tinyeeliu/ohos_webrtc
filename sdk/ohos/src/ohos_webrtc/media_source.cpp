@@ -159,6 +159,11 @@ void NapiVideoSource::Init(Napi::Env env, Napi::Object exports)
             InstanceMethod<&NapiVideoSource::StartCapture>(kMethodNameStartCapture),
             InstanceMethod<&NapiVideoSource::StopCapture>(kMethodNameStopCapture),
             InstanceMethod<&NapiVideoSource::SwitchCamera>(kMethodNameSwitchCamera),
+            InstanceMethod<&NapiVideoSource::HasTorch>(kMethodNameHasTorch),
+            InstanceMethod<&NapiVideoSource::SetTorch>(kMethodNameSetTorch),
+            InstanceMethod<&NapiVideoSource::SetFocusMode>(kMethodNameSetFocusMode),
+            InstanceMethod<&NapiVideoSource::SetFocusPoint>(kMethodNameSetFocusPoint),
+            InstanceMethod<&NapiVideoSource::SetExposureMode>(kMethodNameSetExposureMode),
             InstanceMethod<&NapiVideoSource::ToJson>(kMethodNameToJson),
         });
     exports.Set(kClassName, func);
@@ -371,6 +376,79 @@ Napi::Value NapiVideoSource::SwitchCamera(const Napi::CallbackInfo& info)
         source_->SwitchCamera(cameraId);
     } else {
         source_->SwitchCamera();
+    }
+
+    return info.Env().Undefined();
+}
+
+Napi::Value NapiVideoSource::HasTorch(const Napi::CallbackInfo& info)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    if (!source_) {
+        NAPI_THROW(Error::New(info.Env(), "Illegal state"), info.Env().Undefined());
+    }
+
+    return Boolean::New(info.Env(), source_->HasTorch());
+}
+
+Napi::Value NapiVideoSource::SetTorch(const Napi::CallbackInfo& info)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    if (!source_ || info.Length() < 1 || !info[0].IsBoolean()) {
+        NAPI_THROW(TypeError::New(info.Env(), "Invalid argument"), info.Env().Undefined());
+    }
+
+    if (!source_->SetTorch(info[0].As<Boolean>().Value())) {
+        NAPI_THROW(Error::New(info.Env(), "Torch is not supported on the active camera"), info.Env().Undefined());
+    }
+
+    return info.Env().Undefined();
+}
+
+Napi::Value NapiVideoSource::SetFocusMode(const Napi::CallbackInfo& info)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    if (!source_ || info.Length() < 1 || !info[0].IsNumber()) {
+        NAPI_THROW(TypeError::New(info.Env(), "Invalid argument"), info.Env().Undefined());
+    }
+
+    if (!source_->SetFocusMode(info[0].As<Number>().Int32Value())) {
+        NAPI_THROW(Error::New(info.Env(), "Focus mode is not supported on the active camera"), info.Env().Undefined());
+    }
+
+    return info.Env().Undefined();
+}
+
+Napi::Value NapiVideoSource::SetFocusPoint(const Napi::CallbackInfo& info)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    if (!source_ || info.Length() < 2 || !info[0].IsNumber() || !info[1].IsNumber()) {
+        NAPI_THROW(TypeError::New(info.Env(), "Invalid argument"), info.Env().Undefined());
+    }
+
+    if (!source_->SetFocusPoint(info[0].As<Number>().DoubleValue(), info[1].As<Number>().DoubleValue())) {
+        NAPI_THROW(
+            Error::New(info.Env(), "Focus point is not supported on the active camera"), info.Env().Undefined());
+    }
+
+    return info.Env().Undefined();
+}
+
+Napi::Value NapiVideoSource::SetExposureMode(const Napi::CallbackInfo& info)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    if (!source_ || info.Length() < 1 || !info[0].IsNumber()) {
+        NAPI_THROW(TypeError::New(info.Env(), "Invalid argument"), info.Env().Undefined());
+    }
+
+    if (!source_->SetExposureMode(info[0].As<Number>().Int32Value())) {
+        NAPI_THROW(
+            Error::New(info.Env(), "Exposure mode is not supported on the active camera"), info.Env().Undefined());
     }
 
     return info.Env().Undefined();

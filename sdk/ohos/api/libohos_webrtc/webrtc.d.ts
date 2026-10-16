@@ -133,6 +133,11 @@ export interface RTCTrackEvent extends Event {
   readonly transceiver: RTCRtpTransceiver;
 }
 
+// non-standard: fires on RTCPeerConnection.onremovetrack when a remote track is removed
+export interface RTCRemoveTrackEvent extends Event {
+  readonly receiver: RTCRtpReceiver;
+}
+
 // https://www.w3.org/TR/webrtc/#rtcpeerconnectioniceevent
 export interface RTCPeerConnectionIceEvent extends Event {
   readonly candidate?: RTCIceCandidate;
@@ -166,6 +171,12 @@ export interface MessageEvent<T = any> extends Event {
 // https://www.w3.org/TR/mediacapture-streams/#mediastreamtrackevent
 export interface MediaStreamTrackEvent extends Event {
   readonly track: MediaStreamTrack;
+}
+
+// non-standard: fires on RTCPeerConnection.onaddstream/onremovestream
+export interface MediaStreamEvent extends Event {
+  readonly stream: MediaStream;
+  readonly streamId: string;
 }
 
 export interface VideoCapturerStartedEvent extends Event {
@@ -344,6 +355,9 @@ export interface RTCPeerConnection extends EventTarget {
   onconnectionstatechange: ((this: RTCPeerConnection, ev: Event) => any) | null;
   ontrack: ((this: RTCPeerConnection, ev: RTCTrackEvent) => any) | null;
   ondatachannel: ((this: RTCPeerConnection, ev: RTCDataChannelEvent) => any) | null;
+  onaddstream: ((this: RTCPeerConnection, ev: MediaStreamEvent) => any) | null;
+  onremovestream: ((this: RTCPeerConnection, ev: MediaStreamEvent) => any) | null;
+  onremovetrack: ((this: RTCPeerConnection, ev: RTCRemoveTrackEvent) => any) | null;
 
   addTrack(track: MediaStreamTrack, ...streams: MediaStream[]): RTCRtpSender;
   removeTrack(sender: RTCRtpSender): void;
@@ -811,9 +825,30 @@ export interface VideoSource extends MediaSource {
   switchCamera(): void;
   // 切换到指定 cameraId 的摄像头; cameraId 不存在时触发 oncameraswitcherror。
   switchCamera(cameraId: string): void;
+
+  // 当前摄像头是否带补光灯。
+  hasTorch(): boolean;
+  // 开/关补光灯常亮。
+  setTorch(on: boolean): void;
+  // 对焦模式。取值见 ohos.multimedia.camera.FocusMode。
+  setFocusMode(mode: number): void;
+  // 点按对焦。x/y 为 [0.0, 1.0] 归一化坐标。
+  setFocusPoint(x: number, y: number): void;
+  // 曝光模式。取值见 ohos.multimedia.camera.ExposureMode。
+  setExposureMode(mode: number): void;
 }
 
 // https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
+// non-standard: one frame captured from a video track via MediaStreamTrack.captureFrame()
+export interface CapturedVideoFrame {
+  readonly width: number;
+  readonly height: number;
+  // 旋转角(度, 0/90/180/270); 存图前需按此转正。
+  readonly rotation: number;
+  // I420 平面数据: width*height 字节 Y 平面 + 两个 1/4 尺寸 U/V 平面(2x2 子采样)。
+  readonly data: ArrayBuffer;
+}
+
 export interface MediaStreamTrack extends EventTarget {
   readonly kind: string;
   readonly id: string;
@@ -822,6 +857,8 @@ export interface MediaStreamTrack extends EventTarget {
 
   stop(): void;
   getSource(): MediaSource | null;
+  // 抓取一帧画面; 仅对视频轨道有意义。
+  captureFrame(): Promise<CapturedVideoFrame>;
 }
 
 export declare var MediaStreamTrack: {
@@ -860,6 +897,8 @@ export interface MediaDeviceInfo {
   readonly kind: MediaDeviceKind;
   readonly label: string;
   readonly groupId: string;
+  // 摄像头硬件支持的采集范围; 仅 videoinput 设备上存在。
+  getCapabilities?(): MediaTrackCapabilities;
 }
 
 export interface DeviceChangeEvent extends Event {
@@ -989,8 +1028,26 @@ declare var AudioDeviceModule: {
 // Hold a native webrtc.AudioProcessing instance
 export interface AudioProcessing {}
 
+// non-standard: 10ms interleaved audio frame handed to JS audio processing slots
+export interface AudioProcessingFrame {
+  readonly sampleRate: number;
+  readonly channels: number;
+  // 交错排列的 float 采样; 就地改写本数组以修改音频。
+  readonly data: Float32Array;
+}
+
+export type AudioProcessingFrameCallback = (frame: AudioProcessingFrame) => void;
+
+export interface AudioProcessingOptions {
+  // 麦克风采集侧处理(编码前)。
+  capturePostProcessing?: AudioProcessingFrameCallback;
+  // 播放侧处理(混音前)。
+  renderPreProcessing?: AudioProcessingFrameCallback;
+}
+
 export interface AudioProcessingFactory {
-  create(): AudioProcessing;
+  // options 传入 JS 处理插槽时, 返回委托版 AudioProcessing(内部仍持有内置 APM 兜底)。
+  create(options?: AudioProcessingOptions): AudioProcessing;
 }
 
 declare var AudioProcessingFactory: {
@@ -1040,6 +1097,10 @@ export interface PeerConnectionFactoryOptions {
   videoEncoderFactory?: VideoEncoderFactory;
   videoDecoderFactory?: VideoDecoderFactory;
   audioProcessing?: AudioProcessing;
+  // 屏蔽不参与建连的网卡类型, 位掩码按位或:
+  // ETHERNET=1<<0, WIFI=1<<1, CELLULAR=1<<2, VPN=1<<3, LOOPBACK=1<<4,
+  // ANY=1<<5, CELLULAR_2G/3G/4G/5G=1<<6..1<<9。工厂创建后应用。
+  networkIgnoreMask?: number;
 }
 
 export interface PeerConnectionFactory {

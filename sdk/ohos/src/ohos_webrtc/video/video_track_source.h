@@ -101,6 +101,12 @@ public:
     // Set camera zoom ratio (dispatched to source thread, then forwarded to capturer)
     void SetZoomRatio(double ratio);
     bool GetZoomRatioRange(float* minZoom, float* maxZoom);
+
+    bool HasTorch();
+    bool SetTorch(bool on);
+    bool SetFocusMode(int32_t mode);
+    bool SetFocusPoint(double x, double y);
+    bool SetExposureMode(int32_t mode);
     bool IsEnded() const;
 
 protected:

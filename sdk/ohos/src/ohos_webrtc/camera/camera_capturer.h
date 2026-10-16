@@ -58,6 +58,12 @@ public:
     void SetZoomRatio(double ratio) override;
     bool GetZoomRatioRange(float* minZoom, float* maxZoom) override;
 
+    bool HasTorch() override;
+    bool SetTorch(bool on) override;
+    bool SetFocusMode(int32_t mode) override;
+    bool SetFocusPoint(double x, double y) override;
+    bool SetExposureMode(int32_t mode) override;
+
 protected:
     void NotifyCapturedStart(bool success);
     void NotifyCapturedStop();

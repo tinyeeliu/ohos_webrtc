@@ -56,6 +56,40 @@ struct Index {
       .alignSelf(ItemAlign.Center)
       .padding({ top: 24 })
 
+      Row() {
+        Button('相机功能测试')
+          .width(300)
+          .height(60)
+          .fontSize(20)
+          .fontWeight(FontWeight.Bold)
+          .margin({ top: 20 })
+          .onClick(() => {
+            console.log(TAG, 'switch to media camera test page!');
+            router.pushUrl({ url: 'pages/MediaCameraTestPage'})
+          })
+          .margin({ left: 10, right: 20 })
+
+      }
+      .alignSelf(ItemAlign.Center)
+      .padding({ top: 24 })
+
+      Row() {
+        Button('连接网络音频测试')
+          .width(300)
+          .height(60)
+          .fontSize(20)
+          .fontWeight(FontWeight.Bold)
+          .margin({ top: 20 })
+          .onClick(() => {
+            console.log(TAG, 'switch to connectivity test page!');
+            router.pushUrl({ url: 'pages/ConnectivityTestPage'})
+          })
+          .margin({ left: 10, right: 20 })
+
+      }
+      .alignSelf(ItemAlign.Center)
+      .padding({ top: 24 })
+
     }
     .width('100%')
     .height('100%')
