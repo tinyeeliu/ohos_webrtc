@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.0.4 (2026-10-09)
+
+Current local changes for multi-device camera adaptation; no package release is assigned yet.
+
+### Added
+
+- Export `CameraPreviewSession` and its options/status types for camera selection, strict device IDs, front/rear preference fallback, foreground/background recovery, bounded retries, and track replacement notifications.
+- Synchronize capture with the host window's display and observe display migration, camera availability, and fold events with runtime capability checks.
+- Add optional `VideoSource.applyDisplayRotation()` and `getCaptureFrameCount()`, `NativeVideoRenderer.setSurfaceSize()`, and `FrameResolutionChangedEvent`. Native `cameraPreviewApiVersion` is now 2; version 1 supports preview without frame-count monitoring.
+- Add opt-in capture-stall monitoring (`frameStallTimeoutMs`, disabled by default), using captured-frame counts and the session's bounded recovery policy.
+- Add controller preview sizing and oriented frame-size notifications, plus the A–F multi-device camera lab: responsive layout, camera selection, aspect-ratio cropping, preview snapshots and local encode/decode loopback, crease-aware hover layout, and two-peer video calls.
+- Add host-side session, layout, loopback, peer-call, and Native rotation/viewport regression tests, plus string-constraint cases in the device test suite.
+- PR:[#145](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/145).
+
+### Changed / Fixed
+
+- Serialize camera rotation changes and preserve host-supplied orientation against default-display updates. Probe physical installation-angle support at runtime and handle HAL rotation failures with software fallback or session recovery when reset fails.
+- Adapt GL and raster preview rendering to Surface dimensions, oriented frames, scaling, and mirroring while retaining legacy behavior for callers that do not opt into enhanced preview.
+- Isolate stale capture/renderer callbacks and cancel recovery work when capture is deactivated or released.
+- Correct string `ideal`/`exact` constraint parsing and reject non-string sequence elements and nested constraint dictionaries.
+- Update English/Chinese SDK and demo documentation for integration, capability versions, A–F validation, and build requirements.
+
+### Compatibility and Validation
+
+- New sessions require a matching Native library with preview capability version 1 or later. Explicit frame-stall monitoring also requires `getCaptureFrameCount()`; the demo enables its 8-second sampling interval only with version 2 or later.
+- Rebuild the complete Native library and replace the target ABI binary to use the current Native additions. Existing low-level API signatures remain available, and new optional declarations allow legacy implementations to remain valid.
+- Automated tests and local loopback do not establish cross-device HAL, orientation, or recovery correctness. Preview snapshots capture the composited view; no raw-frame export or recognition engine is added. Two-peer demo calls use STUN without TURN, so restricted networks may prevent connection.
+
 ## 1.0.3 (2026-07-29)
 
 - Support camera zoom via applyConstraints({ zoom }) and getZoomRange() [#121](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/121)

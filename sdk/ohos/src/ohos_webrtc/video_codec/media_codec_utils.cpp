@@ -17,6 +17,29 @@
 
 #include <multimedia/player_framework/native_avformat.h>
 
+#include <rtc_base/logging.h>
+
+namespace webrtc {
+namespace adapter {
+
+H264Level MaxSupportedH264Level(OH_AVCapability* capability, OH_AVCProfile profile)
+{
+    if (!capability) {
+        return H264Level::kLevel3_1;
+    }
+
+    if (OH_AVCapability_AreProfileAndLevelSupported(capability, profile, AVC_LEVEL_51)) {
+        return H264Level::kLevel5_1;
+    }
+    if (OH_AVCapability_AreProfileAndLevelSupported(capability, profile, AVC_LEVEL_41)) {
+        return H264Level::kLevel4_1;
+    }
+    return H264Level::kLevel3_1;
+}
+
+} // namespace adapter
+} // namespace webrtc
+
 namespace ohos {
 
 const std::vector<int32_t> MediaCodecUtils::DECODER_PIXEL_FORMATS{

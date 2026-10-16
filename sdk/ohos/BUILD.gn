@@ -30,6 +30,7 @@ if (is_ohos) {
         "$ohos_webrtc_src_path/certificate.cpp",
         "$ohos_webrtc_src_path/configuration.cpp",
         "$ohos_webrtc_src_path/data_channel.cpp",
+        "$ohos_webrtc_src_path/delegated_audio_processing.cpp",
         "$ohos_webrtc_src_path/dtls_transport.cpp",
         "$ohos_webrtc_src_path/dtmf_sender.cpp",
         "$ohos_webrtc_src_path/ice_candidate.cpp",
@@ -112,6 +113,7 @@ if (is_ohos) {
     ]
 
     libs = [
+      "dl",
       "ace_napi.z",
       "hilog_ndk.z",
       "ohaudio",
@@ -135,6 +137,7 @@ if (is_ohos) {
     deps = [
       "../../pc:libjingle_peerconnection",
       "../../api:create_peerconnection_factory",
+      "../../api/task_queue:pending_task_safety_flag",
       "../../api/audio_codecs:builtin_audio_decoder_factory",
       "../../api/audio_codecs:builtin_audio_encoder_factory",
       "../../modules/video_coding:webrtc_h264",

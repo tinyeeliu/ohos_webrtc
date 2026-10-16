@@ -46,6 +46,8 @@ public:
     // 切换摄像头: 投递到 capturer 线程执行, 保证 StopInternal/StartInternal 不与运行中的采集竞态。
     void SwitchCamera();
     void SwitchCamera(const std::string& cameraId);
+    void ApplyDisplayRotation(int displayDegrees);
+    uint64_t GetCaptureFrameCount() const { return captureFrameCount_.load(std::memory_order_relaxed); }
 
     void SetCapturerObserver(VideoCapturer::Observer* observer);
 
@@ -101,6 +103,12 @@ public:
     // Set camera zoom ratio (dispatched to source thread, then forwarded to capturer)
     void SetZoomRatio(double ratio);
     bool GetZoomRatioRange(float* minZoom, float* maxZoom);
+
+    bool HasTorch();
+    bool SetTorch(bool on);
+    bool SetFocusMode(int32_t mode);
+    bool SetFocusPoint(double x, double y);
+    bool SetExposureMode(int32_t mode);
     bool IsEnded() const;
 
 protected:
@@ -117,6 +125,7 @@ private:
 
 private:
     std::atomic<bool> is_destroying_{false};
+    std::atomic<uint64_t> captureFrameCount_{0};
     std::unique_ptr<rtc::Thread> thread_;
     rtc::Thread* signalingThread_;
     std::shared_ptr<VideoCapturer> capturer_;

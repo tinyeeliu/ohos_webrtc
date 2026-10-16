@@ -14,6 +14,7 @@
  */
 
 #include "camera_capturer.h"
+#include "preview_rotation_policy.h"
 #include "../video/video_frame_receiver_gl.h"
 #include "../utils/marcos.h"
 
@@ -71,6 +72,8 @@ void CameraCapturer::NotifyCapturedStop()
 void CameraCapturer::Init(std::unique_ptr<VideoFrameReceiver> dataReceiver, VideoCapturer::Observer* observer)
 {
     RTC_LOG(LS_INFO) << __FUNCTION__;
+    captureThread_ = rtc::Thread::Current();
+    RTC_CHECK(captureThread_);
 
     {
         UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
@@ -89,7 +92,13 @@ void CameraCapturer::Init(std::unique_ptr<VideoFrameReceiver> dataReceiver, Vide
 void CameraCapturer::Release()
 {
     RTC_LOG(LS_INFO) << __FUNCTION__;
-    ohos::DisplayManager::GetInstance().UnregisterChangeCallback(this);
+    // The owner releases on the capture thread before joining it. The destructor
+    // may run later on another thread, so repeated release must do nothing.
+    if (!isInitialized_) {
+        return;
+    }
+    RTC_DCHECK_RUN_ON(captureThread_);
+    CancelDisplayRotationTasks();
     Stop();
 
     {
@@ -100,6 +109,7 @@ void CameraCapturer::Release()
     dataReceiver_.reset();
 
     isInitialized_ = false;
+    captureThread_ = nullptr;
 }
 
 void CameraCapturer::Start()
@@ -266,7 +276,6 @@ Camera_Device* CameraCapturer::SelectCameraDevice()
 
     RTC_LOG(LS_VERBOSE) << "device: " << deviceIndex << ", " << device->cameraId;
     isCameraFrontFacing_ = device->cameraPosition == CAMERA_POSITION_FRONT;
-    ohos::DisplayManager::GetInstance().RegisterChangeCallback(this);
     return device;
 }
 
@@ -318,6 +327,7 @@ bool CameraCapturer::StartCaptureSession(Camera_Profile* previewProfile)
     auto surfaceId = std::to_string(dataReceiver_->GetSurfaceId());
 
     previewOutput_ = CameraManager::GetInstance().CreatePreviewOutput(previewProfile, surfaceId);
+    previewRotationAppliedByHal_ = false;
     if (previewOutput_.IsEmpty()) {
         RTC_LOG(LS_ERROR) << "Failed to create camera preview output";
         return false;
@@ -342,6 +352,7 @@ bool CameraCapturer::StartCaptureSession(Camera_Profile* previewProfile)
         RTC_LOG(LS_ERROR) << "Failed to commit capture session config";
         return false;
     }
+    ApplyPreviewRotation();
 
     if (!captureSession_.Start()) {
         RTC_LOG(LS_ERROR) << "Failed to start capture session";
@@ -365,6 +376,8 @@ void CameraCapturer::StartInternal()
         RTC_LOG(LS_WARNING) << "Capture session is started";
         return;
     }
+
+    RTC_DCHECK_RUN_ON(captureThread_);
 
     Camera_Device* device = SelectCameraDevice();
     if (device == nullptr) {
@@ -395,6 +408,9 @@ void CameraCapturer::StartInternal()
         NotifyCapturedStart(false);
         return;
     }
+    if (multiDevicePreviewEnabled_.load()) {
+        input_.UsePhysicalCameraOrientationIfVariable();
+    }
 
     if (!StartCaptureSession(previewProfile)) {
         // StartCaptureSession already calls NotifyCapturedStart(false) on failure.
@@ -402,12 +418,20 @@ void CameraCapturer::StartInternal()
     }
 
     isStarted_ = true;
+    displayRotationSafety_ = PendingTaskSafetyFlag::Create();
+    ohos::DisplayManager::GetInstance().RegisterChangeCallback(this);
+    // Catch any display change that occurred while the session was starting.
+    UpdateRotation();
     NotifyCapturedStart(true);
 }
 
 void CameraCapturer::StopInternal()
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
+
+    if (isInitialized_) {
+        RTC_DCHECK_RUN_ON(captureThread_);
+    }
 
     if (!isStarted_) {
         RTC_LOG(LS_ERROR) << "Capture session is not started";
@@ -421,16 +445,17 @@ void CameraCapturer::StopInternal()
         RTC_LOG(LS_ERROR) << "Failed to stop capture session";
         return;
     }
+    CancelDisplayRotationTasks();
     captureSession_.Reset();
 
     previewOutput_.RemoveObserver(this);
     previewOutput_.Reset();
+    previewRotationAppliedByHal_ = false;
 
     input_.Close();
     input_.Reset();
 
     cameraDevices_.Reset();
-    ohos::DisplayManager::GetInstance().UnregisterChangeCallback(this);
     isStarted_ = false;
 }
 
@@ -482,6 +507,135 @@ bool CameraCapturer::GetZoomRatioRange(float* minZoom, float* maxZoom)
     RTC_LOG(LS_INFO) << "GetZoomRatioRange OK, min=" << *minZoom << ", max=" << *maxZoom;
     return true;
 }
+bool CameraCapturer::HasTorch()
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    if (!captureSession_.Raw()) {
+        return false;
+    }
+
+    // ohcamera has no dedicated torch API; the always-on flash mode is the torch
+    bool supported = false;
+    Camera_ErrorCode ret =
+        OH_CaptureSession_IsFlashModeSupported(captureSession_.Raw(), FLASH_MODE_ALWAYS_OPEN, &supported);
+    if (ret != CAMERA_OK) {
+        RTC_LOG(LS_WARNING) << "OH_CaptureSession_IsFlashModeSupported failed, code=" << ret;
+        return false;
+    }
+    return supported;
+}
+
+bool CameraCapturer::SetTorch(bool on)
+{
+    RTC_LOG(LS_INFO) << __FUNCTION__ << ": on=" << on;
+
+    if (!isStarted_ || !captureSession_.Raw()) {
+        RTC_LOG(LS_WARNING) << "SetTorch ignored: capture session not active";
+        return false;
+    }
+
+    Camera_FlashMode mode = on ? FLASH_MODE_ALWAYS_OPEN : FLASH_MODE_CLOSE;
+    bool supported = false;
+    Camera_ErrorCode ret = OH_CaptureSession_IsFlashModeSupported(captureSession_.Raw(), mode, &supported);
+    if (ret != CAMERA_OK || !supported) {
+        RTC_LOG(LS_WARNING) << "SetTorch ignored: flash mode not supported, code=" << ret;
+        return false;
+    }
+
+    ret = OH_CaptureSession_SetFlashMode(captureSession_.Raw(), mode);
+    if (ret != CAMERA_OK) {
+        RTC_LOG(LS_WARNING) << "OH_CaptureSession_SetFlashMode failed, code=" << ret;
+        return false;
+    }
+    return true;
+}
+
+bool CameraCapturer::SetFocusMode(int32_t mode)
+{
+    RTC_LOG(LS_INFO) << __FUNCTION__ << ": mode=" << mode;
+
+    if (!isStarted_ || !captureSession_.Raw()) {
+        RTC_LOG(LS_WARNING) << "SetFocusMode ignored: capture session not active";
+        return false;
+    }
+
+    if (mode < FOCUS_MODE_MANUAL || mode > FOCUS_MODE_LOCKED) {
+        RTC_LOG(LS_WARNING) << "SetFocusMode ignored: invalid focus mode " << mode;
+        return false;
+    }
+
+    auto focusMode = static_cast<Camera_FocusMode>(mode);
+    bool supported = false;
+    Camera_ErrorCode ret = OH_CaptureSession_IsFocusModeSupported(captureSession_.Raw(), focusMode, &supported);
+    if (ret != CAMERA_OK || !supported) {
+        RTC_LOG(LS_WARNING) << "SetFocusMode ignored: focus mode not supported, code=" << ret;
+        return false;
+    }
+
+    ret = OH_CaptureSession_SetFocusMode(captureSession_.Raw(), focusMode);
+    if (ret != CAMERA_OK) {
+        RTC_LOG(LS_WARNING) << "OH_CaptureSession_SetFocusMode failed, code=" << ret;
+        return false;
+    }
+    return true;
+}
+
+bool CameraCapturer::SetFocusPoint(double x, double y)
+{
+    RTC_LOG(LS_INFO) << __FUNCTION__ << ": x=" << x << ", y=" << y;
+
+    if (!isStarted_ || !captureSession_.Raw()) {
+        RTC_LOG(LS_WARNING) << "SetFocusPoint ignored: capture session not active";
+        return false;
+    }
+
+    // NaN fails these comparisons naturally
+    if (!(x >= 0.0 && x <= 1.0) || !(y >= 0.0 && y <= 1.0)) {
+        RTC_LOG(LS_WARNING) << "SetFocusPoint ignored: point out of range";
+        return false;
+    }
+
+    Camera_Point point{x, y};
+    Camera_ErrorCode ret = OH_CaptureSession_SetFocusPoint(captureSession_.Raw(), point);
+    if (ret != CAMERA_OK) {
+        RTC_LOG(LS_WARNING) << "OH_CaptureSession_SetFocusPoint failed, code=" << ret;
+        return false;
+    }
+    return true;
+}
+
+bool CameraCapturer::SetExposureMode(int32_t mode)
+{
+    RTC_LOG(LS_INFO) << __FUNCTION__ << ": mode=" << mode;
+
+    if (!isStarted_ || !captureSession_.Raw()) {
+        RTC_LOG(LS_WARNING) << "SetExposureMode ignored: capture session not active";
+        return false;
+    }
+
+    if (mode < EXPOSURE_MODE_LOCKED || mode > EXPOSURE_MODE_CONTINUOUS_AUTO) {
+        RTC_LOG(LS_WARNING) << "SetExposureMode ignored: invalid exposure mode " << mode;
+        return false;
+    }
+
+    auto exposureMode = static_cast<Camera_ExposureMode>(mode);
+    bool supported = false;
+    Camera_ErrorCode ret =
+        OH_CaptureSession_IsExposureModeSupported(captureSession_.Raw(), exposureMode, &supported);
+    if (ret != CAMERA_OK || !supported) {
+        RTC_LOG(LS_WARNING) << "SetExposureMode ignored: exposure mode not supported, code=" << ret;
+        return false;
+    }
+
+    ret = OH_CaptureSession_SetExposureMode(captureSession_.Raw(), exposureMode);
+    if (ret != CAMERA_OK) {
+        RTC_LOG(LS_WARNING) << "OH_CaptureSession_SetExposureMode failed, code=" << ret;
+        return false;
+    }
+    return true;
+}
+
 
 void CameraCapturer::OnCameraManagerStatusCallback(Camera_StatusInfo* status)
 {
@@ -505,6 +659,9 @@ void CameraCapturer::OnPreviewOutputFrameEnd(int32_t frameCount)
 void CameraCapturer::OnPreviewOutputError(Camera_ErrorCode errorCode)
 {
     RTC_LOG(LS_ERROR) << __FUNCTION__ << ": errorCode=" << errorCode;
+    // Notify the reusable session owner. Recovery itself is serialized through
+    // the source's capture thread, never performed from this system callback.
+    if (multiDevicePreviewEnabled_.load()) { NotifyCapturedStop(); }
 }
 
 void CameraCapturer::OnVideoOutputFrameStart()
@@ -524,6 +681,7 @@ void CameraCapturer::OnVideoOutputFrameEnd(int32_t frameCount)
 void CameraCapturer::OnVideoOutputError(Camera_ErrorCode errorCode)
 {
     RTC_LOG(LS_ERROR) << __FUNCTION__ << ": errorCode=" << errorCode;
+    if (multiDevicePreviewEnabled_.load()) { NotifyCapturedStop(); }
 }
 
 void CameraCapturer::OnFrameAvailable(
@@ -533,23 +691,51 @@ void CameraCapturer::OnFrameAvailable(
 
     (void)rotation;
     VideoRotation frameRotation = kVideoRotation_0;
+    // captureThread_ may flip this flag mid-frame; one snapshot keeps rotation and dimensions consistent.
+    const bool halApplied = previewRotationAppliedByHal_.load();
 
     if (buffer->type() == VideoFrameBuffer::Type::kNative) {
         auto textureBuffer = static_cast<TextureBuffer*>(buffer.get());
+        const VideoRotation previewRotation = finalRotation_.load();
 
         Matrix transformMatrix;
 
         if (isCameraFrontFacing_) {
             transformMatrix.PreScale(-1.0f, 1.0f, 0.5f, 0.5f);
         }
-        transformMatrix.PreRotate(finalRotation_, 0.5f, 0.5f);
+        // Software fallback retains the original texture transform.
+        if (!halApplied) {
+            transformMatrix.PreRotate(previewRotation, 0.5f, 0.5f);
+        }
         Matrix newMatrix = textureBuffer->GetTransformMatrix();
         newMatrix.PreConcat(transformMatrix);
+        // The profile describes the camera stream BEFORE preview rotation.
+        // NativeImage's matrix describes how to SAMPLE the producer's buffer,
+        // which HAL may already have rotated. Its axes alone do not describe
+        // the orientation of the image relative to the camera profile.
+        // Use the camera preview rotation for logical frame dimensions, while
+        // retaining the producer matrix for sampling. Otherwise landscape can
+        // remain tagged as 720x1280 and every downstream aspect-fit stretches it.
+        const bool swapDimensions = halApplied &&
+            (previewRotation == kVideoRotation_90 || previewRotation == kVideoRotation_270);
+        const int frameWidth = swapDimensions ? textureBuffer->height() : textureBuffer->width();
+        const int frameHeight = swapDimensions ? textureBuffer->width() : textureBuffer->height();
+        if (frameWidth != deliveredWidth_ || frameHeight != deliveredHeight_) {
+            deliveredWidth_ = frameWidth;
+            deliveredHeight_ = frameHeight;
+            RTC_LOG(LS_INFO) << "[CameraFrameGeometry] profile=" << textureBuffer->width() << "x"
+                             << textureBuffer->height() << ", previewRotation=" << previewRotation
+                             << ", halApplied=" << halApplied
+                             << ", frame=" << frameWidth << "x" << frameHeight
+                             << ", samplingMatrix=" << newMatrix;
+        }
         buffer = TextureBuffer::Create(
-            textureBuffer->GetTexture(), textureBuffer->width(), textureBuffer->height(), newMatrix);
+            textureBuffer->GetTexture(), frameWidth, frameHeight, newMatrix);
     } else {
-        // CPU 路径（x86_64 模拟器 ImageReceiver）：无系统变换矩阵，通过 rotation 元数据上报。
-        frameRotation = i420Rotation_;
+        // CPU 路径：若 HAL 未写入旋转，则通过 rotation 元数据上报。
+        if (!halApplied) {
+            frameRotation = i420Rotation_;
+        }
     }
 
     UNUSED std::lock_guard<std::mutex> lock(obsMutex_);
@@ -558,37 +744,96 @@ void CameraCapturer::OnFrameAvailable(
     }
 }
 
-void CameraCapturer::UpdateRotation()
+void CameraCapturer::ApplyPreviewRotation()
 {
+    if (displayRotationOverride_ >= 0) {
+        ApplyPreviewRotation(displayRotationOverride_);
+        return;
+    }
     NativeDisplayManager_Rotation displayRotation = ohos::DisplayManager::GetInstance().GetDefaultDisplayRotation();
     constexpr int kDegreesPerRotationUnit = 90;
+    ApplyPreviewRotation(displayRotation * kDegreesPerRotationUnit);
+}
+
+void CameraCapturer::ApplyPreviewRotation(int displayDegrees)
+{
+    RTC_DCHECK_RUN_ON(captureThread_);
+    constexpr int kDegreesPerRotationUnit = 90;
     constexpr int kFullCircleDegrees = 360;
-    int displayDegrees = displayRotation * kDegreesPerRotationUnit;
+    displayDegrees = ((displayDegrees % kFullCircleDegrees) + kFullCircleDegrees) % kFullCircleDegrees;
+    displayDegrees = (displayDegrees / kDegreesPerRotationUnit) * kDegreesPerRotationUnit;
     int cameraDegrees = static_cast<int>(cameraOrientation_);
     if (cameraDegrees % kVideoRotation_90 != 0) {
         RTC_LOG(LS_WARNING) << "camera orientation must be a multiple of 90: " << cameraDegrees;
         cameraDegrees = 0;
     }
 
-    if (isCameraFrontFacing_) {
-        finalRotation_ =
-            static_cast<VideoRotation>((kFullCircleDegrees - displayDegrees) % kFullCircleDegrees);
-        i420Rotation_ = static_cast<VideoRotation>((cameraDegrees + displayDegrees) % kFullCircleDegrees);
-    } else {
-        finalRotation_ = static_cast<VideoRotation>(displayDegrees % kFullCircleDegrees);
-        i420Rotation_ = static_cast<VideoRotation>(
-            (cameraDegrees - displayDegrees + kFullCircleDegrees) % kFullCircleDegrees);
+    const auto hal = TryApplyPreviewRotation(multiDevicePreviewEnabled_.load(),
+        previewRotationAppliedByHal_.load(), displayDegrees,
+        [this](int display, int* degrees) {
+            Camera_ImageRotation rotation = static_cast<Camera_ImageRotation>(0);
+            const bool result = previewOutput_.GetPreviewRotation(display, &rotation);
+            *degrees = static_cast<int>(rotation);
+            return result;
+        },
+        [this](int degrees, bool isDisplayLocked) {
+            return previewOutput_.SetPreviewRotation(static_cast<Camera_ImageRotation>(degrees), isDisplayLocked);
+        });
+    if (hal.recoveryRequired) {
+        NotifyCapturedStop();
+        return;
     }
+    const bool halApplied = hal.applied;
+    const auto policy = ResolvePreviewRotation(cameraDegrees, displayDegrees,
+        isCameraFrontFacing_, halApplied, hal.degrees);
+    finalRotation_ = static_cast<VideoRotation>(policy.textureRotation);
+    i420Rotation_ = static_cast<VideoRotation>(policy.frameRotation);
+    previewRotationAppliedByHal_ = halApplied;
+    RTC_LOG(LS_INFO) << "ApplyPreviewRotation: display=" << displayDegrees
+                     << ", halApplied=" << halApplied << ", texture=" << policy.textureRotation
+                     << ", frame=" << policy.frameRotation;
+}
 
-    RTC_DLOG(LS_VERBOSE) << "UpdateRotation: camera=" << cameraDegrees << ", display=" << displayDegrees
-                         << ", finalRotation=" << finalRotation_ << ", i420Rotation=" << i420Rotation_
-                         << ", isFrontFacing=" << isCameraFrontFacing_;
+void CameraCapturer::ApplyDisplayRotation(int displayDegrees)
+{
+    if (!isInitialized_) {
+        return;
+    }
+    RTC_DCHECK_RUN_ON(captureThread_);
+    multiDevicePreviewEnabled_ = true;
+    displayRotationOverride_ = displayDegrees;
+    if (!isStarted_) {
+        return;
+    }
+    ApplyPreviewRotation();
+}
+
+void CameraCapturer::UpdateRotation()
+{
+    ApplyPreviewRotation();
 }
 
 void CameraCapturer::OnDisplayChange(uint64_t displayId)
 {
     (void)displayId;
-    UpdateRotation();
+    // DisplayManager holds its observer lock here. Never wait for the capture
+    // thread, which may be unregistering this observer while stopping capture.
+    captureThread_->PostTask(SafeTask(displayRotationSafety_, [this] {
+        if (displayRotationOverride_ < 0) {
+            UpdateRotation();
+        }
+    }));
+}
+
+void CameraCapturer::CancelDisplayRotationTasks()
+{
+    if (!displayRotationSafety_) {
+        return;
+    }
+    RTC_DCHECK_RUN_ON(captureThread_);
+    ohos::DisplayManager::GetInstance().UnregisterChangeCallback(this);
+    displayRotationSafety_->SetNotAlive();
+    displayRotationSafety_ = nullptr;
 }
 
 } // namespace webrtc
