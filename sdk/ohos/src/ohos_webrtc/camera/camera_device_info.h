@@ -39,6 +39,8 @@ struct CameraDeviceInfo {
     std::string label;
     FacingMode facingMode;
     std::vector<video::VideoProfile> profiles;
+    // Aggregate fps range over video profiles; {0, 0} when unknown
+    video::FrameRateRange frameRateRange {};
 };
 
 std::string CameraPositionToString(Camera_Position position);

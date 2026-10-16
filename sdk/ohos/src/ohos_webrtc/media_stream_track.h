@@ -30,6 +30,7 @@ class OhosVideoTrackSource;
 class OhosLocalAudioSource;
 class LongConstraint;
 class DoubleConstraint;
+class FrameCaptureSink;
 
 class NapiMediaStreamTrack : public Napi::ObjectWrap<NapiMediaStreamTrack>, public ObserverInterface {
 public:
@@ -61,11 +62,15 @@ protected:
     void RemoveVideoSink(rtc::VideoSinkInterface<VideoFrame>* sink);
     void RemoveAllVideoSinks();
 
+    void AddCaptureSink(const std::shared_ptr<FrameCaptureSink>& sink);
+    void RemoveCaptureSink(FrameCaptureSink* sink);
+
     // ObserverInterface implementation
     void OnChanged() override;
 
 protected:
     friend class ObjectWrap;
+    friend class FrameCaptureSink;
 
     explicit NapiMediaStreamTrack(const Napi::CallbackInfo& info);
 
@@ -78,6 +83,7 @@ protected:
     Napi::Value GetSource(const Napi::CallbackInfo& info);
     Napi::Value ApplyConstraints(const Napi::CallbackInfo& info);
     Napi::Value GetZoomRange(const Napi::CallbackInfo& info);
+    Napi::Value CaptureFrame(const Napi::CallbackInfo& info);
     Napi::Value ToJson(const Napi::CallbackInfo& info);
 
 private:
@@ -145,6 +151,7 @@ public:
 
     std::mutex sinksMutex_;
     std::set<rtc::VideoSinkInterface<VideoFrame>*> videoSinks_;
+    std::set<std::shared_ptr<FrameCaptureSink>> captureSinks_;
 };
 
 } // namespace webrtc

@@ -30,6 +30,7 @@ if (is_ohos) {
         "$ohos_webrtc_src_path/certificate.cpp",
         "$ohos_webrtc_src_path/configuration.cpp",
         "$ohos_webrtc_src_path/data_channel.cpp",
+        "$ohos_webrtc_src_path/delegated_audio_processing.cpp",
         "$ohos_webrtc_src_path/dtls_transport.cpp",
         "$ohos_webrtc_src_path/dtmf_sender.cpp",
         "$ohos_webrtc_src_path/ice_candidate.cpp",

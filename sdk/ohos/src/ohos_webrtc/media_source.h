@@ -85,6 +85,11 @@ public:
     NAPI_METHOD_NAME_DECLARE(StartCapture, startCapture);
     NAPI_METHOD_NAME_DECLARE(StopCapture, stopCapture);
     NAPI_METHOD_NAME_DECLARE(SwitchCamera, switchCamera);
+    NAPI_METHOD_NAME_DECLARE(HasTorch, hasTorch);
+    NAPI_METHOD_NAME_DECLARE(SetTorch, setTorch);
+    NAPI_METHOD_NAME_DECLARE(SetFocusMode, setFocusMode);
+    NAPI_METHOD_NAME_DECLARE(SetFocusPoint, setFocusPoint);
+    NAPI_METHOD_NAME_DECLARE(SetExposureMode, setExposureMode);
     NAPI_METHOD_NAME_DECLARE(ApplyDisplayRotation, applyDisplayRotation);
     NAPI_METHOD_NAME_DECLARE(GetCaptureFrameCount, getCaptureFrameCount);
 
@@ -111,6 +116,11 @@ protected:
     Napi::Value StartCapture(const Napi::CallbackInfo& info);
     Napi::Value StopCapture(const Napi::CallbackInfo& info);
     Napi::Value SwitchCamera(const Napi::CallbackInfo& info);
+    Napi::Value HasTorch(const Napi::CallbackInfo& info);
+    Napi::Value SetTorch(const Napi::CallbackInfo& info);
+    Napi::Value SetFocusMode(const Napi::CallbackInfo& info);
+    Napi::Value SetFocusPoint(const Napi::CallbackInfo& info);
+    Napi::Value SetExposureMode(const Napi::CallbackInfo& info);
     Napi::Value ApplyDisplayRotation(const Napi::CallbackInfo& info);
     Napi::Value GetCaptureFrameCount(const Napi::CallbackInfo& info);
     Napi::Value ToJson(const Napi::CallbackInfo& info);

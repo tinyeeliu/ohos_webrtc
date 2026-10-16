@@ -24,7 +24,13 @@
 #include "camera/camera_enumerator.h"
 
 #include "rtc_base/logging.h"
+#include "rtc_base/copy_on_write_buffer.h"
 #include "utils/marcos.h"
+
+#include <algorithm>
+#include <cstring>
+#include <memory>
+#include <atomic>
 
 namespace webrtc {
 
@@ -47,6 +53,7 @@ const char kMethodNameGetSource[] = "getSource";
 const char kMethodNameToJson[] = "toJSON";
 const char kMethodNameApplyConstraints[] = "applyConstraints";
 const char kMethodNameGetZoomRange[] = "getZoomRange";
+const char kMethodNameCaptureFrame[] = "captureFrame";
 
 const char kEnumMediaStreamTrackStateLive[] = "live";
 const char kEnumMediaStreamTrackStateEnded[] = "ended";
@@ -54,6 +61,147 @@ const char kEnumMediaStreamTrackStateEnded[] = "ended";
 const char kEventNameMute[] = "mute";
 const char kEventNameUnmute[] = "unmute";
 const char kEventNameEnded[] = "ended";
+
+// Single-shot sink for captureFrame: grabs the first frame (or the track-ended fallback),
+// settles the promise on the JS thread and removes itself. Must not call RemoveSink from
+// OnFrame (video thread holds the broadcaster lock), removal happens in the tsfn callback
+// on the JS thread. Shared-pointer owned: the owner's captureSinks_ set plus in-flight tsfn
+// calls keep it alive; captured_ makes OnFrame/NotifyEnded settle exactly once.
+class FrameCaptureSink : public rtc::VideoSinkInterface<VideoFrame>,
+                        public std::enable_shared_from_this<FrameCaptureSink> {
+public:
+    FrameCaptureSink(Napi::Env env, Napi::Promise::Deferred deferred, NapiMediaStreamTrack* owner)
+        : owner_(owner), track_(owner->Get()), deferred_(std::move(deferred)), env_(env)
+    {
+        tsfn_ = ThreadSafeFunction::New(
+            env, Function::New(env, [](const CallbackInfo& info) { return info.Env().Undefined(); }),
+            "captureFrame", 0, 1);
+    }
+
+    ~FrameCaptureSink() override
+    {
+        tsfn_.Release();
+    }
+
+    void OnFrame(const VideoFrame& frame) override
+    {
+        if (captured_.exchange(true)) {
+            return;
+        }
+
+        auto data = CopyFrameToI420(frame);
+        if (!data) {
+            RejectWith("Failed to convert the frame to I420");
+            return;
+        }
+
+        DeliverFrame(data, frame.width(), frame.height(), frame.rotation());
+    }
+
+    // Track ended before the first frame (stop / remote stop / disconnect): settle instead
+    // of hanging forever. captured_ guarantees only one of OnFrame/NotifyEnded proceeds.
+    void NotifyEnded()
+    {
+        if (captured_.exchange(true)) {
+            return;
+        }
+        RejectWith("Track ended before a frame was captured");
+    }
+
+    // JS thread only (track teardown): settle the promise when an earlier tsfn delivery
+    // failed, so no queued callback will ever run for this sink.
+    void SettleIfPending()
+    {
+        if (settled_.exchange(true)) {
+            return;
+        }
+        deferred_.Reject(Napi::Error::New(env_, "captureFrame was not delivered").Value());
+    }
+
+private:
+    // Returns I420 planar data (Y then quarter-size U/V) or nullptr on failure.
+    rtc::CopyOnWriteBuffer* CopyFrameToI420(const VideoFrame& frame)
+    {
+        auto buffer = frame.video_frame_buffer()->ToI420();
+        if (!buffer || buffer->width() <= 0 || buffer->height() <= 0) {
+            return nullptr;
+        }
+
+        const int width = buffer->width();
+        const int height = buffer->height();
+        const int chromaWidth = (width + 1) / 2;
+        const int chromaHeight = (height + 1) / 2;
+        const size_t ySize = static_cast<size_t>(width) * height;
+        const size_t uSize = static_cast<size_t>(chromaWidth) * chromaHeight;
+        constexpr size_t kI420ChromaPlaneCount = 2;
+
+        auto data = new rtc::CopyOnWriteBuffer();
+        data->SetSize(ySize + uSize * kI420ChromaPlaneCount);
+        uint8_t* dst = data->MutableData();
+        CopyPlane(dst, buffer->DataY(), width, height, buffer->StrideY());
+        CopyPlane(dst + ySize, buffer->DataU(), chromaWidth, chromaHeight, buffer->StrideU());
+        CopyPlane(dst + ySize + uSize, buffer->DataV(), chromaWidth, chromaHeight, buffer->StrideV());
+        return data;
+    }
+
+    // Resolves the promise with the captured frame and detaches the sink (JS thread)
+    void DeliverFrame(rtc::CopyOnWriteBuffer* data, int width, int height, VideoRotation rotation)
+    {
+        napi_status status = tsfn_.NonBlockingCall(
+            [this, self = shared_from_this(), data, width, height, rotation](
+                Napi::Env env, Napi::Function jsCallback) {
+                settled_ = true;
+                auto arrayBuffer = ArrayBuffer::New(
+                    env, static_cast<void*>(data->MutableData()), data->size(),
+                    [](Napi::Env /*env*/, void* /*data*/, rtc::CopyOnWriteBuffer* hint) { delete hint; }, data);
+
+                auto result = Object::New(env);
+                result.Set("width", Number::New(env, width));
+                result.Set("height", Number::New(env, height));
+                result.Set("rotation", Number::New(env, static_cast<int32_t>(rotation)));
+                result.Set("data", arrayBuffer);
+
+                deferred_.Resolve(result);
+                owner_->RemoveCaptureSink(this);
+            });
+        if (status != napi_ok) {
+            RTC_LOG(LS_ERROR) << "captureFrame tsfn call error: " << status;
+            // No RemoveCaptureSink here: OnFrame runs under the broadcaster lock and a
+            // synchronous removal would re-enter that lock on this thread. The sink stays
+            // owned by captureSinks_ until track teardown, which settles the promise.
+            delete data;
+        }
+    }
+
+    void RejectWith(const char* message)
+    {
+        napi_status status = tsfn_.NonBlockingCall(
+            [this, self = shared_from_this(), message](Napi::Env env, Napi::Function jsCallback) {
+                settled_ = true;
+                deferred_.Reject(Error::New(env, message).Value());
+                owner_->RemoveCaptureSink(this);
+            });
+        if (status != napi_ok) {
+            RTC_LOG(LS_ERROR) << "captureFrame tsfn call error: " << status;
+        }
+    }
+
+    static void CopyPlane(uint8_t* dst, const uint8_t* src, int width, int height, int stride)
+    {
+        for (int row = 0; row < height; row++) {
+            std::copy(src + static_cast<size_t>(row) * stride, src + static_cast<size_t>(row) * stride + width, dst);
+            dst += width;
+        }
+    }
+
+    NapiMediaStreamTrack* owner_;
+    rtc::scoped_refptr<MediaStreamTrackInterface> track_;
+    Napi::Promise::Deferred deferred_;
+    ThreadSafeFunction tsfn_;
+    std::atomic<bool> captured_ { false };
+    std::atomic<bool> settled_ { false };
+    Napi::Env env_;
+};
 
 void NapiMediaStreamTrack::Init(Napi::Env env, Object exports)
 {
@@ -69,6 +217,7 @@ void NapiMediaStreamTrack::Init(Napi::Env env, Object exports)
             InstanceMethod<&NapiMediaStreamTrack::GetSource>(kMethodNameGetSource),
             InstanceMethod<&NapiMediaStreamTrack::ApplyConstraints>(kMethodNameApplyConstraints),
             InstanceMethod<&NapiMediaStreamTrack::GetZoomRange>(kMethodNameGetZoomRange),
+            InstanceMethod<&NapiMediaStreamTrack::CaptureFrame>(kMethodNameCaptureFrame),
             InstanceMethod<&NapiMediaStreamTrack::ToJson>(kMethodNameToJson),
         });
     exports.Set(kClassName, func);
@@ -213,6 +362,42 @@ void NapiMediaStreamTrack::RemoveVideoSink(rtc::VideoSinkInterface<VideoFrame>* 
     videoTrack->RemoveSink(sink);
 }
 
+void NapiMediaStreamTrack::AddCaptureSink(const std::shared_ptr<FrameCaptureSink>& sink)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    if (!IsVideoTrack()) {
+        RTC_LOG(LS_WARNING) << "Not a video track";
+        return;
+    }
+
+    {
+        UNUSED std::lock_guard<std::mutex> lock(sinksMutex_);
+        captureSinks_.insert(sink);
+    }
+
+    auto videoTrack = static_cast<VideoTrackInterface*>(track_.get());
+    videoTrack->AddOrUpdateSink(sink.get(), rtc::VideoSinkWants());
+}
+
+void NapiMediaStreamTrack::RemoveCaptureSink(FrameCaptureSink* sink)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    {
+        UNUSED std::lock_guard<std::mutex> lock(sinksMutex_);
+        for (auto it = captureSinks_.begin(); it != captureSinks_.end(); it++) {
+            if (it->get() == sink) {
+                captureSinks_.erase(it);
+                break;
+            }
+        }
+    }
+
+    auto videoTrack = static_cast<VideoTrackInterface*>(track_.get());
+    videoTrack->RemoveSink(sink);
+}
+
 void NapiMediaStreamTrack::RemoveAllVideoSinks()
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
@@ -233,12 +418,37 @@ void NapiMediaStreamTrack::RemoveAllVideoSinks()
             videoTrack->RemoveSink(sink);
         }
     }
+
+    std::set<std::shared_ptr<FrameCaptureSink>> captureSinks;
+    {
+        UNUSED std::lock_guard<std::mutex> lock(sinksMutex_);
+        captureSinks_.swap(captureSinks);
+    }
+    for (auto& sink : captureSinks) {
+        videoTrack->RemoveSink(sink.get());
+        sink->SettleIfPending();
+    }
 }
 
 void NapiMediaStreamTrack::OnChanged()
 {
     RTC_DLOG(LS_INFO) << __FUNCTION__ << "(" << track_->kind() << ") state=" << track_->state()
                       << ", enabled=" << track_->enabled();
+
+    if (track_->state() != MediaStreamTrackInterface::kEnded) {
+        return;
+    }
+
+    std::set<std::shared_ptr<FrameCaptureSink>> sinks;
+    {
+        UNUSED std::lock_guard<std::mutex> lock(sinksMutex_);
+        sinks = captureSinks_;
+    }
+    for (auto& sink : sinks) {
+        if (sink) {
+            sink->NotifyEnded();
+        }
+    }
 }
 
 Napi::Value NapiMediaStreamTrack::GetId(const Napi::CallbackInfo& info)
@@ -712,6 +922,38 @@ Napi::Value NapiMediaStreamTrack::GetZoomRange(const Napi::CallbackInfo& info)
     RTC_LOG(LS_INFO) << __FUNCTION__ << ": supported=" << supported << ", min=" << minZoom << ", max=" << maxZoom;
 
     return obj;
+}
+
+Napi::Value NapiMediaStreamTrack::CaptureFrame(const Napi::CallbackInfo& info)
+{
+    RTC_LOG(LS_INFO) << __FUNCTION__ << " called on " << (IsVideoTrack() ? "video" : "audio") << " track";
+
+    auto env = info.Env();
+    auto deferred = Napi::Promise::Deferred::New(env);
+
+    if (!track_ || !IsVideoTrack()) {
+        deferred.Reject(Error::New(env, "captureFrame is only available on a video track").Value());
+        return deferred.Promise();
+    }
+
+    if (track_->state() == MediaStreamTrackInterface::TrackState::kEnded) {
+        deferred.Reject(Error::New(env, "Cannot capture a frame from an ended track").Value());
+        return deferred.Promise();
+    }
+
+    auto videoSource = factory_->GetVideoSource(track_);
+    if (!videoSource || videoSource->IsEnded()) {
+        deferred.Reject(Error::New(env, "Video source is not available").Value());
+        return deferred.Promise();
+    }
+
+    auto sink = std::make_shared<FrameCaptureSink>(env, deferred, this);
+    AddCaptureSink(sink);
+    if (track_->state() == MediaStreamTrackInterface::TrackState::kEnded) {
+        sink->NotifyEnded();
+    }
+
+    return deferred.Promise();
 }
 
 Napi::Value NapiMediaStreamTrack::ToJson(const Napi::CallbackInfo& info)

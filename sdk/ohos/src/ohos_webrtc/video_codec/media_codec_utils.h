@@ -22,6 +22,18 @@
 #include <multimedia/player_framework/native_avcodec_base.h>
 #include <multimedia/player_framework/native_avcapability.h>
 
+#include <api/video_codecs/h264_profile_level_id.h>
+
+namespace webrtc {
+namespace adapter {
+
+// Highest H264 level (5.1 -> 4.1 -> 3.1 fallback) the device reports for the profile.
+// Declared level must match what is negotiated; iOS MaxSupportedLevelForProfile semantics.
+H264Level MaxSupportedH264Level(OH_AVCapability* capability, OH_AVCProfile profile);
+
+} // namespace adapter
+} // namespace webrtc
+
 namespace ohos {
 
 class MediaCodecUtils {

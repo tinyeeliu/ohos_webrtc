@@ -22,6 +22,45 @@
 
 namespace webrtc {
 
+namespace {
+
+// Merge output-capability profiles into the device entry: preview profiles become
+// selectable track profiles; video profiles provide the real fps range for getCapabilities.
+void FillDeviceProfiles(ohos::CameraOutputCapability& capability, CameraDeviceInfo& device)
+{
+    for (uint32_t j = 0; j < capability.PreviewProfileSize(); j++) {
+        Camera_Profile* profile = capability.GetPreviewProfile(j);
+        RTC_DLOG(LS_VERBOSE) << "preview format: " << profile->format;
+        RTC_DLOG(LS_VERBOSE) << "preview size: " << profile->size.width << "x" << profile->size.height;
+
+        video::VideoProfile p;
+        p.format = NativeCameraFormatToPixelFormat(profile->format);
+        p.resolution = video::Resolution{profile->size.width, profile->size.height};
+        p.frameRateRange = video::FrameRateRange{0, UINT_MAX}; // equivalently to ignore 'frameRate' constraints
+        device.profiles.push_back(p);
+    }
+
+    // Real device fps capability for getCapabilities; Camera_VideoProfile is flat
+    // (format/size/range), see ohcamera camera_manager.h
+    for (uint32_t j = 0; j < capability.VideoProfileSize(); j++) {
+        Camera_VideoProfile* fpsProfile = capability.GetVideoProfile(j);
+        if (!fpsProfile) {
+            continue;
+        }
+        RTC_DLOG(LS_VERBOSE) << "video profile size: " << fpsProfile->size.width << "x"
+                             << fpsProfile->size.height << ", fps " << fpsProfile->range.min << "-"
+                             << fpsProfile->range.max;
+        if (device.frameRateRange.min == 0 || fpsProfile->range.min < device.frameRateRange.min) {
+            device.frameRateRange.min = fpsProfile->range.min;
+        }
+        if (fpsProfile->range.max > device.frameRateRange.max) {
+            device.frameRateRange.max = fpsProfile->range.max;
+        }
+    }
+}
+
+} // namespace
+
 std::vector<CameraDeviceInfo> CameraEnumerator::GetDevices()
 {
     std::vector<CameraDeviceInfo> result;
@@ -56,17 +95,7 @@ std::vector<CameraDeviceInfo> CameraEnumerator::GetDevices()
         }
 
         auto capability = ohos::CameraManager::GetInstance().GetSupportedCameraOutputCapability(camera);
-        for (uint32_t j = 0; j < capability.PreviewProfileSize(); j++) {
-            Camera_Profile* profile = capability.GetPreviewProfile(j);
-            RTC_DLOG(LS_VERBOSE) << "preview format: " << profile->format;
-            RTC_DLOG(LS_VERBOSE) << "preview size: " << profile->size.width << "x" << profile->size.height;
-
-            video::VideoProfile p;
-            p.format = NativeCameraFormatToPixelFormat(profile->format);
-            p.resolution = video::Resolution{profile->size.width, profile->size.height};
-            p.frameRateRange = video::FrameRateRange{0, UINT_MAX}; // equivalently to ignore 'frameRate' constraints
-            device.profiles.push_back(p);
-        }
+        FillDeviceProfiles(capability, device);
 
         result.push_back(device);
     }

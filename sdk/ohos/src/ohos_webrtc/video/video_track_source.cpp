@@ -329,6 +329,46 @@ bool OhosVideoTrackSource::GetZoomRatioRange(float* minZoom, float* maxZoom)
     return capturer_->GetZoomRatioRange(minZoom, maxZoom);
 }
 
+bool OhosVideoTrackSource::HasTorch()
+{
+    if (is_destroying_.load(std::memory_order_acquire) || !capturer_) {
+        return false;
+    }
+    return capturer_->HasTorch();
+}
+
+bool OhosVideoTrackSource::SetTorch(bool on)
+{
+    if (is_destroying_.load(std::memory_order_acquire) || !capturer_) {
+        return false;
+    }
+    return capturer_->SetTorch(on);
+}
+
+bool OhosVideoTrackSource::SetFocusMode(int32_t mode)
+{
+    if (is_destroying_.load(std::memory_order_acquire) || !capturer_) {
+        return false;
+    }
+    return capturer_->SetFocusMode(mode);
+}
+
+bool OhosVideoTrackSource::SetFocusPoint(double x, double y)
+{
+    if (is_destroying_.load(std::memory_order_acquire) || !capturer_) {
+        return false;
+    }
+    return capturer_->SetFocusPoint(x, y);
+}
+
+bool OhosVideoTrackSource::SetExposureMode(int32_t mode)
+{
+    if (is_destroying_.load(std::memory_order_acquire) || !capturer_) {
+        return false;
+    }
+    return capturer_->SetExposureMode(mode);
+}
+
 void OhosVideoTrackSource::SwitchCapturer(std::shared_ptr<VideoCapturer> capturer)
 {
     RTC_LOG(LS_INFO) << __FUNCTION__;
