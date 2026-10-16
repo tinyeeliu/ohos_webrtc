@@ -59,12 +59,19 @@ std::vector<SdpVideoFormat> HardwareVideoDecoderFactory::GetSupportedFormats() c
         }
 
         if (type == VideoCodecMimeType::H264) {
+            // Declare the level the device really supports (probe high -> low), symmetric
+            // with the encoder factory so both ends announce the same level
+            H264Level highProfileLevel = MaxSupportedH264Level(capability, AVC_PROFILE_HIGH);
+            H264Level baselineProfileLevel = MaxSupportedH264Level(capability, AVC_PROFILE_BASELINE);
+            RTC_LOG(LS_INFO) << "H264 declared levels: high=" << static_cast<int>(highProfileLevel)
+                             << ", baseline=" << static_cast<int>(baselineProfileLevel);
+
             if (OH_AVCapability_AreProfileAndLevelSupported(capability, AVC_PROFILE_HIGH, AVC_LEVEL_31)) {
                 supportedFormats.push_back(
-                    CreateH264Format(H264Profile::kProfileConstrainedHigh, H264Level::kLevel3_1, "1"));
+                    CreateH264Format(H264Profile::kProfileConstrainedHigh, highProfileLevel, "1"));
             }
             supportedFormats.push_back(
-                CreateH264Format(H264Profile::kProfileConstrainedBaseline, H264Level::kLevel3_1, "1"));
+                CreateH264Format(H264Profile::kProfileConstrainedBaseline, baselineProfileLevel, "1"));
         } else {
             supportedFormats.push_back(SdpVideoFormat(type.name()));
         }
