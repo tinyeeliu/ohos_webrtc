@@ -114,6 +114,9 @@ private:
     rtc::scoped_refptr<PeerConnectionInterface> pc_;
 
     Napi::ObjectReference sctpTransportRef_;
+
+    // onremovestream must return the same object as onaddstream
+    std::map<MediaStreamInterface*, Napi::ObjectReference> remoteStreams_;
 };
 
 } // namespace webrtc

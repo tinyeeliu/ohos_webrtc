@@ -329,6 +329,46 @@ bool OhosVideoTrackSource::GetZoomRatioRange(float* minZoom, float* maxZoom)
     return capturer_->GetZoomRatioRange(minZoom, maxZoom);
 }
 
+bool OhosVideoTrackSource::HasTorch()
+{
+    if (is_destroying_.load(std::memory_order_acquire) || !capturer_) {
+        return false;
+    }
+    return capturer_->HasTorch();
+}
+
+bool OhosVideoTrackSource::SetTorch(bool on)
+{
+    if (is_destroying_.load(std::memory_order_acquire) || !capturer_) {
+        return false;
+    }
+    return capturer_->SetTorch(on);
+}
+
+bool OhosVideoTrackSource::SetFocusMode(int32_t mode)
+{
+    if (is_destroying_.load(std::memory_order_acquire) || !capturer_) {
+        return false;
+    }
+    return capturer_->SetFocusMode(mode);
+}
+
+bool OhosVideoTrackSource::SetFocusPoint(double x, double y)
+{
+    if (is_destroying_.load(std::memory_order_acquire) || !capturer_) {
+        return false;
+    }
+    return capturer_->SetFocusPoint(x, y);
+}
+
+bool OhosVideoTrackSource::SetExposureMode(int32_t mode)
+{
+    if (is_destroying_.load(std::memory_order_acquire) || !capturer_) {
+        return false;
+    }
+    return capturer_->SetExposureMode(mode);
+}
+
 void OhosVideoTrackSource::SwitchCapturer(std::shared_ptr<VideoCapturer> capturer)
 {
     RTC_LOG(LS_INFO) << __FUNCTION__;
@@ -467,6 +507,16 @@ void OhosVideoTrackSource::SwitchCamera(const std::string& cameraId)
     thread_->PostTask([capturer = capturer_, cameraId] { capturer->SwitchCamera(cameraId); });
 }
 
+void OhosVideoTrackSource::ApplyDisplayRotation(int displayDegrees)
+{
+    if (is_destroying_.load(std::memory_order_acquire)) {
+        RTC_LOG(LS_WARNING) << "ApplyDisplayRotation: source destroying, skip";
+        return;
+    }
+    RTC_LOG(LS_VERBOSE) << __FUNCTION__ << ": displayDegrees=" << displayDegrees;
+    thread_->PostTask([capturer = capturer_, displayDegrees] { capturer->ApplyDisplayRotation(displayDegrees); });
+}
+
 void OhosVideoTrackSource::OnCameraSwitchDone(const std::string& newCameraId)
 {
     if (is_destroying_.load(std::memory_order_acquire)) {
@@ -503,6 +553,9 @@ void OhosVideoTrackSource::OnCameraSwitchError(const std::string& errorMessage)
 void OhosVideoTrackSource::OnFrameCaptured(
     rtc::scoped_refptr<VideoFrameBuffer> buffer, int64_t timestampUs, VideoRotation rotation)
 {
+    if (buffer && buffer->width() > 0 && buffer->height() > 0) {
+        captureFrameCount_.fetch_add(1, std::memory_order_relaxed);
+    }
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " timestampUs=" << timestampUs << ", rotation=" << rotation;
     auto alignedTimestampUs = timestampAligner_.TranslateTimestamp(timestampUs, rtc::TimeMicros());
     RTC_DLOG(LS_VERBOSE) << "alignedTimestampUs=" << alignedTimestampUs;

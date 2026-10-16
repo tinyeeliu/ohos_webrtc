@@ -42,6 +42,9 @@ protected:
     void OnError(const Napi::Error& e) override;
 
 private:
+    void FillCameraDevices(Napi::Array& result);
+    void FillAudioDevices(Napi::Array& result);
+
     Napi::Promise::Deferred deferred_;
 
     std::vector<CameraDeviceInfo> cameraDevices_;
