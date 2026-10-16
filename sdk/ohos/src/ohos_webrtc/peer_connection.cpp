@@ -91,6 +91,9 @@ const char kAttributeNameOnNegotiationNeeded[] = "onnegotiationneeded";
 const char kAttributeNameOnSignalingStateChange[] = "onsignalingstatechange";
 const char kAttributeNameOnTrack[] = "ontrack";
 const char kAttributeNameOnDataChannel[] = "ondatachannel";
+const char kAttributeNameOnAddStream[] = "onaddstream";
+const char kAttributeNameOnRemoveStream[] = "onremovestream";
+const char kAttributeNameOnRemoveTrack[] = "onremovetrack";
 
 const char kMethodNameAddTrack[] = "addTrack";
 const char kMethodNameRemoveTrack[] = "removeTrack";
@@ -124,6 +127,9 @@ const char kEventNegotiationNeeded[] = "negotiationneeded";
 const char kEventSignalingStateChange[] = "signalingstatechange";
 const char kEventTrack[] = "track";
 const char kEventDataChannel[] = "datachannel";
+const char kEventAddStream[] = "addstream";
+const char kEventRemoveStream[] = "removestream";
+const char kEventRemoveTrack[] = "removetrack";
 
 template <typename T>
 class BaseSdpObserver : public T {
@@ -322,6 +328,12 @@ void NapiPeerConnection::Init(class Env env, Object exports)
                 kAttributeNameOnTrack, napi_default, (void*)kEventTrack),
             InstanceAccessor<&NapiPeerConnection::GetEventHandler, &NapiPeerConnection::SetEventHandler>(
                 kAttributeNameOnDataChannel, napi_default, (void*)kEventDataChannel),
+            InstanceAccessor<&NapiPeerConnection::GetEventHandler, &NapiPeerConnection::SetEventHandler>(
+                kAttributeNameOnAddStream, napi_default, (void*)kEventAddStream),
+            InstanceAccessor<&NapiPeerConnection::GetEventHandler, &NapiPeerConnection::SetEventHandler>(
+                kAttributeNameOnRemoveStream, napi_default, (void*)kEventRemoveStream),
+            InstanceAccessor<&NapiPeerConnection::GetEventHandler, &NapiPeerConnection::SetEventHandler>(
+                kAttributeNameOnRemoveTrack, napi_default, (void*)kEventRemoveTrack),
             InstanceMethod<&NapiPeerConnection::AddTrack>(kMethodNameAddTrack),
             InstanceMethod<&NapiPeerConnection::RemoveTrack>(kMethodNameRemoveTrack),
             InstanceMethod<&NapiPeerConnection::SetLocalDescription>(kMethodNameSetLocalDescription),
@@ -1615,11 +1627,51 @@ void NapiPeerConnection::OnIceSelectedCandidatePairChanged(const cricket::Candid
 void NapiPeerConnection::OnAddStream(rtc::scoped_refptr<MediaStreamInterface> stream)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    if (!stream) {
+        return;
+    }
+
+    Dispatch(CallbackEvent<NapiPeerConnection>::Create([this, stream](NapiPeerConnection& target) {
+        RTC_DCHECK_EQ(this, &target);
+
+        auto env = target.Env();
+        Napi::HandleScope scope(env);
+        auto jsStream = NapiMediaStream::NewInstance(target.factory_, stream);
+        auto jsEvent = Object::New(env);
+        jsEvent.Set("type", String::New(env, kEventAddStream));
+        jsEvent.Set("stream", jsStream);
+        jsEvent.Set("streamId", String::New(env, stream->id()));
+        target.remoteStreams_[stream.get()] = Napi::Persistent(jsStream.As<Object>());
+        target.MakeCallback(kEventAddStream, {jsEvent});
+    }));
 }
 
 void NapiPeerConnection::OnRemoveStream(rtc::scoped_refptr<MediaStreamInterface> stream)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    if (!stream) {
+        return;
+    }
+
+    Dispatch(CallbackEvent<NapiPeerConnection>::Create([this, stream](NapiPeerConnection& target) {
+        RTC_DCHECK_EQ(this, &target);
+
+        auto it = target.remoteStreams_.find(stream.get());
+        if (it == target.remoteStreams_.end()) {
+            return;
+        }
+
+        auto env = target.Env();
+        Napi::HandleScope scope(env);
+        auto jsEvent = Object::New(env);
+        jsEvent.Set("type", String::New(env, kEventRemoveStream));
+        jsEvent.Set("stream", it->second.Value());
+        jsEvent.Set("streamId", String::New(env, stream->id()));
+        target.remoteStreams_.erase(it);
+        target.MakeCallback(kEventRemoveStream, {jsEvent});
+    }));
 }
 
 void NapiPeerConnection::OnDataChannel(rtc::scoped_refptr<DataChannelInterface> channel)
@@ -1708,6 +1760,21 @@ void NapiPeerConnection::OnTrack(rtc::scoped_refptr<RtpTransceiverInterface> tra
 void NapiPeerConnection::OnRemoveTrack(rtc::scoped_refptr<RtpReceiverInterface> receiver)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    if (!receiver) {
+        return;
+    }
+
+    Dispatch(CallbackEvent<NapiPeerConnection>::Create([this, receiver](NapiPeerConnection& target) {
+        RTC_DCHECK_EQ(this, &target);
+
+        auto env = target.Env();
+        Napi::HandleScope scope(env);
+        auto jsEvent = Object::New(env);
+        jsEvent.Set("type", String::New(env, kEventRemoveTrack));
+        jsEvent.Set("receiver", NapiRtpReceiver::NewInstance(target.factory_, target.pc_, receiver));
+        target.MakeCallback(kEventRemoveTrack, {jsEvent});
+    }));
 }
 
 } // namespace webrtc

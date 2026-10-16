@@ -61,6 +61,7 @@ public:
     NAPI_ATTRIBUTE_NAME_DECLARE(VideoEncoderFactory, videoEncoderFactory);
     NAPI_ATTRIBUTE_NAME_DECLARE(VideoDecoderFactory, videoDecoderFactory);
     NAPI_ATTRIBUTE_NAME_DECLARE(AudioProcessing, audioProcessing);
+    NAPI_ATTRIBUTE_NAME_DECLARE(NetworkIgnoreMask, networkIgnoreMask);
 };
 
 std::mutex PeerConnectionFactoryWrapper::mutex_;
@@ -87,10 +88,12 @@ void PeerConnectionFactoryWrapper::SetDefault(std::shared_ptr<PeerConnectionFact
 
 std::shared_ptr<PeerConnectionFactoryWrapper> PeerConnectionFactoryWrapper::Create(
     rtc::scoped_refptr<OhosAudioDeviceModule> adm, std::unique_ptr<VideoEncoderFactory> videoEncoderFactory,
-    std::unique_ptr<VideoDecoderFactory> videoDecoderFactory, rtc::scoped_refptr<AudioProcessing> audioProcessing)
+    std::unique_ptr<VideoDecoderFactory> videoDecoderFactory, rtc::scoped_refptr<AudioProcessing> audioProcessing,
+    absl::optional<int32_t> networkIgnoreMask)
 {
     auto wrapper = std::make_shared<PeerConnectionFactoryWrapper>();
-    if (!wrapper->Init(adm, std::move(videoEncoderFactory), std::move(videoDecoderFactory), audioProcessing)) {
+    if (!wrapper->Init(adm, std::move(videoEncoderFactory), std::move(videoDecoderFactory), audioProcessing,
+                       networkIgnoreMask)) {
         return nullptr;
     }
     return wrapper;
@@ -194,7 +197,8 @@ void PeerConnectionFactoryWrapper::RemoveVideoSource(rtc::scoped_refptr<MediaStr
 
 bool PeerConnectionFactoryWrapper::Init(
     rtc::scoped_refptr<OhosAudioDeviceModule> adm, std::unique_ptr<VideoEncoderFactory> videoEncoderFactory,
-    std::unique_ptr<VideoDecoderFactory> videoDecoderFactory, rtc::scoped_refptr<AudioProcessing> audioProcessing)
+    std::unique_ptr<VideoDecoderFactory> videoDecoderFactory, rtc::scoped_refptr<AudioProcessing> audioProcessing,
+    absl::optional<int32_t> networkIgnoreMask)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
@@ -237,6 +241,13 @@ bool PeerConnectionFactoryWrapper::Init(
         return false;
     }
 
+    // Applied after creation, same as the desktop SDKs do (create first, then SetOptions)
+    if (networkIgnoreMask) {
+        PeerConnectionFactoryInterface::Options factoryOptions;
+        factoryOptions.network_ignore_mask = *networkIgnoreMask;
+        pcFactory_->SetOptions(factoryOptions);
+    }
+
     adm_ = adm;
     socketServer_ = std::move(socketServer);
     networkThread_ = std::move(networkThread);
@@ -261,8 +272,16 @@ NapiPeerConnectionFactory::NapiPeerConnectionFactory(const CallbackInfo& info)
     std::unique_ptr<VideoEncoderFactory> videoEncoderFactory;
     std::unique_ptr<VideoDecoderFactory> videoDecoderFactory;
     rtc::scoped_refptr<AudioProcessing> audioProcessing;
+    absl::optional<int32_t> networkIgnoreMask;
     if (info.Length() > 0 && info[0].IsObject()) {
         auto jsOptions = info[0].As<Object>();
+        if (jsOptions.Has(NapiPeerConnectionFactoryOptions::kAttributeNameNetworkIgnoreMask)) {
+            auto jsNetworkIgnoreMask =
+                jsOptions.Get(NapiPeerConnectionFactoryOptions::kAttributeNameNetworkIgnoreMask);
+            if (jsNetworkIgnoreMask.IsNumber()) {
+                networkIgnoreMask = jsNetworkIgnoreMask.As<Number>().Int32Value();
+            }
+        }
         if (jsOptions.Has(NapiPeerConnectionFactoryOptions::kAttributeNameAdm)) {
             auto jsAdm = jsOptions.Get(NapiPeerConnectionFactoryOptions::kAttributeNameAdm).As<Object>();
             auto napiAdm = NapiAudioDeviceModule::Unwrap(jsAdm);
@@ -293,7 +312,7 @@ NapiPeerConnectionFactory::NapiPeerConnectionFactory(const CallbackInfo& info)
     }
 
     wrapper_ = PeerConnectionFactoryWrapper::Create(
-        adm, std::move(videoEncoderFactory), std::move(videoDecoderFactory), audioProcessing);
+        adm, std::move(videoEncoderFactory), std::move(videoDecoderFactory), audioProcessing, networkIgnoreMask);
 }
 
 void NapiPeerConnectionFactory::Init(Napi::Env env, Object exports)

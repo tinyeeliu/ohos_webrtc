@@ -507,6 +507,135 @@ bool CameraCapturer::GetZoomRatioRange(float* minZoom, float* maxZoom)
     RTC_LOG(LS_INFO) << "GetZoomRatioRange OK, min=" << *minZoom << ", max=" << *maxZoom;
     return true;
 }
+bool CameraCapturer::HasTorch()
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    if (!captureSession_.Raw()) {
+        return false;
+    }
+
+    // ohcamera has no dedicated torch API; the always-on flash mode is the torch
+    bool supported = false;
+    Camera_ErrorCode ret =
+        OH_CaptureSession_IsFlashModeSupported(captureSession_.Raw(), FLASH_MODE_ALWAYS_OPEN, &supported);
+    if (ret != CAMERA_OK) {
+        RTC_LOG(LS_WARNING) << "OH_CaptureSession_IsFlashModeSupported failed, code=" << ret;
+        return false;
+    }
+    return supported;
+}
+
+bool CameraCapturer::SetTorch(bool on)
+{
+    RTC_LOG(LS_INFO) << __FUNCTION__ << ": on=" << on;
+
+    if (!isStarted_ || !captureSession_.Raw()) {
+        RTC_LOG(LS_WARNING) << "SetTorch ignored: capture session not active";
+        return false;
+    }
+
+    Camera_FlashMode mode = on ? FLASH_MODE_ALWAYS_OPEN : FLASH_MODE_CLOSE;
+    bool supported = false;
+    Camera_ErrorCode ret = OH_CaptureSession_IsFlashModeSupported(captureSession_.Raw(), mode, &supported);
+    if (ret != CAMERA_OK || !supported) {
+        RTC_LOG(LS_WARNING) << "SetTorch ignored: flash mode not supported, code=" << ret;
+        return false;
+    }
+
+    ret = OH_CaptureSession_SetFlashMode(captureSession_.Raw(), mode);
+    if (ret != CAMERA_OK) {
+        RTC_LOG(LS_WARNING) << "OH_CaptureSession_SetFlashMode failed, code=" << ret;
+        return false;
+    }
+    return true;
+}
+
+bool CameraCapturer::SetFocusMode(int32_t mode)
+{
+    RTC_LOG(LS_INFO) << __FUNCTION__ << ": mode=" << mode;
+
+    if (!isStarted_ || !captureSession_.Raw()) {
+        RTC_LOG(LS_WARNING) << "SetFocusMode ignored: capture session not active";
+        return false;
+    }
+
+    if (mode < FOCUS_MODE_MANUAL || mode > FOCUS_MODE_LOCKED) {
+        RTC_LOG(LS_WARNING) << "SetFocusMode ignored: invalid focus mode " << mode;
+        return false;
+    }
+
+    auto focusMode = static_cast<Camera_FocusMode>(mode);
+    bool supported = false;
+    Camera_ErrorCode ret = OH_CaptureSession_IsFocusModeSupported(captureSession_.Raw(), focusMode, &supported);
+    if (ret != CAMERA_OK || !supported) {
+        RTC_LOG(LS_WARNING) << "SetFocusMode ignored: focus mode not supported, code=" << ret;
+        return false;
+    }
+
+    ret = OH_CaptureSession_SetFocusMode(captureSession_.Raw(), focusMode);
+    if (ret != CAMERA_OK) {
+        RTC_LOG(LS_WARNING) << "OH_CaptureSession_SetFocusMode failed, code=" << ret;
+        return false;
+    }
+    return true;
+}
+
+bool CameraCapturer::SetFocusPoint(double x, double y)
+{
+    RTC_LOG(LS_INFO) << __FUNCTION__ << ": x=" << x << ", y=" << y;
+
+    if (!isStarted_ || !captureSession_.Raw()) {
+        RTC_LOG(LS_WARNING) << "SetFocusPoint ignored: capture session not active";
+        return false;
+    }
+
+    // NaN fails these comparisons naturally
+    if (!(x >= 0.0 && x <= 1.0) || !(y >= 0.0 && y <= 1.0)) {
+        RTC_LOG(LS_WARNING) << "SetFocusPoint ignored: point out of range";
+        return false;
+    }
+
+    Camera_Point point{x, y};
+    Camera_ErrorCode ret = OH_CaptureSession_SetFocusPoint(captureSession_.Raw(), point);
+    if (ret != CAMERA_OK) {
+        RTC_LOG(LS_WARNING) << "OH_CaptureSession_SetFocusPoint failed, code=" << ret;
+        return false;
+    }
+    return true;
+}
+
+bool CameraCapturer::SetExposureMode(int32_t mode)
+{
+    RTC_LOG(LS_INFO) << __FUNCTION__ << ": mode=" << mode;
+
+    if (!isStarted_ || !captureSession_.Raw()) {
+        RTC_LOG(LS_WARNING) << "SetExposureMode ignored: capture session not active";
+        return false;
+    }
+
+    if (mode < EXPOSURE_MODE_LOCKED || mode > EXPOSURE_MODE_CONTINUOUS_AUTO) {
+        RTC_LOG(LS_WARNING) << "SetExposureMode ignored: invalid exposure mode " << mode;
+        return false;
+    }
+
+    auto exposureMode = static_cast<Camera_ExposureMode>(mode);
+    bool supported = false;
+    Camera_ErrorCode ret =
+        OH_CaptureSession_IsExposureModeSupported(captureSession_.Raw(), exposureMode, &supported);
+    if (ret != CAMERA_OK || !supported) {
+        RTC_LOG(LS_WARNING) << "SetExposureMode ignored: exposure mode not supported, code=" << ret;
+        return false;
+    }
+
+    ret = OH_CaptureSession_SetExposureMode(captureSession_.Raw(), exposureMode);
+    if (ret != CAMERA_OK) {
+        RTC_LOG(LS_WARNING) << "OH_CaptureSession_SetExposureMode failed, code=" << ret;
+        return false;
+    }
+    return true;
+}
+
 
 void CameraCapturer::OnCameraManagerStatusCallback(Camera_StatusInfo* status)
 {
