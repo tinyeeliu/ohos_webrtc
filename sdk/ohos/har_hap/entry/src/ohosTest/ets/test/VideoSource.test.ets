@@ -26,6 +26,52 @@ export default function VideoSourceTest() {
       Logging.enableLogToDebugOutput(LoggingSeverity.VERBOSE);
     })
 
+    // A nonexistent mandatory ID must reach device selection and throw a
+    // catchable error, rather than aborting in Napi::String::CheckCast.
+    it('exactDeviceIdStringRejectsWithoutNativeCrash', 0, () => {
+      let message = '';
+      try {
+        pcf.createVideoSource({ deviceId: { exact: '__missing_camera_regression__' } });
+      } catch (e) {
+        message = (e as Error).message;
+      }
+      expect(message).assertEqual('Unsatisfied constraint: deviceId');
+    })
+
+    it('exactDeviceIdArrayRejectsWithoutNativeCrash', 0, () => {
+      let message = '';
+      try {
+        pcf.createVideoSource({ deviceId: { exact: ['__missing_camera_regression__'] } });
+      } catch (e) {
+        message = (e as Error).message;
+      }
+      expect(message).assertEqual('Unsatisfied constraint: deviceId');
+    })
+
+    it('idealDeviceIdStringParsesBeforeExactSelection', 0, () => {
+      let message = '';
+      try {
+        pcf.createVideoSource({ deviceId: {
+          ideal: '__preferred_camera__', exact: '__missing_camera_regression__'
+        } });
+      } catch (e) {
+        message = (e as Error).message;
+      }
+      expect(message).assertEqual('Unsatisfied constraint: deviceId');
+    })
+
+    it('idealDeviceIdArrayParsesBeforeExactSelection', 0, () => {
+      let message = '';
+      try {
+        pcf.createVideoSource({ deviceId: {
+          ideal: ['__preferred_camera__'], exact: ['__missing_camera_regression__']
+        } });
+      } catch (e) {
+        message = (e as Error).message;
+      }
+      expect(message).assertEqual('Unsatisfied constraint: deviceId');
+    })
+
     it('releaseChangesStateToEnded', 0, () => {
       let videoSource = pcf.createVideoSource();
       expect(videoSource.state === 'live' || videoSource.state === 'initializing' || videoSource.state === 'ended' || videoSource.state === 'muted').assertTrue();

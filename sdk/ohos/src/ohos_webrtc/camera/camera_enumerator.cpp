@@ -68,6 +68,24 @@ std::vector<CameraDeviceInfo> CameraEnumerator::GetDevices()
             device.profiles.push_back(p);
         }
 
+        // Real device fps capability for getCapabilities; Camera_VideoProfile is flat
+        // (format/size/range), see ohcamera camera_manager.h
+        for (uint32_t j = 0; j < capability.VideoProfileSize(); j++) {
+            Camera_VideoProfile* videoProfile = capability.GetVideoProfile(j);
+            if (!videoProfile) {
+                continue;
+            }
+            RTC_DLOG(LS_VERBOSE) << "video profile size: " << videoProfile->size.width << "x"
+                                 << videoProfile->size.height << ", fps " << videoProfile->range.min << "-"
+                                 << videoProfile->range.max;
+            if (device.frameRateRange.min == 0 || videoProfile->range.min < device.frameRateRange.min) {
+                device.frameRateRange.min = videoProfile->range.min;
+            }
+            if (videoProfile->range.max > device.frameRateRange.max) {
+                device.frameRateRange.max = videoProfile->range.max;
+            }
+        }
+
         result.push_back(device);
     }
 

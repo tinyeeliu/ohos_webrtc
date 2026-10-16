@@ -247,9 +247,7 @@ void ScreenCapturer::Stop()
         stopCond_.wait_for(lock, std::chrono::milliseconds(kStopConfirmTimeoutMs),
             [this] { return stopConfirmed_.load(); });
     }
-    if (stopConfirmed_.load()) {
-        screenCapture_.Reset();
-    }
+    screenCapture_.Reset();
 
     if (!stopConfirmed_.load()) {
         // No state change callback, notify manually.

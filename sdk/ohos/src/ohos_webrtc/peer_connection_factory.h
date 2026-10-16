@@ -39,7 +39,8 @@ public:
         rtc::scoped_refptr<OhosAudioDeviceModule> adm = nullptr,
         std::unique_ptr<VideoEncoderFactory> videoEncoderFactory = nullptr,
         std::unique_ptr<VideoDecoderFactory> videoDecoderFactory = nullptr,
-        rtc::scoped_refptr<AudioProcessing> audioProcessing = nullptr);
+        rtc::scoped_refptr<AudioProcessing> audioProcessing = nullptr,
+        absl::optional<int32_t> networkIgnoreMask = absl::nullopt);
 
     // Do not use this constructor directly, use 'Create' above.
     PeerConnectionFactoryWrapper() = default;
@@ -93,7 +94,8 @@ public:
 protected:
     bool Init(
         rtc::scoped_refptr<OhosAudioDeviceModule> adm, std::unique_ptr<VideoEncoderFactory> videoEncoderFactory,
-        std::unique_ptr<VideoDecoderFactory> videoDecoderFactory, rtc::scoped_refptr<AudioProcessing> audioProcessing);
+        std::unique_ptr<VideoDecoderFactory> videoDecoderFactory, rtc::scoped_refptr<AudioProcessing> audioProcessing,
+        absl::optional<int32_t> networkIgnoreMask = absl::nullopt);
 
 private:
     static std::mutex mutex_;
