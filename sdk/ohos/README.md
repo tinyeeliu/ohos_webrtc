@@ -24,11 +24,7 @@ To integrate `libwebrtc.a` directly in an NDK C++ project, see [Integrating the 
 
 ### Compatibility
 
-Earlier releases were verified in the following environment:
-
-- DevEco Studio: NEXT Beta2(5.0.3.900), SDK: API12 Release(5.0.0.71), ROM: 5.0.0.71
-
-> **OHOS SDK API 12 or above is required.**
+OpenHarmony API version >= 15.
 
 ### Permissions
 
