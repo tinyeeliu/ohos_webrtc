@@ -26,9 +26,9 @@ OpenHarmony ohpm 环境配置等更多内容，请参考[如何安装 OpenHarmon
 
 既有版本的验证环境：
 
-- DevEco Studio: NEXT Beta2(5.0.3.900)，SDK: API12 Release(5.0.0.71)，ROM：5.0.0.71
+- DevEco Studio: 6.1.1.300; SDK: API17 (5.0.5); ROM: 6.1.0.135
 
-> **OHOS SDK 要求 API 12 及以上。**
+> **OHOS SDK 要求 API 17 及以上。**
 
 ### 权限要求
 
