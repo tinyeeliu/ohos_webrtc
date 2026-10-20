@@ -24,11 +24,7 @@ OpenHarmony ohpm 环境配置等更多内容，请参考[如何安装 OpenHarmon
 
 ### 兼容性
 
-既有版本的验证环境：
-
-- DevEco Studio: NEXT Beta2(5.0.3.900)，SDK: API12 Release(5.0.0.71)，ROM：5.0.0.71
-
-> **OHOS SDK 要求 API 12 及以上。**
+OpenHarmony API 版本 ≥ 15。
 
 ### 权限要求
 
