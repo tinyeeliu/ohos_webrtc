@@ -21,12 +21,15 @@ Current local changes for multi-device camera adaptation; no package release is 
 - Isolate stale capture/renderer callbacks and cancel recovery work when capture is deactivated or released.
 - Correct string `ideal`/`exact` constraint parsing and reject non-string sequence elements and nested constraint dictionaries.
 - Update English/Chinese SDK and demo documentation for integration, capability versions, A–F validation, and build requirements.
+- Fix the front camera preview and encoded streams being inverted 180 degrees relative to the window when the window orientation is locked and the physical posture family mismatches the window orientation family. The posture family is derived from the accelerometer with hysteresis and debounce, the mismatch is confirmed before compensation, and the per-frame compensation applies to both HAL-declared and software rotation paths, scoped to phone form-factor devices [#142](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/pull/142)
 
 ### Compatibility and Validation
 
 - New sessions require a matching Native library with preview capability version 1 or later. Explicit frame-stall monitoring also requires `getCaptureFrameCount()`; the demo enables its 8-second sampling interval only with version 2 or later.
 - Rebuild the complete Native library and replace the target ABI binary to use the current Native additions. Existing low-level API signatures remain available, and new optional declarations allow legacy implementations to remain valid.
 - Automated tests and local loopback do not establish cross-device HAL, orientation, or recovery correctness. Preview snapshots capture the composited view; no raw-frame export or recognition engine is added. Two-peer demo calls use STUN without TURN, so restricted networks may prevent connection.
+- Posture mismatch compensation is restricted to phone form-factor devices (`OH_GetDeviceType() == "phone"`); other form factors neither subscribe to the accelerometer nor receive compensation, keeping their exact previous behavior. An unavailable device type fails closed, and the gate decision is logged once.
+- The compensation assumes the front-camera HAL's posture-following pixel rotation measured on an API 12 phone and re-verified on an API 26 phone. Phone devices without this rotation would receive an unwanted 180-degree compensation under a locked window with a mismatched posture; validate on the target phone matrix. A measured API 26 tablet exhibits the opposite stream phase and an unstable reported camera orientation, which the form-factor whitelist excludes. Missing accelerometer permission or sensor data degrades the compensation to a no-op.
 
 ## 1.0.3 (2026-07-29)
 
