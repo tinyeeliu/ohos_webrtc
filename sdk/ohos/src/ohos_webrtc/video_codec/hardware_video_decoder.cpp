@@ -351,9 +351,14 @@ bool HardwareVideoDecoder::InitDecode()
     RenderResolution resolution = decoderSettings_.max_render_resolution();
 
     auto format = ohos::AVFormat::Create();
+    // Frames rendered into a surface must be configured for surface output.
+    // colorFormat_ describes an in-memory layout (NV12 and friends) and is only
+    // valid for the byte-buffer path.
+    const int32_t pixelFormat =
+        sharedContext_ ? static_cast<int32_t>(AV_PIXEL_FORMAT_SURFACE_FORMAT) : colorFormat_;
     OH_AVFormat_SetIntValue(format.Raw(), OH_MD_KEY_WIDTH, resolution.Width());
     OH_AVFormat_SetIntValue(format.Raw(), OH_MD_KEY_HEIGHT, resolution.Height());
-    OH_AVFormat_SetIntValue(format.Raw(), OH_MD_KEY_PIXEL_FORMAT, colorFormat_);
+    OH_AVFormat_SetIntValue(format.Raw(), OH_MD_KEY_PIXEL_FORMAT, pixelFormat);
 
     ret = OH_VideoDecoder_Configure(decoder_.Raw(), format.Raw());
     if (ret != AV_ERR_OK) {
