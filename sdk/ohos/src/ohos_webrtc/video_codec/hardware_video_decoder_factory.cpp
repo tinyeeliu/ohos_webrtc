@@ -51,12 +51,9 @@ std::vector<SdpVideoFormat> HardwareVideoDecoderFactory::GetSupportedFormats() c
         const char* name = OH_AVCapability_GetName(capability);
         RTC_DLOG(LS_VERBOSE) << "capability codec name: " << name;
 
-        uint32_t pixelFormatNum = 0;
-        const int32_t* pixelFormats = nullptr;
-        OH_AVCapability_GetVideoSupportedPixelFormats(capability, &pixelFormats, &pixelFormatNum);
-        for (uint32_t i = 0; i < pixelFormatNum; i++) {
-            RTC_DLOG(LS_VERBOSE) << "supported pixel format: " << pixelFormats[i];
-        }
+        // The supported-pixel-format query used to be logged here. It is a pure
+        // diagnostic, and on MLR-AL10 it crashes inside the system API for the
+        // HEVC capability while formats are being enumerated.
 
         if (type == VideoCodecMimeType::H264) {
             if (OH_AVCapability_AreProfileAndLevelSupported(capability, AVC_PROFILE_HIGH, AVC_LEVEL_31)) {
@@ -87,7 +84,12 @@ std::unique_ptr<VideoDecoder> HardwareVideoDecoderFactory::CreateVideoDecoder(co
     }
 
     const char* codecName = OH_AVCapability_GetName(capability);
-    RTC_DLOG(LS_VERBOSE) << "codec name: " << codecName;
+    if (codecName == nullptr || codecName[0] == '\0') {
+        // A capability without a usable name cannot be handed to
+        // OH_VideoDecoder_CreateByName(); fail here instead of crashing later.
+        RTC_LOG(LS_ERROR) << "Codec capability without a name for " << type.mimeType();
+        return nullptr;
+    }
 
     std::optional<int32_t> pixelFormat =
         ohos::MediaCodecUtils::SelectPixelFormat(ohos::MediaCodecUtils::DECODER_PIXEL_FORMATS, capability);
