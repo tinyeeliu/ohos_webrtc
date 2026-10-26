@@ -336,6 +336,15 @@ bool HardwareVideoDecoder::InitDecode()
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
     decoder_ = ohos::VideoDecoder::CreateByName(codecName_.c_str());
+    if (decoder_.Raw() == nullptr) {
+        // CreateByName() returns a wrapper that holds nullptr when the platform
+        // cannot create the codec. Observed on MLR-AL10 with HEVC: the
+        // capability is advertised, but no codec instance is returned.
+        // Continuing would pass the null handle to the next OH_VideoDecoder_*
+        // call and crash inside the system API.
+        RTC_LOG(LS_ERROR) << "Failed to create decoder by name: " << codecName_;
+        return false;
+    }
 
     OH_AVCodecCallback callback;
     callback.onError = &HardwareVideoDecoder::OnCodecError1;
