@@ -48,7 +48,15 @@ HardwareVideoDecoder::HardwareVideoDecoder(
     (void)format;
 }
 
-HardwareVideoDecoder::~HardwareVideoDecoder() = default;
+HardwareVideoDecoder::~HardwareVideoDecoder()
+{
+    // Members are destroyed in reverse declaration order, and decoder_ is
+    // declared before videoFrameReceiver_: without an explicit Release() the
+    // frame receiver is torn down while the codec may still dispatch output
+    // callbacks into it. Callers do call Release(); this is the fallback for
+    // destruction paths that do not.
+    Release();
+}
 
 bool HardwareVideoDecoder::Configure(const Settings& settings)
 {
