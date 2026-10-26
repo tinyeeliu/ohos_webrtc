@@ -105,6 +105,14 @@ int HardwareVideoEncoder::InitEncode(const VideoCodec* codec_settings, const Set
     RTC_DLOG(LS_VERBOSE) << "qualityRange=[" << qualityRange.minVal << "~" << qualityRange.maxVal << "]";
 
     encoder_ = ohos::VideoEncoder::CreateByName(codecName_.c_str());
+    if (encoder_.Raw() == nullptr) {
+        // Same failure mode as the decoder path: with exceptions disabled
+        // (NDK_HELPER_DISABLE_CPP_EXCEPTIONS), CreateByName() returns a wrapper
+        // that holds nullptr when the platform cannot create the encoder, and
+        // the next call would pass it to OH_VideoEncoder_RegisterCallback().
+        RTC_LOG(LS_ERROR) << "Failed to create encoder by name: " << codecName_;
+        return WEBRTC_VIDEO_CODEC_ERROR;
+    }
 
     OH_AVCodecCallback callback;
     callback.onError = &HardwareVideoEncoder::OnCodecError1;
