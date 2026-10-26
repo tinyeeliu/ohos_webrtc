@@ -336,6 +336,13 @@ bool HardwareVideoDecoder::InitDecode()
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
     decoder_ = ohos::VideoDecoder::CreateByName(codecName_.c_str());
+    if (decoder_.Raw() == nullptr) {
+        // CreateByName() returns a wrapper that holds nullptr when the platform
+        // cannot create the codec. Passing that handle to any OH_VideoDecoder_*
+        // call (the next one is RegisterCallback) crashes inside the system API.
+        RTC_LOG(LS_ERROR) << "Failed to create decoder by name: " << codecName_;
+        return false;
+    }
 
     OH_AVCodecCallback callback;
     callback.onError = &HardwareVideoDecoder::OnCodecError1;
