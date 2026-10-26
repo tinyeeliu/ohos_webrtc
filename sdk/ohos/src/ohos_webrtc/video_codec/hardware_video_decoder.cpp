@@ -48,7 +48,13 @@ HardwareVideoDecoder::HardwareVideoDecoder(
     (void)format;
 }
 
-HardwareVideoDecoder::~HardwareVideoDecoder() = default;
+HardwareVideoDecoder::~HardwareVideoDecoder()
+{
+    // Callers are expected to Release() first, but nothing enforces it; without
+    // this fallback the codec, its worker thread and the callbacks that carry
+    // `this` outlive the object.
+    Release();
+}
 
 bool HardwareVideoDecoder::Configure(const Settings& settings)
 {
@@ -69,6 +75,12 @@ int32_t HardwareVideoDecoder::Release()
             return WEBRTC_VIDEO_CODEC_ERROR;
         }
 
+        // Publish "not initialized" as soon as the codec is stopped: Decode()
+        // and DequeueInputBuffer() wait on this flag, and they must not queue
+        // into (or block on) a decoder whose receiver and buffer queue are
+        // about to be dismantled below.
+        initialized_ = false;
+
         if (videoFrameReceiver_) {
             videoFrameReceiver_.reset();
         }
@@ -82,8 +94,6 @@ int32_t HardwareVideoDecoder::Release()
         UNUSED std::lock_guard<std::mutex> lock(extraInfosMutex_);
         extraInfos_.clear();
     }
-
-    initialized_ = false;
 
     return WEBRTC_VIDEO_CODEC_OK;
 }
