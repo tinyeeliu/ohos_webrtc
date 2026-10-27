@@ -35,6 +35,7 @@
 #include "peer_connection_factory.h"
 #include "rtp_receiver.h"
 #include "rtp_sender.h"
+#include "sei/napi_sei.h"
 #include "rtp_transceiver.h"
 #include "sctp_transport.h"
 #include "session_description.h"
@@ -93,6 +94,7 @@ static napi_value Init(napi_env env, napi_value exports)
     NapiIceCandidate::Init(e, exp);
     NapiSessionDescription::Init(e, exp);
     NapiRtpSender::Init(e, exp);
+    NapiEncoderWrapper::Init(e, exp);
     NapiRtpReceiver::Init(e, exp);
     NapiRtpTransceiver::Init(e, exp);
     NapiSctpTransport::Init(e, exp);

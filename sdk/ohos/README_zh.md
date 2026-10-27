@@ -117,6 +117,8 @@ await peerConnection.setLocalDescription(offer);
 
 ## 接口说明
 
+H.264 自定义 SEI 收发、`EncoderWrapper` 与 `RTCRtpReceiver.onsei` 的接入及编译验证步骤见 [SEI 使用说明](../../docs/ohos/sei_h264.md)。需要配套重编 Native 动态库。
+
 完整接口定义见 `api/libohos_webrtc/webrtc.d.ts`，完整说明请参阅[接口文档](./api/libwebrtc.md)。
 
 ## 多设备相机预览

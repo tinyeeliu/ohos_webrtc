@@ -14,6 +14,7 @@
  */
 
 #include "peer_connection.h"
+#include "sei/sei_transformer.h"
 #include "peer_connection_factory.h"
 
 #include <future>
@@ -369,7 +370,8 @@ Napi::Value NapiPeerConnection::NewInstance(Napi::Value configuration,
         {configuration, External<std::shared_ptr<PeerConnectionFactoryWrapper>>::New(env, &factory)});
 }
 
-NapiPeerConnection::NapiPeerConnection(const CallbackInfo& info) : NapiEventTarget<NapiPeerConnection>(info)
+NapiPeerConnection::NapiPeerConnection(const CallbackInfo& info)
+    : NapiEventTarget<NapiPeerConnection>(info), seiContext_(std::make_shared<sei::PeerSeiContext>())
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
@@ -403,6 +405,7 @@ NapiPeerConnection::NapiPeerConnection(const CallbackInfo& info) : NapiEventTarg
 
 NapiPeerConnection::~NapiPeerConnection()
 {
+    seiContext_->Close();
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 }
 
@@ -822,7 +825,7 @@ Napi::Value NapiPeerConnection::AddTrack(const Napi::CallbackInfo& info)
         }
     }
 
-    return NapiRtpSender::NewInstance(factory_, pc_, result.value());
+    return NapiRtpSender::NewInstance(factory_, pc_, result.value(), seiContext_);
 }
 
 Napi::Value NapiPeerConnection::RemoveTrack(const Napi::CallbackInfo& info)
@@ -1173,7 +1176,7 @@ Napi::Value NapiPeerConnection::GetSenders(const Napi::CallbackInfo& info)
     auto senders = pc_->GetSenders();
     auto jsSenders = Array::New(info.Env(), senders.size());
     for (uint32_t i = 0; i < senders.size(); i++) {
-        jsSenders.Set(i, NapiRtpSender::NewInstance(factory_, pc_, senders[i]));
+        jsSenders.Set(i, NapiRtpSender::NewInstance(factory_, pc_, senders[i], seiContext_));
     }
 
     return jsSenders;
@@ -1186,7 +1189,7 @@ Napi::Value NapiPeerConnection::GetReceivers(const Napi::CallbackInfo& info)
     auto receivers = pc_->GetReceivers();
     auto jsReceivers = Array::New(info.Env(), receivers.size());
     for (uint32_t i = 0; i < receivers.size(); i++) {
-        jsReceivers.Set(i, NapiRtpReceiver::NewInstance(factory_, pc_, receivers[i]));
+        jsReceivers.Set(i, NapiRtpReceiver::NewInstance(factory_, pc_, receivers[i], seiContext_));
     }
 
     return jsReceivers;
@@ -1199,7 +1202,7 @@ Napi::Value NapiPeerConnection::GetTransceivers(const Napi::CallbackInfo& info)
     auto transceivers = pc_->GetTransceivers();
     auto jsTransceivers = Array::New(info.Env(), transceivers.size());
     for (uint32_t i = 0; i < transceivers.size(); i++) {
-        jsTransceivers.Set(i, NapiRtpTransceiver::NewInstance(factory_, pc_, transceivers[i]));
+        jsTransceivers.Set(i, NapiRtpTransceiver::NewInstance(factory_, pc_, transceivers[i], seiContext_));
     }
 
     return jsTransceivers;
@@ -1294,13 +1297,13 @@ Napi::Value NapiPeerConnection::AddTransceiver(const Napi::CallbackInfo& info)
             if (!result_or_error.ok()) {
                 NAPI_THROW(Error::New(info.Env(), result_or_error.error().message()), info.Env().Undefined());
             }
-            return NapiRtpTransceiver::NewInstance(factory_, pc_, result_or_error.value());
+            return NapiRtpTransceiver::NewInstance(factory_, pc_, result_or_error.value(), seiContext_);
         } else {
             auto result_or_error = pc_->AddTransceiver(track->Get());
             if (!result_or_error.ok()) {
                 NAPI_THROW(Error::New(info.Env(), result_or_error.error().message()), info.Env().Undefined());
             }
-            return NapiRtpTransceiver::NewInstance(factory_, pc_, result_or_error.value());
+            return NapiRtpTransceiver::NewInstance(factory_, pc_, result_or_error.value(), seiContext_);
         }
     } else {
         std::string jsMediatype = info[0].As<String>().Utf8Value();
@@ -1321,13 +1324,13 @@ Napi::Value NapiPeerConnection::AddTransceiver(const Napi::CallbackInfo& info)
             if (!result.ok()) {
                 NAPI_THROW(Error::New(info.Env(), result.error().message()), info.Env().Undefined());
             }
-            return NapiRtpTransceiver::NewInstance(factory_, pc_, result.value());
+            return NapiRtpTransceiver::NewInstance(factory_, pc_, result.value(), seiContext_);
         } else {
             auto result = pc_->AddTransceiver(mediaType);
             if (!result.ok()) {
                 NAPI_THROW(Error::New(info.Env(), result.error().message()), info.Env().Undefined());
             }
-            return NapiRtpTransceiver::NewInstance(factory_, pc_, result.value());
+            return NapiRtpTransceiver::NewInstance(factory_, pc_, result.value(), seiContext_);
         }
     }
     NAPI_THROW(Error::New(info.Env(), "Invalid argument type for the first parameter"), info.Env().Undefined());
@@ -1336,6 +1339,9 @@ Napi::Value NapiPeerConnection::AddTransceiver(const Napi::CallbackInfo& info)
 Napi::Value NapiPeerConnection::Close(const Napi::CallbackInfo& info)
 {
     RTC_LOG(LS_VERBOSE) << __FUNCTION__;
+
+    // Cancel queued ArkTS notifications synchronously before native async close.
+    seiContext_->Close();
 
     // Close操作可能耗时较长，放到信令线程执行以避免阻塞主线程
     pc_->signaling_thread()->PostTask([pc = pc_] {
@@ -1546,6 +1552,7 @@ void NapiPeerConnection::OnSignalingChange(PeerConnectionInterface::SignalingSta
         target.MakeCallback(kEventSignalingStateChange, {jsEvent});
 
         if (newState == webrtc::PeerConnectionInterface::kClosed) {
+            seiContext_->Close();
             Stop();
         }
     }));
@@ -1698,8 +1705,8 @@ void NapiPeerConnection::OnTrack(rtc::scoped_refptr<RtpTransceiverInterface> tra
         jsEvent.Set("type", String::New(env, kEventTrack));
         jsEvent.Set("streams", jsStreams);
         jsEvent.Set("track", NapiMediaStreamTrack::NewInstance(factory_, receiver->track()));
-        jsEvent.Set("receiver", NapiRtpReceiver::NewInstance(factory_, pc_, receiver));
-        jsEvent.Set("transceiver", NapiRtpTransceiver::NewInstance(factory_, pc_, transceiver));
+        jsEvent.Set("receiver", NapiRtpReceiver::NewInstance(factory_, pc_, receiver, seiContext_));
+        jsEvent.Set("transceiver", NapiRtpTransceiver::NewInstance(factory_, pc_, transceiver, seiContext_));
 
         target.MakeCallback(kEventTrack, {jsEvent});
     }));

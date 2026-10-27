@@ -40,6 +40,9 @@ if (is_ohos) {
         "$ohos_webrtc_src_path/media_stream_track.cpp",
         "$ohos_webrtc_src_path/media_track_constraints.cpp",
         "$ohos_webrtc_src_path/napi_module.cpp",
+        "$ohos_webrtc_src_path/sei/h264_sei.cpp",
+        "$ohos_webrtc_src_path/sei/sei_transformer.cpp",
+        "$ohos_webrtc_src_path/sei/napi_sei.cpp",
         "$ohos_webrtc_src_path/peer_connection.cpp",
         "$ohos_webrtc_src_path/peer_connection_factory.cpp",
         "$ohos_webrtc_src_path/rtp_parameters.cpp",
@@ -139,6 +142,11 @@ if (is_ohos) {
     deps = [
       "../../pc:libjingle_peerconnection",
       "../../api:create_peerconnection_factory",
+      "../../api:frame_transformer_interface",
+      "../../api:make_ref_counted",
+      "../../api:libjingle_peerconnection_api",
+      "../../api:rtp_sender_interface",
+      "../../api/video:video_frame_metadata",
       "../../api/task_queue:pending_task_safety_flag",
       "../../api/audio_codecs:builtin_audio_decoder_factory",
       "../../api/audio_codecs:builtin_audio_encoder_factory",
@@ -152,6 +160,26 @@ if (is_ohos) {
     ]
 
     output_extension = "so"
+  }
+
+  if (rtc_include_tests) {
+    rtc_test("sei_unittests") {
+      sources = [
+        "tests/sei_transformer_unittest.cpp",
+        "$ohos_webrtc_src_path/sei/h264_sei.cpp",
+        "$ohos_webrtc_src_path/sei/sei_transformer.cpp",
+      ]
+      include_dirs = [ ohos_webrtc_src_path ]
+      deps = [
+        "../../api:frame_transformer_interface",
+        "../../api:libjingle_peerconnection_api",
+        "../../api:make_ref_counted",
+        "../../api:rtp_sender_interface",
+        "../../api/video:video_frame_metadata",
+        "../../test:test_main",
+        "../../test:test_support",
+      ]
+    }
   }
 
 }

@@ -18,6 +18,11 @@ import webrtc, { VideoRenderController, ScalingMode } from '@ohos/webrtc';
 /** Demo-only encode/decode verification. No signaling server or STUN/TURN service. */
 export class PreviewLoopback {
   public onStatus?: (message: string) => void;
+  public onSei?: (event: webrtc.RTCSeiEvent) => void;
+  public encoder?: webrtc.EncoderWrapper;
+  get connected(): boolean {
+    return this.sender?.connectionState === 'connected' && this.receiver?.connectionState === 'connected';
+  }
   private sender?: webrtc.RTCPeerConnection;
   private receiver?: webrtc.RTCPeerConnection;
   private generation: number = 0;
@@ -37,6 +42,7 @@ export class PreviewLoopback {
 
   stop(): void {
     this.generation++;
+    this.encoder = undefined;
     if (this.timeout >= 0) { clearTimeout(this.timeout); this.timeout = -1; }
     this.controller.onFrameSizeChanged = undefined;
     this.controller.setVideoTrack(null);
@@ -56,7 +62,8 @@ export class PreviewLoopback {
     this.receiverReady = false;
   }
 
-  async start(factory: webrtc.PeerConnectionFactory, track: webrtc.MediaStreamTrack): Promise<void> {
+  async start(factory: webrtc.PeerConnectionFactory, track: webrtc.MediaStreamTrack,
+    enableSei: boolean = false): Promise<void> {
     this.stop();
     const generation = this.generation;
     const fail = (): void => {
@@ -76,6 +83,11 @@ export class PreviewLoopback {
       };
       receiver.ontrack = (event: webrtc.RTCTrackEvent): void => {
         if (generation === this.generation && event.track.kind === 'video') {
+          if (enableSei) {
+            event.receiver.onsei = (sei: webrtc.RTCSeiEvent): void => {
+              if (generation === this.generation) { this.onSei?.(sei); }
+            };
+          }
           this.controller.setVideoTrack(event.track);
         }
       };
@@ -102,7 +114,17 @@ export class PreviewLoopback {
       };
       this.timeout = setTimeout(fail, 15000);
       this.onStatus?.('正在建立本机编解码验证连接…');
-      sender.addTrack(track);
+      if (enableSei) {
+        const codecs = webrtc.RTCRtpSender.getCapabilities('video')?.codecs.filter(
+          (codec: webrtc.RTCRtpCodec) => codec.mimeType.toLowerCase() === 'video/h264' &&
+            (codec.sdpFmtpLine ?? '').split(';').some((part: string) => part.trim() === 'packetization-mode=1')) ?? [];
+        if (codecs.length === 0) { throw new Error('当前设备或构建没有 H.264 packetization-mode=1 编码能力'); }
+        const transceiver = sender.addTransceiver(track, { direction: 'sendonly' });
+        transceiver.setCodecPreferences(codecs);
+        this.encoder = transceiver.sender.getEncoderWrapper();
+      } else {
+        sender.addTrack(track);
+      }
       const offer = await sender.createOffer();
       if (generation !== this.generation) { return; }
       await sender.setLocalDescription(offer);
@@ -127,6 +149,9 @@ export class PreviewLoopback {
         if (generation !== this.generation) { return; }
       }
       this.pendingSender = [];
-    } catch (e) { fail(); }
+    } catch (e) {
+      fail();
+      if (enableSei) { this.onStatus?.(`SEI 回环失败：${(e as Error).message}`); }
+    }
   }
 }
