@@ -122,8 +122,7 @@ NapiMediaStreamTrack::NapiMediaStreamTrack(const Napi::CallbackInfo& info)
 
     // Event dispatch to the JS thread. The callback only runs while the JS object is
     // alive (weak self reference); destruction aborts the tsfn first.
-    selfRef_ = Napi::Persistent(this->Value());
-    selfRef_.SetWeak();
+    selfRef_ = Napi::Weak(this->Value());
     tsfn_ = Napi::ThreadSafeFunction::New(
         env, Napi::Function::New(env, [this](const Napi::CallbackInfo& cbInfo) { DrainEvents(cbInfo.Env()); }),
         "MediaStreamTrackEvents", 0, 1);
