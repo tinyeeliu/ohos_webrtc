@@ -51,6 +51,10 @@ public:
 
     void SetCapturerObserver(VideoCapturer::Observer* observer);
 
+    // MediaSourceInterface::state() stays public (base interface contract): track
+    // wrappers read it as the muted/ended ground truth.
+    SourceState state() const override;
+
 protected:
     OhosVideoTrackSource(
         std::unique_ptr<VideoCapturer> capturer, rtc::Thread* signaling_thread,
@@ -71,7 +75,6 @@ protected:
     void RemoveSink(rtc::VideoSinkInterface<VideoFrame>* sink) override;
 
     // Implements MediaSourceInterface
-    SourceState state() const override;
     bool remote() const override;
 
     // Part of VideoTrackSourceInterface.
