@@ -47,6 +47,9 @@ public:
         //     int32_t sampleRate, int32_t format, int32_t channelCount, rtc::CopyOnWriteBuffer* data) = 0;
         virtual void OnAudioInputDataReady(
             AudioInput* input, void* buffer, int32_t length, int64_t timestampUs, int64_t deleyUs) = 0;
+        // System interrupt/resume of the capture path (e.g. forced pause by a higher-priority
+        // audio session). Default no-op so existing observers are not broken.
+        virtual void OnAudioInputInterrupted(AudioInput* input, bool interrupted) { (void)input; (void)interrupted; }
     };
 
     virtual ~AudioInput() {}
@@ -129,6 +132,26 @@ public:
         return 0;
     }
 
+    // Records whether the system has forcibly interrupted (paused) the capture path and
+    // notifies observers. Independent from SetMute(): `mute_` silences samples by request,
+    // while an interrupt means the system temporarily cannot provide media at all.
+    void SetCaptureInterrupted(bool interrupted)
+    {
+        if (interrupted_.exchange(interrupted) == interrupted) {
+            return;
+        }
+
+        std::lock_guard<std::mutex> lock(obsMutex_);
+        for (auto& obs : observers_) {
+            obs->OnAudioInputInterrupted(this, interrupted);
+        }
+    }
+
+    bool CaptureInterrupted() const
+    {
+        return interrupted_.load();
+    }
+
     void SetVolume(double volume) override
     {
         volume_ = std::max(0.0, std::min(kAudioInputVolumeMax, volume));
@@ -163,6 +186,9 @@ protected:
 
     // Sets all recorded samples to zero if `mute_` is true.
     std::atomic<bool> mute_{false};
+
+    // True while the system forcibly interrupts (pauses) the capture path.
+    std::atomic<bool> interrupted_{false};
 
     // API/UI volume [0, kAudioInputVolumeMax]: 0 = mute, 1 = default (10% gain), max = 100%.
     // Applied gain is volume_/kAudioInputVolumeMax when volume_ < kAudioInputVolumeMax.

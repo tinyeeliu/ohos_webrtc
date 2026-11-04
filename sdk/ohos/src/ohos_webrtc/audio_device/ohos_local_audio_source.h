@@ -31,7 +31,7 @@ namespace webrtc {
 
 class OhosAudioDeviceModule;
 
-class OhosLocalAudioSource : public Notifier<AudioSourceInterface> {
+class OhosLocalAudioSource : public Notifier<AudioSourceInterface>, public AudioInput::Observer {
 public:
     // Creates an instance of OhosLocalAudioSource.
     static rtc::scoped_refptr<OhosLocalAudioSource> Create(
@@ -71,6 +71,14 @@ public:
     void ApplyConstraints(const cricket::AudioOptions& options);
 
     void Stop();
+
+    // AudioInput::Observer implementation. Called from the audio callback thread;
+    // state migration and notification are posted to the signaling thread.
+    void OnAudioInputError(AudioInput* input, AudioErrorType type, const std::string& message) override;
+    void OnAudioInputStateChange(AudioInput* input, AudioStateType newState) override;
+    void OnAudioInputDataReady(
+        AudioInput* input, void* buffer, int32_t length, int64_t timestampUs, int64_t deleyUs) override;
+    void OnAudioInputInterrupted(AudioInput* input, bool interrupted) override;
 protected:
     OhosLocalAudioSource() = default;
     ~OhosLocalAudioSource() override;
@@ -81,6 +89,9 @@ protected:
 
 private:
     void ReleaseAdmLiveSourceIfNeeded();
+
+    // Applies a system-interrupt driven muted/live transition. Must run on signalingThread_.
+    void ApplyInterruptedState(bool interrupted);
 
     cricket::AudioOptions audioOptions_;
     std::shared_ptr<AudioInput> audioInput_;

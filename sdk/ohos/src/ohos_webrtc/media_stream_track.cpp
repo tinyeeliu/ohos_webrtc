@@ -65,6 +65,13 @@ void NapiMediaStreamTrack::Init(Napi::Env env, Object exports)
             InstanceAccessor<&NapiMediaStreamTrack::GetEnabled, &NapiMediaStreamTrack::SetEnabled>(
                 kAttributeNameEnabled),
             InstanceAccessor<&NapiMediaStreamTrack::GetReadyState>(kAttributeNameReadyState),
+            InstanceAccessor<&NapiMediaStreamTrack::GetMuted>(kAttributeNameMuted),
+            InstanceAccessor<&NapiMediaStreamTrack::GetOnEnded, &NapiMediaStreamTrack::SetOnEnded>(
+                kAttributeNameOnEnded),
+            InstanceAccessor<&NapiMediaStreamTrack::GetOnMute, &NapiMediaStreamTrack::SetOnMute>(
+                kAttributeNameOnMute),
+            InstanceAccessor<&NapiMediaStreamTrack::GetOnUnmute, &NapiMediaStreamTrack::SetOnUnmute>(
+                kAttributeNameOnUnmute),
             InstanceMethod<&NapiMediaStreamTrack::Stop>(kMethodNameStop),
             InstanceMethod<&NapiMediaStreamTrack::GetSource>(kMethodNameGetSource),
             InstanceMethod<&NapiMediaStreamTrack::ApplyConstraints>(kMethodNameApplyConstraints),
@@ -111,11 +118,36 @@ NapiMediaStreamTrack::NapiMediaStreamTrack(const Napi::CallbackInfo& info)
     track_ = *info[1].As<External<rtc::scoped_refptr<MediaStreamTrackInterface>>>().Data();
 
     track_->RegisterObserver(this);
+    muted_ = QuerySourceMuted();
+
+    // Event dispatch to the JS thread. The callback only runs while the JS object is
+    // alive (weak self reference); destruction aborts the tsfn first.
+    selfRef_ = Napi::Persistent(this->Value());
+    selfRef_.SetWeak();
+    tsfn_ = Napi::ThreadSafeFunction::New(
+        env, Napi::Function::New(env, [this](const Napi::CallbackInfo& cbInfo) { DrainEvents(cbInfo.Env()); }),
+        "MediaStreamTrackEvents", 0, 1);
 }
 
 NapiMediaStreamTrack::~NapiMediaStreamTrack()
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    // Block any in-flight dispatch before tearing down members.
+    destroyed_.store(true);
+    if (tsfn_) {
+        tsfn_.Abort();
+    }
+    {
+        std::lock_guard<std::mutex> lock(eventsMutex_);
+        onendedRef_.Reset();
+        onmuteRef_.Reset();
+        onunmuteRef_.Reset();
+        selfRef_.Reset();
+        while (!pendingEvents_.empty()) {
+            pendingEvents_.pop();
+        }
+    }
 
     track_->UnregisterObserver(this);
 
@@ -125,6 +157,123 @@ NapiMediaStreamTrack::~NapiMediaStreamTrack()
         factory_->RemoveAudioSource(track_);
     } else if (IsVideoTrack()) {
         factory_->RemoveVideoSource(track_);
+    }
+}
+
+void NapiMediaStreamTrack::UpdateHandlerRef(Napi::FunctionReference& ref, const Napi::Value& value)
+{
+    if (value.IsFunction()) {
+        ref = Napi::Persistent(value.As<Napi::Function>());
+    } else {
+        // null/undefined (or any non-function) unbinds the handler.
+        ref.Reset();
+    }
+}
+
+bool NapiMediaStreamTrack::QuerySourceMuted() const
+{
+    if (!factory_ || !track_) {
+        return false;
+    }
+    if (IsAudioTrack()) {
+        auto source = factory_->GetAudioSource(track_);
+        return source && source->state() == MediaSourceInterface::kMuted;
+    }
+    if (IsVideoTrack()) {
+        auto source = factory_->GetVideoSource(track_);
+        return source && source->state() == MediaSourceInterface::kMuted;
+    }
+    return false;
+}
+
+void NapiMediaStreamTrack::EnqueueEvent(TrackEventType type)
+{
+    {
+        std::lock_guard<std::mutex> lock(eventsMutex_);
+        pendingEvents_.push(type);
+    }
+
+    napi_status status = tsfn_.NonBlockingCall([](Napi::Env /*env*/, Napi::Function /*jsCallback*/) {});
+    if (status != napi_ok) {
+        RTC_LOG(LS_ERROR) << "Track event tsfn call failed: " << status;
+    }
+}
+
+void NapiMediaStreamTrack::DrainEvents(Napi::Env env)
+{
+    if (destroyed_.load()) {
+        return;
+    }
+    if (selfRef_.IsEmpty()) {
+        // JS object already collected; drop queued events.
+        std::lock_guard<std::mutex> lock(eventsMutex_);
+        while (!pendingEvents_.empty()) {
+            pendingEvents_.pop();
+        }
+        return;
+    }
+
+    std::queue<TrackEventType> events;
+    {
+        std::lock_guard<std::mutex> lock(eventsMutex_);
+        events.swap(pendingEvents_);
+    }
+
+    Napi::HandleScope scope(env);
+    while (!events.empty()) {
+        auto type = events.front();
+        events.pop();
+        if (destroyed_.load()) {
+            break;
+        }
+        DispatchEvent(env, type);
+    }
+}
+
+void NapiMediaStreamTrack::DispatchEvent(Napi::Env env, TrackEventType type)
+{
+    Napi::FunctionReference* handlerRef = nullptr;
+    const char* eventType = nullptr;
+    switch (type) {
+        case TrackEventType::Ended:
+            handlerRef = &onendedRef_;
+            eventType = kEventNameEnded;
+            break;
+        case TrackEventType::Mute:
+            handlerRef = &onmuteRef_;
+            eventType = kEventNameMute;
+            break;
+        case TrackEventType::Unmute:
+            handlerRef = &onunmuteRef_;
+            eventType = kEventNameUnmute;
+            break;
+        default:
+            return;
+    }
+
+    Napi::Function handler;
+    {
+        std::lock_guard<std::mutex> lock(eventsMutex_);
+        if (handlerRef->IsEmpty() || selfRef_.IsEmpty()) {
+            return;
+        }
+        handler = handlerRef->Value();
+    }
+
+    RTC_DLOG(LS_INFO) << __FUNCTION__ << "(" << track_->kind() << "): " << eventType;
+
+    auto event = Napi::Object::New(env);
+    event.Set("type", Napi::String::New(env, eventType));
+
+    handler.Call(selfRef_.Value(), {event});
+
+    // Isolate user callback exceptions: log and continue cleanup, never propagate.
+    bool isPending = false;
+    napi_is_exception_pending(env, &isPending);
+    if (isPending) {
+        napi_value exception;
+        napi_get_and_clear_last_exception(env, &exception);
+        RTC_LOG(LS_ERROR) << "Track event handler (" << eventType << ") threw an exception";
     }
 }
 
@@ -239,6 +388,26 @@ void NapiMediaStreamTrack::OnChanged()
 {
     RTC_DLOG(LS_INFO) << __FUNCTION__ << "(" << track_->kind() << ") state=" << track_->state()
                       << ", enabled=" << track_->enabled();
+
+    if (destroyed_.load()) {
+        return;
+    }
+
+    auto state = track_->state();
+    bool sourceMuted = QuerySourceMuted();
+
+    // ended: kLive -> kEnded for reasons other than this track's own stop().
+    if (state == MediaStreamTrackInterface::kEnded && !userStopped_ && !endedDispatched_) {
+        endedDispatched_ = true;
+        EnqueueEvent(TrackEventType::Ended);
+    }
+
+    // mute/unmute: driven solely by the source muted state; enabled changes are
+    // deliberately excluded (black frames / silence are not "media unavailable").
+    if (!endedDispatched_ && sourceMuted != muted_) {
+        muted_ = sourceMuted;
+        EnqueueEvent(sourceMuted ? TrackEventType::Mute : TrackEventType::Unmute);
+    }
 }
 
 Napi::Value NapiMediaStreamTrack::GetId(const Napi::CallbackInfo& info)
@@ -310,6 +479,54 @@ Napi::Value NapiMediaStreamTrack::GetReadyState(const Napi::CallbackInfo& info)
     NAPI_THROW(Error::New(info.Env(), "Invalid state"), info.Env().Undefined());
 }
 
+Napi::Value NapiMediaStreamTrack::GetMuted(const Napi::CallbackInfo& info)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    if (!track_) {
+        NAPI_THROW(Error::New(info.Env(), "Illegal state"), info.Env().Undefined());
+    }
+
+    std::lock_guard<std::mutex> lock(eventsMutex_);
+    return Napi::Boolean::New(info.Env(), muted_.load());
+}
+
+Napi::Value NapiMediaStreamTrack::GetOnEnded(const Napi::CallbackInfo& info)
+{
+    std::lock_guard<std::mutex> lock(eventsMutex_);
+    return onendedRef_.IsEmpty() ? info.Env().Null() : Napi::Value(info.Env(), onendedRef_.Value());
+}
+
+void NapiMediaStreamTrack::SetOnEnded(const Napi::CallbackInfo& info, const Napi::Value& value)
+{
+    std::lock_guard<std::mutex> lock(eventsMutex_);
+    UpdateHandlerRef(onendedRef_, value);
+}
+
+Napi::Value NapiMediaStreamTrack::GetOnMute(const Napi::CallbackInfo& info)
+{
+    std::lock_guard<std::mutex> lock(eventsMutex_);
+    return onmuteRef_.IsEmpty() ? info.Env().Null() : Napi::Value(info.Env(), onmuteRef_.Value());
+}
+
+void NapiMediaStreamTrack::SetOnMute(const Napi::CallbackInfo& info, const Napi::Value& value)
+{
+    std::lock_guard<std::mutex> lock(eventsMutex_);
+    UpdateHandlerRef(onmuteRef_, value);
+}
+
+Napi::Value NapiMediaStreamTrack::GetOnUnmute(const Napi::CallbackInfo& info)
+{
+    std::lock_guard<std::mutex> lock(eventsMutex_);
+    return onunmuteRef_.IsEmpty() ? info.Env().Null() : Napi::Value(info.Env(), onunmuteRef_.Value());
+}
+
+void NapiMediaStreamTrack::SetOnUnmute(const Napi::CallbackInfo& info, const Napi::Value& value)
+{
+    std::lock_guard<std::mutex> lock(eventsMutex_);
+    UpdateHandlerRef(onunmuteRef_, value);
+}
+
 Napi::Value NapiMediaStreamTrack::Stop(const Napi::CallbackInfo& info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
@@ -317,6 +534,9 @@ Napi::Value NapiMediaStreamTrack::Stop(const Napi::CallbackInfo& info)
     if (!track_) {
         NAPI_THROW(Error::New(info.Env(), "Illegal state"), info.Env().Undefined());
     }
+
+    // W3C: a track ended by its own stop() does not fire ended.
+    userStopped_ = true;
 
     auto state = track_->state();
     if (state == MediaStreamTrackInterface::kEnded) {

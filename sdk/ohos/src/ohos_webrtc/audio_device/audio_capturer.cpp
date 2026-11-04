@@ -296,6 +296,14 @@ AudioCapturer::OnInterruptEvent(OH_AudioCapturer* stream, OH_AudioInterrupt_Forc
 
     (void)stream;
 
+    // Only a forced pause means the system temporarily cannot provide media (maps to
+    // track mute). Shared interrupts and volume hints (duck/flux) keep media flowing.
+    if (type == INTERRUPT_FORCE && hint == INTERRUPT_HINT_PAUSE) {
+        SetCaptureInterrupted(true);
+    } else if (hint == INTERRUPT_HINT_RESUME) {
+        SetCaptureInterrupted(false);
+    }
+
     return 0;
 }
 

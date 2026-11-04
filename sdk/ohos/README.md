@@ -67,6 +67,11 @@ Open `entry/src/main/module.json5` and add the following permissions as needed:
 ]
 ```
 
+### Audio 3A and Track Events
+
+- Audio 3A: the `echoCancellation`, `autoGainControl` and `noiseSuppression` constraints of `createAudioSource` (including explicit `false`) are passed to the WebRTC software audio processing (APM) configuration and are never silently ignored. Built-in system 3A switches are not currently bridged (`isBuiltInAcousticEchoCancelerSupported`/`isBuiltInNoiseSuppressorSupported` return false). Capture/playback use the voice-communication audio scene by default; the system may apply scene-fixed processing, which must not be mistaken for the effect of the software constraints above.
+- Track events: `MediaStreamTrack` supports the `onended`/`onmute`/`onunmute` event properties and the readonly `muted` state. A user-initiated `stop()` does not fire `onended`; `enabled` toggles and silence frames do not fire mute/unmute. mute/unmute are driven by real system interruption signals: local audio tracks fire mute when the system forces an interruption (e.g. an incoming call) and unmute on resume. Local video and remote tracks have no reliable signal yet — `muted` stays false and no mute/unmute is dispatched (known difference).
+
 ## Usage Example
 
 The following example demonstrates a basic audio/video call setup flow:
