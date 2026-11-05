@@ -67,6 +67,11 @@ OpenHarmony API 版本 ≥ 15。
 ]
 ```
 
+### 音频 3A 与轨道事件能力说明
+
+- 音频 3A：`createAudioSource` 的 `echoCancellation`、`autoGainControl`、`noiseSuppression` 约束（含显式 `false`）会传递至 WebRTC 软件音频处理（APM）配置，不被静默忽略；系统内置 3A 开关当前未对接（`isBuiltInAcousticEchoCancelerSupported`/`isBuiltInNoiseSuppressorSupported` 返回 false），采集/播放默认使用语音通信场景，系统可能按场景提供固定处理，应用不应将其等同于上述软件约束的效果。
+- 轨道事件：`MediaStreamTrack` 支持 `onended`/`onmute`/`onunmute` 事件属性与只读 `muted` 状态。主动 `stop()` 不触发 `onended`；`enabled` 切换与静音帧不触发 mute/unmute。mute/unmute 以系统真实中断信号为状态源：当前本地音频轨道在系统强制中断（如来电抢占）时派发 mute、恢复时派发 unmute；本地视频与远端轨道暂无可靠信号，`muted` 恒为 false 且不派发（已知差异）。
+
 ## 使用示例
 
 以下示例展示了基本的音视频通话建立流程：

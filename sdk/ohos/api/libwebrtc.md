@@ -1110,6 +1110,12 @@ setAudioPlayout(playout: boolean): void
 | id         | string                                          | 是   | 否   | 表示媒体流轨道的唯一标识符                  |
 | enabled    | boolean                                         | 是   | 是   | 表示媒体流轨道是否启用                    |
 | readyState | [MediaStreamTrackState](#mediastreamtrackstate) | 是   | 否   | 表示媒体流轨道的就绪状态                   |
+| muted      | boolean                                         | 是   | 否   | 表示媒体源是否暂时无法提供媒体（系统中断驱动）。与 onmute/onunmute 事件共享同一真实状态源；无可靠中断信号的轨道（本地视频、远端轨道）恒为 false |
+| onended    | ((this: MediaStreamTrack, ev: [Event](#event)) => void) \| null | 是   | 是   | 轨道因非主动原因结束时回调，每次结束仅触发一次；主动调用 stop() 不触发。默认 null，赋 null 解绑 |
+| onmute     | ((this: MediaStreamTrack, ev: [Event](#event)) => void) \| null | 是   | 是   | 媒体源暂时无法提供媒体时回调（本地音频为系统强制中断，如来电抢占）。enabled 切换、静音帧不触发。默认 null，赋 null 解绑 |
+| onunmute   | ((this: MediaStreamTrack, ev: [Event](#event)) => void) \| null | 是   | 是   | 媒体实际恢复且轨道未结束时回调一次。默认 null，赋 null 解绑 |
+
+> **事件差异说明**：mute/unmute 需要系统中断/恢复的真实信号。当前本地音频轨道以 OHAudio 强制中断事件为状态源；本地视频轨道与远端音视频轨道暂无可靠信号，`muted` 恒为 false 且不派发 mute/unmute（列为已知差异，不以猜测逻辑冒充支持）。事件在 JS 线程派发，注册回调前发生的状态变化不补发，可通过 `readyState`/`muted` 查询当前状态。
 
 ### stop
 
@@ -2308,6 +2314,11 @@ createAudioSource(constraints?: MediaTrackConstraints): AudioSource;
 
 > **说明：**
 > 使用麦克风需要申请 ohos.permission.MICROPHONE 权限，具体请查阅相关文档。
+
+> **3A 约束语义说明：**
+> 1. `echoCancellation`、`autoGainControl`、`noiseSuppression` 三个约束的请求值（含显式 `false`）均会传递至实际音频处理配置，不会被静默忽略；未设置时使用引擎默认值。
+> 2. 当前平台未对接可独立查询/启停的系统内置 3A 开关：`AudioDeviceModule` 的 `isBuiltInAcousticEchoCancelerSupported()` / `isBuiltInNoiseSuppressorSupported()` 返回 false。音频采集与播放默认使用语音通信（VOICE_COMMUNICATION）场景，系统可能按场景提供固定的音频处理；该场景行为不受上述约束控制，应用不应将软件约束的效果等同于系统处理能力。
+> 3. 上述约束仅控制 WebRTC 软件音频处理（APM）。创建后不支持通过 `applyConstraints` 动态修改音频 3A 约束。
 
 ### createAudioTrack
 
