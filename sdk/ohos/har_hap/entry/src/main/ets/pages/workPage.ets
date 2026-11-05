@@ -577,6 +577,22 @@ struct Index {
 
       this.localAudioTrack = this.pcf?.createAudioTrack("audio", this.localAudioSource);
       console.info(TAG, 'audioTrack: ' + JSON.stringify(this.localAudioTrack));
+
+      // 轨道事件验证（3A 与轨道回调功能补齐）：真实状态变化时刷新状态栏。
+      if (this.localAudioTrack) {
+        this.localAudioTrack.onended = (ev: webrtc.Event) => {
+          console.info(TAG, 'localAudioTrack.onended: ' + ev.type);
+          this.setStatus('本地音频轨道结束(自然)');
+        };
+        this.localAudioTrack.onmute = (ev: webrtc.Event) => {
+          console.info(TAG, 'localAudioTrack.onmute: ' + ev.type + ', muted=' + this.localAudioTrack?.muted);
+          this.setStatus('本地音频被系统中断(mute)');
+        };
+        this.localAudioTrack.onunmute = (ev: webrtc.Event) => {
+          console.info(TAG, 'localAudioTrack.onunmute: ' + ev.type + ', muted=' + this.localAudioTrack?.muted);
+          this.setStatus('本地音频恢复(unmute)');
+        };
+      }
     }
 
     if (!this.localVideoTrack) {

@@ -296,6 +296,17 @@ AudioCapturer::OnInterruptEvent(OH_AudioCapturer* stream, OH_AudioInterrupt_Forc
 
     (void)stream;
 
+    // Only a forced loss of media means the system temporarily cannot provide it
+    // (maps to track mute). Shared interrupts and volume hints (duck/unduck) keep
+    // media flowing. STOP/MUTE and RESUME/UNMUTE hints are API 20 additions.
+    if (type == AUDIOSTREAM_INTERRUPT_FORCE &&
+        (hint == AUDIOSTREAM_INTERRUPT_HINT_PAUSE || hint == AUDIOSTREAM_INTERRUPT_HINT_STOP ||
+            hint == AUDIOSTREAM_INTERRUPT_HINT_MUTE)) {
+        SetCaptureInterrupted(true);
+    } else if (hint == AUDIOSTREAM_INTERRUPT_HINT_RESUME || hint == AUDIOSTREAM_INTERRUPT_HINT_UNMUTE) {
+        SetCaptureInterrupted(false);
+    }
+
     return 0;
 }
 

@@ -830,6 +830,16 @@ export interface MediaStreamTrack extends EventTarget {
   readonly id: string;
   enabled: boolean;
   readonly readyState: MediaStreamTrackState;
+  // Source temporarily unable to provide media (system-driven). Readonly state
+  // sharing the same ground truth as the mute/unmute events. Tracks without a
+  // reliable interruption signal (local video, remote tracks) stay false.
+  readonly muted: boolean;
+
+  // Assign a function to subscribe; assign null to unbind. Default null.
+  // A user-initiated stop() does not fire onended.
+  onended: ((this: MediaStreamTrack, ev: Event) => void) | null;
+  onmute: ((this: MediaStreamTrack, ev: Event) => void) | null;
+  onunmute: ((this: MediaStreamTrack, ev: Event) => void) | null;
 
   stop(): void;
   getSource(): MediaSource | null;

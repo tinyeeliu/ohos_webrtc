@@ -1110,6 +1110,12 @@ setAudioPlayout(playout: boolean): void
 | id         | string                                          | 是   | 否   | 表示媒体流轨道的唯一标识符                  |
 | enabled    | boolean                                         | 是   | 是   | 表示媒体流轨道是否启用                    |
 | readyState | [MediaStreamTrackState](#mediastreamtrackstate) | 是   | 否   | 表示媒体流轨道的就绪状态                   |
+| muted      | boolean                                         | 是   | 否   | 表示媒体源是否暂时无法提供媒体（系统中断驱动）。与 onmute/onunmute 事件共享同一真实状态源；无可靠中断信号的轨道（本地视频、远端轨道）恒为 false |
+| onended    | ((this: MediaStreamTrack, ev: [Event](#event)) => void) \| null | 是   | 是   | 轨道因非主动原因结束时回调，每次结束仅触发一次；主动调用 stop() 不触发。默认 null，赋 null 解绑 |
+| onmute     | ((this: MediaStreamTrack, ev: [Event](#event)) => void) \| null | 是   | 是   | 媒体源暂时无法提供媒体时回调（本地音频为系统强制中断，如来电抢占）。enabled 切换、静音帧不触发。默认 null，赋 null 解绑 |
+| onunmute   | ((this: MediaStreamTrack, ev: [Event](#event)) => void) \| null | 是   | 是   | 媒体实际恢复且轨道未结束时回调一次。默认 null，赋 null 解绑 |
+
+> **事件差异说明**：mute/unmute 需要系统中断/恢复的真实信号。当前本地音频轨道以 OHAudio 强制中断事件为状态源；本地视频轨道与远端音视频轨道暂无可靠信号，`muted` 恒为 false 且不派发 mute/unmute（列为已知差异，不以猜测逻辑冒充支持）。事件在 JS 线程派发，注册回调前发生的状态变化不补发，可通过 `readyState`/`muted` 查询当前状态。
 
 ### stop
 
@@ -2308,6 +2314,17 @@ createAudioSource(constraints?: MediaTrackConstraints): AudioSource;
 
 > **说明：**
 > 使用麦克风需要申请 ohos.permission.MICROPHONE 权限，具体请查阅相关文档。
+
+> **3A 约束语义说明：**
+> 1. `echoCancellation`、`autoGainControl`、`noiseSuppression` 三个约束的请求值（含显式 `false`）均会传递至实际音频处理配置，不会被静默忽略；未设置时使用引擎默认值。
+> 2. 系统 3A 对接（分层实施，2026-11-05）：
+>    - 系统内置 `EFFECTCHAIN_VOIP_3A` 厂商效果链（回声消除/噪声抑制/自动增益实现在系统厂商库内），默认作用于语音通信场景的麦克风/蓝牙录音。三方应用没有开关或旁路该链的接口。
+>    - **NS（噪声抑制）**：引擎真实查询当前设备系统智能降噪的生效状态（API 21+）。生效时关闭软件噪声抑制，未生效或低版本系统时保留软件噪声抑制。
+>    - **AEC（回声消除）/ AGC（自动增益）**：平台无状态查询接口，按产品级假设声明系统能力（依据上述系统默认效果链配置）。引擎据此关闭软件 AEC/AGC，由系统链处理。个别厂商裁剪该链时该假设不成立，以真机验收结果为准。
+>    - `AudioDeviceModule` 的 `isBuiltInAcousticEchoCancelerSupported()` / `isBuiltInNoiseSuppressorSupported()` 反映上述声明结果；系统链不可关闭（显式关闭请求如实上报为不支持，软件回退语义不受影响）。
+>    - 应用调用麦克风静音（`setMicrophoneMute`）时，库同步向系统报告自静音状态（API 24+），系统可关停录音效果省电。
+>    - 已知限制：采集流重建后系统可能丢失自静音提示；API 21/24 以下系统降级为纯软件 3A（行为与对接前一致）。
+> 3. 上述约束仅控制 WebRTC 软件音频处理（APM）的启停决策；创建后不支持通过 `applyConstraints` 动态修改音频 3A 约束。
 
 ### createAudioTrack
 

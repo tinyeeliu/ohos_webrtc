@@ -22,6 +22,8 @@
 #include <memory>
 #include <utility>
 
+#include <ohaudio/native_audio_common.h>
+
 #include "api/make_ref_counted.h"
 #include "api/task_queue/default_task_queue_factory.h"
 #include "modules/audio_device/audio_device_buffer.h"
@@ -30,6 +32,64 @@
 namespace webrtc {
 
 using namespace Napi;
+
+namespace {
+
+// Weak symbols: systems below API 19/21/24 lack these entries; nullptr checks fall
+// back to pre-integration behavior (false / no hint) without load-time failure.
+extern "C" {
+struct OH_AudioStreamManager;
+struct OH_AudioSessionManager;
+
+__attribute__((weak)) OH_AudioCommon_Result OH_AudioManager_GetAudioStreamManager(
+    OH_AudioStreamManager** streamManager);
+__attribute__((weak)) bool OH_AudioStreamManager_IsIntelligentNoiseReductionEnabledForCurrentDevice(
+    OH_AudioStreamManager* streamManager, OH_AudioStream_SourceType source);
+__attribute__((weak)) OH_AudioCommon_Result OH_AudioManager_GetAudioSessionManager(
+    OH_AudioSessionManager** audioSessionManager);
+__attribute__((weak)) OH_AudioCommon_Result OH_AudioSessionManager_SetCaptureMuteHint(
+    OH_AudioSessionManager* audioSessionManager, bool mute);
+} // extern "C"
+
+OH_AudioStreamManager* GetStreamManager()
+{
+    static OH_AudioStreamManager* manager = nullptr;
+    if (manager == nullptr && OH_AudioManager_GetAudioStreamManager != nullptr) {
+        if (OH_AudioManager_GetAudioStreamManager(&manager) != AUDIOCOMMON_RESULT_SUCCESS) {
+            manager = nullptr;
+        }
+    }
+    return manager;
+}
+
+OH_AudioSessionManager* GetSessionManager()
+{
+    static OH_AudioSessionManager* manager = nullptr;
+    if (manager == nullptr && OH_AudioManager_GetAudioSessionManager != nullptr) {
+        if (OH_AudioManager_GetAudioSessionManager(&manager) != AUDIOCOMMON_RESULT_SUCCESS) {
+            manager = nullptr;
+        }
+    }
+    return manager;
+}
+
+void SyncCaptureMuteHint(bool mute)
+{
+    if (OH_AudioSessionManager_SetCaptureMuteHint == nullptr) {
+        return;
+    }
+    OH_AudioSessionManager* manager = GetSessionManager();
+    if (manager == nullptr) {
+        return;
+    }
+    OH_AudioCommon_Result result = OH_AudioSessionManager_SetCaptureMuteHint(manager, mute);
+    if (result != AUDIOCOMMON_RESULT_SUCCESS) {
+        RTC_DLOG(LS_INFO) << "SetCaptureMuteHint(" << mute << ") ignored: " << result
+                          << " (e.g. no running capturer)";
+    }
+}
+
+} // namespace
 
 const char kClassName[] = "AudioDeviceModule";
 
@@ -743,6 +803,7 @@ int32_t OhosAudioDeviceModule::SetMicrophoneMute(bool enable)
     if (input_) {
         input_->SetMute(enable);
     }
+    SyncCaptureMuteHint(enable);
     return 0;
 }
 
@@ -829,45 +890,58 @@ bool OhosAudioDeviceModule::BuiltInAECIsAvailable() const
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    return false;
+    return true;
 }
 
 bool OhosAudioDeviceModule::BuiltInAGCIsAvailable() const
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    return false;
+    return true;
 }
 
 bool OhosAudioDeviceModule::BuiltInNSIsAvailable() const
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    return false;
+    if (OH_AudioStreamManager_IsIntelligentNoiseReductionEnabledForCurrentDevice == nullptr) {
+        return false;
+    }
+    OH_AudioStreamManager* manager = GetStreamManager();
+    if (manager == nullptr) {
+        return false;
+    }
+    bool enabled = OH_AudioStreamManager_IsIntelligentNoiseReductionEnabledForCurrentDevice(
+        manager, AUDIOSTREAM_SOURCE_TYPE_VOICE_COMMUNICATION);
+    RTC_DLOG(LS_INFO) << "System intelligent noise reduction enabled: " << enabled;
+    return enabled;
 }
 
 int32_t OhosAudioDeviceModule::EnableBuiltInAEC(bool enable)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << "(" << enable << ")";
-    RTC_LOG_F(LS_ERROR) << "Not supported on this platform";
 
-    return -1;
+    RTC_DLOG(LS_INFO) << "System AEC: " << (enable ? "assumed enabled (chain auto-mounted)"
+                                                   : "cannot be disabled by app");
+    return enable ? 0 : -1;
 }
 
 int32_t OhosAudioDeviceModule::EnableBuiltInAGC(bool enable)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << "(" << enable << ")";
-    RTC_LOG_F(LS_ERROR) << "Not supported on this platform";
 
-    return -1;
+    RTC_DLOG(LS_INFO) << "System AGC: " << (enable ? "assumed enabled (chain auto-mounted)"
+                                                   : "cannot be disabled by app");
+    return enable ? 0 : -1;
 }
 
 int32_t OhosAudioDeviceModule::EnableBuiltInNS(bool enable)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << "(" << enable << ")";
-    RTC_LOG_F(LS_ERROR) << "Not supported on this platform";
 
-    return -1;
+    RTC_DLOG(LS_INFO) << "System NS: " << (enable ? "enabled (queried via system API)"
+                                                  : "cannot be disabled by app");
+    return enable ? 0 : -1;
 }
 
 int32_t OhosAudioDeviceModule::GetPlayoutUnderrunCount() const

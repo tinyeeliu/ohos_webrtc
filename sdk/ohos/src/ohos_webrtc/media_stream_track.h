@@ -16,6 +16,9 @@
 #ifndef WEBRTC_MEDIA_STREAM_TRACK_H
 #define WEBRTC_MEDIA_STREAM_TRACK_H
 
+#include <atomic>
+#include <mutex>
+#include <queue>
 #include <set>
 
 #include "napi.h"
@@ -64,6 +67,18 @@ protected:
     // ObserverInterface implementation
     void OnChanged() override;
 
+    // Event dispatch infrastructure (JS thread). Events are enqueued from the
+    // signaling thread and drained on the JS thread via ThreadSafeFunction.
+    enum class TrackEventType { Ended, Mute, Unmute };
+    void EnqueueEvent(TrackEventType type);
+    void DrainEvents(Napi::Env env);
+    void DispatchEvent(Napi::Env env, TrackEventType type);
+    // Reads the underlying source muted state; false when no reliable signal exists.
+    bool QuerySourceMuted() const;
+
+    // Stores or clears an event handler reference (null/undefined clears).
+    static void UpdateHandlerRef(Napi::FunctionReference& ref, const Napi::Value& value);
+
 protected:
     friend class ObjectWrap;
 
@@ -74,6 +89,13 @@ protected:
     Napi::Value GetEnabled(const Napi::CallbackInfo& info);
     void SetEnabled(const Napi::CallbackInfo& info, const Napi::Value& value);
     Napi::Value GetReadyState(const Napi::CallbackInfo& info);
+    Napi::Value GetMuted(const Napi::CallbackInfo& info);
+    Napi::Value GetOnEnded(const Napi::CallbackInfo& info);
+    void SetOnEnded(const Napi::CallbackInfo& info, const Napi::Value& value);
+    Napi::Value GetOnMute(const Napi::CallbackInfo& info);
+    void SetOnMute(const Napi::CallbackInfo& info, const Napi::Value& value);
+    Napi::Value GetOnUnmute(const Napi::CallbackInfo& info);
+    void SetOnUnmute(const Napi::CallbackInfo& info, const Napi::Value& value);
     Napi::Value Stop(const Napi::CallbackInfo& info);
     Napi::Value GetSource(const Napi::CallbackInfo& info);
     Napi::Value ApplyConstraints(const Napi::CallbackInfo& info);
@@ -145,6 +167,20 @@ public:
 
     std::mutex sinksMutex_;
     std::set<rtc::VideoSinkInterface<VideoFrame>*> videoSinks_;
+
+    // Event dispatch state. All napi objects are only touched on the JS thread;
+    // flags below are atomic because OnChanged arrives on the signaling thread.
+    Napi::ThreadSafeFunction tsfn_;
+    Napi::ObjectReference selfRef_; // weak: events stop firing once the JS object is gone
+    mutable std::mutex eventsMutex_;
+    std::queue<TrackEventType> pendingEvents_;
+    Napi::FunctionReference onendedRef_;
+    Napi::FunctionReference onmuteRef_;
+    Napi::FunctionReference onunmuteRef_;
+    std::atomic<bool> destroyed_{false};
+    std::atomic<bool> userStopped_{false};
+    std::atomic<bool> muted_{false};
+    bool endedDispatched_{false};
 };
 
 } // namespace webrtc
