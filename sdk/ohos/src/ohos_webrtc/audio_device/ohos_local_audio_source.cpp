@@ -49,10 +49,18 @@ void OhosLocalAudioSource::Initialize(
     audioInput_ = std::move(audioInput);
     signalingThread_ = signalingThread;
     adm_ = std::move(adm);
+    // Subscribe to system capture interrupt/resume notifications.
+    if (audioInput_) {
+        audioInput_->RegisterObserver(this);
+    }
 }
 
 OhosLocalAudioSource::~OhosLocalAudioSource()
 {
+    // Mirror of the constructor subscription; no notifications after this point.
+    if (audioInput_) {
+        audioInput_->UnregisterObserver(this);
+    }
     // Source destroyed without track.stop(): still release ADM live-source refcount.
     if (state_.load() == kLive) {
         ReleaseAdmLiveSourceIfNeeded();
@@ -76,9 +84,19 @@ void OhosLocalAudioSource::SetVolume(double volume)
 
 void OhosLocalAudioSource::ApplyConstraints(const cricket::AudioOptions& options)
 {
-    RTC_LOG(LS_INFO) << __FUNCTION__ << " echo_cancellation=" << options.echo_cancellation.has_value()
-                     << ", auto_gain_control=" << options.auto_gain_control.has_value()
-                     << ", noise_suppression=" << options.noise_suppression.has_value();
+    // First of the two-part 3A log: what the app requested (raw constraint values).
+    RTC_LOG(LS_INFO) << __FUNCTION__ << " request: echo_cancellation="
+                     << (options.echo_cancellation.has_value()
+                                ? (options.echo_cancellation.value() ? "true" : "false")
+                                : "unset")
+                     << ", auto_gain_control="
+                     << (options.auto_gain_control.has_value()
+                                ? (options.auto_gain_control.value() ? "true" : "false")
+                                : "unset")
+                     << ", noise_suppression="
+                     << (options.noise_suppression.has_value()
+                                ? (options.noise_suppression.value() ? "true" : "false")
+                                : "unset");
 
     if (options.echo_cancellation.has_value()) {
         audioOptions_.echo_cancellation = options.echo_cancellation;
@@ -89,6 +107,21 @@ void OhosLocalAudioSource::ApplyConstraints(const cricket::AudioOptions& options
     if (options.noise_suppression.has_value()) {
         audioOptions_.noise_suppression = options.noise_suppression;
     }
+
+    // Distinguish "requested" from "effectively configured": unset options keep the
+    // engine default; explicit values (including false) are passed through verbatim.
+    RTC_LOG(LS_INFO) << __FUNCTION__ << " effective: echo_cancellation="
+                     << (audioOptions_.echo_cancellation.has_value()
+                                ? (audioOptions_.echo_cancellation.value() ? "true" : "false")
+                                : "unset")
+                     << ", auto_gain_control="
+                     << (audioOptions_.auto_gain_control.has_value()
+                                ? (audioOptions_.auto_gain_control.value() ? "true" : "false")
+                                : "unset")
+                     << ", noise_suppression="
+                     << (audioOptions_.noise_suppression.has_value()
+                                ? (audioOptions_.noise_suppression.value() ? "true" : "false")
+                                : "unset");
 }
 
 void OhosLocalAudioSource::ReleaseAdmLiveSourceIfNeeded()
@@ -122,6 +155,61 @@ void OhosLocalAudioSource::Stop()
     } else {
         signalingThread_->PostTask(std::move(doStop));
     }
+}
+
+void OhosLocalAudioSource::OnAudioInputError(AudioInput* input, AudioErrorType type, const std::string& message)
+{
+    (void)input;
+    RTC_LOG(LS_ERROR) << __FUNCTION__ << " type=" << type << ", message=" << message;
+}
+
+void OhosLocalAudioSource::OnAudioInputStateChange(AudioInput* input, AudioStateType newState)
+{
+    (void)input;
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__ << " newState=" << newState;
+}
+
+void OhosLocalAudioSource::OnAudioInputDataReady(
+    AudioInput* input, void* buffer, int32_t length, int64_t timestampUs, int64_t deleyUs)
+{
+    (void)input;
+    (void)buffer;
+    (void)length;
+    (void)timestampUs;
+    (void)deleyUs;
+}
+
+void OhosLocalAudioSource::OnAudioInputInterrupted(AudioInput* input, bool interrupted)
+{
+    (void)input;
+    RTC_LOG(LS_INFO) << __FUNCTION__ << " interrupted=" << interrupted;
+
+    // Arrives on the audio callback thread: migrate state and notify on the signaling
+    // thread, mirroring Stop(). Keep a ref so the source outlives the posted task.
+    if (rtc::Thread::Current() == signalingThread_) {
+        ApplyInterruptedState(interrupted);
+    } else {
+        signalingThread_->PostTask(
+            [self = rtc::scoped_refptr<OhosLocalAudioSource>(this), interrupted] {
+                self->ApplyInterruptedState(interrupted);
+            });
+    }
+}
+
+void OhosLocalAudioSource::ApplyInterruptedState(bool interrupted)
+{
+    // Terminal state wins: a late interrupt/resume must not revive or mutate an ended source.
+    if (state_.load() == MediaSourceInterface::kEnded) {
+        return;
+    }
+
+    auto newState = interrupted ? MediaSourceInterface::kMuted : MediaSourceInterface::kLive;
+    if (state_.exchange(newState) == newState) {
+        return;
+    }
+
+    RTC_LOG(LS_INFO) << __FUNCTION__ << " state -> " << (interrupted ? "muted" : "live");
+    FireOnChanged();
 }
 
 } // namespace webrtc
