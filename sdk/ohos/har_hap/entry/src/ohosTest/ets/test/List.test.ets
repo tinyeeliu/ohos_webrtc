@@ -41,6 +41,7 @@ import CameraPreviewSessionTest from './CameraPreviewSession.test';
 import VideoEncoderFactoryTest from './VideoEncoderFactory.test';
 import X86EmulatorFallbackTest from './X86EmulatorFallback.test';
 import CameraZoomTest from './CameraZoom.test';
+import TrackEventsTest from './TrackEvents.test';
 
 export default function testsuite() {
   abilityTest();
@@ -71,4 +72,5 @@ export default function testsuite() {
   VideoEncoderFactoryTest();
   X86EmulatorFallbackTest();
   CameraZoomTest();
+  TrackEventsTest();
 }

@@ -47,6 +47,10 @@ interface RtpStats extends webrtc.RTCStats {
 struct Index {
   @State buttonTitle: string = 'Connect';
   @State statusText: string = '';
+  // 轨道事件观察框：当前状态（轮询）+ 事件历史（带时间戳，挂断后可回看）
+  @State trackStateText: string = 'readyState: - | muted: -';
+  @State trackEventText: string = '(尚无轨道事件)';
+  private trackPollTimer?: number = undefined;
   @State private myId: string = '';
   @State private peerId: string = '';
   @State muteBtnTitle: string = 'Mute';
@@ -113,6 +117,24 @@ struct Index {
         }
         .width('100%')
         .alignSelf(ItemAlign.Start)
+
+        // 轨道状态观察框：MediaStreamTrack 事件回调（onended/onmute/onunmute）实测用
+        Column() {
+          Text('轨道: ' + this.trackStateText)
+            .fontSize(16)
+            .fontWeight(FontWeight.Bold)
+            .width('100%')
+          Text('事件: ' + this.trackEventText)
+            .fontSize(14)
+            .width('100%')
+            .maxLines(6)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+        }
+        .width('100%')
+        .alignSelf(ItemAlign.Start)
+        .margin({ top: 8 })
+        .padding(8)
+        .border({ width: 1, color: Color.Gray, radius: 6 })
 
         Row() {
           Text("本机ID")
@@ -480,6 +502,8 @@ struct Index {
     this.localVideoTrack?.stop();
     this.localVideoTrack = undefined;
 
+    this.stopTrackStatePoll();
+
     this.ws.close();
 
     this.ws.off('open');
@@ -503,6 +527,40 @@ struct Index {
   setStatus(text: string) {
     console.info(TAG, text);
     this.statusText = text;
+  }
+
+  // 轨道事件历史：prepend 新行、保留最近 6 条，挂断后可回看判定事件是否派发
+  pushTrackEvent(type: string) {
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    const ss = String(now.getSeconds()).padStart(2, '0');
+    const muted = this.localAudioTrack ? String(this.localAudioTrack.muted) : '?';
+    const line = `[${hh}:${mm}:${ss}] ${type} (muted=${muted})`;
+    let lines: string[] = [];
+    if (this.trackEventText.startsWith('[')) {
+      lines = this.trackEventText.split('\n');
+    }
+    lines.unshift(line);
+    this.trackEventText = lines.slice(0, 6).join('\n');
+    console.info(TAG, 'trackEvent: ' + line);
+  }
+
+  // 轮询当前轨道状态，独立于事件通道——事件没派发时这里也能看到 muted 变化
+  startTrackStatePoll() {
+    this.stopTrackStatePoll();
+    this.trackPollTimer = setInterval(() => {
+      if (this.localAudioTrack) {
+        this.trackStateText = `readyState: ${this.localAudioTrack.readyState} | muted: ${this.localAudioTrack.muted}`;
+      }
+    }, 1000);
+  }
+
+  stopTrackStatePoll() {
+    if (this.trackPollTimer !== undefined) {
+      clearInterval(this.trackPollTimer);
+      this.trackPollTimer = undefined;
+    }
   }
 
   setError(error: string) {
@@ -572,11 +630,34 @@ struct Index {
 
   async prepareLocalMedia() {
     if (!this.localAudioTrack) {
-      this.localAudioSource = this.pcf?.createAudioSource({ echoCancellation: true, noiseSuppression: true });
+      // 请求系统 3A：回声消除、智能降噪、自动增益（对接后由系统效果链处理，hilog ADM 日志可查生效状态）
+      this.localAudioSource = this.pcf?.createAudioSource({ echoCancellation: true, noiseSuppression: true, autoGainControl: true });
       console.info(TAG, 'audioSource: ' + JSON.stringify(this.localAudioSource));
+      this.setStatus('3A(AEC/NS/AGC) 已请求，生效状态见 hilog ADM 日志');
 
       this.localAudioTrack = this.pcf?.createAudioTrack("audio", this.localAudioSource);
       console.info(TAG, 'audioTrack: ' + JSON.stringify(this.localAudioTrack));
+
+      // 轨道事件验证（3A 与轨道回调功能补齐）：真实状态变化时刷新状态栏。
+      if (this.localAudioTrack) {
+        this.localAudioTrack.onended = (ev: webrtc.Event) => {
+          console.info(TAG, 'localAudioTrack.onended: ' + ev.type);
+          this.pushTrackEvent('ended');
+          this.setStatus('本地音频轨道结束(自然)');
+        };
+        this.localAudioTrack.onmute = (ev: webrtc.Event) => {
+          console.info(TAG, 'localAudioTrack.onmute: ' + ev.type + ', muted=' + this.localAudioTrack?.muted);
+          this.pushTrackEvent('mute');
+          this.setStatus('本地音频被系统中断(mute)');
+        };
+        this.localAudioTrack.onunmute = (ev: webrtc.Event) => {
+          console.info(TAG, 'localAudioTrack.onunmute: ' + ev.type + ', muted=' + this.localAudioTrack?.muted);
+          this.pushTrackEvent('unmute');
+          this.setStatus('本地音频恢复(unmute)');
+        };
+        this.trackStateText = 'readyState: ' + this.localAudioTrack.readyState + ' | muted: ' + this.localAudioTrack.muted;
+        this.startTrackStatePoll();
+      }
     }
 
     if (!this.localVideoTrack) {

@@ -16,6 +16,8 @@
 #ifndef WEBRTC_MEDIA_STREAM_TRACK_H
 #define WEBRTC_MEDIA_STREAM_TRACK_H
 
+#include <atomic>
+#include <mutex>
 #include <set>
 
 #include "napi.h"
@@ -64,6 +66,19 @@ protected:
     // ObserverInterface implementation
     void OnChanged() override;
 
+    // Event dispatch infrastructure (JS thread). Events raised on the signaling
+    // thread are passed to the JS thread via ThreadSafeFunction (BlockingCall).
+    enum class TrackEventType { Ended, Mute, Unmute };
+    void EnqueueEvent(TrackEventType type);
+    void DispatchEvent(Napi::Env env, TrackEventType type);
+    // Reads the underlying source muted state; false when no reliable signal exists.
+    bool QuerySourceMuted() const;
+    // Resolves the source backing this track (null for tracks without one).
+    rtc::scoped_refptr<MediaSourceInterface> GetSourceForTrack() const;
+
+    // Stores or clears an event handler reference (null/undefined clears).
+    static void UpdateHandlerRef(Napi::FunctionReference& ref, const Napi::Value& value);
+
 protected:
     friend class ObjectWrap;
 
@@ -74,6 +89,14 @@ protected:
     Napi::Value GetEnabled(const Napi::CallbackInfo& info);
     void SetEnabled(const Napi::CallbackInfo& info, const Napi::Value& value);
     Napi::Value GetReadyState(const Napi::CallbackInfo& info);
+    // NAPI accessors for the muted state and the three event handler properties.
+    Napi::Value GetMuted(const Napi::CallbackInfo& info);
+    Napi::Value GetOnEnded(const Napi::CallbackInfo& info);
+    void SetOnEnded(const Napi::CallbackInfo& info, const Napi::Value& value);
+    Napi::Value GetOnMute(const Napi::CallbackInfo& info);
+    void SetOnMute(const Napi::CallbackInfo& info, const Napi::Value& value);
+    Napi::Value GetOnUnmute(const Napi::CallbackInfo& info);
+    void SetOnUnmute(const Napi::CallbackInfo& info, const Napi::Value& value);
     Napi::Value Stop(const Napi::CallbackInfo& info);
     Napi::Value GetSource(const Napi::CallbackInfo& info);
     Napi::Value ApplyConstraints(const Napi::CallbackInfo& info);
@@ -142,9 +165,24 @@ public:
 
     std::shared_ptr<PeerConnectionFactoryWrapper> factory_;
     rtc::scoped_refptr<MediaStreamTrackInterface> track_;
+    // Source-level observer subscription. The track-level notifier never fires for
+    // muted transitions (AudioTrack::OnChanged collapses kMuted into kLive), so
+    // mute/unmute detection observes the source directly.
+    rtc::scoped_refptr<MediaSourceInterface> observedSource_;
 
     std::mutex sinksMutex_;
     std::set<rtc::VideoSinkInterface<VideoFrame>*> videoSinks_;
+
+    // Event dispatch state. Handlers are bound on the JS thread and events are
+    // delivered on the JS thread (via tsfn_ BlockingCall), so no locking.
+    Napi::ThreadSafeFunction tsfn_;
+    Napi::FunctionReference onendedRef_;
+    Napi::FunctionReference onmuteRef_;
+    Napi::FunctionReference onunmuteRef_;
+    std::atomic<bool> destroyed_{false};
+    std::atomic<bool> userStopped_{false};
+    std::atomic<bool> muted_{false};
+    bool endedDispatched_{false};
 };
 
 } // namespace webrtc

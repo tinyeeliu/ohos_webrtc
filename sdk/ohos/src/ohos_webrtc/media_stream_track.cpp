@@ -65,6 +65,14 @@ void NapiMediaStreamTrack::Init(Napi::Env env, Object exports)
             InstanceAccessor<&NapiMediaStreamTrack::GetEnabled, &NapiMediaStreamTrack::SetEnabled>(
                 kAttributeNameEnabled),
             InstanceAccessor<&NapiMediaStreamTrack::GetReadyState>(kAttributeNameReadyState),
+            // muted is read-only; the three event handlers are writable, null default.
+            InstanceAccessor<&NapiMediaStreamTrack::GetMuted>(kAttributeNameMuted),
+            InstanceAccessor<&NapiMediaStreamTrack::GetOnEnded, &NapiMediaStreamTrack::SetOnEnded>(
+                kAttributeNameOnEnded),
+            InstanceAccessor<&NapiMediaStreamTrack::GetOnMute, &NapiMediaStreamTrack::SetOnMute>(
+                kAttributeNameOnMute),
+            InstanceAccessor<&NapiMediaStreamTrack::GetOnUnmute, &NapiMediaStreamTrack::SetOnUnmute>(
+                kAttributeNameOnUnmute),
             InstanceMethod<&NapiMediaStreamTrack::Stop>(kMethodNameStop),
             InstanceMethod<&NapiMediaStreamTrack::GetSource>(kMethodNameGetSource),
             InstanceMethod<&NapiMediaStreamTrack::ApplyConstraints>(kMethodNameApplyConstraints),
@@ -111,11 +119,47 @@ NapiMediaStreamTrack::NapiMediaStreamTrack(const Napi::CallbackInfo& info)
     track_ = *info[1].As<External<rtc::scoped_refptr<MediaStreamTrackInterface>>>().Data();
 
     track_->RegisterObserver(this);
+    muted_ = QuerySourceMuted();
+
+    // The track-level notifier never fires for muted transitions: upstream
+    // AudioTrack::OnChanged collapses source kMuted into track kLive, and
+    // MediaStreamTrack::set_state only notifies observers on track-state changes.
+    // Observe the source directly so mute/unmute transitions reach the JS layer.
+    observedSource_ = GetSourceForTrack();
+    if (observedSource_) {
+        observedSource_->RegisterObserver(this);
+    }
+
+    // Event dispatch to the JS thread. Same pattern as the SDP observers in
+    // peer_connection.cpp: the JS callback receives the event type and does
+    // the real dispatch; the signaling thread passes it via BlockingCall.
+    tsfn_ = Napi::ThreadSafeFunction::New(
+        env,
+        Napi::Function::New(env,
+            [this](const Napi::CallbackInfo& info) {
+                auto type = static_cast<TrackEventType>(info[0].As<Napi::Number>().Int32Value());
+                DispatchEvent(info.Env(), type);
+            }),
+        "MediaStreamTrackEvents", 0, 1);
 }
 
 NapiMediaStreamTrack::~NapiMediaStreamTrack()
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    // Block any in-flight dispatch before tearing down members.
+    destroyed_.store(true);
+    if (observedSource_) {
+        // Mirror of the constructor subscription; no notifications after this point.
+        observedSource_->UnregisterObserver(this);
+    }
+    if (tsfn_) {
+        tsfn_.Abort();
+    }
+    // Handler refs are JS-thread only (like the SDP observer pattern); no lock needed.
+    onendedRef_.Reset();
+    onmuteRef_.Reset();
+    onunmuteRef_.Reset();
 
     track_->UnregisterObserver(this);
 
@@ -125,6 +169,94 @@ NapiMediaStreamTrack::~NapiMediaStreamTrack()
         factory_->RemoveAudioSource(track_);
     } else if (IsVideoTrack()) {
         factory_->RemoveVideoSource(track_);
+    }
+}
+
+void NapiMediaStreamTrack::UpdateHandlerRef(Napi::FunctionReference& ref, const Napi::Value& value)
+{
+    if (value.IsFunction()) {
+        ref = Napi::Persistent(value.As<Napi::Function>());
+    } else {
+        // null/undefined (or any non-function) unbinds the handler.
+        ref.Reset();
+    }
+}
+
+rtc::scoped_refptr<MediaSourceInterface> NapiMediaStreamTrack::GetSourceForTrack() const
+{
+    if (!factory_ || !track_) {
+        return nullptr;
+    }
+    if (IsAudioTrack()) {
+        return factory_->GetAudioSource(track_);
+    }
+    if (IsVideoTrack()) {
+        return factory_->GetVideoSource(track_);
+    }
+    return nullptr;
+}
+
+bool NapiMediaStreamTrack::QuerySourceMuted() const
+{
+    auto source = GetSourceForTrack();
+    return source && source->state() == MediaSourceInterface::kMuted;
+}
+
+void NapiMediaStreamTrack::EnqueueEvent(TrackEventType type)
+{
+    if (destroyed_.load()) {
+        return;
+    }
+
+    napi_status status = tsfn_.BlockingCall(
+        [type](Napi::Env env, Napi::Function jsCallback) {
+            jsCallback.Call({Napi::Number::New(env, static_cast<int>(type))});
+        });
+    if (status != napi_ok) {
+        RTC_LOG(LS_ERROR) << "Track event tsfn call failed: " << status;
+    }
+}
+
+void NapiMediaStreamTrack::DispatchEvent(Napi::Env env, TrackEventType type)
+{
+    Napi::FunctionReference* handlerRef = nullptr;
+    const char* eventType = nullptr;
+    switch (type) {
+        case TrackEventType::Ended:
+            handlerRef = &onendedRef_;
+            eventType = kEventNameEnded;
+            break;
+        case TrackEventType::Mute:
+            handlerRef = &onmuteRef_;
+            eventType = kEventNameMute;
+            break;
+        case TrackEventType::Unmute:
+            handlerRef = &onunmuteRef_;
+            eventType = kEventNameUnmute;
+            break;
+        default:
+            return;
+    }
+
+    if (handlerRef->IsEmpty()) {
+        return;
+    }
+    Napi::Function handler = handlerRef->Value();
+
+    auto event = Napi::Object::New(env);
+    event.Set("type", Napi::String::New(env, eventType));
+
+    // Receiver: the wrapped JS object. It is necessarily alive here — JS GC would
+    // have finalized the ObjectWrap first, and the destructor sets destroyed_.
+    handler.Call(this->Value(), {event});
+
+    // Isolate user callback exceptions: log and continue cleanup, never propagate.
+    bool isPending = false;
+    napi_is_exception_pending(env, &isPending);
+    if (isPending) {
+        napi_value exception;
+        napi_get_and_clear_last_exception(env, &exception);
+        RTC_LOG(LS_ERROR) << "Track event handler (" << eventType << ") threw an exception";
     }
 }
 
@@ -239,6 +371,26 @@ void NapiMediaStreamTrack::OnChanged()
 {
     RTC_DLOG(LS_INFO) << __FUNCTION__ << "(" << track_->kind() << ") state=" << track_->state()
                       << ", enabled=" << track_->enabled();
+
+    if (destroyed_.load()) {
+        return;
+    }
+
+    auto state = track_->state();
+    bool sourceMuted = QuerySourceMuted();
+
+    // ended: kLive -> kEnded for reasons other than this track's own stop().
+    if (state == MediaStreamTrackInterface::kEnded && !userStopped_ && !endedDispatched_) {
+        endedDispatched_ = true;
+        EnqueueEvent(TrackEventType::Ended);
+    }
+
+    // mute/unmute: driven solely by the source muted state; enabled changes are
+    // deliberately excluded (black frames / silence are not "media unavailable").
+    if (!endedDispatched_ && sourceMuted != muted_) {
+        muted_ = sourceMuted;
+        EnqueueEvent(sourceMuted ? TrackEventType::Mute : TrackEventType::Unmute);
+    }
 }
 
 Napi::Value NapiMediaStreamTrack::GetId(const Napi::CallbackInfo& info)
@@ -310,6 +462,47 @@ Napi::Value NapiMediaStreamTrack::GetReadyState(const Napi::CallbackInfo& info)
     NAPI_THROW(Error::New(info.Env(), "Invalid state"), info.Env().Undefined());
 }
 
+Napi::Value NapiMediaStreamTrack::GetMuted(const Napi::CallbackInfo& info)
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    if (!track_) {
+        NAPI_THROW(Error::New(info.Env(), "Illegal state"), info.Env().Undefined());
+    }
+
+    return Napi::Boolean::New(info.Env(), muted_.load());
+}
+
+Napi::Value NapiMediaStreamTrack::GetOnEnded(const Napi::CallbackInfo& info)
+{
+    return onendedRef_.IsEmpty() ? info.Env().Null() : Napi::Value(info.Env(), onendedRef_.Value());
+}
+
+void NapiMediaStreamTrack::SetOnEnded(const Napi::CallbackInfo& info, const Napi::Value& value)
+{
+    UpdateHandlerRef(onendedRef_, value);
+}
+
+Napi::Value NapiMediaStreamTrack::GetOnMute(const Napi::CallbackInfo& info)
+{
+    return onmuteRef_.IsEmpty() ? info.Env().Null() : Napi::Value(info.Env(), onmuteRef_.Value());
+}
+
+void NapiMediaStreamTrack::SetOnMute(const Napi::CallbackInfo& info, const Napi::Value& value)
+{
+    UpdateHandlerRef(onmuteRef_, value);
+}
+
+Napi::Value NapiMediaStreamTrack::GetOnUnmute(const Napi::CallbackInfo& info)
+{
+    return onunmuteRef_.IsEmpty() ? info.Env().Null() : Napi::Value(info.Env(), onunmuteRef_.Value());
+}
+
+void NapiMediaStreamTrack::SetOnUnmute(const Napi::CallbackInfo& info, const Napi::Value& value)
+{
+    UpdateHandlerRef(onunmuteRef_, value);
+}
+
 Napi::Value NapiMediaStreamTrack::Stop(const Napi::CallbackInfo& info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
@@ -317,6 +510,9 @@ Napi::Value NapiMediaStreamTrack::Stop(const Napi::CallbackInfo& info)
     if (!track_) {
         NAPI_THROW(Error::New(info.Env(), "Illegal state"), info.Env().Undefined());
     }
+
+    // W3C: a track ended by its own stop() does not fire ended.
+    userStopped_ = true;
 
     auto state = track_->state();
     if (state == MediaStreamTrackInterface::kEnded) {

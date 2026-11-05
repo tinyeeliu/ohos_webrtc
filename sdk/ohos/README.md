@@ -69,6 +69,17 @@ Open `entry/src/main/module.json5` and add the following permissions as needed:
 ]
 ```
 
+### Audio 3A and Track Events
+
+- Track events: `MediaStreamTrack` supports the `onended`/`onmute`/`onunmute` event properties and the readonly `muted` state. A user-initiated `stop()` does not fire `onended`; `enabled` toggles and silence frames do not fire mute/unmute. mute/unmute are driven by real system interruption signals: local audio tracks fire mute when the system forces an interruption (e.g. an incoming call) and unmute on resume. Local video and remote tracks have no reliable signal yet — `muted` stays false and no mute/unmute is dispatched (known difference).
+- System 3A: capture/playback use the voice-communication audio scene, where the system mounts its built-in VOIP 3A effect chain (echo cancellation, noise suppression, automatic gain) by default. The ADM now reports this to the WebRTC engine so software APM processing is not duplicated: noise suppression availability is queried from the system in real time (API 21+); echo cancellation and automatic gain are declared per the system default effect-chain configuration. Explicit disable requests are reported as not supported and the software fallback semantics are unaffected. App-initiated microphone mute is also reported to the system (API 24+), allowing the system to suspend recording effects and save power.
+
+#### Compatibility
+
+- New features: the four `MediaStreamTrack` members above and the system 3A integration; all are incremental, no existing API signature or behavior changes.
+- Incompatible changes: none.
+- Version requirements: noise-suppression querying and the mute coordination hint take effect on API 21+ and API 24+ systems respectively; on older systems they degrade gracefully to pre-integration behavior (software 3A only). Built with OHOS SDK 26.1.0.
+
 ## Usage Example
 
 The following example demonstrates a basic audio/video call setup flow:
