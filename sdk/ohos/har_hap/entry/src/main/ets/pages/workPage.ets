@@ -572,11 +572,29 @@ struct Index {
 
   async prepareLocalMedia() {
     if (!this.localAudioTrack) {
-      this.localAudioSource = this.pcf?.createAudioSource({ echoCancellation: true, noiseSuppression: true });
+      // 请求系统 3A：回声消除、智能降噪、自动增益（对接后由系统效果链处理，hilog ADM 日志可查生效状态）
+      this.localAudioSource = this.pcf?.createAudioSource({ echoCancellation: true, noiseSuppression: true, autoGainControl: true });
       console.info(TAG, 'audioSource: ' + JSON.stringify(this.localAudioSource));
+      this.setStatus('3A(AEC/NS/AGC) 已请求，生效状态见 hilog ADM 日志');
 
       this.localAudioTrack = this.pcf?.createAudioTrack("audio", this.localAudioSource);
       console.info(TAG, 'audioTrack: ' + JSON.stringify(this.localAudioTrack));
+
+      // 轨道事件验证（3A 与轨道回调功能补齐）：真实状态变化时刷新状态栏。
+      if (this.localAudioTrack) {
+        this.localAudioTrack.onended = (ev: webrtc.Event) => {
+          console.info(TAG, 'localAudioTrack.onended: ' + ev.type);
+          this.setStatus('本地音频轨道结束(自然)');
+        };
+        this.localAudioTrack.onmute = (ev: webrtc.Event) => {
+          console.info(TAG, 'localAudioTrack.onmute: ' + ev.type + ', muted=' + this.localAudioTrack?.muted);
+          this.setStatus('本地音频被系统中断(mute)');
+        };
+        this.localAudioTrack.onunmute = (ev: webrtc.Event) => {
+          console.info(TAG, 'localAudioTrack.onunmute: ' + ev.type + ', muted=' + this.localAudioTrack?.muted);
+          this.setStatus('本地音频恢复(unmute)');
+        };
+      }
     }
 
     if (!this.localVideoTrack) {
