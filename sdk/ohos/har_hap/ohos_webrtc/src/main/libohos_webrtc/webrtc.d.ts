@@ -374,10 +374,27 @@ declare var RTCPeerConnection: {
 };
 
 // https://www.w3.org/TR/webrtc/#rtcrtpreceiver-interface
+/** OHOS extension: a parsed H.264 user_data_unregistered SEI message. */
+export interface RTCSeiEvent extends Event {
+  readonly payloadType: number;
+  readonly codec: string;
+  /** Canonical UUID, without the 16 UUID bytes in data. */
+  readonly uuid: string;
+  readonly data: ArrayBuffer;
+  readonly ssrc: number;
+  /** 90 kHz RTP timestamp of the encoded frame; not wall-clock time. */
+  readonly rtpTimestamp: number;
+  /** Notifications dropped by this listener's bounded native-to-ArkTS queue. */
+  readonly droppedMessages: number;
+}
+
 export interface RTCRtpReceiver {
   readonly track: MediaStreamTrack;
   readonly transport: RTCDtlsTransport | null;
   readonly id: string | null;
+
+  /** H.264 SEI only. Assign null to cancel queued notifications and release the listener. */
+  onsei: ((event: RTCSeiEvent) => void) | null;
 
   getParameters(): RTCRtpReceiveParameters;
   getStats(): Promise<RTCStatsReport>;
@@ -463,7 +480,33 @@ export interface RTCRtpSynchronizationSource extends RTCRtpContributingSource {
 
 // https://www.w3.org/TR/webrtc/#rtcrtpsender-interface
 // https://www.w3.org/TR/webrtc/#rtcrtpsender-interface-extensions
+/** OHOS extension: sender-scoped SEI control, obtained via getEncoderWrapper(). */
+export interface EncoderWrapper {
+  /** True for H.264 Annex B packetization-mode=1 output; false on close/codec change. */
+  readonly ready: boolean;
+  readonly pendingMessages: number;
+  /** Number of encoded frames injected, including separate simulcast layers. */
+  readonly injectedMessages: number;
+  /**
+   * Copies 1..4096 bytes and queues one payload for a subsequent encoded frame.
+   * Throws if not ready, closed, invalid input or the 64-message queue is full.
+   * Success means queued, not delivered. UUID defaults to EncoderWrapper.defaultUuid.
+   */
+  writeSei(data: ArrayBuffer, uuid?: string): void;
+  /** Discard pending data. Does not retract frames already passed to RTP. */
+  clearSei(): void;
+}
+
+/** Capability constants. Instances are created by RTCRtpSender, not by new. */
+export declare var EncoderWrapper: {
+  readonly defaultUuid: string;
+  readonly maxDataBytes: number;
+  readonly maxPendingMessages: number;
+};
+
 export interface RTCRtpSender {
+  /** Install H.264 SEI injection on this video sender. Call before waiting for ready. */
+  getEncoderWrapper(): EncoderWrapper;
   readonly track: MediaStreamTrack | null;
   readonly transport: RTCDtlsTransport | null;
   readonly dtmf: RTCDTMFSender | null;

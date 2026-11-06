@@ -22,6 +22,12 @@ const TAG: string = '[Index]';
 struct Index {
   build() {
     Column() {
+      Button('SEI测试')
+        .width(300)
+        .height(60)
+        .fontSize(20)
+        .fontWeight(FontWeight.Bold)
+        .onClick(() => { router.pushUrl({ url: 'pages/SeiTestPage' }); })
       Row() {
         Button("多设备相机实验室（A–F）")
           .width(300)

@@ -31,6 +31,7 @@
 namespace webrtc {
 
 class PeerConnectionFactoryWrapper;
+namespace sei { class PeerSeiContext; }
 
 class NapiPeerConnection : public NapiEventTarget<NapiPeerConnection>, public PeerConnectionObserver {
 public:
@@ -112,6 +113,7 @@ private:
 
     std::shared_ptr<PeerConnectionFactoryWrapper> factory_;
     rtc::scoped_refptr<PeerConnectionInterface> pc_;
+    std::shared_ptr<sei::PeerSeiContext> seiContext_;
 
     Napi::ObjectReference sctpTransportRef_;
 };

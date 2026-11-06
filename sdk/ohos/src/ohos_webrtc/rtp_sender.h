@@ -25,6 +25,7 @@
 namespace webrtc {
 
 class PeerConnectionFactoryWrapper;
+namespace sei { class PeerSeiContext; }
 
 class NapiRtpSender : public Napi::ObjectWrap<NapiRtpSender> {
 public:
@@ -32,7 +33,7 @@ public:
 
     static Napi::Object NewInstance(
         std::shared_ptr<PeerConnectionFactoryWrapper> factory, rtc::scoped_refptr<PeerConnectionInterface> pc,
-        rtc::scoped_refptr<RtpSenderInterface> sender);
+        rtc::scoped_refptr<RtpSenderInterface> sender, std::shared_ptr<sei::PeerSeiContext> seiContext);
 
     ~NapiRtpSender() override;
 
@@ -53,6 +54,7 @@ protected:
     Napi::Value ReplaceTrack(const Napi::CallbackInfo& info);
     Napi::Value SetStreams(const Napi::CallbackInfo& info);
     Napi::Value GetStats(const Napi::CallbackInfo& info);
+    Napi::Value GetEncoderWrapper(const Napi::CallbackInfo& info);
     Napi::Value ToJson(const Napi::CallbackInfo& info);
 
 private:
@@ -61,6 +63,7 @@ private:
     std::shared_ptr<PeerConnectionFactoryWrapper> factory_;
     rtc::scoped_refptr<PeerConnectionInterface> pc_;
     rtc::scoped_refptr<RtpSenderInterface> rtpSender_;
+    std::shared_ptr<sei::PeerSeiContext> seiContext_;
 };
 
 } // namespace webrtc

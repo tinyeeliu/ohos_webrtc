@@ -1,6 +1,7 @@
 {
   "src": [
     "pages/Index",
+    "pages/SeiTestPage",
     "pages/workPage",
     "pages/ApplyConstraintsTestPage",
     "pages/MultiDeviceRtcLabPage"

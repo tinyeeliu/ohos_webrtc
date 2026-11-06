@@ -25,6 +25,8 @@
 namespace webrtc {
 
 class PeerConnectionFactoryWrapper;
+class SeiJsCallback;
+namespace sei { class PeerSeiContext; }
 
 class NapiRtpReceiver : public Napi::ObjectWrap<NapiRtpReceiver> {
 public:
@@ -32,7 +34,7 @@ public:
 
     static Napi::Object NewInstance(
         std::shared_ptr<PeerConnectionFactoryWrapper> factory, rtc::scoped_refptr<PeerConnectionInterface> pc,
-        rtc::scoped_refptr<RtpReceiverInterface> receiver);
+        rtc::scoped_refptr<RtpReceiverInterface> receiver, std::shared_ptr<sei::PeerSeiContext> seiContext);
 
     ~NapiRtpReceiver() override;
 
@@ -53,6 +55,9 @@ protected:
     Napi::Value GetContributingSources(const Napi::CallbackInfo& info);
     Napi::Value GetSynchronizationSources(const Napi::CallbackInfo& info);
     Napi::Value ToJson(const Napi::CallbackInfo& info);
+    Napi::Value GetOnSei(const Napi::CallbackInfo& info);
+    void SetOnSei(const Napi::CallbackInfo& info, const Napi::Value& value);
+    void ClearSeiCallback();
 
 private:
     static thread_local Napi::FunctionReference constructor_;
@@ -60,6 +65,9 @@ private:
     std::shared_ptr<PeerConnectionFactoryWrapper> factory_;
     rtc::scoped_refptr<PeerConnectionInterface> pc_;
     rtc::scoped_refptr<RtpReceiverInterface> rtpReceiver_;
+    std::shared_ptr<sei::PeerSeiContext> seiContext_;
+    std::shared_ptr<SeiJsCallback> seiCallback_;
+    Napi::FunctionReference onSei_;
 };
 
 } // namespace webrtc
