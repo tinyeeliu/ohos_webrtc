@@ -19,6 +19,7 @@
 #include "dtls_transport.h"
 #include "rtp_parameters.h"
 #include "peer_connection.h"
+#include "sei/napi_sei.h"
 
 #include <atomic>
 #include <limits>
@@ -55,7 +56,7 @@ const char kAttributeNameAudioLevel[] = "audioLevel";
 thread_local FunctionReference NapiRtpReceiver::constructor_;
 
 static constexpr int indexTwo = 2;
-static constexpr int callbackInfoLen = 3;
+static constexpr int callbackInfoLen = 4;
 
 void NapiRtpReceiver::Init(Napi::Env env, Napi::Object exports)
 {
@@ -65,6 +66,7 @@ void NapiRtpReceiver::Init(Napi::Env env, Napi::Object exports)
         env, kClassName,
         {
             InstanceAccessor<&NapiRtpReceiver::GetId>(kAttributeNameId),
+            InstanceAccessor<&NapiRtpReceiver::GetOnSei, &NapiRtpReceiver::SetOnSei>("onsei"),
             InstanceAccessor<&NapiRtpReceiver::GetTrack>(kAttributeNameTrack),
             InstanceAccessor<&NapiRtpReceiver::GetTransport>(kAttributeNameTransport),
             InstanceMethod<&NapiRtpReceiver::GetParameters>(kMethodNameGetParameters),
@@ -82,7 +84,7 @@ void NapiRtpReceiver::Init(Napi::Env env, Napi::Object exports)
 
 Napi::Object NapiRtpReceiver::NewInstance(
     std::shared_ptr<PeerConnectionFactoryWrapper> factory, rtc::scoped_refptr<PeerConnectionInterface> pc,
-    rtc::scoped_refptr<RtpReceiverInterface> receiver)
+    rtc::scoped_refptr<RtpReceiverInterface> receiver, std::shared_ptr<sei::PeerSeiContext> seiContext)
 {
     int cur = ++g_receiverNewInFlight;
 
@@ -97,7 +99,8 @@ Napi::Object NapiRtpReceiver::NewInstance(
     auto obj = constructor_.New(
         {External<std::shared_ptr<PeerConnectionFactoryWrapper>>::New(env, &factory),
          External<rtc::scoped_refptr<PeerConnectionInterface>>::New(env, &pc),
-         External<rtc::scoped_refptr<RtpReceiverInterface>>::New(env, &receiver)});
+         External<rtc::scoped_refptr<RtpReceiverInterface>>::New(env, &receiver),
+         External<std::shared_ptr<sei::PeerSeiContext>>::New(env, &seiContext)});
     return obj;
 }
 
@@ -105,20 +108,66 @@ NapiRtpReceiver::NapiRtpReceiver(const Napi::CallbackInfo& info) : Napi::ObjectW
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    // Create from native with 3 paramters, and SHOULD NOT create from ArkTS
+    // Created internally with factory, PC, receiver and shared SEI context.
     if (info.Length() != callbackInfoLen || !info[0].IsExternal() || !info[1].IsExternal() ||
-        !info[indexTwo].IsExternal()) {
+        !info[indexTwo].IsExternal() || !info[3].IsExternal()) {
         NAPI_THROW_VOID(Napi::Error::New(info.Env(), "Invalid Operation"));
     }
 
     factory_ = *info[0].As<External<std::shared_ptr<PeerConnectionFactoryWrapper>>>().Data();
     pc_ = *info[1].As<External<rtc::scoped_refptr<PeerConnectionInterface>>>().Data();
     rtpReceiver_ = *info[indexTwo].As<External<rtc::scoped_refptr<RtpReceiverInterface>>>().Data();
+    seiContext_ = *info[3].As<External<std::shared_ptr<sei::PeerSeiContext>>>().Data();
 }
 
 NapiRtpReceiver::~NapiRtpReceiver()
 {
+    ClearSeiCallback();
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+}
+
+void NapiRtpReceiver::ClearSeiCallback()
+{
+    if (seiCallback_) { seiCallback_->Close(); seiCallback_.reset(); }
+    onSei_.Reset();
+}
+
+Napi::Value NapiRtpReceiver::GetOnSei(const Napi::CallbackInfo& info)
+{
+    if (onSei_.IsEmpty() || !seiCallback_ || !seiCallback_->Active()) { return info.Env().Null(); }
+    return onSei_.Value();
+}
+
+void NapiRtpReceiver::SetOnSei(const Napi::CallbackInfo& info, const Napi::Value& value)
+{
+    if (!value.IsNull() && !value.IsUndefined() && !value.IsFunction()) {
+        NAPI_THROW_VOID(TypeError::New(info.Env(), "onsei must be a function or null"));
+    }
+    if (value.IsNull() || value.IsUndefined()) { ClearSeiCallback(); return; }
+    if (!seiContext_ || seiContext_->Closed()) {
+        NAPI_THROW_VOID(Error::New(info.Env(), "PeerConnection is closed"));
+    }
+    if (rtpReceiver_->media_type() != cricket::MEDIA_TYPE_VIDEO) {
+        NAPI_THROW_VOID(TypeError::New(info.Env(), "SEI requires a video receiver"));
+    }
+    ClearSeiCallback();
+    auto transformer = seiContext_->Receiver(rtpReceiver_);
+    // Pin the JS object, not a raw ObjectWrap pointer. Environment teardown may
+    // finalize wrapped C++ objects before the TSFN finalizer runs.
+    napi_ref receiverRef = nullptr;
+    if (napi_create_reference(info.Env(), info.This(), 1, &receiverRef) != napi_ok) {
+        NAPI_THROW_VOID(Error::New(info.Env(), "Unable to retain SEI receiver"));
+    }
+    auto callback = SeiJsCallback::Create(info.Env(), value.As<Function>(), [receiverRef](napi_env env) {
+        if (env) { napi_delete_reference(env, receiverRef); }
+    });
+    if (!callback) { napi_delete_reference(info.Env(), receiverRef); return; }
+    if (!transformer->AddObserver(callback)) {
+        callback->Close();
+        NAPI_THROW_VOID(Error::New(info.Env(), "Too many SEI listeners or PeerConnection is closed"));
+    }
+    seiCallback_ = std::move(callback);
+    onSei_ = Persistent(value.As<Function>());
 }
 
 rtc::scoped_refptr<RtpReceiverInterface> NapiRtpReceiver::Get() const

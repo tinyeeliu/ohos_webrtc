@@ -58,7 +58,7 @@ const char kEnumRtpTransceiverDirectionStopped[] = "stopped";
 
 thread_local FunctionReference NapiRtpTransceiver::constructor_;
 static constexpr int indexTwo = 2;
-static constexpr int callbackInfoLen = 3;
+static constexpr int callbackInfoLen = 4;
 
 void NapiRtpTransceiver::Init(Napi::Env env, Napi::Object exports)
 {
@@ -85,7 +85,7 @@ void NapiRtpTransceiver::Init(Napi::Env env, Napi::Object exports)
 
 Napi::Object NapiRtpTransceiver::NewInstance(
     std::shared_ptr<PeerConnectionFactoryWrapper> factory, rtc::scoped_refptr<PeerConnectionInterface> pc,
-    rtc::scoped_refptr<RtpTransceiverInterface> transceiver)
+    rtc::scoped_refptr<RtpTransceiverInterface> transceiver, std::shared_ptr<sei::PeerSeiContext> seiContext)
 {
     int cur = ++g_transceiverNewInFlight;
 
@@ -101,7 +101,8 @@ Napi::Object NapiRtpTransceiver::NewInstance(
     auto obj = constructor_.New(
         {External<std::shared_ptr<PeerConnectionFactoryWrapper>>::New(env, &factory),
          External<rtc::scoped_refptr<PeerConnectionInterface>>::New(env, &pc),
-         External<rtc::scoped_refptr<RtpTransceiverInterface>>::New(env, &transceiver)});
+         External<rtc::scoped_refptr<RtpTransceiverInterface>>::New(env, &transceiver),
+         External<std::shared_ptr<sei::PeerSeiContext>>::New(env, &seiContext)});
     return obj;
 }
 
@@ -109,15 +110,16 @@ NapiRtpTransceiver::NapiRtpTransceiver(const Napi::CallbackInfo& info) : Napi::O
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    // Create from native with 3 paramters, and SHOULD NOT create from ArkTS
+    // Created internally with factory, PC, transceiver and shared SEI context.
     if (info.Length() != callbackInfoLen || !info[0].IsExternal() || !info[1].IsExternal() ||
-        !info[indexTwo].IsExternal()) {
+        !info[indexTwo].IsExternal() || !info[3].IsExternal()) {
         NAPI_THROW_VOID(Napi::Error::New(info.Env(), "Invalid Operation"));
     }
 
     factory_ = *info[0].As<External<std::shared_ptr<PeerConnectionFactoryWrapper>>>().Data();
     pc_ = *info[1].As<External<rtc::scoped_refptr<PeerConnectionInterface>>>().Data();
     rtpTransceiver_ = *info[indexTwo].As<External<rtc::scoped_refptr<RtpTransceiverInterface>>>().Data();
+    seiContext_ = *info[3].As<External<std::shared_ptr<sei::PeerSeiContext>>>().Data();
 }
 
 NapiRtpTransceiver::~NapiRtpTransceiver()
@@ -146,14 +148,14 @@ Napi::Value NapiRtpTransceiver::GetSender(const Napi::CallbackInfo& info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    return NapiRtpSender::NewInstance(factory_, pc_, rtpTransceiver_->sender());
+    return NapiRtpSender::NewInstance(factory_, pc_, rtpTransceiver_->sender(), seiContext_);
 }
 
 Napi::Value NapiRtpTransceiver::GetReceiver(const Napi::CallbackInfo& info)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    return NapiRtpReceiver::NewInstance(factory_, pc_, rtpTransceiver_->receiver());
+    return NapiRtpReceiver::NewInstance(factory_, pc_, rtpTransceiver_->receiver(), seiContext_);
 }
 
 Napi::Value NapiRtpTransceiver::GetDirection(const Napi::CallbackInfo& info)
