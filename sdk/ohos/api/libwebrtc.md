@@ -1517,6 +1517,22 @@ send(data: ArrayBuffer): void;
 | ------ | ----------- | ---- | ---- |
 | data   | ArrayBuffer | 是   | 数据 |
 
+## RTCSeiEvent
+
+视频接收端解析出的 H.264 `user_data_unregistered` SEI 消息，继承 [Event](#event)。
+
+### 属性
+
+| 名称 | 类型 | 说明 |
+| --- | --- | --- |
+| data | ArrayBuffer | 自定义业务数据，不包含 16 字节 UUID，最大 4096 字节 |
+| uuid | string | 标识业务数据格式的 UUID，由应用筛选和解释 |
+| payloadType | number | SEI 消息类型，当前为 5 |
+| codec | string | 视频编码的 MIME 类型，当前为 `video/H264` |
+| ssrc | number | 视频 RTP 流的 SSRC |
+| rtpTimestamp | number | 编码帧的 90 kHz RTP 时间戳，不是毫秒或墙钟时间 |
+| droppedMessages | number | 当前监听器因通知队列满而累计丢弃的通知数 |
+
 ## RTCRtpReceiver
 
 用于表示 RTP 流的接收端点，允许应用程序通过网络接收媒体数据（音频或视频）。
@@ -1528,6 +1544,14 @@ send(data: ArrayBuffer): void;
 | id        | string \| null                          | 是    | 否   | RTCRtpReceiver 的唯一标识符，未关联轨道时为 null |
 | track     | [MediaStreamTrack](#mediastreamtrack)  | 是    | 否   | 表示与 RTCRtpReceiver 关联的媒体轨道 |
 | transport | [RTCDtlsTransport](#rtcdtlstransport) \| null | 是   | 否 | 用于接收媒体数据的传输机制           |
+
+### onsei
+
+onsei: ((event: RTCSeiEvent) => void) | null;
+
+监听视频码流中的自定义 SEI。在 `pc.ontrack` 收到视频轨道后设置该接收器的 `onsei`，赋值 `null` 取消监听及尚未执行的通知。向音频接收器注册监听或在连接关闭后注册会抛出异常。
+
+回调会报告不同 UUID 的 `payloadType=5` 消息，应用负责筛选 UUID 并按双方约定解释 `data`。每个 `RTCRtpReceiver` 对象支持一个监听器，同一底层接收器最多允许 16 个并存注册；每个监听器的通知队列最多 64 条，超限时丢弃通知。回调与视频显示不保证同步，SEI 可能随视频丢包或丢帧而丢失。停止接收 SEI 时，将 `onsei` 设为 `null`。
 
 ### getParameters
 
@@ -1779,6 +1803,12 @@ insertDTMF(tones: string, duration?: number, interToneGap?: number): void;
 | transport | [RTCDtlsTransport](#rtcdtlstransport)  \| null | 是 | 否   | 表示可选的 RTCDtlsTransport 对象，用于指定 RTP 数据的传输    |
 | dtmf      | [RTCDTMFSender](#RTCDTMFSender) \| null | 是 | 否   | 表示可选的 RTCDTMFSender 对象，用于发送 DTMF（双音多频）信号 |
 
+### getEncoderWrapper
+
+getEncoderWrapper(): EncoderWrapper;
+
+获取当前视频发送器的 [EncoderWrapper](#encoderwrapper)，并启用 SEI 写入处理。获取后等待对象的 `ready` 为 `true` 再写入；重复获取的对象共享同一发送队列。音频发送器或已关闭连接调用此方法会抛出异常。
+
 ### setParameters
 
 setParameters(parameters: RTCRtpSendParameters): Promise<void>;
@@ -1870,6 +1900,61 @@ static getCapabilities(kind: string): RTCRtpCapabilities | null;
 | [RTCRtpCapabilities](#rtcrtpcapabilities) | 包含了对指定媒体类型的 RTP 支持的编解码器和 RTP 头扩展 |
 | null                                      | 没有支持的媒体类型                        |
 
+
+## EncoderWrapper
+
+视频发送器的自定义 SEI 写入对象，由 [RTCRtpSender.getEncoderWrapper](#getencoderwrapper) 获取，不支持直接构造。
+
+写入的 SEI 类型为 H.264 标准定义的 `user_data_unregistered`（`payloadType=5`）。当前发送实现仅支持 Annex B 码流和 `packetization-mode=1`，这是本功能的支持范围。
+
+视频编码及 RTP 打包参数沿用原有 SDP Offer/Answer 协商，可在协商前使用 [setCodecPreferences](#setcodecpreferences) 设置编码偏好。这类自定义 SEI 无需额外的能力协商；接收方应用需实现 SEI 提取，并按双方约定的 UUID 和数据格式处理业务内容。
+
+### 属性
+
+| 名称 | 类型 | 说明 |
+| --- | --- | --- |
+| ready | boolean | 本端是否满足 SEI 写入条件，只读；实际输出符合上述条件的编码帧后为 `true` |
+| pendingMessages | number | 等待写入编码帧的消息数，只读 |
+| injectedMessages | number | 已插入 SEI 的编码输出帧数，只读，不代表对端已收到 |
+
+静态常量：`maxDataBytes` 为 4096，`maxPendingMessages` 为 64，`defaultUuid` 为 `5f7d3c20-9b61-4e8a-a2f0-6c8d174b9301`。
+
+### writeSei
+
+writeSei(data: ArrayBuffer, uuid?: string): void;
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| data | ArrayBuffer | 是 | 1–4096 字节的业务数据；格式由双端约定 |
+| uuid | string | 否 | `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` 格式的 UUID，省略时使用 `defaultUuid` |
+
+同步复制数据并加入发送队列，由后续编码帧携带；调用成功只表示入队，不提供送达确认。SDK 自动添加 16 字节 UUID、SEI 长度及转义，不需应用自行拼接。参数非法、`ready` 为 `false`、连接关闭或 64 条队列已满时抛出异常。编码器暂停可能停止消耗队列；编码输出不符合支持条件、转换器卸载或连接关闭时清空待发数据。
+
+### clearSei
+
+clearSei(): void;
+
+清除待发 SEI 和缓存，不撤回已经交给 RTP 发送的帧。
+
+### 示例
+
+```typescript
+// videoSender、videoReceiver 为已创建的视频发送器和接收器。
+const encoder = videoSender.getEncoderWrapper();
+videoReceiver.onsei = (event: webrtc.RTCSeiEvent) => {
+  if (event.uuid !== webrtc.EncoderWrapper.defaultUuid) { return; }
+  const data = new Uint8Array(event.data);
+  // 按双端约定解析 data，用于业务处理或界面展示。
+};
+
+// 视频开始发送，且 encoder.ready 为 true 后写入 SEI。
+if (encoder.ready) {
+  encoder.writeSei(new Uint8Array([0x00, 0x01, 0xFF]).buffer);
+}
+
+```
+
+停止使用 SEI 时设置 `videoReceiver.onsei = null`，调用 `encoder.clearSei()` 清理待发消息；结束通话时再关闭所属连接。
 
 ## RTCDtlsTransport
 

@@ -24,6 +24,7 @@
 namespace webrtc {
 
 class PeerConnectionFactoryWrapper;
+namespace sei { class PeerSeiContext; }
 
 class NapiRtpTransceiver : public Napi::ObjectWrap<NapiRtpTransceiver> {
 public:
@@ -31,7 +32,7 @@ public:
 
     static Napi::Object NewInstance(
         std::shared_ptr<PeerConnectionFactoryWrapper> factory, rtc::scoped_refptr<PeerConnectionInterface> pc,
-        rtc::scoped_refptr<RtpTransceiverInterface> transceiver);
+        rtc::scoped_refptr<RtpTransceiverInterface> transceiver, std::shared_ptr<sei::PeerSeiContext> seiContext);
 
     ~NapiRtpTransceiver() override;
 
@@ -58,6 +59,7 @@ private:
     std::shared_ptr<PeerConnectionFactoryWrapper> factory_;
     rtc::scoped_refptr<PeerConnectionInterface> pc_;
     rtc::scoped_refptr<RtpTransceiverInterface> rtpTransceiver_;
+    std::shared_ptr<sei::PeerSeiContext> seiContext_;
 };
 
 void PopulateTransceiverInit(const Napi::Object& jsInit, webrtc::RtpTransceiverInit& init);

@@ -22,6 +22,7 @@
 #include "peer_connection_factory.h"
 #include "async_work/async_worker_get_stats.h"
 #include "peer_connection.h"
+#include "sei/napi_sei.h"
 
 #include <algorithm>
 #include <atomic>
@@ -48,7 +49,7 @@ const char kMethodNameToJson[] = "toJSON";
 
 const char kStaticMethodNameGetCapabilities[] = "getCapabilities";
 static constexpr int indexTwo = 2;
-static constexpr int callbackInfoLen = 3;
+static constexpr int callbackInfoLen = 4;
 
 class AsyncWorkerReplaceTrack : public Napi::AsyncWorker {
 public:
@@ -122,6 +123,7 @@ void NapiRtpSender::Init(Napi::Env env, Napi::Object exports)
             InstanceMethod<&NapiRtpSender::ReplaceTrack>(kMethodNameReplaceTrack),
             InstanceMethod<&NapiRtpSender::SetStreams>(kMethodNameSetStreams),
             InstanceMethod<&NapiRtpSender::GetStats>(kMethodNameGetStats),
+            InstanceMethod<&NapiRtpSender::GetEncoderWrapper>("getEncoderWrapper"),
             InstanceMethod<&NapiRtpSender::ToJson>(kMethodNameToJson),
             StaticMethod<&NapiRtpSender::GetCapabilities>(kStaticMethodNameGetCapabilities),
         });
@@ -133,7 +135,7 @@ void NapiRtpSender::Init(Napi::Env env, Napi::Object exports)
 
 Napi::Object NapiRtpSender::NewInstance(
     std::shared_ptr<PeerConnectionFactoryWrapper> factory, rtc::scoped_refptr<PeerConnectionInterface> pc,
-    rtc::scoped_refptr<RtpSenderInterface> sender)
+    rtc::scoped_refptr<RtpSenderInterface> sender, std::shared_ptr<sei::PeerSeiContext> seiContext)
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
@@ -146,7 +148,8 @@ Napi::Object NapiRtpSender::NewInstance(
     auto obj = constructor_.New(
         {External<std::shared_ptr<PeerConnectionFactoryWrapper>>::New(env, &factory),
          External<rtc::scoped_refptr<PeerConnectionInterface>>::New(env, &pc),
-         External<rtc::scoped_refptr<RtpSenderInterface>>::New(env, &sender)});
+         External<rtc::scoped_refptr<RtpSenderInterface>>::New(env, &sender),
+         External<std::shared_ptr<sei::PeerSeiContext>>::New(env, &seiContext)});
     return obj;
 }
 
@@ -154,15 +157,28 @@ NapiRtpSender::NapiRtpSender(const Napi::CallbackInfo& info) : Napi::ObjectWrap<
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
-    // Create from native with 3 paramters, and SHOULD NOT create from ArkTS
+    // Created internally with factory, PC, sender and shared SEI context.
     if (info.Length() != callbackInfoLen || !info[0].IsExternal() || !info[1].IsExternal() ||
-        !info[indexTwo].IsExternal()) {
+        !info[indexTwo].IsExternal() || !info[3].IsExternal()) {
         NAPI_THROW_VOID(Napi::Error::New(info.Env(), "Invalid Operation"));
     }
 
     factory_ = *info[0].As<External<std::shared_ptr<PeerConnectionFactoryWrapper>>>().Data();
     pc_ = *info[1].As<External<rtc::scoped_refptr<PeerConnectionInterface>>>().Data();
     rtpSender_ = *info[indexTwo].As<External<rtc::scoped_refptr<RtpSenderInterface>>>().Data();
+    seiContext_ = *info[3].As<External<std::shared_ptr<sei::PeerSeiContext>>>().Data();
+}
+
+Napi::Value NapiRtpSender::GetEncoderWrapper(const Napi::CallbackInfo& info)
+{
+    if (!seiContext_ || seiContext_->Closed()) {
+        NAPI_THROW(Error::New(info.Env(), "PeerConnection is closed"), info.Env().Undefined());
+    }
+    if (rtpSender_->media_type() != cricket::MEDIA_TYPE_VIDEO) {
+        NAPI_THROW(TypeError::New(info.Env(), "SEI requires a video sender"), info.Env().Undefined());
+    }
+    auto transformer = seiContext_->Sender(rtpSender_);
+    return NapiEncoderWrapper::NewInstance(info.Env(), factory_, pc_, seiContext_, transformer);
 }
 
 NapiRtpSender::~NapiRtpSender()
