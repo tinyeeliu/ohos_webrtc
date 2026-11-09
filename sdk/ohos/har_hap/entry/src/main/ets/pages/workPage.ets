@@ -20,6 +20,7 @@ import promptAction from '@ohos.promptAction';
 import buffer from '@ohos.buffer';
 import fs from '@ohos.file.fs';
 import audio from '@ohos.multimedia.audio';
+import util from '@ohos.util';
 import { BusinessError } from '@kit.BasicServicesKit';
 
 const TAG: string = '[Index]';
@@ -30,6 +31,9 @@ const SIGNAL_SERVER = 'wss://youzhi.life:8443';
 // https://webrtc.youzhi.life/
 // 用于测试的STUN服务器地址
 const STUN_SERVER = "stun:stun.l.google.com:19302"
+const SEI_SEQUENCE_BYTES: number = 4;
+const SEI_BINARY_BYTES: number = 8;
+const SEI_BYTE_INDICES: number[] = [0, 1, 2, 3, 4, 5, 6, 7];
 
 interface MessageData {
   sdp?: webrtc.RTCSessionDescriptionInit;
@@ -58,6 +62,22 @@ struct Index {
   @State canChangeResolution: boolean = false;
   @State private customResWidth: string = '1280';
   @State private customResHeight: string = '720';
+  @State private seiText: string = 'SEI占位';
+  @State private seiBinaryInputs: string[] = ['00', '00', '01', '02', '03', 'FF', '80', '7F'];
+  @State private seiReady: boolean = false;
+  @State private seiContinuous: boolean = false;
+  @State private receivedSeiText: string = '';
+  @State private receivedSeiSequence: string = '';
+  @State private receivedSeiBinary: string = '';
+  private seiEncoder?: webrtc.EncoderWrapper;
+  private seiReceiver?: webrtc.RTCRtpReceiver;
+  private seiSequence: number = 0;
+  private seiReadyTimer: number = -1;
+  private seiSendTimer: number = -1;
+  private pageActive: boolean = false;
+  private pageVisible: boolean = false;
+  private peerGeneration: number = 0;
+  private reconnectTimer: number = -1;
   private statsTimer?: number = undefined;
   private mXComponentController1: VideoRenderController = new VideoRenderController();
   private mXComponentController2: VideoRenderController = new VideoRenderController();
@@ -147,6 +167,7 @@ struct Index {
             .margin({ top: 20 })
             .onClick(() => {
               if (this.buttonTitle == 'Disconnect') {
+                this.pauseSei();
                 this.ws.close();
                 this.buttonTitle = 'Connect';
                 this.canChangeResolution = false;
@@ -334,6 +355,57 @@ struct Index {
         .alignSelf(ItemAlign.Start)
         .padding({ top: 10 })
 
+        Column({ space: 10 }) {
+          Text('本端发送 SEI').fontSize(16).fontWeight(FontWeight.Medium)
+          Row({ space: 6 }) {
+            Text('SEI文本').width(70).fontSize(14)
+            TextInput({ text: this.seiText, placeholder: '输入 SEI 文本' }).layoutWeight(1)
+              .onChange((value: string) => { this.seiText = value; })
+          }.width('100%').alignItems(VerticalAlign.Center)
+          Row({ space: 6 }) {
+            Text('二进制数据').width(70).fontSize(14)
+            Row({ space: 3 }) {
+              ForEach(SEI_BYTE_INDICES, (index: number) => {
+                TextInput({ text: this.seiBinaryInputs[index], placeholder: '00' })
+                  .layoutWeight(1).height(40).fontSize(14).textAlign(TextAlign.Center)
+                  .padding({ left: 0, right: 0 }).borderRadius(6).maxLength(2)
+                  .inputFilter('[0-9a-fA-F]')
+                  .onChange((value: string) => { this.seiBinaryInputs[index] = value.toUpperCase(); })
+              }, (index: number) => index.toString())
+            }.layoutWeight(1)
+          }.width('100%').alignItems(VerticalAlign.Center)
+          Text('每格填写两位十六进制数（00–FF）').fontSize(12).fontColor('#666666')
+          Row({ space: 12 }) {
+            Button('发送一条').fontSize(14).enabled(this.seiReady && !this.seiContinuous)
+              .onClick(() => {
+                try { this.sendSei(); }
+                catch (error) { this.showSeiError((error as Error).message); }
+              })
+            Button(this.seiContinuous ? '停止发送' : '连续发送').fontSize(14)
+              .enabled(this.seiReady || this.seiContinuous)
+              .onClick(() => {
+                if (this.seiContinuous) { this.stopContinuousSei(); }
+                else { this.startContinuousSei(); }
+              })
+          }
+        }.alignItems(HorizontalAlign.Start).width('100%').padding(12)
+          .margin({ top: 16 }).backgroundColor('#F5F5F5').borderRadius(8)
+
+        Column({ space: 6 }) {
+          Text('本端接收 SEI').fontSize(16).fontWeight(FontWeight.Medium)
+          if (this.receivedSeiText.length > 0) {
+            Text(`SEI文本：${this.receivedSeiText}`).fontSize(14)
+              .maxLines(3).textOverflow({ overflow: TextOverflow.Ellipsis })
+          }
+          if (this.receivedSeiSequence.length > 0) {
+            Text(`序号：${this.receivedSeiSequence}`).fontSize(14)
+          }
+          if (this.receivedSeiBinary.length > 0) {
+            Text(`二进制：${this.receivedSeiBinary}`).fontSize(14)
+          }
+        }.alignItems(HorizontalAlign.Start).width('100%').padding(12)
+          .margin({ top: 12 }).backgroundColor('#F5F5F5').borderRadius(8)
+
       }
       .width('100%')
       .padding({
@@ -352,6 +424,8 @@ struct Index {
   }
 
   aboutToAppear(): void {
+    this.pageActive = true;
+    this.pageVisible = true;
     // 设置音频策略，允许和其它音频流并发
     let strategy: audio.AudioSessionStrategy = {
       concurrencyMode: audio.AudioConcurrencyMode.CONCURRENCY_MIX_WITH_OTHERS
@@ -372,6 +446,7 @@ struct Index {
     abilityAccessCtrl.createAtManager()
       .requestPermissionsFromUser(getContext(), ['ohos.permission.CAMERA', 'ohos.permission.MICROPHONE'])
       .then(async (result: PermissionRequestResult) => {
+        if (!this.pageActive) { return; }
         let granted = true;
         for (let index = 0; index < result.permissions.length; index++) {
           console.info(TAG,
@@ -393,6 +468,8 @@ struct Index {
       });
 
     this.ws.on('open', (err, data) => {
+      if (!this.pageActive) { return; }
+      if (this.reconnectTimer >= 0) { clearTimeout(this.reconnectTimer); this.reconnectTimer = -1; }
       console.info(TAG, 'websocket open');
       this.myId = this.getRandomId();
       this.sendMessage("HELLO " + this.myId);
@@ -400,27 +477,31 @@ struct Index {
     });
 
     this.ws.on('close', (err, data: webSocket.CloseResult) => {
+      if (!this.pageActive) { return; }
       console.info(TAG, 'websocket closed');
       this.setStatus('Disconnected from server');
 
+      this.peerGeneration++;
+      this.resetSei();
+      this.stopStatsPolling();
+      this.buttonTitle = 'Connect';
+      this.canChangeResolution = false;
       this.pc?.close();
       this.pc = undefined;
 
-      setTimeout(() => {
-        this.ws.connect(SIGNAL_SERVER);
-      }, 1000);
+      this.scheduleReconnect();
     });
 
     this.ws.on('error', (err) => {
+      if (!this.pageActive) { return; }
       console.info(TAG, 'websocket err: ' + err.code);
       this.setError("Unable to connect to server: " + err.message);
 
-      setTimeout(() => {
-        this.ws.connect(SIGNAL_SERVER);
-      }, 1000);
+      this.scheduleReconnect();
     });
 
     this.ws.on('message', (err, data: string | ArrayBuffer) => {
+      if (!this.pageActive) { return; }
       console.info(TAG, 'websocket receive message: ' + data);
       if (data === 'HELLO') {
         this.setStatus("Registered with server, waiting for call");
@@ -456,6 +537,11 @@ struct Index {
   }
 
   aboutToDisappear(): void {
+    this.pageActive = false;
+    this.pageVisible = false;
+    this.peerGeneration++;
+    if (this.reconnectTimer >= 0) { clearTimeout(this.reconnectTimer); this.reconnectTimer = -1; }
+    this.resetSei();
     this.stopStatsPolling();
     this.pcf?.stopAecDump();
     Logging.deleteInjectedLoggable();
@@ -489,11 +575,160 @@ struct Index {
   }
 
   onPageShow(): void {
+    this.pageVisible = true;
+    if (this.pc?.connectionState === 'connected') { this.startSeiPolling(); }
     console.info(TAG, 'onPageShow');
   }
 
   onPageHide(): void {
+    this.pageVisible = false;
+    this.pauseSei();
     console.info(TAG, 'onPageHide');
+  }
+
+  private scheduleReconnect(): void {
+    if (!this.pageActive || this.reconnectTimer >= 0) { return; }
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = -1;
+      if (this.pageActive) { this.ws.connect(SIGNAL_SERVER); }
+    }, 1000);
+  }
+
+  private showSeiError(message: string): void {
+    // Do not put application-supplied SEI text or bytes into logs.
+    console.error(TAG, 'SEI operation failed');
+    try { promptAction.showToast({ message: message, duration: 3000 }); }
+    catch (error) { console.error(TAG, 'Failed to show SEI error'); }
+  }
+
+  private stopContinuousSei(): void {
+    if (this.seiSendTimer >= 0) { clearInterval(this.seiSendTimer); this.seiSendTimer = -1; }
+    this.seiContinuous = false;
+  }
+
+  private pauseSei(): void {
+    this.stopContinuousSei();
+    if (this.seiReadyTimer >= 0) { clearInterval(this.seiReadyTimer); this.seiReadyTimer = -1; }
+    this.seiReady = false;
+    try { this.seiEncoder?.clearSei(); }
+    catch (error) { console.error(TAG, 'Failed to clear pending SEI'); }
+  }
+
+  private resetSei(): void {
+    this.pauseSei();
+    if (this.seiReceiver) {
+      try { this.seiReceiver.onsei = null; }
+      catch (error) { console.error(TAG, 'Failed to detach SEI receiver'); }
+    }
+    this.seiReceiver = undefined;
+    this.seiEncoder = undefined;
+    this.receivedSeiText = '';
+    this.receivedSeiSequence = '';
+    this.receivedSeiBinary = '';
+  }
+
+  private startSeiPolling(): void {
+    if (this.seiReadyTimer >= 0) { clearInterval(this.seiReadyTimer); this.seiReadyTimer = -1; }
+    const peer = this.pc;
+    if (!this.pageVisible || !peer || !this.seiEncoder) { return; }
+    this.seiReadyTimer = setInterval(() => {
+      if (this.pc !== peer) { return; }
+      if (!this.pageVisible) { this.pauseSei(); return; }
+      this.seiReady = peer.connectionState === 'connected' && (this.seiEncoder?.ready ?? false);
+      if (!this.seiReady && this.seiContinuous) { this.stopContinuousSei(); }
+    }, 200);
+  }
+
+  private configureSeiSender(transceiver: webrtc.RTCRtpTransceiver): void {
+    if (typeof webrtc.EncoderWrapper === 'undefined') { return; }
+    try {
+      const codecs = webrtc.RTCRtpSender.getCapabilities('video')?.codecs ?? [];
+      const preferred = codecs.filter((codec: webrtc.RTCRtpCodec) =>
+        codec.mimeType.toLowerCase() === 'video/h264' &&
+        (codec.sdpFmtpLine ?? '').split(';').some((part: string) => part.trim() === 'packetization-mode=1'));
+      if (preferred.length > 0) {
+        // Prefer SEI-capable H.264 while retaining other codecs for ordinary calls.
+        transceiver.setCodecPreferences(preferred.concat(codecs.filter(
+          (codec: webrtc.RTCRtpCodec) => !preferred.includes(codec))));
+      }
+      this.seiEncoder = transceiver.sender.getEncoderWrapper();
+    } catch (error) {
+      this.seiEncoder = undefined;
+      this.showSeiError('SEI 发送初始化失败');
+    }
+  }
+
+  private bindSeiReceiver(peer: webrtc.RTCPeerConnection, receiver: webrtc.RTCRtpReceiver): void {
+    if (typeof webrtc.EncoderWrapper === 'undefined') { return; }
+    try {
+      if (this.seiReceiver) { this.seiReceiver.onsei = null; }
+      this.seiReceiver = receiver;
+      receiver.onsei = (event: webrtc.RTCSeiEvent): void => {
+        if (this.pageVisible && this.pc === peer && this.seiReceiver === receiver) { this.receiveSei(event); }
+      };
+    } catch (error) { this.showSeiError('SEI 接收初始化失败'); }
+  }
+
+  private sendSei(): void {
+    if (!this.pageVisible || this.pc?.connectionState !== 'connected' || !this.seiEncoder?.ready) {
+      throw new Error('请先建立 H.264 视频通话');
+    }
+    const binary = new Uint8Array(SEI_BINARY_BYTES);
+    for (let index = 0; index < SEI_BINARY_BYTES; index++) {
+      const value = this.seiBinaryInputs[index];
+      if (!/^[0-9a-fA-F]{2}$/.test(value)) {
+        throw new Error(`第 ${index + 1} 个字节请输入两位十六进制数（00–FF）`);
+      }
+      binary[index] = parseInt(value, 16);
+    }
+    const text = new util.TextEncoder().encodeInto(this.seiText);
+    const length = SEI_SEQUENCE_BYTES + text.length + SEI_BINARY_BYTES;
+    if (length > webrtc.EncoderWrapper.maxDataBytes) { throw new Error('文本过长'); }
+    const payload = new Uint8Array(length);
+    const sequence = (this.seiSequence + 1) >>> 0;
+    new DataView(payload.buffer).setUint32(0, sequence);
+    payload.set(text, SEI_SEQUENCE_BYTES);
+    payload.set(binary, SEI_SEQUENCE_BYTES + text.length);
+    this.seiEncoder.writeSei(payload.buffer);
+    this.seiSequence = sequence;
+  }
+
+  private startContinuousSei(): void {
+    if (this.seiContinuous) { return; }
+    try {
+      this.sendSei();
+      this.seiContinuous = true;
+      this.seiSendTimer = setInterval(() => {
+        try { this.sendSei(); }
+        catch (error) {
+          this.stopContinuousSei();
+          this.showSeiError((error as Error).message);
+        }
+      }, 200);
+    } catch (error) { this.showSeiError((error as Error).message); }
+  }
+
+  private receiveSei(event: webrtc.RTCSeiEvent): void {
+    if (event.uuid !== webrtc.EncoderWrapper.defaultUuid) { return; }
+    this.receivedSeiText = '';
+    this.receivedSeiSequence = '';
+    this.receivedSeiBinary = '';
+    try {
+      const bytes = new Uint8Array(event.data);
+      if (bytes.length < SEI_SEQUENCE_BYTES + SEI_BINARY_BYTES) {
+        throw new Error('收到的 SEI 长度不足');
+      }
+      const textEnd = bytes.length - SEI_BINARY_BYTES;
+      const text = util.TextDecoder.create('utf-8', { fatal: true })
+        .decodeToString(bytes.subarray(SEI_SEQUENCE_BYTES, textEnd));
+      const binary: string[] = [];
+      for (let index = textEnd; index < bytes.length; index++) {
+        binary.push(bytes[index].toString(16).toUpperCase().padStart(2, '0'));
+      }
+      this.receivedSeiText = text.length > 0 ? text : '（空文本）';
+      this.receivedSeiSequence = new DataView(event.data).getUint32(0).toString();
+      this.receivedSeiBinary = binary.join(' ');
+    } catch (error) { this.showSeiError('收到的 SEI 不符合本测试的数据格式'); }
   }
 
   getRandomId() {
@@ -656,8 +891,15 @@ struct Index {
   }
 
   async createPeerConnection() {
+    if (!this.pageActive) { return; }
+    const generation = ++this.peerGeneration;
+    this.resetSei();
+    this.stopStatsPolling();
+    this.pc?.close();
+    this.pc = undefined;
     // 设置捕获相机画面
     await this.prepareLocalMedia();
+    if (!this.pageActive || generation !== this.peerGeneration) { return; }
     // 设置捕获设备桌面
     // await this.prepareDisplayMedia();
 
@@ -670,9 +912,12 @@ struct Index {
       return;
     }
 
+    const peer = this.pc;
     this.pc.ontrack = (event: webrtc.RTCTrackEvent) => {
+      if (this.pc !== peer) { return; }
       console.info(TAG, 'ontrack: ' + JSON.stringify(event));
       if (event.track.kind == 'video') {
+        this.bindSeiReceiver(peer, event.receiver);
         console.info(TAG, 'Received remote video track, setting to renderer');
         this.remoteVideoTrack = event.track;
         // 确保每次收到远端视频轨道时都设置到渲染器
@@ -683,11 +928,14 @@ struct Index {
       }
     };
     this.pc.onsignalingstatechange = (event) => {
+      if (this.pc !== peer) { return; }
       console.info(TAG, 'onsignalingstatechange: ' + this.pc?.signalingState);
     }
     this.pc.onconnectionstatechange = (event) => {
+      if (this.pc !== peer) { return; }
       console.info(TAG, 'onconnectionstatechange: ' + this.pc?.connectionState);
       if (this.pc?.connectionState == 'connected') {
+        this.startSeiPolling();
         // 连接建立后开始获取统计信息
         this.startStatsPolling();
         // 确保按钮可用（如果视频轨道已创建）
@@ -695,16 +943,19 @@ struct Index {
           this.canChangeResolution = true;
         }
       } else if (this.pc?.connectionState == 'failed') {
+        this.pauseSei();
         this.setError("Peer connection failed");
         this.ws.close();
         this.stopStatsPolling();
         this.canChangeResolution = false;
       } else if (this.pc?.connectionState == 'closed' || this.pc?.connectionState == 'disconnected') {
+        this.pauseSei();
         this.stopStatsPolling();
         this.canChangeResolution = false;
       }
     }
     this.pc.onnegotiationneeded = (event) => {
+      if (this.pc !== peer) { return; }
       // this is Index
       console.info(TAG, 'onnegotiationneeded: this=' + JSON.stringify(this.pc));
       console.info(TAG, 'onnegotiationneeded: event=' + JSON.stringify(event));
@@ -717,15 +968,18 @@ struct Index {
     }
 
     this.pc.onicecandidate = (event) => {
+      if (this.pc !== peer) { return; }
       console.info(TAG, 'onicecandidate: event=' + JSON.stringify(event));
       if (event.candidate) {
         this.sendMessage(JSON.stringify({ ice: event.candidate }));
       }
     };
     this.pc.onicecandidateerror = (event) => {
+      if (this.pc !== peer) { return; }
       console.error(TAG, 'onicecandidateerror: event=' + JSON.stringify(event));
     };
     this.pc.oniceconnectionstatechange = (event) => {
+      if (this.pc !== peer) { return; }
       console.info(TAG, 'oniceconnectionstatechange: ' + this.pc?.iceConnectionState);
       if (this.pc?.iceConnectionState === 'failed') {
         this.setError("Ice connection failed");
@@ -733,6 +987,7 @@ struct Index {
       }
     };
     this.pc.onicegatheringstatechange = (event) => {
+      if (this.pc !== peer) { return; }
       console.info(TAG, 'onicegatheringstatechange: ' + this.pc?.iceGatheringState);
       switch (this.pc?.iceGatheringState) {
         case "new":
@@ -747,6 +1002,7 @@ struct Index {
       }
     };
     this.pc.ondatachannel = (event) => {
+      if (this.pc !== peer) { return; }
       console.info(TAG, 'ondatachannel: event=' + JSON.stringify(event));
       this.setStatus("Data channel created");
       this.recvChannel = event.channel;
@@ -765,7 +1021,9 @@ struct Index {
       console.info(TAG, 'rtpSender2: ' + JSON.stringify(rtpSender2));
     }
     if (this.localVideoTrack) {
-      let rtpSender3 = this.pc.addTrack(this.localVideoTrack);
+      const transceiver = this.pc.addTransceiver(this.localVideoTrack, { direction: 'sendrecv' });
+      this.configureSeiSender(transceiver);
+      let rtpSender3 = transceiver.sender;
       console.info(TAG, 'rtpSender3: ' + JSON.stringify(rtpSender3));
     }
 

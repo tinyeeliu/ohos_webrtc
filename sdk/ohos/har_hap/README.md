@@ -42,6 +42,12 @@ ninja -C out/x86_64
 
 使用 DevEco Studio 打开本工程，连接设备后点击运行。原有通话示例通过首页“switch to working page”进入，在文本框输入对端 ID 后点击 Connect。多设备适配通过首页“多设备相机实验室（A–F）”进入。
 
+首页“SEI测试”用于本机回环，点击“开始回环”后测试；双端测试则在两台设备的“switch to working page”建立视频通话后操作视频下方的 SEI 区域。SEI 接口及发送条件见 [EncoderWrapper](../api/libwebrtc.md#encoderwrapper)。
+
+填写“SEI文本”和 8 个两位十六进制字节（00–FF），点击“发送一条”或“连续发送”（每 200 毫秒一条），在接收区域核对文本、序号和二进制数据。未收到数据时只显示接收标题；断开或离开页面时停止连续发送。显示内容来自最近一次回调，不保证与当前视频帧严格同步。
+
+Demo 使用默认 UUID，数据格式为“4 字节大端序号 + UTF-8 文本 + 8 字节二进制数据”。这是示例的业务约定，应用可自行定义。接收端需提取 SEI 并按相同格式解析后展示，普通浏览器测试页未提供该展示功能。
+
 **说明**
 > 本工程所使用的信令服务器（wss://youzhi.life:8443），及浏览器端测试网页（https://webrtc.youzhi.life）仅用于测试，请勿作其它用途。
 
@@ -74,5 +80,7 @@ node --test sdk/ohos/tests/camera_preview_session.test.cjs sdk/ohos/tests/demo_m
 ```
 
 测试覆盖会话恢复、旧接口兼容、布局、回环与双端信令逻辑，使用平台替身，不会启动设备相机或连接真实信令服务。设备侧约束测试位于 [`VideoSource.test.ets`](entry/src/ohosTest/ets/test/VideoSource.test.ets)。
+
+设备侧 [Sei.test.ets](entry/src/ohosTest/ets/test/Sei.test.ets) 覆盖 SEI 实际收发、输入内存复制、多个监听器及关闭行为，需支持 H.264 的设备和相机权限。双端还需验证分辨率变化、前后台、重连、弱网及未适配 SEI 的对端。
 
 ArkTS 编译、HAP 打包、完整 API 12 SDK 实编及配套新 `.so` 的真机验证应分别记录；自动测试通过不能替代后两项。
