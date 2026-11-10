@@ -15,12 +15,13 @@
 
 import { describe, beforeAll, beforeEach, afterEach, afterAll, it, expect } from '@ohos/hypium'
 import webrtc, { Logging, LoggingSeverity } from '@ohos/webrtc';
+import {
+  UDP_HOST_CANDIDATE_STRING,
+  TCP_SRFLX_CANDIDATE_STRING,
+  ARBITRARY_CANDIDATE_STRING
+} from './TestFixtures';
 
 const DEFAULT = 0
-
-const candidateString = 'candidate:1905690388 1 udp 2113937151 192.168.0.1 58041 typ host generation 0 ufrag thC8 network-cost 50';
-const candidateString2 = 'candidate:435653019 2 tcp 1845501695 192.168.0.196 4444 typ srflx raddr www.example.com rport 22222 tcptype active';
-const arbitraryString = '<arbitrary string[0] content>;';
 
 export default function RTCIceCandidateTest() {
   describe('RTCIceCandidateTest', () => {
@@ -45,7 +46,7 @@ export default function RTCIceCandidateTest() {
       // This API supports only one parameter: clear action function.
     })
 
-    it("newRTCIceCandidateSetSdpMidAudio", DEFAULT, () => {
+    it('shouldCreateRTCIceCandidateWithSdpMidAudio', DEFAULT, () => {
       let iceCandidateInit: webrtc.RTCIceCandidateInit = {
         candidate: "",
         sdpMid: "audio",
@@ -57,7 +58,7 @@ export default function RTCIceCandidateTest() {
       expect(res.usernameFragment).assertUndefined();
     })
 
-    it("newRTCIceCandidateSdpMLineIndexZero", DEFAULT, () => {
+    it('shouldCreateRTCIceCandidateWithSdpMLineIndexZero', DEFAULT, () => {
       let iceCandidateInit: webrtc.RTCIceCandidateInit = {
         candidate: "",
         sdpMLineIndex: 0,
@@ -69,7 +70,7 @@ export default function RTCIceCandidateTest() {
       expect(res.usernameFragment).assertUndefined();
     })
 
-    it("newRTCIceCandidateSetSdpMidAudioSdpMLineIndexZero", DEFAULT, () => {
+    it('shouldCreateRTCIceCandidateWithSdpMidAndSdpMLineIndexZero', DEFAULT, () => {
       let iceCandidateInit: webrtc.RTCIceCandidateInit = {
         candidate: "",
         sdpMLineIndex: 0,
@@ -82,27 +83,27 @@ export default function RTCIceCandidateTest() {
       expect(res.usernameFragment).assertUndefined();
     })
 
-    it("newRTCIceCandidateWithValidCandidateStringAndSdpMid", DEFAULT, () => {
+    it('shouldCreateRTCIceCandidateWithValidCandidateStringAndSdpMid', DEFAULT, () => {
       let iceCandidateInit: webrtc.RTCIceCandidateInit = {
-        candidate: candidateString,
+        candidate: UDP_HOST_CANDIDATE_STRING,
         sdpMid: "audio",
       };
       let res = new webrtc.RTCIceCandidate(iceCandidateInit);
-      expect(res.candidate).assertEqual(candidateString);
+      expect(res.candidate).assertEqual(UDP_HOST_CANDIDATE_STRING);
       expect(res.sdpMid).assertEqual("audio");
       expect(res.sdpMLineIndex).assertUndefined();
       expect(res.usernameFragment).assertEqual("thC8");
     })
 
-    it("newRTCIceCandidateWithNonDefaultValuesForAllFields", DEFAULT, () => {
+    it('shouldCreateRTCIceCandidateWithNonDefaultValuesForAllFields', DEFAULT, () => {
       let iceCandidateInit: webrtc.RTCIceCandidateInit = {
-        candidate: candidateString,
+        candidate: UDP_HOST_CANDIDATE_STRING,
         sdpMid: 'video',
         sdpMLineIndex: 1,
         usernameFragment: 'test'
       };
       let res = new webrtc.RTCIceCandidate(iceCandidateInit);
-      expect(res.candidate).assertEqual(candidateString);
+      expect(res.candidate).assertEqual(UDP_HOST_CANDIDATE_STRING);
       expect(res.sdpMid).assertEqual('video');
       expect(res.sdpMLineIndex).assertEqual(1);
       expect(res.usernameFragment).assertEqual('test');
@@ -118,16 +119,16 @@ export default function RTCIceCandidateTest() {
       expect(res.relatedPort).assertEqual(0);
     })
 
-    it("newRTCIceCandidateWithNonDefaultValuesForAllFieldsTcpCandidate", DEFAULT, () => {
+    it('shouldCreateRTCIceCandidateWithNonDefaultTcpCandidateFields', DEFAULT, () => {
       let iceCandidateInit: webrtc.RTCIceCandidateInit = {
-        candidate: candidateString2,
+        candidate: TCP_SRFLX_CANDIDATE_STRING,
         sdpMid: 'video',
         sdpMLineIndex: 1,
         usernameFragment: 'user1'
       };
       let res = new webrtc.RTCIceCandidate(iceCandidateInit);
 
-      expect(res.candidate).assertEqual(candidateString2);
+      expect(res.candidate).assertEqual(TCP_SRFLX_CANDIDATE_STRING);
       expect(res.sdpMid).assertEqual('video');
       expect(res.sdpMLineIndex).assertEqual(1);
       expect(res.usernameFragment).assertEqual('user1');
@@ -143,20 +144,20 @@ export default function RTCIceCandidateTest() {
       expect(res.relatedPort).assertEqual(22222);
     })
 
-    it("newRTCIceCandidateWithInvalidSdpMid", DEFAULT, () => {
+    it('shouldCreateRTCIceCandidateWithInvalidSdpMid', DEFAULT, () => {
       let iceCandidateInit: webrtc.RTCIceCandidateInit = {
         candidate: "",
-        sdpMid: arbitraryString
+        sdpMid: ARBITRARY_CANDIDATE_STRING
       };
       let res = new webrtc.RTCIceCandidate(iceCandidateInit);
 
       expect(res.candidate).assertEqual("");
-      expect(res.sdpMid).assertEqual(arbitraryString);
+      expect(res.sdpMid).assertEqual(ARBITRARY_CANDIDATE_STRING);
       expect(res.sdpMLineIndex).assertUndefined();
       expect(res.usernameFragment).assertUndefined();
     })
 
-    it("newRTCIceCandidateWithInvalidSdpMLineIndex", DEFAULT, () => {
+    it('shouldCreateRTCIceCandidateWithInvalidSdpMLineIndex', DEFAULT, () => {
       let iceCandidateInit: webrtc.RTCIceCandidateInit = {
         candidate: "",
         sdpMLineIndex: 65535

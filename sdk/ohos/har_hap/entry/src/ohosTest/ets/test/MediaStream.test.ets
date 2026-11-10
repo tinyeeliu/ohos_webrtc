@@ -26,7 +26,7 @@ export default function MediaStreamTest() {
       Logging.enableLogToDebugOutput(LoggingSeverity.VERBOSE);
     })
 
-    it('addTrackAndActive', 0, () => {
+    it('shouldUpdateActiveWhenAddTrack', 0, () => {
       let stream = new webrtc.MediaStream();
       expect(stream.active).assertFalse();
       let audioSource = pcf.createAudioSource();
@@ -36,7 +36,7 @@ export default function MediaStreamTest() {
       audioSource.release();
     })
 
-    it('removeTrackAndActive', 0, () => {
+    it('shouldUpdateActiveWhenRemoveTrack', 0, () => {
       let audioSource = pcf.createAudioSource();
       let audioTrack = pcf.createAudioTrack('audio', audioSource);
       let stream = new webrtc.MediaStream([audioTrack]);
@@ -46,7 +46,7 @@ export default function MediaStreamTest() {
       audioSource.release();
     })
 
-    it('getTrackByIdFound', 0, () => {
+    it('shouldFindTrackWhenGetTrackById', 0, () => {
       let audioSource = pcf.createAudioSource();
       let audioTrack = pcf.createAudioTrack('audio', audioSource);
       let stream = new webrtc.MediaStream([audioTrack]);
@@ -56,13 +56,13 @@ export default function MediaStreamTest() {
       audioSource.release();
     })
 
-    it('getTrackByIdNotFound', 0, () => {
+    it('shouldNotFindTrackWhenGetTrackByIdUnknown', 0, () => {
       let stream = new webrtc.MediaStream();
       let found = stream.getTrackById('nonexistent');
       expect(found).assertNull();
     })
 
-    it('mixedAudioAndVideoTracks', 0, () => {
+    it('shouldMixAudioAndVideoTracks', 0, () => {
       let audioSource = pcf.createAudioSource();
       let audioTrack = pcf.createAudioTrack('audio', audioSource);
       let videoSource = pcf.createVideoSource();
@@ -75,13 +75,13 @@ export default function MediaStreamTest() {
       videoSource.release();
     })
 
-    it('idPropertyIsString', 0, () => {
+    it('shouldHaveIdPropertyAsString', 0, () => {
       let stream = new webrtc.MediaStream();
       expect(typeof stream.id).assertEqual('string');
       expect(stream.id.length).assertLarger(0);
     })
 
-    it('copyConstructorPreservesTracks', 0, () => {
+    it('shouldPreserveTracksInCopyConstructor', 0, () => {
       let audioSource = pcf.createAudioSource();
       let audioTrack = pcf.createAudioTrack('audio', audioSource);
       let original = new webrtc.MediaStream([audioTrack]);
