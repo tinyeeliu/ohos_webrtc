@@ -26,7 +26,7 @@ export default function PeerConnectionFactoryTest() {
       Logging.enableLogToDebugOutput(LoggingSeverity.VERBOSE);
     })
 
-    it('createPeerConnectionReturnsValidPc', 0, () => {
+    it('shouldCreateValidPeerConnection', 0, () => {
       let pc = pcf.createPeerConnection({
         iceServers: []
       });
@@ -35,7 +35,7 @@ export default function PeerConnectionFactoryTest() {
       pc.close();
     })
 
-    it('createAudioTrackProperties', 0, () => {
+    it('shouldCreateAudioTrackWithCorrectProperties', 0, () => {
       let audioSource = pcf.createAudioSource();
       let audioTrack = pcf.createAudioTrack('audio', audioSource);
       expect(audioTrack.kind).assertEqual('audio');
@@ -44,7 +44,7 @@ export default function PeerConnectionFactoryTest() {
       audioSource.release();
     })
 
-    it('createVideoSourceWithConstraintsStateIsLive', 0, async () => {
+    it('shouldCreateVideoSourceWithConstraintsAndGenerateVideoOffer', 0, async () => {
       let constraints: webrtc.MediaTrackConstraints = {
         width: 640,
         height: 480,
@@ -66,27 +66,28 @@ export default function PeerConnectionFactoryTest() {
       }
     })
 
-    it('startAecDumpWithInvalidFdReturnsFalse', 0, () => {
+    it('shouldReturnFalseWhenStartAecDumpWithInvalidFd', 0, () => {
       let result = pcf.startAecDump(-1, 1024);
       expect(result).assertFalse();
     })
 
-    it('stopAecDumpDoesNotCrash', 0, () => {
+    it('shouldNotCrashWhenStopAecDump', 0, () => {
       pcf.stopAecDump();
     })
 
-    it('stopAecDumpAfterStartDoesNotCrash', 0, () => {
+    it('shouldNotCrashWhenStopAecDumpAfterStart', 0, () => {
       pcf.startAecDump(0, 1024);
       pcf.stopAecDump();
     })
 
-    it('setDefaultDoesNotCrash', 0, () => {
+    it('shouldNotCrashWhenSetDefault', 0, () => {
       let factory = new webrtc.PeerConnectionFactory();
       webrtc.PeerConnectionFactory.setDefault(factory);
     })
 
     // audio-only 双端完整 SDP 协商（x86 无摄像头降级场景核心路径）
-    it('audioOnly_SDPNegotiation_shouldSucceed', 0, async () => {
+
+    it('shouldNegotiateAudioOnlySdpBetweenTwoPeers', 0, async () => {
       const factory = new webrtc.PeerConnectionFactory();
       const caller = factory.createPeerConnection({ iceServers: [] });
       const callee = factory.createPeerConnection({ iceServers: [] });
@@ -116,7 +117,8 @@ export default function PeerConnectionFactoryTest() {
     })
 
     // VideoSource 创建/释放后工厂可正常回收，验证无泄漏崩溃
-    it('dispose_afterCreateVideoSource_shouldNotCrash', 0, () => {
+
+    it('shouldNotCrashWhenDisposeAfterCreateVideoSource', 0, () => {
       const factory = new webrtc.PeerConnectionFactory();
       let videoSource: webrtc.VideoSource | undefined;
       try {

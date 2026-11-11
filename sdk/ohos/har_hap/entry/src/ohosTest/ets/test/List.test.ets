@@ -37,6 +37,7 @@ import LoggingTest from './Logging.test';
 import RTCSessionDescriptionTest from './RTCSessionDescription.test';
 import VideoSourceTest from './VideoSource.test';
 import VideoRenderControllerTest from './VideoRenderController.test';
+import CameraPreviewSessionTest from './CameraPreviewSession.test';
 import VideoEncoderFactoryTest from './VideoEncoderFactory.test';
 import X86EmulatorFallbackTest from './X86EmulatorFallback.test';
 import CameraZoomTest from './CameraZoom.test';
@@ -66,6 +67,7 @@ export default function testsuite() {
   RTCSessionDescriptionTest();
   VideoSourceTest();
   VideoRenderControllerTest();
+  CameraPreviewSessionTest();
   VideoEncoderFactoryTest();
   X86EmulatorFallbackTest();
   CameraZoomTest();

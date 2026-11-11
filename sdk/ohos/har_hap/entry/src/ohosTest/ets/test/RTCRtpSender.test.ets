@@ -66,25 +66,25 @@ export default function RTCRtpSenderTest() {
       // This API supports only one parameter: clear action function.
     })
 
-    it('getCapabilitiesWithAudioKind', 0, () => {
+    it('shouldGetCapabilitiesWithAudioKind', 0, () => {
       let capabilities = webrtc.RTCRtpSender.getCapabilities('audio');
       console.debug(TAG, "getCapabilities: " + JSON.stringify(capabilities));
       validateRtpCapabilities(capabilities!);
     })
 
-    it('getCapabilitiesWithVideoKind', 0, () => {
+    it('shouldGetCapabilitiesWithVideoKind', 0, () => {
       let capabilities = webrtc.RTCRtpSender.getCapabilities('video');
       console.debug(TAG, "getCapabilities: " + JSON.stringify(capabilities));
       validateRtpCapabilities(capabilities!);
     })
 
-    it('getCapabilitiesWithInvalidKind', 0, () => {
+    it('shouldReturnNullWhenGetCapabilitiesWithInvalidKind', 0, () => {
       let capabilities = webrtc.RTCRtpSender.getCapabilities('whatever');
       console.debug(TAG, "getCapabilities: " + JSON.stringify(capabilities));
       expect(capabilities).assertNull();
     })
 
-    it('dtmfOfVideoSenderIsNull', 0, async () => {
+    it('shouldHaveNullDtmfOnVideoSender', 0, async () => {
       const t1 = caller.addTransceiver("audio");
       const t2 = caller.addTransceiver("video");
 
@@ -92,7 +92,7 @@ export default function RTCRtpSenderTest() {
       expect(t2.sender!.dtmf).assertNull();
     })
 
-    it('getTransportInitially', 0, async () => {
+    it('shouldHaveNullTransportInitially', 0, async () => {
       const transceiver = caller.addTransceiver('audio', {
         direction: 'recvonly'
       });
@@ -100,7 +100,7 @@ export default function RTCRtpSenderTest() {
       expect(transceiver.sender!.transport).assertNull();
     })
 
-    it('getTransportAfterSetLocalDescription', 0, async () => {
+    it('shouldHaveDtlsTransportAfterSetLocalDescription', 0, async () => {
       const transceiver = caller.addTransceiver('audio', {
         direction: 'recvonly'
       });
@@ -108,7 +108,7 @@ export default function RTCRtpSenderTest() {
       expect(transceiver.sender!.transport instanceof webrtc.RTCDtlsTransport).assertTrue();
     })
 
-    it('canGetTrack', 0, () => {
+    it('shouldGetTrackFromSender', 0, () => {
       let audioSource = pcf.createAudioSource();
       let audioTrack = pcf.createAudioTrack("audio", audioSource);
       audioRtpSender = caller.addTrack(audioTrack);
@@ -118,7 +118,7 @@ export default function RTCRtpSenderTest() {
       expect(audioTrack.id).assertEqual(audioRtpSender.track!.id);
     })
 
-    it('canSetParameters', 0, async () => {
+    it('shouldSetParametersSuccessfully', 0, async () => {
       createAudioRtpSender();
 
       let parameters = audioRtpSender.getParameters();
@@ -132,7 +132,7 @@ export default function RTCRtpSenderTest() {
       }
     })
 
-    it('setParametersWhenTransceiverIsStopped', 0, async () => {
+    it('shouldRejectSetParametersWhenTransceiverStopped', 0, async () => {
       const transceiver = caller.addTransceiver('audio');
       const sender = transceiver.sender;
 
@@ -147,7 +147,7 @@ export default function RTCRtpSenderTest() {
       }
     })
 
-    it('setParametersWithSame', 0, async () => {
+    it('shouldSetParametersWithSameValues', 0, async () => {
       const transceiver = caller.addTransceiver('audio');
       const sender = transceiver.sender;
 
@@ -156,7 +156,7 @@ export default function RTCRtpSenderTest() {
       await sender!.setParameters(param);
     })
 
-    it('replaceTrackWithClosedConnection', 0, async () => {
+    it('shouldThrowWhenReplaceTrackWithClosedConnection', 0, async () => {
       let audioSource = pcf.createAudioSource();
       let audioTrack = pcf.createAudioTrack("audio", audioSource);
 
@@ -172,7 +172,7 @@ export default function RTCRtpSenderTest() {
       }
     })
 
-    it('replaceTrackWithStoppedTransceiver', 0, async () => {
+    it('shouldThrowWhenReplaceTrackWithStoppedTransceiver', 0, async () => {
       let audioSource = pcf.createAudioSource();
       let audioTrack = pcf.createAudioTrack("audio", audioSource);
 
@@ -189,7 +189,7 @@ export default function RTCRtpSenderTest() {
       }
     })
 
-    it('replaceTrackWithDifferentKind', 0, async () => {
+    it('shouldThrowWhenReplaceTrackWithDifferentKind', 0, async () => {
       let audioSource = pcf.createAudioSource();
       let audioTrack = pcf.createAudioTrack("audio", audioSource);
 
@@ -205,7 +205,7 @@ export default function RTCRtpSenderTest() {
       }
     })
 
-    it('replaceTrackWithNull', 0, async () => {
+    it('shouldReplaceTrackWithNull', 0, async () => {
       let audioSource = pcf.createAudioSource();
       let audioTrack = pcf.createAudioTrack("audio", audioSource);
 

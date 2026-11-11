@@ -30,6 +30,8 @@ OpenHarmony API version >= 15.
 
 Open `entry/src/main/module.json5` and add the following permissions as needed:
 
+> **NOTE**: The HAR module pre-declares `ohos.permission.INTERNET`, `ohos.permission.CAMERA`, and `ohos.permission.MICROPHONE`. `ohos.permission.CAPTURE_SCREEN` is required only when using screen capture (`getDisplayMedia`) and must be declared by the host application in its own `module.json5`; the HAR does not pre-declare it because it is a system-granted permission that only applications can request.
+
 ```json
 "requestPermissions": [
   {

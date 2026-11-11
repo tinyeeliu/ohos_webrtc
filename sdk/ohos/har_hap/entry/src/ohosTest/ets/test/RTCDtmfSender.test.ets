@@ -124,7 +124,7 @@ export default function RTCDtmfSenderTest() {
       // This API supports only one parameter: clear action function.
     })
 
-    it("canInsertDTMFAfterCreateDtmfSender", DEFAULT, async () => {
+    it('shouldBeAbleToInsertDTMFAfterCreateDtmfSender', DEFAULT, async () => {
       let sender = await createDtmfSender(caller, callee);
       let dtmfSender = sender?.dtmf;
       if (isX86()) {
@@ -135,13 +135,13 @@ export default function RTCDtmfSenderTest() {
       expect(dtmfSender!.canInsertDTMF).assertTrue();
     })
 
-    it("toneBufferAfterCreateDtmfSender", DEFAULT, async () => {
+    it('shouldHaveEmptyToneBufferAfterCreateDtmfSender', DEFAULT, async () => {
       let sender = await createDtmfSender(caller, callee);
       let dtmfSender = sender?.dtmf;
       expect(dtmfSender!.toneBuffer).assertEqual("");
     })
 
-    it("durationShouldLessThan6000", DEFAULT, async () => {
+    it('shouldRejectDTMFDurationAbove6000', DEFAULT, async () => {
       let sender = await createDtmfSender(caller, callee);
       let dtmfSender = sender?.dtmf;
       if (isX86()) {
@@ -158,7 +158,7 @@ export default function RTCDtmfSenderTest() {
       }
     })
 
-    it("durationShouldMoreThan40", DEFAULT, async () => {
+    it('shouldRejectDTMFDurationBelow40', DEFAULT, async () => {
       let sender = await createDtmfSender(caller, callee);
       let dtmfSender = sender?.dtmf;
       if (isX86()) {
@@ -175,7 +175,7 @@ export default function RTCDtmfSenderTest() {
       }
     })
 
-    it("interToneGapShouldLessThan6000", DEFAULT, async () => {
+    it('shouldRejectDTMFInterToneGapAbove6000', DEFAULT, async () => {
       let sender = await createDtmfSender(caller, callee);
       let dtmfSender = sender?.dtmf;
       if (isX86()) {
@@ -192,7 +192,7 @@ export default function RTCDtmfSenderTest() {
       }
     })
 
-    it("interToneGapShouldMoreThan40", DEFAULT, async () => {
+    it('shouldRejectDTMFInterToneGapBelow40', DEFAULT, async () => {
       let sender = await createDtmfSender(caller, callee);
       let dtmfSender = sender?.dtmf;
       if (isX86()) {
@@ -209,7 +209,7 @@ export default function RTCDtmfSenderTest() {
       }
     })
 
-    it("ontonechangeWhenInsertDTMF", DEFAULT, async () => {
+    it('shouldTriggerOntonechangeWhenInsertDTMF', DEFAULT, async () => {
       let sender = await createDtmfSender(caller, callee);
       let dtmfSender = sender?.dtmf;
       let res: string;
@@ -235,7 +235,7 @@ export default function RTCDtmfSenderTest() {
       expect(res!).assertEqual('A')
     })
 
-    it("ontonechangeWhenInsertDTMFErrorString", DEFAULT, async () => {
+    it('shouldNotTriggerOntonechangeWhenInsertInvalidDTMF', DEFAULT, async () => {
       let sender = await createDtmfSender(caller, callee);
       let dtmfSender = sender?.dtmf;
       let res: string = "";

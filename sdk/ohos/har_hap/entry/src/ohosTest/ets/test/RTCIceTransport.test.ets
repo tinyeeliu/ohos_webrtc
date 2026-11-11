@@ -105,7 +105,7 @@ export default function RTCIceTransportTest() {
       // This API supports only one parameter: clear action function.
     })
 
-    it("unconnectedIceTransportShouldHaveEmptySelectedPair", DEFAULT, async () => {
+    it('shouldHaveEmptySelectedPairWhenIceTransportUnconnected', DEFAULT, async () => {
       caller.createDataChannel('');
       let offer = await caller.createOffer();
       await caller.setLocalDescription(offer);
@@ -115,14 +115,14 @@ export default function RTCIceTransportTest() {
       expect(iceTransport?.getSelectedCandidatePair()).assertNull();
     })
 
-    it("iceTransportShouldBeInStateNewInitially", DEFAULT, async () => {
+    it('shouldHaveInitialStateNewForIceTransport', DEFAULT, async () => {
       const transceiver = caller.addTransceiver('audio');
       await caller.setLocalDescription();
       const iceTransport = transceiver.sender.transport?.iceTransport;
       expect(iceTransport?.state).assertEqual('new');
     })
 
-    it("iceTransportShouldTransitionToGatheringThenCompleteAfterSLD", DEFAULT, async () => {
+    it('shouldTransitionGatheringStateAfterSetLocalDescription', DEFAULT, async () => {
       const transceiver = caller.addTransceiver('audio');
       await caller.setLocalDescription();
       const iceTransport = transceiver.sender.transport?.iceTransport;
@@ -147,7 +147,7 @@ export default function RTCIceTransportTest() {
       expect(iceTransport?.gatheringState).not().assertEqual("new");
     })
 
-    it("afterInitializationSelectedCandidatePairNotNull", DEFAULT, async () => {
+    it('shouldHaveNonNullSelectedCandidatePairAfterInitialization', DEFAULT, async () => {
       let transport = await createIceTransport(caller, callee);
       while (transport.state != "connected") {
         await sleep(500);
@@ -155,7 +155,7 @@ export default function RTCIceTransportTest() {
       expect(transport.getSelectedCandidatePair()).not().assertNull();
     })
 
-    it("onstatechange", DEFAULT, async () => {
+    it('shouldTriggerOnstatechange', DEFAULT, async () => {
       exchangeIceCandidates(caller, callee);
       const transceiver = caller.addTransceiver('audio');
       await caller.setLocalDescription();
@@ -175,7 +175,7 @@ export default function RTCIceTransportTest() {
       expect(events.length).not().assertEqual(0);
     })
 
-    it("onSelectedCandidatePairChange", DEFAULT, async () => {
+    it('shouldTriggerOnselectedcandidatepairchange', DEFAULT, async () => {
       exchangeIceCandidates(caller, callee);
       const transceiver = caller.addTransceiver('audio');
       await caller.setLocalDescription();

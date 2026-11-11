@@ -823,7 +823,7 @@ getReceivers(): RTCRtpReceiver[];
 
 | 类型                                     | 说明                      |
 |----------------------------------------|-------------------------|
-| [RTCRtpReceiver](#rtcrtptransceiver)[] | 返回一个数组，包含当前连接中的所有接收器对象。 |
+| [RTCRtpReceiver](#rtcrtpreceiver)[] | 返回一个数组，包含当前连接中的所有接收器对象。 |
 
 ### getTransceivers
 
@@ -2913,7 +2913,7 @@ static e(tag: string, message: string, e?: Error): void
 
 ### w
 
-static w(tag: string, message: string, e?: Error): void
+static w(tag: string, message: string, e: Error): void
 
 输出日志，级别为 LoggingSeverity.WARNING。
 
@@ -2923,7 +2923,7 @@ static w(tag: string, message: string, e?: Error): void
 |---------|--------|-----|-------|
 | tag     | string | 是   | 日志tag |
 | message | string | 是   | 日志内容  |
-| e       | Error  | 否   | 错误信息  |
+| e       | Error  | 是   | 错误信息  |
 
 ### v
 
@@ -3019,7 +3019,7 @@ getUserMedia(constraints?: MediaStreamConstraints): Promise<MediaStream>
 ```typescript
 let mediaDevices = new webrtc.MediaDevices();
 // 获取音频流轨道，禁用回声消除；获取视频流轨道，指定理想的分辨率为640x480，并限制帧率在15到30之间
-let mediaStream = await mediaDevices.getUserMedia({audio:{echoCancellation:false}, video:{width:640, height:480, framerate:{min:15, max:30}}});
+let mediaStream = await mediaDevices.getUserMedia({audio:{echoCancellation:false}, video:{width:640, height:480, frameRate:{min:15, max:30}}});
 ```
 
 ### getDisplayMedia
@@ -3361,6 +3361,166 @@ build()
 this.mXComponentController.setScalingMode(ScalingMode.Fill);
 ```
 
+### enableCameraPreviewAdaptation
+
+enableCameraPreviewAdaptation(): void
+
+启用相机预览适配模式。开启后，控制器将根据 Surface 尺寸和帧分辨率自动管理渲染缓冲区的旋转和缩放，替代默认的渲染缓冲区行为。新建的相机会话通常需要调用此方法。
+
+#### 参数
+
+无
+
+#### 返回值
+
+无
+
+### lockSurfaceRotation
+
+lockSurfaceRotation(lock?: boolean): void
+
+锁定或解锁 XComponent Surface 的旋转。启用相机预览适配时，适配后的 WebRTC 帧已携带旋转信息，应跟随窗口正常的渲染缓冲区变换，而非保持相机直连预览的旋转锁定。
+
+#### 参数
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| lock | boolean | 否 | `true` 表示锁定 Surface 旋转，`false` 表示解锁。默认为 `true`。 |
+
+#### 返回值
+
+无
+
+### resetAppliedSurfaceSize
+
+resetAppliedSurfaceSize(): void
+
+重置已应用的 Surface 尺寸缓存。旋转结束后调用，避免 `setPreviewSurfaceSize` 因尺寸巧合相同而跳过真正的刷新。
+
+#### 参数
+
+无
+
+#### 返回值
+
+无
+
+### setPreviewSurfaceSize
+
+setPreviewSurfaceSize(surfaceWidth: number, surfaceHeight: number): void
+
+设置 Surface 显示区域的宽高（单位 px，非 vp）。传入的尺寸必须为正整数，且与上次应用值不同时才会真正刷新。
+
+#### 参数
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| surfaceWidth | number | 是 | Surface 显示区域宽度，单位 px。 |
+| surfaceHeight | number | 是 | Surface 显示区域高度，单位 px。 |
+
+#### 返回值
+
+无
+
+### applyPreviewSurfaceRect
+
+applyPreviewSurfaceRect(windowWidth: number, windowHeight: number, streamWidth: number, streamHeight: number): void
+
+按采集分辨率对窗口做 AspectFit 等比布局，不对调宽高。适用于通话页小窗等非全屏相机预览场景。
+
+#### 参数
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| windowWidth | number | 是 | 窗口可用宽度，单位 px。 |
+| windowHeight | number | 是 | 窗口可用高度，单位 px。 |
+| streamWidth | number | 是 | 采集分辨率宽度，单位 px。 |
+| streamHeight | number | 是 | 采集分辨率高度，单位 px。 |
+
+#### 返回值
+
+无
+
+### applyOrientedPreviewSurfaceRect
+
+applyOrientedPreviewSurfaceRect(windowWidth: number, windowHeight: number, streamWidth: number, streamHeight: number): void
+
+按实际旋转后的帧尺寸做等比布局。会先根据适配状态设置旋转锁定，再使用控制器已记录的显示帧宽高（若有效）计算 AspectFit 缩放比例。不假设设备自然方向。
+
+#### 参数
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| windowWidth | number | 是 | 窗口可用宽度，单位 px。 |
+| windowHeight | number | 是 | 窗口可用高度，单位 px。 |
+| streamWidth | number | 是 | 采集分辨率宽度，单位 px，作为帧宽高的回退值。 |
+| streamHeight | number | 是 | 采集分辨率高度，单位 px，作为帧宽高的回退值。 |
+
+#### 返回值
+
+无
+
+### onFrameSizeChanged
+
+onFrameSizeChanged?: (width: number, height: number) => void
+
+对外控制器通知回调。当旋转后的显示帧宽高发生变化时触发，返回的宽高为旋转后的显示像素尺寸（非渲染缓冲区尺寸），用于等比布局。
+
+#### 属性
+
+| 名称 | 类型 | 说明 |
+|------|------|------|
+| onFrameSizeChanged | (width: number, height: number) => void \| undefined | 帧尺寸变化回调，可选。 |
+
+### onSurfaceCreated
+
+onSurfaceCreated(surfaceId: string): void
+
+XComponent 的 Surface 创建时由系统回调。初始化内部的 `NativeVideoRenderer` 实例，注册帧分辨率变化监听，并恢复之前关联的视频轨道、镜像、缩放模式等状态。启用相机预览适配时还会同步 Surface 旋转锁定。
+
+#### 参数
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| surfaceId | string | 是 | 窗口对应的 Surface Id。 |
+
+#### 返回值
+
+无
+
+### onSurfaceChanged
+
+onSurfaceChanged(surfaceId: string, rect: SurfaceRect): void
+
+XComponent 的 Surface 尺寸变化时由系统回调。启用相机预览适配时，将新的显示尺寸同步到原生渲染器，不解除采集端绑定。
+
+#### 参数
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| surfaceId | string | 是 | 窗口对应的 Surface Id。 |
+| rect | SurfaceRect | 是 | Surface 尺寸信息，包含 `surfaceWidth` 和 `surfaceHeight`。 |
+
+#### 返回值
+
+无
+
+### onSurfaceDestroyed
+
+onSurfaceDestroyed(surfaceId: string): void
+
+XComponent 的 Surface 销毁时由系统回调。解除视频轨道关联，释放内部的 `NativeVideoRenderer` 实例。
+
+#### 参数
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| surfaceId | string | 是 | 窗口对应的 Surface Id。 |
+
+#### 返回值
+
+无
+
 ## ScalingMode
 
 缩放模式枚举。
@@ -3370,3 +3530,142 @@ this.mXComponentController.setScalingMode(ScalingMode.Fill);
 | Fill | 0   | 缩放内容以适应窗口的大小，如果需要可以改变内容的宽高比。 |
 | AspectFill    | 1   | 缩放内容以填充窗口的大小。保持宽高比不变，部分内容可能会被裁剪。  |
 | AspectFit | 2   | 缩放内容以适应窗口的大小。保持宽高比不变，窗口左右或上下可能会有黑边。  |
+
+## CameraPreviewOptions
+
+相机预览会话配置选项，用于构造 `CameraPreviewSession` 时指定分辨率、设备、恢复策略等参数。
+
+### 属性
+
+| 名称 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| width | number | 否 | 期望的采集分辨率宽度，正整数，默认 1280。 |
+| height | number | 否 | 期望的采集分辨率高度，正整数，默认 720。 |
+| front | boolean | 否 | 是否优先使用前置摄像头，默认 `false`。 |
+| deviceId | string | 否 | 指定相机设备 ID。非空时严格匹配，不会自动替换为其它设备。 |
+| allowFallback | boolean | 否 | 当指定方向的摄像头不存在时，是否允许回退到其它可用设备，默认 `true`。 |
+| autoRecover | boolean | 否 | 采集中断后是否自动恢复，默认 `true`。 |
+| maxRetries | number | 否 | 自动恢复的最大重试次数，非负整数，默认 3。 |
+| scalingMode | [ScalingMode](#scalingmode) | 否 | 渲染缩放模式，默认 `ScalingMode.AspectFit`（仅在原生库支持相机预览时生效）。 |
+| frameStallTimeoutMs | number | 否 | 停帧监测周期（毫秒）。0（默认）表示不监测，有效范围为 1000..60000。 |
+
+## CameraPreviewStatus
+
+相机预览状态描述对象，通过 `CameraPreviewSession.onStatusChanged` 回调返回。
+
+### 属性
+
+| 名称 | 类型 | 说明 |
+|------|------|------|
+| state | string | 当前状态，取值包括 `starting`、`running`、`suspended`、`recovering`、`error`、`incompatible`。 |
+| cameraId | string | 当前使用的相机设备 ID。 |
+| front | boolean | 当前摄像头是否为前置。 |
+| error | string | 错误信息，仅在 `error` 或 `recovering` 状态下有值。 |
+
+## CameraPreviewSession
+
+相机预览会话控制器，管理相机采集的启动、恢复、设备切换和生命周期。负责采集恢复逻辑，不管理页面布局。构造前需确保已授予相机权限。
+
+> **所需权限**：`ohos.permission.CAMERA`。
+>
+> **依赖系统 API**：`@ohos.multimedia.camera`、`@ohos.display`、`@ohos.window`、`@ohos.app.ability.common`。需要 OpenHarmony API >= 15。
+
+### 构造函数
+
+constructor(context: common.Context, factory: PeerConnectionFactory, controller: VideoRenderController, options?: CameraPreviewOptions)
+
+创建相机预览会话实例。
+
+#### 参数
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| context | common.Context | 是 | 应用上下文，用于获取相机管理器。 |
+| factory | [PeerConnectionFactory](#peerconnectionfactory) | 是 | PeerConnectionFactory 实例，用于创建视频源和轨道。 |
+| controller | [VideoRenderController](#videorendercontroller) | 是 | 关联的渲染控制器，会话内部通过它设置视频轨道和渲染参数。 |
+| options | [CameraPreviewOptions](#camerapreviewoptions) | 否 | 预览配置选项，参见 CameraPreviewOptions。 |
+
+### 属性
+
+| 名称 | 类型 | 可读 | 可写 | 说明 |
+|------|------|------|------|------|
+| onStatusChanged | (status: [CameraPreviewStatus](#camerapreviewstatus)) => void \| undefined | 是 | 是 | 状态变化回调，通知调用方当前采集状态。 |
+| onTrackChanged | (track: [MediaStreamTrack](#mediastreamtrack) \| undefined) => void \| undefined | 是 | 是 | 视频轨道变化回调。采集恢复可能替换轨道，调用方需据此更新已发布的发送端轨道。 |
+| track | [MediaStreamTrack](#mediastreamtrack) \| undefined | 是 | 否 | 当前采集产生的视频轨道。 |
+
+### attachWindow
+
+attachWindow(host: window.Window): void
+
+绑定宿主窗口，注册窗口可见性、尺寸变化和显示迁移事件监听。同一窗口重复调用会被忽略；绑定新窗口前会先解绑旧窗口。
+
+#### 参数
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| host | window.Window | 是 | 宿主窗口实例。 |
+
+#### 返回值
+
+无
+
+### setActive
+
+setActive(active: boolean): void
+
+设置页面可见性和权限状态。`active` 为 `false` 时暂停采集并释放相机资源，`true` 时恢复。窗口可见性由库内部处理，调用方只需反映页面状态。
+
+#### 参数
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| active | boolean | 是 | `true` 表示页面可见且权限就绪，`false` 表示暂停。 |
+
+#### 返回值
+
+无
+
+### setCameraPreference
+
+setCameraPreference(front: boolean, deviceId?: string): void
+
+切换摄像头方向或指定设备 ID。切换后重置重试计数并立即尝试采集（如果当前可采集）。
+
+#### 参数
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| front | boolean | 是 | `true` 使用前置摄像头，`false` 使用后置摄像头。 |
+| deviceId | string | 否 | 指定相机设备 ID，空字符串表示按方向选择。默认为空。 |
+
+#### 返回值
+
+无
+
+### retry
+
+retry(): void
+
+手动触发一次采集重试。重置重试计数并立即尝试启动采集（如果当前可采集）。
+
+#### 参数
+
+无
+
+#### 返回值
+
+无
+
+### release
+
+release(): void
+
+释放会话持有的所有资源，包括关闭采集、解绑窗口、注销系统事件监听。释放后回调被置空，不可再使用。
+
+#### 参数
+
+无
+
+#### 返回值
+
+无

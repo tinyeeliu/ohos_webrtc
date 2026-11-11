@@ -24,13 +24,13 @@ export default function AudioDeviceModuleTest() {
       Logging.enableLogToDebugOutput(LoggingSeverity.VERBOSE);
     })
 
-    it('setNoiseSuppressorEnabledReturnsFalseWithoutDevice', 0, () => {
+    it('shouldReturnFalseWhenSetNoiseSuppressorEnabledWithoutDevice', 0, () => {
       let adm = new webrtc.AudioDeviceModule();
       let result = adm.setNoiseSuppressorEnabled(true);
       expect(result).assertFalse();
     })
 
-    it('setSpeakerMuteThenCreatePcAndSignaling', 0, async () => {
+    it('shouldCreatePcAndSignalAfterSetSpeakerMute', 0, async () => {
       let adm = new webrtc.AudioDeviceModule();
       adm.setSpeakerMute(true);
       let factory = new webrtc.PeerConnectionFactory({ adm: adm });
@@ -50,7 +50,7 @@ export default function AudioDeviceModuleTest() {
       audioSource.release();
     })
 
-    it('setMicrophoneMuteThenCreatePcAndSignaling', 0, async () => {
+    it('shouldCreatePcAndSignalAfterSetMicrophoneMute', 0, async () => {
       let adm = new webrtc.AudioDeviceModule();
       adm.setMicrophoneMute(true);
       let factory = new webrtc.PeerConnectionFactory({ adm: adm });
@@ -70,7 +70,7 @@ export default function AudioDeviceModuleTest() {
       audioSource.release();
     })
 
-    it('releaseThenCreateNewAdmDoesNotCrash', 0, () => {
+    it('shouldNotCrashWhenReleaseThenCreateNewAdm', 0, () => {
       let adm1 = new webrtc.AudioDeviceModule();
       adm1.release();
       let adm2 = new webrtc.AudioDeviceModule();
@@ -80,17 +80,17 @@ export default function AudioDeviceModuleTest() {
       pc.close();
     })
 
-    it('isBuiltInAcousticEchoCancelerSupportedReturnsBoolean', 0, () => {
+    it('shouldReturnBooleanWhenIsBuiltInAcousticEchoCancelerSupported', 0, () => {
       let result = webrtc.AudioDeviceModule.isBuiltInAcousticEchoCancelerSupported();
       expect(typeof result).assertEqual('boolean');
     })
 
-    it('isBuiltInNoiseSuppressorSupportedReturnsBoolean', 0, () => {
+    it('shouldReturnBooleanWhenIsBuiltInNoiseSuppressorSupported', 0, () => {
       let result = webrtc.AudioDeviceModule.isBuiltInNoiseSuppressorSupported();
       expect(typeof result).assertEqual('boolean');
     })
 
-    it('callbackPropertiesExist', 0, () => {
+    it('shouldHaveCallbackProperties', 0, () => {
       let adm = new webrtc.AudioDeviceModule();
       expect(adm.oncapturererror).assertNull();
       expect(adm.oncapturerstatechange).assertNull();
