@@ -121,6 +121,77 @@ await peerConnection.setLocalDescription(offer);
 
 完整接口定义见 `api/libohos_webrtc/webrtc.d.ts`，完整说明请参阅[接口文档](./api/libwebrtc.md)。
 
+### 核心 API
+
+| API | 说明 | 类型 | 适配状态 |
+|-----|------|------|---------|
+| PeerConnectionFactory | PeerConnection 工厂类，创建各类媒体对象 | 类 | 已适配 |
+| createAudioSource | 创建音频源 | 方法 | 已适配 |
+| createAudioTrack | 创建音频轨道 | 方法 | 已适配 |
+| createVideoSource | 创建视频源 | 方法 | 已适配 |
+| createVideoTrack | 创建视频轨道 | 方法 | 已适配 |
+| createPeerConnection | 创建 PeerConnection | 方法 | 已适配 |
+| RTCPeerConnection | WebRTC Peer 连接 | 类 | 已适配 |
+| addTrack | 添加媒体轨道 | 方法 | 已适配 |
+| createOffer | 创建 Offer SDP | 方法 | 已适配 |
+| createAnswer | 创建 Answer SDP | 方法 | 已适配 |
+| setLocalDescription | 设置本地描述 | 方法 | 已适配 |
+| setRemoteDescription | 设置远程描述 | 方法 | 已适配 |
+| AudioDeviceModule | 音频设备模块 | 类 | 已适配 |
+| CameraPreviewSession | 相机预览会话（鸿蒙新增） | 类 | 已适配 |
+| VideoRenderController | 视频渲染控制器 | 类 | 已适配 |
+
+### CameraPreviewSession API（鸿蒙新增）
+
+| API | 说明 | 类型 |
+|-----|------|------|
+| setActive | 设置相机激活状态 | 方法 |
+| setCameraPreference | 设置相机偏好 | 方法 |
+| retry | 重试相机连接 | 方法 |
+| release | 释放相机会话 | 方法 |
+| attachWindow | 绑定渲染窗口 | 方法 |
+| applyDisplayRotation | 应用屏幕旋转 | 方法 |
+| getCaptureFrameCount | 获取采集帧数 | 方法 |
+
+## 与上游差异
+
+本项目基于 [Google WebRTC](https://webrtc.googlesource.com/src) 开发。以下列出相对于上游库的 API 变更（新增、删除、修改）及鸿蒙适配情况。
+
+### 新增 API
+
+| API | 说明 | 适配状态 |
+|-----|------|---------|
+| CameraPreviewSession | 相机预览会话管理，支持多设备（手机、折叠屏、三折叠）相机选择、前后台恢复、有限重试、宿主窗口方向管理 | 已适配 |
+| VideoRenderController | 视频渲染控制器，管理渲染窗口绑定和旋转 | 已适配 |
+| setActive | 相机激活/停用控制 | 已适配 |
+| setCameraPreference | 相机偏好设置 | 已适配 |
+| retry | 相机连接重试机制 | 已适配 |
+| attachWindow | 渲染窗口绑定 | 已适配 |
+| applyDisplayRotation | 屏幕旋转应用 | 已适配 |
+| getCaptureFrameCount | 采集帧数获取 | 已适配 |
+
+以上 API 为鸿蒙化新增，适配鸿蒙多设备相机管理和 XComponent 渲染机制。
+
+### 未适配 API
+
+| 上游 API | 未适配原因 |
+|----------|----------|
+| Android Camera2 API | 使用鸿蒙 CameraKit 替代 |
+| SurfaceView/TextureView 渲染 | 使用鸿蒙 XComponent 替代 |
+| Android EGL 上下文管理 | 使用鸿蒙 EGL 适配层替代 |
+| Java 层 PeerConnection 包装类 | 重写为 ArkTS/ETS 接口 |
+
+### 修改 API
+
+| API | 上游行为 | 鸿蒙行为 | 变更说明 |
+|-----|---------|---------|---------|
+| 视频采集 | Android Camera2 | 鸿蒙 CameraKit + CameraPreviewSession | 采集层适配鸿蒙多设备相机 |
+| 视频渲染 | SurfaceView/OpenGL ES | XComponent + EGL | 渲染层适配鸿蒙组件 |
+| 音频设备 | Android AudioRecord/AudioTrack | 鸿蒙 OHAudio | 音频后端替换 |
+| 编解码器 | Android MediaCodec | 鸿蒙 Codec | 硬件编解码适配 |
+| 网络传输 | Java Network | 鸿蒙 Network Kit | 网络栈替换 |
+| 线程模型 | pthread | FFRT | 线程模型替换为鸿蒙 FFRT |
+
 ## 多设备相机预览
 
 当前本地增量提供 `CameraPreviewSession`，统一管理手机、折叠/三折叠设备及多显示器场景中的相机选择、前后台恢复、有限重试和宿主窗口方向同步。发布状态见 CHANGELOG。

@@ -121,6 +121,77 @@ The implementation code is in the `src/ohos_webrtc` directory. NAPI interface bi
 
 Full type definitions are in `api/libohos_webrtc/webrtc.d.ts`. For detailed documentation, see the [API Documentation](./api/libwebrtc.md).
 
+### Core APIs
+
+| API | Description | Type | Adaptation Status |
+|-----|-------------|------|-------------------|
+| PeerConnectionFactory | PeerConnection factory class for creating media objects | Class | Adapted |
+| createAudioSource | Create audio source | Method | Adapted |
+| createAudioTrack | Create audio track | Method | Adapted |
+| createVideoSource | Create video source | Method | Adapted |
+| createVideoTrack | Create video track | Method | Adapted |
+| createPeerConnection | Create PeerConnection | Method | Adapted |
+| RTCPeerConnection | WebRTC peer connection | Class | Adapted |
+| addTrack | Add media track | Method | Adapted |
+| createOffer | Create Offer SDP | Method | Adapted |
+| createAnswer | Create Answer SDP | Method | Adapted |
+| setLocalDescription | Set local description | Method | Adapted |
+| setRemoteDescription | Set remote description | Method | Adapted |
+| AudioDeviceModule | Audio device module | Class | Adapted |
+| CameraPreviewSession | Camera preview session (HarmonyOS addition) | Class | Adapted |
+| VideoRenderController | Video render controller | Class | Adapted |
+
+### CameraPreviewSession APIs (HarmonyOS Addition)
+
+| API | Description | Type |
+|-----|-------------|------|
+| setActive | Set camera active state | Method |
+| setCameraPreference | Set camera preference | Method |
+| retry | Retry camera connection | Method |
+| release | Release camera session | Method |
+| attachWindow | Attach render window | Method |
+| applyDisplayRotation | Apply display rotation | Method |
+| getCaptureFrameCount | Get capture frame count | Method |
+
+## Upstream Differences
+
+This project is based on [Google WebRTC](https://webrtc.googlesource.com/src). The following lists API changes (additions, deletions, modifications) relative to the upstream library and their HarmonyOS adaptation status.
+
+### Added APIs
+
+| API | Description | Adaptation Status |
+|-----|-------------|-------------------|
+| CameraPreviewSession | Camera preview session management supporting multi-device (phone, foldable, trifold) camera selection, foreground/background recovery, bounded retries, host-window orientation | Adapted |
+| VideoRenderController | Video render controller managing render window binding and rotation | Adapted |
+| setActive | Camera activate/deactivate control | Adapted |
+| setCameraPreference | Camera preference setting | Adapted |
+| retry | Camera connection retry mechanism | Adapted |
+| attachWindow | Render window binding | Adapted |
+| applyDisplayRotation | Display rotation application | Adapted |
+| getCaptureFrameCount | Capture frame count retrieval | Adapted |
+
+These APIs are newly added for HarmonyOS, adapting to HarmonyOS multi-device camera management and XComponent rendering.
+
+### Unadapted APIs
+
+| Upstream API | Reason for Non-adaptation |
+|--------------|--------------------------|
+| Android Camera2 API | Replaced with HarmonyOS CameraKit |
+| SurfaceView/TextureView rendering | Replaced with HarmonyOS XComponent |
+| Android EGL context management | Replaced with HarmonyOS EGL adaptation layer |
+| Java PeerConnection wrapper | Rewritten as ArkTS/ETS interface |
+
+### Modified APIs
+
+| API | Upstream Behavior | HarmonyOS Behavior | Change Description |
+|-----|-------------------|--------------------|--------------------|
+| Video capture | Android Camera2 | HarmonyOS CameraKit + CameraPreviewSession | Capture layer adapted for HarmonyOS multi-device camera |
+| Video rendering | SurfaceView/OpenGL ES | XComponent + EGL | Rendering layer adapted for HarmonyOS components |
+| Audio device | Android AudioRecord/AudioTrack | HarmonyOS OHAudio | Audio backend replaced |
+| Codec | Android MediaCodec | HarmonyOS Codec | Hardware codec adapted |
+| Network transport | Java Network | HarmonyOS Network Kit | Network stack replaced |
+| Thread model | pthread | FFRT | Thread model replaced with HarmonyOS FFRT |
+
 ## Multi-device Camera Preview
 
 The current local changes add `CameraPreviewSession` to manage camera selection, foreground/background recovery, bounded retries, and host-window orientation for phones, foldable/trifold devices, and multiple displays. See the changelog for release status.
