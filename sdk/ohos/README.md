@@ -127,7 +127,7 @@ The current local changes add `CameraPreviewSession` to manage camera selection,
 
 ### Integration and Lifecycle
 
-Grant camera permission first and attach the same `VideoRenderController` to your XComponent. The host supplies `context`, `factory`, and `hostWindow` below:
+Grant camera permission first, then create the session; attach the same `VideoRenderController` to your XComponent. The host supplies `context`, `factory`, and `hostWindow` below:
 
 ```typescript
 import { CameraPreviewSession, VideoRenderController } from '@ohos/webrtc';
@@ -165,7 +165,7 @@ session.setActive(true);
 
 The current Native source declares version 2. To use frame-stall monitoring, rebuild the entire Native library from the current source and replace `libohos_webrtc.so` for the target ABI. Updating ArkTS files alone does not provide this capability. Explicitly requesting monitoring without the frame-count method reports `incompatible`.
 
-The low-level `VideoSource` API remains available. `applyDisplayRotation(0/90/180/270)` enables host-supplied rotation; `-1` restores automatic default-display rotation. `CameraPreviewSession` synchronizes the angle. The controller handles Surface sizing and aspect-preserving rendering, while Native probes installation-angle support and handles HAL rotation fallback.
+The low-level `VideoSource` API remains available. `applyDisplayRotation(0/90/180/270)` enables host-supplied rotation; `-1` restores automatic default-display rotation. `CameraPreviewSession` synchronizes the angle, so no duplicate compensation is needed on the page side. The controller handles Surface sizing and aspect-preserving rendering, while Native probes installation-angle support and handles HAL rotation fallback.
 
 ### Demo and Validation
 
@@ -185,6 +185,8 @@ To prevent `@ohos/webrtc` from being obfuscated, add the following exclusion rul
 ```
 
 ## Directory Structure
+
+The SDK directory structure and descriptions are as follows:
 
 ```shell
 sdk/ohos/
@@ -225,4 +227,4 @@ Feel free to open an [Issue](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/
 
 ## License
 
-This project is licensed under the [BSD License](../../LICENSE).
+This project is licensed under the [BSD License](../../LICENSE), please feel free to enjoy and participate in open source.
