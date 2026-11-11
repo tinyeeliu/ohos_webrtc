@@ -117,9 +117,75 @@ await peerConnection.setLocalDescription(offer);
 
 实现代码在 `src/ohos_webrtc` 目录下，其中 NAPI 接口的使用借助了开源项目 [node-addon-api](https://github.com/nodejs/node-addon-api)。
 
+## 上游升级 API 变更及鸿蒙适配情况
+
+- 上游库：WebRTC m120（[https://webrtc.googlesource.com/src](https://webrtc.googlesource.com/src)）
+- 当前库版本：基于 WebRTC m120 版本
+- OpenHarmony API 版本：>= 15
+
+### API 变更
+
+| 变更类型 | 项目 | 说明 |
+| --- | --- | --- |
+| 本地新增 | CameraPreviewSession | 统一管理手机、折叠/三折叠设备及多显示器场景中的相机选择、前后台恢复、有限重试和宿主窗口方向同步 |
+| 本地新增 | VideoRenderController | 封装 NativeVideoRenderer，用于视频渲染控制 |
+| 本地新增 | VideoSource.getCaptureFrameCount() | 用于停帧监测（能力版本 2+） |
+| 本地新增 | VideoSource.applyDisplayRotation() | 宿主提供的旋转角度控制 |
+| 适配 | 视频采集模块 | 适配 OHOS Camera API |
+| 适配 | 视频渲染模块 | 适配 ArkUI XComponent/Surface |
+| 适配 | 音频模块 | 适配 OHOS OHAudio API |
+| 适配 | 视频编解码模块 | 适配 OHOS MediaCodec |
+| 适配 | 网络模块 | 适配 OHOS 网络协议栈 |
+
+### 鸿蒙适配情况
+
+基于 WebRTC m120；C++ 层适配视频采集、渲染及编解码模块；ArkTS 接口绑定通过 NAPI（node-addon-api）实现；大部分接口设计遵循 W3C WebRTC 规范；根据实际需要额外提供 PeerConnectionFactory、AudioDeviceModule 等接口。
+
 ## 接口说明
 
 完整接口定义见 `api/libohos_webrtc/webrtc.d.ts`，完整说明请参阅[接口文档](./api/libwebrtc.md)。
+
+### 全量 API 清单
+
+| 分类 | API 名称 | 类型 | 说明 |
+| --- | --- | --- | --- |
+| PeerConnectionFactory | constructor | 构造函数 | 创建 PeerConnectionFactory 实例 |
+| PeerConnectionFactory | createAudioSource | 方法 | 创建本地音频源 |
+| PeerConnectionFactory | createAudioTrack | 方法 | 基于音频源创建音频轨道 |
+| PeerConnectionFactory | createVideoSource | 方法 | 根据指定分辨率和帧率创建本地视频源 |
+| PeerConnectionFactory | createVideoTrack | 方法 | 基于视频源创建视频轨道 |
+| PeerConnectionFactory | createPeerConnection | 方法 | 根据给定配置创建 RTCPeerConnection |
+| RTCPeerConnection | addTrack | 方法 | 向连接添加媒体轨道 |
+| RTCPeerConnection | removeTrack | 方法 | 从连接移除媒体轨道 |
+| RTCPeerConnection | createOffer | 方法 | 创建 SDP offer |
+| RTCPeerConnection | createAnswer | 方法 | 创建 SDP answer |
+| RTCPeerConnection | setLocalDescription | 方法 | 设置本地会话描述 |
+| RTCPeerConnection | setRemoteDescription | 方法 | 设置远端会话描述 |
+| RTCPeerConnection | addIceCandidate | 方法 | 添加远端发送的 ICE 候选者 |
+| RTCPeerConnection | close | 方法 | 关闭连接并释放资源 |
+| RTCPeerConnection | onicecandidate | 事件 | ICE 候选者可用时触发 |
+| RTCPeerConnection | ontrack | 事件 | 收到对端轨道时触发 |
+| RTCPeerConnection | oniceconnectionstatechange | 事件 | ICE 连接状态变化时触发 |
+| MediaStreamTrack | kind | 属性 | 轨道类型（audio/video） |
+| MediaStreamTrack | id | 属性 | 轨道唯一标识 |
+| MediaStreamTrack | enabled | 属性 | 轨道是否启用 |
+| MediaStreamTrack | stop | 方法 | 停止并释放轨道 |
+| VideoSource | applyDisplayRotation | 方法 | 应用宿主角度（0/90/180/270；-1 恢复默认显示器自动旋转） |
+| VideoSource | getCaptureFrameCount | 方法 | 返回采集帧计数，用于停帧监测（能力版本 2+） |
+| CameraPreviewSession | constructor | 构造函数 | 创建多设备场景相机预览会话 |
+| CameraPreviewSession | attachWindow | 方法 | 挂载宿主窗口以同步方向 |
+| CameraPreviewSession | setActive | 方法 | 启用或停用采集 |
+| CameraPreviewSession | setCameraPreference | 方法 | 设置前后置相机偏好 |
+| CameraPreviewSession | retry | 方法 | 显式重试相机采集 |
+| CameraPreviewSession | release | 方法 | 释放会话及其资源 |
+| VideoRenderController | constructor | 构造函数 | 创建封装 NativeVideoRenderer 的渲染控制器 |
+| VideoRenderController | onFrameSizeChanged | 回调 | 通知旋转后实际帧宽高，用于布局 |
+| MediaDevices | getUserMedia | 方法 | 从本地设备获取音视频流 |
+| MediaDevices | getDisplayMedia | 方法 | 获取屏幕采集流 |
+| 接口 | RTCConfiguration | 接口 | createPeerConnection 的配置 |
+| 接口 | RTCIceServer | 接口 | ICE 服务器配置 |
+| 接口 | RTCSessionDescription | 接口 | SDP 会话描述 |
+| AudioDeviceModule | - | 模块 | 音频设备模块，用于音频输入输出管理 |
 
 ## 多设备相机预览
 

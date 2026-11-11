@@ -117,9 +117,75 @@ For more examples, see the demo project in the `har_hap` directory. For instruct
 
 The implementation code is in the `src/ohos_webrtc` directory. NAPI interface bindings are built with the open-source project [node-addon-api](https://github.com/nodejs/node-addon-api).
 
+## Upstream Upgrade API Changes and HarmonyOS Adaptation
+
+- Upstream library: WebRTC m120 ([https://webrtc.googlesource.com/src](https://webrtc.googlesource.com/src))
+- Current library version: based on the WebRTC m120 release
+- OpenHarmony API version: >= 15
+
+### API Changes
+
+| Change Type | Item | Description |
+| --- | --- | --- |
+| Added (local) | CameraPreviewSession | Manages camera selection, foreground/background recovery, bounded retries, and host-window orientation for phones, foldable/trifold devices, and multiple displays |
+| Added (local) | VideoRenderController | Wraps NativeVideoRenderer for video rendering control |
+| Added (local) | VideoSource.getCaptureFrameCount() | For frame-stall monitoring (capability version 2+) |
+| Added (local) | VideoSource.applyDisplayRotation() | Host-supplied rotation control |
+| Adapted | Video capture module | Adapted to the OHOS Camera API |
+| Adapted | Video rendering module | Adapted to ArkUI XComponent/Surface |
+| Adapted | Audio module | Adapted to the OHOS OHAudio API |
+| Adapted | Video codec module | Adapted to OHOS MediaCodec |
+| Adapted | Network module | Adapted to the OHOS network stack |
+
+### HarmonyOS Adaptation
+
+Based on WebRTC m120; the C++ layer adapts the video capture, rendering, and codec modules; ArkTS interface bindings are provided via NAPI (node-addon-api); most interface designs follow the W3C WebRTC specification; additional interfaces (PeerConnectionFactory, AudioDeviceModule) are provided based on practical needs.
+
 ## API Reference
 
 Full type definitions are in `api/libohos_webrtc/webrtc.d.ts`. For detailed documentation, see the [API Documentation](./api/libwebrtc.md).
+
+### API Complete Index
+
+| Category | API Name | Type | Description |
+| --- | --- | --- | --- |
+| PeerConnectionFactory | constructor | constructor | Creates a PeerConnectionFactory instance |
+| PeerConnectionFactory | createAudioSource | method | Creates a local audio source |
+| PeerConnectionFactory | createAudioTrack | method | Creates an audio track from an audio source |
+| PeerConnectionFactory | createVideoSource | method | Creates a local video source with the specified resolution and frame rate |
+| PeerConnectionFactory | createVideoTrack | method | Creates a video track from a video source |
+| PeerConnectionFactory | createPeerConnection | method | Creates an RTCPeerConnection with the given configuration |
+| RTCPeerConnection | addTrack | method | Adds a media track to the connection |
+| RTCPeerConnection | removeTrack | method | Removes a media track from the connection |
+| RTCPeerConnection | createOffer | method | Creates an SDP offer |
+| RTCPeerConnection | createAnswer | method | Creates an SDP answer |
+| RTCPeerConnection | setLocalDescription | method | Sets the local session description |
+| RTCPeerConnection | setRemoteDescription | method | Sets the remote session description |
+| RTCPeerConnection | addIceCandidate | method | Adds an ICE candidate received from the remote peer |
+| RTCPeerConnection | close | method | Closes the connection and releases resources |
+| RTCPeerConnection | onicecandidate | event | Fired when an ICE candidate becomes available |
+| RTCPeerConnection | ontrack | event | Fired when a track is received from the remote peer |
+| RTCPeerConnection | oniceconnectionstatechange | event | Fired when the ICE connection state changes |
+| MediaStreamTrack | kind | property | The type of the track (audio/video) |
+| MediaStreamTrack | id | property | The unique identifier of the track |
+| MediaStreamTrack | enabled | property | Whether the track is enabled |
+| MediaStreamTrack | stop | method | Stops and releases the track |
+| VideoSource | applyDisplayRotation | method | Applies host-supplied rotation (0/90/180/270; -1 restores automatic default-display rotation) |
+| VideoSource | getCaptureFrameCount | method | Returns the capture frame count for stall monitoring (capability version 2+) |
+| CameraPreviewSession | constructor | constructor | Creates a camera preview session for multi-device scenarios |
+| CameraPreviewSession | attachWindow | method | Attaches the host window for orientation synchronization |
+| CameraPreviewSession | setActive | method | Activates or deactivates the capture |
+| CameraPreviewSession | setCameraPreference | method | Sets the front/rear camera preference |
+| CameraPreviewSession | retry | method | Explicitly retries camera capture |
+| CameraPreviewSession | release | method | Releases the session and its resources |
+| VideoRenderController | constructor | constructor | Creates a render controller wrapping NativeVideoRenderer |
+| VideoRenderController | onFrameSizeChanged | callback | Notifies the actual oriented frame dimensions for layout |
+| MediaDevices | getUserMedia | method | Acquires audio/video streams from local devices |
+| MediaDevices | getDisplayMedia | method | Acquires a screen capture stream |
+| Interface | RTCConfiguration | interface | Configuration for createPeerConnection |
+| Interface | RTCIceServer | interface | ICE server configuration |
+| Interface | RTCSessionDescription | interface | SDP session description |
+| AudioDeviceModule | - | module | Audio device module for audio I/O management |
 
 ## Multi-device Camera Preview
 
