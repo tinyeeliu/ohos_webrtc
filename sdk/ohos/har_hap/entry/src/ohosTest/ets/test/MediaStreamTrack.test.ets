@@ -27,7 +27,7 @@ export default function MediaStreamTrackTest() {
       Logging.enableLogToDebugOutput(LoggingSeverity.VERBOSE);
     })
 
-    it('enabledFalseDoesNotChangeReadyState', 0, () => {
+    it('shouldNotChangeReadyStateWhenEnabledFalse', 0, () => {
       let audioSource = pcf.createAudioSource();
       let audioTrack = pcf.createAudioTrack('audio', audioSource);
       expect(audioTrack.readyState).assertEqual('live');
@@ -36,7 +36,7 @@ export default function MediaStreamTrackTest() {
       audioSource.release();
     })
 
-    it('stopChangesReadyStateToEnded', 0, () => {
+    it('shouldChangeReadyStateToEndedWhenStop', 0, () => {
       let audioSource = pcf.createAudioSource();
       let audioTrack = pcf.createAudioTrack('audio', audioSource);
       expect(audioTrack.readyState).assertEqual('live');
@@ -45,7 +45,7 @@ export default function MediaStreamTrackTest() {
       audioSource.release();
     })
 
-    it('getSourceAfterStopStillReturnsSource', 0, () => {
+    it('shouldStillReturnSourceAfterStop', 0, () => {
       let audioSource = pcf.createAudioSource();
       let audioTrack = pcf.createAudioTrack('audio', audioSource);
       audioTrack.stop();
@@ -54,7 +54,7 @@ export default function MediaStreamTrackTest() {
       audioSource.release();
     })
 
-    it('addTrackToPeerConnectionCreatesSenderWithTrack', 0, () => {
+    it('shouldCreateSenderWithTrackWhenAddTrackToPeerConnection', 0, () => {
       let pc = pcf.createPeerConnection({});
       let audioSource = pcf.createAudioSource();
       let audioTrack = pcf.createAudioTrack('audio', audioSource);
@@ -66,7 +66,7 @@ export default function MediaStreamTrackTest() {
       audioSource.release();
     })
 
-    it('stopTrackRemovesItFromSender', 0, () => {
+    it('shouldRemoveTrackFromSenderWhenStopTrack', 0, () => {
       let pc = pcf.createPeerConnection({});
       let audioSource = pcf.createAudioSource();
       let audioTrack = pcf.createAudioTrack('audio', audioSource);
@@ -78,7 +78,7 @@ export default function MediaStreamTrackTest() {
       audioSource.release();
     })
 
-    it('replaceTrackUpdatesSenderTrack', 0, async () => {
+    it('shouldUpdateSenderTrackWhenReplaceTrack', 0, async () => {
       let pc = pcf.createPeerConnection({});
       let audioSource1 = pcf.createAudioSource();
       let audioTrack1 = pcf.createAudioTrack('audio1', audioSource1);
@@ -93,7 +93,7 @@ export default function MediaStreamTrackTest() {
       audioSource2.release();
     })
 
-    it('calleeReceivesTrackViaOntrack', 0, async () => {
+    it('shouldReceiveTrackViaOntrackOnCallee', 0, async () => {
       let caller = pcf.createPeerConnection({
         iceServers: []
       });
@@ -145,7 +145,7 @@ export default function MediaStreamTrackTest() {
       audioSource.release();
     })
 
-    it('applyConstraintsWithWidthHeightFrameRate', 0, () => {
+    it('shouldApplyConstraintsWithWidthHeightFrameRate', 0, () => {
       let videoSource = pcf.createVideoSource({});
       let videoTrack = pcf.createVideoTrack('video', videoSource);
       expect(videoTrack).not().assertNull();
@@ -160,7 +160,7 @@ export default function MediaStreamTrackTest() {
       videoSource.release();
     })
 
-    it('applyConstraintsWithFacingModeUser', 0, () => {
+    it('shouldApplyConstraintsWithFacingModeUser', 0, () => {
       let videoSource = pcf.createVideoSource({});
       let videoTrack = pcf.createVideoTrack('video', videoSource);
       expect(videoTrack).not().assertNull();
@@ -173,7 +173,7 @@ export default function MediaStreamTrackTest() {
       videoSource.release();
     })
 
-    it('applyConstraintsWithFacingModeEnvironment', 0, () => {
+    it('shouldApplyConstraintsWithFacingModeEnvironment', 0, () => {
       let videoSource = pcf.createVideoSource({});
       let videoTrack = pcf.createVideoTrack('video', videoSource);
       expect(videoTrack).not().assertNull();
@@ -186,7 +186,7 @@ export default function MediaStreamTrackTest() {
       videoSource.release();
     })
 
-    it('applyConstraintsWithAllParams', 0, () => {
+    it('shouldApplyConstraintsWithAllParams', 0, () => {
       let videoSource = pcf.createVideoSource({});
       let videoTrack = pcf.createVideoTrack('video', videoSource);
       expect(videoTrack).not().assertNull();
@@ -202,7 +202,7 @@ export default function MediaStreamTrackTest() {
       videoSource.release();
     })
 
-    it('applyConstraintsAudioTrackNotSupported', 0, async () => {
+    it('shouldNotSupportApplyConstraintsOnAudioTrack', 0, async () => {
       let audioSource = pcf.createAudioSource();
       let audioTrack = pcf.createAudioTrack('audio', audioSource);
       expect(audioTrack).not().assertNull();
@@ -219,7 +219,7 @@ export default function MediaStreamTrackTest() {
       audioSource.release();
     })
 
-    it('applyConstraintsWithNegativeWidthShouldReject', 0, async () => {
+    it('shouldRejectApplyConstraintsWithNegativeWidth', 0, async () => {
       let videoSource = pcf.createVideoSource({});
       let videoTrack = pcf.createVideoTrack('video', videoSource);
       expect(videoTrack).not().assertNull();
@@ -237,7 +237,7 @@ export default function MediaStreamTrackTest() {
       videoSource.release();
     })
 
-    it('applyConstraintsWithZeroWidthShouldReject', 0, async () => {
+    it('shouldRejectApplyConstraintsWithZeroWidth', 0, async () => {
       let videoSource = pcf.createVideoSource({});
       let videoTrack = pcf.createVideoTrack('video', videoSource);
       expect(videoTrack).not().assertNull();
@@ -255,7 +255,7 @@ export default function MediaStreamTrackTest() {
       videoSource.release();
     })
 
-    it('applyConstraintsWithNegativeHeightShouldReject', 0, async () => {
+    it('shouldRejectApplyConstraintsWithNegativeHeight', 0, async () => {
       let videoSource = pcf.createVideoSource({});
       let videoTrack = pcf.createVideoTrack('video', videoSource);
       expect(videoTrack).not().assertNull();
@@ -273,7 +273,7 @@ export default function MediaStreamTrackTest() {
       videoSource.release();
     })
 
-    it('applyConstraintsWithZeroHeightShouldReject', 0, async () => {
+    it('shouldRejectApplyConstraintsWithZeroHeight', 0, async () => {
       let videoSource = pcf.createVideoSource({});
       let videoTrack = pcf.createVideoTrack('video', videoSource);
       expect(videoTrack).not().assertNull();
@@ -291,7 +291,7 @@ export default function MediaStreamTrackTest() {
       videoSource.release();
     })
 
-    it('applyConstraintsWithNegativeFrameRateShouldReject', 0, async () => {
+    it('shouldRejectApplyConstraintsWithNegativeFrameRate', 0, async () => {
       let videoSource = pcf.createVideoSource({});
       let videoTrack = pcf.createVideoTrack('video', videoSource);
       expect(videoTrack).not().assertNull();
@@ -309,7 +309,7 @@ export default function MediaStreamTrackTest() {
       videoSource.release();
     })
 
-    it('applyConstraintsWithZeroFrameRateShouldReject', 0, async () => {
+    it('shouldRejectApplyConstraintsWithZeroFrameRate', 0, async () => {
       let videoSource = pcf.createVideoSource({});
       let videoTrack = pcf.createVideoTrack('video', videoSource);
       expect(videoTrack).not().assertNull();
@@ -327,7 +327,7 @@ export default function MediaStreamTrackTest() {
       videoSource.release();
     })
 
-    it('applyConstraintsWithInvalidFacingModeShouldReject', 0, async () => {
+    it('shouldRejectApplyConstraintsWithInvalidFacingMode', 0, async () => {
       let videoSource = pcf.createVideoSource({});
       let videoTrack = pcf.createVideoTrack('video', videoSource);
       expect(videoTrack).not().assertNull();
@@ -345,7 +345,7 @@ export default function MediaStreamTrackTest() {
       videoSource.release();
     })
 
-    it('applyConstraintsWithEmptyFacingModeShouldReject', 0, async () => {
+    it('shouldRejectApplyConstraintsWithEmptyFacingMode', 0, async () => {
       let videoSource = pcf.createVideoSource({});
       let videoTrack = pcf.createVideoTrack('video', videoSource);
       expect(videoTrack).not().assertNull();
@@ -363,7 +363,7 @@ export default function MediaStreamTrackTest() {
       videoSource.release();
     })
 
-    it('applyConstraintsToEndedTrackShouldReject', 0, async () => {
+    it('shouldRejectApplyConstraintsToEndedTrack', 0, async () => {
       let videoSource = pcf.createVideoSource({});
       let videoTrack = pcf.createVideoTrack('video', videoSource);
       expect(videoTrack).not().assertNull();

@@ -30,6 +30,8 @@ OpenHarmony API 版本 ≥ 15。
 
 打开 `entry/src/main/module.json5`，根据实际功能需求添加以下权限：
 
+> **说明**：HAR 模块已预声明 `ohos.permission.INTERNET`、`ohos.permission.CAMERA`、`ohos.permission.MICROPHONE` 三个权限。`ohos.permission.CAPTURE_SCREEN` 仅在使用屏幕采集（`getDisplayMedia`）时需要，且必须由宿主应用在自己的 `module.json5` 中声明；HAR 未预声明此权限，因为它是系统授予型权限，仅应用可申请。
+
 ```json
 "requestPermissions": [
   {

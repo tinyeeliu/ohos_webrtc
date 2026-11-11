@@ -157,7 +157,8 @@ export default function DataChannelTest() {
       // Presets a clear action, which is performed after all test cases of the test suite end.
       // This API supports only one parameter: clear action function.
     })
-    it('attribute', 0, async () => {
+
+    it('shouldExposeDataChannelAttributes', 0, async () => {
       let channel = caller.createDataChannel("audio", dataChannel);
       console.debug(TAG, "channel attribute: " + JSON.stringify(channel));
       expect(channel.label).assertEqual("audio");
@@ -173,7 +174,7 @@ export default function DataChannelTest() {
       expect(channel.binaryType).assertEqual("blob");
     })
 
-    it("onBufferedAmountLow", 0, async () => {
+    it('shouldTriggerOnBufferedAmountLow', 0, async () => {
       let channel = caller.createDataChannel("onBufferedAmountLow");
       console.debug(TAG, "onBufferedAmountLow: " + JSON.stringify(channel));
       let flag = false;
@@ -194,7 +195,7 @@ export default function DataChannelTest() {
       expect(flag).assertTrue();
     })
 
-    it("theCloseEventBeTriggeredWhenTheConversationClose", 0, async () => {
+    it('shouldTriggerCloseEventWhenConversationCloses', 0, async () => {
       let channel = caller.createDataChannel("onclose", dataChannel);
       console.debug(TAG, "onclose: " + JSON.stringify(channel))
       let flag: boolean = false;
@@ -209,7 +210,7 @@ export default function DataChannelTest() {
       expect(flag).assertEqual(true);
     })
 
-    it("onclosing", 0, async () => {
+    it('shouldTriggerOnclosing', 0, async () => {
       let channel = caller.createDataChannel("onclosing", dataChannel);
       console.debug(TAG, "onclosing: " + JSON.stringify(channel));
       let flag = false;
@@ -225,7 +226,7 @@ export default function DataChannelTest() {
       expect(flag).assertTrue();
     })
 
-    it("afterConnectionOnopenWillTriggered", 0, async () => {
+    it('shouldTriggerOnopenAfterConnection', 0, async () => {
       let channel = caller.createDataChannel("onopen");
       let flag = false;
       let promise = new Promise<void>((resolve) => {
@@ -241,7 +242,7 @@ export default function DataChannelTest() {
       expect(flag).assertTrue();
     })
 
-    it("onmessage", 0, async () => {
+    it('shouldTriggerOnmessageWhenMessageSent', 0, async () => {
       let pair = await createDataChannelPair({}, caller, callee);
       let dc1 = pair[0];
       let dc2 = pair[1];
@@ -259,7 +260,7 @@ export default function DataChannelTest() {
       await promise;
     })
 
-    it("sendWhenClosed", 0, async () => {
+    it('shouldRejectSendWhenChannelClosed', 0, async () => {
       let channel = caller.createDataChannel("17", dataChannel);
       let onclose = new Promise<webrtc.Event>((resolve, reject) => {
         channel.onclose = resolve;
@@ -275,7 +276,7 @@ export default function DataChannelTest() {
       }
     })
 
-    it("afterConnectionOncloseWillTriggered", 0, async () => {
+    it('shouldTriggerOncloseAfterConnection', 0, async () => {
       let channel = caller.createDataChannel("18", dataChannel);
       console.debug(TAG, "close: " + JSON.stringify(channel));
       let flag = false;
@@ -290,7 +291,7 @@ export default function DataChannelTest() {
       expect(flag).assertTrue();
     })
 
-    it("sendString", 0, async () => {
+    it('shouldSendString', 0, async () => {
       let channel1 = caller.createDataChannel("sendString");
       let channel2: webrtc.RTCDataChannel;
       let promiseOpen1 = new Promise<void>((resolve) => {
@@ -324,7 +325,7 @@ export default function DataChannelTest() {
       await promiseReceive;
     })
 
-    it("sendArrayBuffer", 0, async () => {
+    it('shouldSendArrayBuffer', 0, async () => {
       let pair = await createDataChannelPair({}, caller, callee);
       let dc1 = pair[0];
       let dc2 = pair[1];
@@ -347,7 +348,7 @@ export default function DataChannelTest() {
       expect(new Uint8Array(data)[0]).assertEqual(97);
     })
 
-    it("sendWhenReadyStateIsConnecting", 0, () => {
+    it('shouldRejectSendWhenReadyStateIsConnecting', 0, () => {
       let channel = caller.createDataChannel("sendWhenReadyStateConnecting");
       try {
         console.info(TAG, "channel.readyState:", channel.readyState);
@@ -358,7 +359,7 @@ export default function DataChannelTest() {
       }
     })
 
-    it("sendWhenBufferIsEmpty", 0, async () => {
+    it('shouldSendWhenBufferIsEmpty', 0, async () => {
       let pair = await createDataChannelPair({}, caller, callee);
       let dc1 = pair[0];
       let dc2 = pair[1];
@@ -378,7 +379,7 @@ export default function DataChannelTest() {
       expect(data.byteLength).assertEqual(10);
     })
 
-    it("sendUnicodeString", 0, async () => {
+    it('shouldSendUnicodeString', 0, async () => {
       let pair = await createDataChannelPair({}, caller, callee);
       let dc1 = pair[0];
       let dc2 = pair[1];
@@ -397,7 +398,7 @@ export default function DataChannelTest() {
       await promise;
     })
 
-    it("sendBeforeCloseChannel", 0, async () => {
+    it('shouldSendBeforeCloseChannel', 0, async () => {
       let pair = await createDataChannelPair({}, caller, callee);
       let dc1 = pair[0];
       let dc2 = pair[1];
@@ -421,7 +422,7 @@ export default function DataChannelTest() {
       expect(receivedSize).assertEqual(sentSize);
     })
 
-    it("setNegotiatedFalse", 0, async () => {
+    it('shouldHaveNegotiatedFalse', 0, async () => {
       let channel1 = caller.createDataChannel('', {
         negotiated: false,
         id: 42
@@ -448,7 +449,7 @@ export default function DataChannelTest() {
       expect(channel1.id == 42 && channel2.id == 42).assertFalse();
     })
 
-    it("restartIceChannelIsOpen", 0, async () => {
+    it('shouldReopenChannelAfterIceRestart', 0, async () => {
       let pair = await createDataChannelPair({}, caller, callee);
       let dc1 = pair[0];
       let dc2 = pair[1];
@@ -466,7 +467,7 @@ export default function DataChannelTest() {
       dc2.close();
     })
 
-    it("afterPcCloseChannelWillClose", 0, async () => {
+    it('shouldCloseChannelWhenPcCloses', 0, async () => {
       let channel1 = caller.createDataChannel("");
       let closed = false;
       let promise = new Promise<void>((resolve) => {
@@ -483,7 +484,7 @@ export default function DataChannelTest() {
       expect(closed).assertEqual(true);
     })
 
-    it("beforePcCloseChannelWillNotClose", 0, async () => {
+    it('shouldNotCloseChannelBeforePcCloses', 0, async () => {
       let channel1 = caller.createDataChannel("");
       let closed = false;
       channel1.onclose = () => {
@@ -495,7 +496,7 @@ export default function DataChannelTest() {
       expect(closed).assertEqual(false);
     })
 
-    it("changeBinaryType", 0, () => {
+    it('shouldChangeBinaryType', 0, () => {
       let channel = caller.createDataChannel("");
       console.info(TAG, "BinaryType: ", channel.binaryType);
       channel.binaryType = "arraybuffer";

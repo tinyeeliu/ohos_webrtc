@@ -26,12 +26,12 @@ export default function AudioSourceTest() {
       Logging.enableLogToDebugOutput(LoggingSeverity.VERBOSE);
     })
 
-    it('createAudioSourceWithDefaultConstraints', 0, () => {
+    it('shouldCreateAudioSourceWithDefaultConstraints', 0, () => {
       let audioSource = pcf.createAudioSource();
       expect(audioSource).not().assertNull();
     })
 
-    it('createAudioSourceWithConstraints', 0, () => {
+    it('shouldCreateAudioSourceWithConstraints', 0, () => {
       let audioSource = pcf.createAudioSource({
         echoCancellation: false,
         autoGainControl: false,
@@ -40,32 +40,32 @@ export default function AudioSourceTest() {
       expect(audioSource).not().assertNull();
     })
 
-    it('stateIsLive', 0, () => {
+    it('shouldBeLiveWhenCreated', 0, () => {
       let audioSource = pcf.createAudioSource();
       expect(audioSource.state).assertEqual('live');
     })
 
-    it('setVolume', 0, () => {
+    it('shouldGetVolume', 0, () => {
       let audioSource = pcf.createAudioSource();
       audioSource.setVolume(0.5);
     })
 
-    it('setVolumeToMax', 0, () => {
+    it('shouldSetVolumeToMax', 0, () => {
       let audioSource = pcf.createAudioSource();
       audioSource.setVolume(1.0);
     })
 
-    it('setVolumeToMin', 0, () => {
+    it('shouldSetVolumeToMin', 0, () => {
       let audioSource = pcf.createAudioSource();
       audioSource.setVolume(0.0);
     })
 
-    it('release', 0, () => {
+    it('shouldRelease', 0, () => {
       let audioSource = pcf.createAudioSource();
       audioSource.release();
     })
 
-    it('stateAfterRelease', 0, () => {
+    it('shouldHaveEndedStateAfterRelease', 0, () => {
       let audioSource = pcf.createAudioSource();
       audioSource.release();
       try {
@@ -77,7 +77,7 @@ export default function AudioSourceTest() {
       }
     })
 
-    it('setVolumeAfterReleaseThrows', 0, () => {
+    it('shouldThrowWhenGetVolumeAfterRelease', 0, () => {
       let audioSource = pcf.createAudioSource();
       audioSource.release();
       try {
@@ -90,7 +90,7 @@ export default function AudioSourceTest() {
       }
     })
 
-    it('doubleReleaseDoesNotCrash', 0, () => {
+    it('shouldNotCrashWhenDoubleRelease', 0, () => {
       let audioSource = pcf.createAudioSource();
       audioSource.release();
       try {

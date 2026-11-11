@@ -101,7 +101,7 @@ export default function RTCDtlsTransportTest() {
       // This API supports only one parameter: clear action function.
     })
 
-    it("transportGoesToConnectedState", DEFAULT, async () => {
+    it('shouldGoToConnectedState', DEFAULT, async () => {
       await createDtlsTransport(caller, callee);
       let transport1 = caller.getTransceivers()[0].sender.transport;
       let transport2 = callee.getTransceivers()[0].sender.transport;
@@ -137,7 +137,7 @@ export default function RTCDtlsTransportTest() {
       expect(flag2).assertEqual("connected");
     })
 
-    it("closeCausesTheLocalTransportToCloseImmediately", DEFAULT, async () => {
+    it('shouldCloseLocalTransportImmediatelyOnClose', DEFAULT, async () => {
       await createDtlsTransport(caller, callee);
       let transport1 = caller.getTransceivers()[0].sender.transport;
       let transport2 = callee.getTransceivers()[0].sender.transport;
@@ -156,7 +156,7 @@ export default function RTCDtlsTransportTest() {
       expect(flag).assertEqual("closed");
     })
 
-    it("closeCausesTheOtherEndTransportToClose", DEFAULT, async () => {
+    it('shouldCloseOtherEndTransportWhenPeerCloses', DEFAULT, async () => {
       await createDtlsTransport(caller, callee);
       let transport1 = caller.getTransceivers()[0].sender.transport;
       let transport2 = callee.getTransceivers()[0].sender.transport;
@@ -176,18 +176,18 @@ export default function RTCDtlsTransportTest() {
       expect(flag).assertEqual("closed");
     })
 
-    it("iceTransportIsNotNullAfterCreateDtlsTransport", DEFAULT, async () => {
+    it('shouldHaveNonNullIceTransportAfterCreateDtlsTransport', DEFAULT, async () => {
       await createDtlsTransport(caller, callee);
       expect(caller.getSenders()[0]!.transport).not().assertNull();
     })
 
-    it("stateIsNotNullAfterCreateDtlsTransport", DEFAULT, async () => {
+    it('shouldHaveNonNullStateAfterCreateDtlsTransport', DEFAULT, async () => {
       await createDtlsTransport(caller, callee);
       console.info(TAG, "state: ", caller.getSenders()[0]!.transport!.state);
       expect(caller.getSenders()[0]!.transport!.state).not().assertNull();
     })
 
-    it("getRemoteCertificatesIsNotNullAfterCreateDtlsTransport", DEFAULT, async () => {
+    it('shouldHaveNonNullRemoteCertificatesAfterCreateDtlsTransport', DEFAULT, async () => {
       await createDtlsTransport(caller, callee);
       await sleep(1000);
       console.info(TAG, "getRemoteCertificates: ",
