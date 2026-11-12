@@ -1,0 +1,22 @@
+name: ohos-webrtc-xts-test
+
+# XTS 测试 CI：触发方式与前置条件见注释。
+# OpenHarmony XTS 测试需要 OpenHarmony SDK（API 15+）与签名配置，
+# 请在自托管运行器（已安装 DevEco Studio / 命令行工具并接入设备或模拟器）上启用本流程。
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ master ]
+    paths:
+      - 'sdk/ohos/**'
+
+jobs:
+  xts-test:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run XTS test suite
+        working-directory: sdk/ohos/har_hap
+        run: ./run-tests.sh clean

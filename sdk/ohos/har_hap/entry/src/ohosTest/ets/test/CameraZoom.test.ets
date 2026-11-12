@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 
+/** 测试类型： unit（单元测试） */
+
 import { describe, beforeAll, it, expect } from '@ohos/hypium'
 import webrtc, { Logging, LoggingSeverity } from '@ohos/webrtc';
 
@@ -28,7 +30,7 @@ export default function CameraZoomTest() {
 
     // ========== getZoomRange ==========
 
-    it('getZoomRangeOnVideoTrackReturnsValidStructure', 0, () => {
+    it('shouldReturnValidStructureWhenGetZoomRangeOnVideoTrack', 0, () => {
       let videoSource = pcf.createVideoSource({ facingMode: 'environment' });
       let videoTrack = pcf.createVideoTrack('video', videoSource);
       expect(videoTrack).not().assertNull();
@@ -48,7 +50,7 @@ export default function CameraZoomTest() {
       videoSource.release();
     })
 
-    it('getZoomRangeOnAudioTrackReturnsNotSupported', 0, () => {
+    it('shouldReturnNotSupportedWhenGetZoomRangeOnAudioTrack', 0, () => {
       let audioSource = pcf.createAudioSource();
       let audioTrack = pcf.createAudioTrack('audio', audioSource);
 
@@ -61,7 +63,7 @@ export default function CameraZoomTest() {
 
     // ========== applyConstraints with zoom ==========
 
-    it('applyConstraintsZoomResolvesOnVideoTrack', 0, async () => {
+    it('shouldResolveWhenApplyConstraintsWithZoomOnVideoTrack', 0, async () => {
       let videoSource = pcf.createVideoSource({ facingMode: 'environment' });
       let videoTrack = pcf.createVideoTrack('video', videoSource);
 
@@ -78,7 +80,7 @@ export default function CameraZoomTest() {
       videoSource.release();
     })
 
-    it('applyConstraintsZoomOneResolvesOnVideoTrack', 0, async () => {
+    it('shouldResolveWhenApplyConstraintsWithZoomOneOnVideoTrack', 0, async () => {
       let videoSource = pcf.createVideoSource({ facingMode: 'environment' });
       let videoTrack = pcf.createVideoTrack('video', videoSource);
 
@@ -93,7 +95,7 @@ export default function CameraZoomTest() {
       videoSource.release();
     })
 
-    it('applyConstraintsZoomOutOfRangeResolvesWithClamp', 0, async () => {
+    it('shouldClampWhenApplyConstraintsWithZoomOutOfRange', 0, async () => {
       let videoSource = pcf.createVideoSource({ facingMode: 'environment' });
       let videoTrack = pcf.createVideoTrack('video', videoSource);
 
@@ -118,7 +120,7 @@ export default function CameraZoomTest() {
       videoSource.release();
     })
 
-    it('applyConstraintsZoomZeroRejectsOnVideoTrack', 0, async () => {
+    it('shouldRejectWhenApplyConstraintsWithZoomZeroOnVideoTrack', 0, async () => {
       let videoSource = pcf.createVideoSource({ facingMode: 'environment' });
       let videoTrack = pcf.createVideoTrack('video', videoSource);
 
@@ -135,7 +137,7 @@ export default function CameraZoomTest() {
       videoSource.release();
     })
 
-    it('applyConstraintsZoomNegativeRejectsOnVideoTrack', 0, async () => {
+    it('shouldRejectWhenApplyConstraintsWithZoomNegativeOnVideoTrack', 0, async () => {
       let videoSource = pcf.createVideoSource({ facingMode: 'environment' });
       let videoTrack = pcf.createVideoTrack('video', videoSource);
 
@@ -152,7 +154,7 @@ export default function CameraZoomTest() {
       videoSource.release();
     })
 
-    it('applyConstraintsWithZoomAndFrameRateResolves', 0, async () => {
+    it('shouldResolveWhenApplyConstraintsWithZoomAndFrameRate', 0, async () => {
       let videoSource = pcf.createVideoSource({ facingMode: 'environment' });
       let videoTrack = pcf.createVideoTrack('video', videoSource);
 

@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 
+/** 测试类型： unit（单元测试） */
+
 import { describe, beforeAll, afterEach, it, expect } from '@ohos/hypium'
 import webrtc, { Logging, LoggingSeverity } from '@ohos/webrtc';
 
@@ -29,7 +31,7 @@ export default function LoggingTest() {
       Logging.enableLogToDebugOutput(LoggingSeverity.VERBOSE);
     })
 
-    it('dShorthandProducesLogWithInfoSeverity', 0, () => {
+    it('shouldProduceLogWithInfoSeverityWhenDShorthand', 0, () => {
       let receivedSeverities: number[] = [];
       let loggable: webrtc.Loggable = {
         logMessage: (_message: string, severity: number, _tag: string) => {
@@ -42,7 +44,7 @@ export default function LoggingTest() {
       expect(receivedSeverities[0]).assertEqual(LoggingSeverity.INFO);
     })
 
-    it('eShorthandProducesLogWithErrorSeverity', 0, () => {
+    it('shouldProduceLogWithErrorSeverityWhenEShorthand', 0, () => {
       let receivedSeverities: number[] = [];
       let loggable: webrtc.Loggable = {
         logMessage: (_message: string, severity: number, _tag: string) => {
@@ -55,7 +57,7 @@ export default function LoggingTest() {
       expect(receivedSeverities[0]).assertEqual(LoggingSeverity.ERROR);
     })
 
-    it('eShorthandIncludesErrorMessage', 0, () => {
+    it('shouldIncludeErrorMessageWhenEShorthand', 0, () => {
       let receivedMessages: string[] = [];
       let loggable: webrtc.Loggable = {
         logMessage: (message: string, _severity: number, _tag: string) => {
@@ -68,7 +70,7 @@ export default function LoggingTest() {
       expect(allMessages).assertContain('my error detail');
     })
 
-    it('wShorthandProducesLogWithWarningSeverity', 0, () => {
+    it('shouldProduceLogWithWarningSeverityWhenWShorthand', 0, () => {
       let receivedSeverities: number[] = [];
       let loggable: webrtc.Loggable = {
         logMessage: (_message: string, severity: number, _tag: string) => {
@@ -81,7 +83,7 @@ export default function LoggingTest() {
       expect(receivedSeverities[0]).assertEqual(LoggingSeverity.WARNING);
     })
 
-    it('vShorthandProducesLogWithVerboseSeverity', 0, () => {
+    it('shouldProduceLogWithVerboseSeverityWhenVShorthand', 0, () => {
       let receivedSeverities: number[] = [];
       let loggable: webrtc.Loggable = {
         logMessage: (_message: string, severity: number, _tag: string) => {
@@ -94,7 +96,7 @@ export default function LoggingTest() {
       expect(receivedSeverities[0]).assertEqual(LoggingSeverity.VERBOSE);
     })
 
-    it('logPassesCorrectSeverity', 0, () => {
+    it('shouldPassCorrectSeverityWhenLogCalled', 0, () => {
       let receivedSeverities: number[] = [];
       let loggable: webrtc.Loggable = {
         logMessage: (_message: string, severity: number, _tag: string) => {
@@ -107,7 +109,7 @@ export default function LoggingTest() {
       expect(receivedSeverities[0]).assertEqual(LoggingSeverity.WARNING);
     })
 
-    it('logPassesCorrectTag', 0, () => {
+    it('shouldPassCorrectTagWhenLogCalled', 0, () => {
       let receivedTags: string[] = [];
       let loggable: webrtc.Loggable = {
         logMessage: (_message: string, _severity: number, tag: string) => {
@@ -120,7 +122,7 @@ export default function LoggingTest() {
       expect(receivedTags[0]).assertEqual('MyCustomTag');
     })
 
-    it('vPassesCorrectTag', 0, () => {
+    it('shouldPassCorrectTagWhenVShorthand', 0, () => {
       let receivedTags: string[] = [];
       let loggable: webrtc.Loggable = {
         logMessage: (_message: string, _severity: number, tag: string) => {
@@ -133,7 +135,7 @@ export default function LoggingTest() {
       expect(receivedTags[0]).assertEqual('VerboseTag');
     })
 
-    it('ePassesCorrectTag', 0, () => {
+    it('shouldPassCorrectTagWhenEShorthand', 0, () => {
       let receivedTags: string[] = [];
       let loggable: webrtc.Loggable = {
         logMessage: (_message: string, _severity: number, tag: string) => {
@@ -146,7 +148,7 @@ export default function LoggingTest() {
       expect(receivedTags[0]).assertEqual('ErrorTag');
     })
 
-    it('injectLoggableReceivesMessages', 0, () => {
+    it('shouldReceiveMessagesWhenLoggableInjected', 0, () => {
       let receivedMessages: string[] = [];
       let loggable: webrtc.Loggable = {
         logMessage: (message: string, _severity: number, _tag: string) => {
@@ -159,7 +161,7 @@ export default function LoggingTest() {
       expect(receivedMessages[0]).assertContain('hello from test');
     })
 
-    it('deleteInjectedLoggableStopsCallbacks', 0, () => {
+    it('shouldStopCallbacksWhenInjectedLoggableDeleted', 0, () => {
       let receivedCount = 0;
       let loggable: webrtc.Loggable = {
         logMessage: (_message: string, _severity: number, _tag: string) => {
@@ -175,7 +177,7 @@ export default function LoggingTest() {
       expect(receivedCount).assertEqual(countBeforeDelete);
     })
 
-    it('enableLogToDebugOutputAfterInjectLoggableThrows', 0, () => {
+    it('shouldThrowWhenEnableLogToDebugOutputAfterInjectLoggable', 0, () => {
       let loggable: webrtc.Loggable = {
         logMessage: (_message: string, _severity: number, _tag: string) => {}
       };
@@ -188,7 +190,37 @@ export default function LoggingTest() {
       }
     })
 
-    it('enableLogToDebugOutputWorksAfterDeleteInjectedLoggable', 0, () => {
+    it('shouldDeliverMessageWhenTagEmpty', 0, () => {
+      let receivedMessages: string[] = [];
+      let receivedTags: string[] = [];
+      let loggable: webrtc.Loggable = {
+        logMessage: (message: string, _severity: number, tag: string) => {
+          receivedMessages.push(message);
+          receivedTags.push(tag);
+        }
+      };
+      Logging.injectLoggable(loggable, LoggingSeverity.VERBOSE);
+      Logging.d('', 'empty tag message');
+      expect(receivedMessages.length).assertEqual(1);
+      expect(receivedMessages[0]).assertEqual('empty tag message');
+      expect(receivedTags[0]).assertEqual('');
+    })
+
+    it('shouldDeliverLongMessageIntact', 0, () => {
+      let receivedMessages: string[] = [];
+      let loggable: webrtc.Loggable = {
+        logMessage: (message: string, _severity: number, _tag: string) => {
+          receivedMessages.push(message);
+        }
+      };
+      let longMessage = ' '.repeat(64 * 1024);
+      Logging.injectLoggable(loggable, LoggingSeverity.VERBOSE);
+      Logging.d(TAG, longMessage);
+      expect(receivedMessages.length).assertEqual(1);
+      expect(receivedMessages[0].length).assertEqual(64 * 1024);
+    })
+
+    it('shouldWorkWhenEnableLogToDebugOutputAfterDeleteInjectedLoggable', 0, () => {
       let loggable: webrtc.Loggable = {
         logMessage: (_message: string, _severity: number, _tag: string) => {}
       };
@@ -206,7 +238,7 @@ export default function LoggingTest() {
       expect(receivedSeverities.length).assertLarger(0);
     })
 
-    it('severityFilterFiltersBelowThreshold', 0, () => {
+    it('shouldFilterMessagesBelowThresholdWhenSeverityFilterSet', 0, () => {
       let receivedMessages: string[] = [];
       let loggable: webrtc.Loggable = {
         logMessage: (message: string, _severity: number, _tag: string) => {
@@ -220,7 +252,7 @@ export default function LoggingTest() {
       expect(receivedMessages[0]).assertContain('error message should pass');
     })
 
-    it('wShorthandIncludesErrorMessage', 0, () => {
+    it('shouldIncludeErrorMessageWhenWShorthand', 0, () => {
       let receivedMessages: string[] = [];
       let loggable: webrtc.Loggable = {
         logMessage: (message: string, _severity: number, _tag: string) => {
@@ -233,7 +265,7 @@ export default function LoggingTest() {
       expect(allMessages).assertContain('my error detail');
     })
 
-    it('enableLogThreadsDoesNotBreakLogging', 0, () => {
+    it('shouldNotBreakLoggingWhenLogThreadsEnabled', 0, () => {
       Logging.enableLogThreads();
       let receivedSeverities: number[] = [];
       let loggable: webrtc.Loggable = {
@@ -246,7 +278,7 @@ export default function LoggingTest() {
       expect(receivedSeverities.length).assertLarger(0);
     })
 
-    it('enableLogTimeStampsDoesNotBreakLogging', 0, () => {
+    it('shouldNotBreakLoggingWhenLogTimeStampsEnabled', 0, () => {
       Logging.enableLogTimeStamps();
       let receivedSeverities: number[] = [];
       let loggable: webrtc.Loggable = {
@@ -259,7 +291,7 @@ export default function LoggingTest() {
       expect(receivedSeverities.length).assertLarger(0);
     })
 
-    it('noneSeverityFiltersAllMessages', 0, () => {
+    it('shouldFilterAllMessagesWhenSeverityNone', 0, () => {
       let receivedCount = 0;
       let loggable: webrtc.Loggable = {
         logMessage: (_message: string, _severity: number, _tag: string) => {

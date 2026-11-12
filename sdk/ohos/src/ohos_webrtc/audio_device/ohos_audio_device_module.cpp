@@ -1168,6 +1168,19 @@ NapiAudioDeviceModule::NapiAudioDeviceModule(const Napi::CallbackInfo& info) : O
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
+    // Env-level safety net for the per-handler Ref() in SetEventHandler: if the
+    // consumer never calls release(), the finalizer releases the event handlers
+    // when the env is torn down. The destructor disarms it via finalizerGuard_.
+    finalizerGuard_ = std::make_shared<std::atomic<bool>>(true);
+    auto guard = finalizerGuard_;
+    info.This().As<Napi::Object>().AddFinalizer(
+        [guard](Napi::Env, NapiAudioDeviceModule* self) {
+            if (guard->exchange(false)) {
+                self->RemoveAllEventHandlers();
+            }
+        },
+        this);
+
     AudioInputOptions inputOptions;
     AudioOutputOptions outputOptions;
 
@@ -1188,10 +1201,30 @@ NapiAudioDeviceModule::~NapiAudioDeviceModule()
 {
     RTC_DLOG(LS_INFO) << __FUNCTION__;
 
+    // Disarm the finalizer first: it must never touch this object after the
+    // destructor has run.
+    if (finalizerGuard_) {
+        finalizerGuard_->store(false);
+    }
+
     if (adm_) {
         adm_->UnregisterInputObserver(this);
         adm_->UnregisterOutputObserver(this);
     }
+
+    // Break the Ref/Unref cycle if release() was never called.
+    RemoveAllEventHandlers();
+}
+
+void NapiAudioDeviceModule::RemoveAllEventHandlers()
+{
+    RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    std::lock_guard<std::mutex> lock(mutex_);
+    for (auto& handler : eventHandlers_) {
+        handler.second.tsfn.Release();
+    }
+    eventHandlers_.clear();
 }
 
 Napi::Value NapiAudioDeviceModule::GetEventHandler(const Napi::CallbackInfo& info)
@@ -1283,13 +1316,7 @@ Napi::Value NapiAudioDeviceModule::Release(const Napi::CallbackInfo& info)
         adm_->UnregisterOutputObserver(this);
     }
 
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        for (auto& handler : eventHandlers_) {
-            handler.second.tsfn.Release();
-        }
-        eventHandlers_.clear();
-    }
+    RemoveAllEventHandlers();
 
     return info.Env().Undefined();
 }

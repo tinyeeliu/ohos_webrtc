@@ -13,6 +13,8 @@
  * limitations under the License.
  */
  
+/** 测试类型： unit（单元测试） */
+
 import { describe, beforeAll, beforeEach, afterEach, afterAll, it, expect } from '@ohos/hypium'
 import webrtc, { Logging, LoggingSeverity } from '@ohos/webrtc';
 import { sleep, isX86 } from './Helper';
@@ -93,7 +95,7 @@ export default function RTCSctpTransportTest() {
       // This API supports only one parameter: clear action function.
     })
 
-    it("anUnconnectedPeerConnectionMustNotHaveMaxChannelsSet", DEFAULT, async () => {
+    it('shouldNotHaveMaxChannelsSetWhenUnconnected', DEFAULT, async () => {
       caller.createDataChannel('test');
       const offer = await caller.createOffer();
       await caller.setRemoteDescription(offer);
@@ -104,7 +106,7 @@ export default function RTCSctpTransportTest() {
       expect(caller.sctp?.maxChannels).assertUndefined();
     })
 
-    it("maxChannelsGetsInstantiatedAfterConnecting", DEFAULT, async () => {
+    it('shouldInstantiateMaxChannelsAfterConnecting', DEFAULT, async () => {
       caller.createDataChannel("");
       exchangeIceCandidates(caller, callee);
       await exchangeOfferAnswer(caller, callee);
@@ -114,14 +116,14 @@ export default function RTCSctpTransportTest() {
       expect(caller.sctp?.maxChannels).assertEqual(callee.sctp?.maxChannels);
     })
 
-    it("maxMessageSizeAfterInitializationNotNull", DEFAULT, async () => {
+    it('shouldHaveMaxMessageSizeAfterInitialization', DEFAULT, async () => {
       caller.createDataChannel('');
       await exchangeOfferAnswer(caller, callee);
       console.info(TAG, "maxMessageSize: ", caller.sctp?.maxMessageSize);
       expect(caller.sctp?.maxMessageSize).not().assertUndefined();
     })
 
-    it("RTCDtlsTransportAfterInitializationNotNull", DEFAULT, async () => {
+    it('shouldHaveNonNullDtlsTransportAfterInitialization', DEFAULT, async () => {
       let audioSource = pcf?.createAudioSource();
       let audioTrack = pcf?.createAudioTrack("audio", audioSource);
 
@@ -133,7 +135,7 @@ export default function RTCSctpTransportTest() {
       expect(caller.sctp?.transport).not().assertUndefined();
     })
 
-    it("whenTheStateChangesTheEventWillTrigger", DEFAULT, async () => {
+    it('shouldTriggerOnstatechangeWhenStateChanges', DEFAULT, async () => {
       let audioSource = pcf?.createAudioSource();
       let audioTrack = pcf?.createAudioTrack("audio", audioSource);
 

@@ -17,7 +17,9 @@
 #define WEBRTC_EVENT_EVENT_TARGET_H
 
 #include <algorithm>
+#include <atomic>
 #include <map>
+#include <memory>
 #include <queue>
 #include <mutex>
 #include <string>
@@ -47,16 +49,59 @@ public:
 
         // Hold the reference until stopped
         this->Ref();
+
+        // Env-level safety net: if the consumer never calls Stop() the Ref()
+        // above keeps the object alive, so this finalizer can only run when
+        // the env is torn down. It shuts the target down if the destructor
+        // has not run yet; the destructor disarms it via finalizerGuard_ so
+        // it never touches the object after destruction.
+        finalizerGuard_ = std::make_shared<std::atomic<bool>>(true);
+        auto guard = finalizerGuard_;
+        info.This().As<Napi::Object>().AddFinalizer(
+            [guard](Napi::Env, NapiEventTarget* self) {
+                if (guard->exchange(false)) {
+                    self->ShutdownEventTarget();
+                }
+            },
+            this);
     }
 
     ~NapiEventTarget() override
     {
-        tsfn_.Release();
+        // Disarm the finalizer first: it must never touch this object after
+        // the destructor has run.
+        if (finalizerGuard_) {
+            finalizerGuard_->store(false);
+        }
+        ShutdownEventTarget();
+    }
+
+    /**
+     * Stops event delivery and balances the constructor's Ref(). Idempotent
+     * and thread-compatible with Run(): the DidStop()/Unref() pair runs
+     * exactly once, here or at the end of Run(), whichever comes first.
+     * Subclass destructors must call this before releasing native resources
+     * whose observer callbacks dispatch events, so late events are dropped
+     * instead of being delivered to a dying object.
+     */
+    void ShutdownEventTarget()
+    {
+        shouldStop_ = true;
+        NotifyStopped();
+        if (!tsfnReleased_) {
+            tsfnReleased_ = true;
+            tsfn_.Release();
+        }
     }
 
     void Dispatch(std::unique_ptr<Event<T>> event)
     {
         RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+        if (shouldStop_) {
+            // Dropped: the target is stopped or being destroyed.
+            return;
+        }
 
         this->Enqueue(std::move(event));
 
@@ -69,7 +114,12 @@ public:
     virtual void Stop()
     {
         shouldStop_ = true;
-        Dispatch(EmptyEvent<T>::Create());
+        // Wake Run() so it observes the stop, runs DidStop() and balances the
+        // constructor Ref(). Events are no longer accepted once stopped.
+        napi_status status = tsfn_.BlockingCall([](Napi::Env env, Napi::Function func) { func.Call({}); });
+        if (status != napi_ok && status != napi_closing) {
+            RTC_LOG(LS_ERROR) << " tsfn call error: " << status;
+        }
     }
 
     bool ShouldStop() const
@@ -160,11 +210,7 @@ protected:
         }
 
         if (shouldStop_) {
-            this->DidStop();
-            auto refCount = this->Unref();
-            if (refCount > 0) {
-                RTC_LOG(LS_WARNING) << "Reference count of napi object is greater than 0: " << refCount;
-            }
+            NotifyStopped();
         }
     }
 
@@ -190,7 +236,24 @@ protected:
     }
 
 private:
+    // Runs DidStop() and balances the constructor Ref() exactly once.
+    void NotifyStopped()
+    {
+        bool expected = false;
+        if (!stopNotified_.compare_exchange_strong(expected, true)) {
+            return;
+        }
+        this->DidStop();
+        auto refCount = this->Unref();
+        if (refCount > 0) {
+            RTC_LOG(LS_WARNING) << "Reference count of napi object is greater than 0: " << refCount;
+        }
+    }
+
     std::atomic<bool> shouldStop_{false};
+    std::atomic<bool> stopNotified_{false};
+    bool tsfnReleased_{false};
+    std::shared_ptr<std::atomic<bool>> finalizerGuard_;
     mutable std::mutex mutex_;
     std::map<std::string, Napi::FunctionReference> eventHandlers_;
     Napi::ThreadSafeFunction tsfn_;

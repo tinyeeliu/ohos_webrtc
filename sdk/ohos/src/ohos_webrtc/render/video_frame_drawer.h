@@ -27,6 +27,8 @@ namespace webrtc {
 
 class VideoFrameDrawer {
 public:
+    ~VideoFrameDrawer();
+
     void DrawFrame(const VideoFrame& frame, GlDrawer& drawer, const Matrix& additionalRenderMatrix);
     void DrawFrame(
         const VideoFrame& frame, GlDrawer& drawer, const Matrix& additionalRenderMatrix, int viewportX, int viewportY,

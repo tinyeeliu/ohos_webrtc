@@ -82,7 +82,8 @@ static napi_value Init(napi_env env, napi_value exports)
 
     static std::once_flag g_hilogSinkOnce;
     std::call_once(g_hilogSinkOnce, []() {
-        rtc::LogMessage::AddLogToStream(new HilogSink(), rtc::LS_INFO);
+        static auto sink = std::make_unique<HilogSink>();
+        rtc::LogMessage::AddLogToStream(sink.get(), rtc::LS_INFO);
     });
 
     Env e(env);

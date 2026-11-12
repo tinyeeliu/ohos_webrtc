@@ -31,28 +31,58 @@ interface DisplayIdEventWindow {
   off(type: 'displayIdChange', callback: (id: number) => void): void;
 }
 
+/**
+ * Options for {@link CameraPreviewSession}.
+ *
+ * Field validation happens in the constructor: width/height must be positive
+ * integers, maxRetries a non-negative integer, and frameStallTimeoutMs either
+ * 0 (disabled) or within 1000..60000 ms; invalid combinations throw.
+ */
 export interface CameraPreviewOptions {
+  /** Requested capture width in pixels. Defaults to 1280. */
   width?: number;
+  /** Requested capture height in pixels. Defaults to 720. */
   height?: number;
+  /** Prefer the front camera when no deviceId is given. Defaults to false. */
   front?: boolean;
   // A nonempty ID is strict: never silently substitute another device.
   deviceId?: string;
+  /** Allow falling back to the first available camera. Defaults to true. */
   allowFallback?: boolean;
+  /** Reopen the camera automatically after interruptions. Defaults to true. */
   autoRecover?: boolean;
+  /** Maximum automatic recovery attempts. Defaults to 3. */
   maxRetries?: number;
+  /** Scaling mode handed to the render controller. */
   scalingMode?: ScalingMode;
   // 0 (default) disables monitoring. Explicitly enable with 1000..60000 ms.
   frameStallTimeoutMs?: number;
 }
 
+/** Snapshot of the session state delivered through {@link CameraPreviewSession.onStatusChanged}. */
 export interface CameraPreviewStatus {
+  /** Session state: starting/running/suspended/recovering/error/incompatible. */
   state: string;
+  /** Camera id currently in use; empty when none is selected. */
   cameraId: string;
+  /** Whether the selected camera is a front camera. */
   front: boolean;
+  /** Failure detail when state is error/recovering/incompatible. */
   error: string;
 }
 
-/** Owns capture recovery, not page layout. Grant camera permission before construction. */
+/**
+ * Owns capture recovery, not page layout. Grant camera permission before construction.
+ *
+ * Uses system capabilities {@code SystemCapability.Multimedia.Camera},
+ * {@code SystemCapability.WindowManager}, and {@code SystemCapability.Display}.
+ * Required permission: {@code ohos.permission.CAMERA}.
+ *
+ * Lifecycle: ArkTS has no finalizers, so the session cannot release itself.
+ * The host component MUST call {@link release} from aboutToDisappear; otherwise
+ * the camera keeps capturing and the registered system event listeners keep
+ * the session alive for the lifetime of the application.
+ */
 export class CameraPreviewSession {
   public onStatusChanged?: (status: CameraPreviewStatus) => void;
   // Capture recovery can replace a track. Callers publishing it must replace their sender track here.
@@ -111,7 +141,15 @@ export class CameraPreviewSession {
       (this.frameStallTimeoutMs !== 0 && (this.frameStallTimeoutMs < 1000 || this.frameStallTimeoutMs > 60000))) {
       throw new Error('Invalid camera preview options');
     }
-    this.manager = camera.getCameraManager(context);
+    try {
+      this.manager = camera.getCameraManager(context);
+    } catch (e) {
+      // Fail-fast is preserved: the original exception propagates unchanged so
+      // host error handling keeps working; the diagnostic record is additive.
+      Logging.e('CameraPreviewSession', 'Camera manager unavailable: ' +
+        (e instanceof Error ? e.message : 'unknown error'));
+      throw e;
+    }
     try {
       this.manager.on('cameraStatus', this.onCameraStatus);
       this.deviceListening = true;
@@ -132,19 +170,37 @@ export class CameraPreviewSession {
     }
   }
 
+  /** The currently captured track; replaced when capture recovery swaps cameras. */
   get track(): MediaStreamTrack | undefined { return this.videoTrack; }
 
+  /**
+   * Binds the session to a host window and starts observing window/display events.
+   * Idempotent per window; re-binding detaches the previous window.
+   */
   attachWindow(host: window.Window): void {
     if (this.released || this.hostWindow === host) { return; }
     this.detachWindow();
     this.hostWindow = host;
-    host.on('windowEvent', this.onWindowEvent);
-    host.on('windowSizeChange', this.onWindowSizeChange);
+    try {
+      host.on('windowEvent', this.onWindowEvent);
+    } catch (e) {
+      Logging.e('CameraPreviewSession', 'Window events unavailable');
+    }
+    try {
+      host.on('windowSizeChange', this.onWindowSizeChange);
+    } catch (e) {
+      Logging.e('CameraPreviewSession', 'Window size events unavailable');
+    }
     try {
       (host as Object as DisplayIdEventWindow).on('displayIdChange', this.onDisplayIdChange);
       this.displayIdListening = true;
     } catch (e) { Logging.e('CameraPreviewSession', 'Window display migration events unavailable'); }
-    this.visible = host.isWindowShowing();
+    try {
+      this.visible = host.isWindowShowing();
+    } catch (e) {
+      Logging.e('CameraPreviewSession', 'Window visibility query unavailable; assuming hidden');
+      this.visible = false;
+    }
     this.reconcile();
   }
 
@@ -155,6 +211,12 @@ export class CameraPreviewSession {
     this.reconcile();
   }
 
+  /**
+   * Switches the camera preference without waiting for the next reconcile.
+   *
+   * @param front prefer the front camera when deviceId is empty.
+   * @param deviceId strict device id; an empty string means "by position".
+   */
   setCameraPreference(front: boolean, deviceId: string = ''): void {
     if (this.released || (this.front === front && this.exactId === deviceId)) { return; }
     this.front = front;
@@ -163,12 +225,19 @@ export class CameraPreviewSession {
     if (this.canCapture()) { this.schedule(0); }
   }
 
+  /** Manual recovery attempt; no-op unless capture preconditions are met. */
   retry(): void {
     if (!this.canCapture()) { return; }
     this.retryCount = 0;
     this.schedule(0);
   }
 
+  /**
+   * Tears down the session: stops capture, clears timers, detaches the window,
+   * and unregisters every event listener. Idempotent; the session is unusable
+   * afterwards. Call this from the host component's aboutToDisappear to avoid
+   * leaking the camera and the registered system event listeners.
+   */
   release(): void {
     if (this.released) { return; }
     this.released = true;

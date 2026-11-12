@@ -71,6 +71,14 @@ void NapiDtlsTransport::Init(Napi::Env env, Napi::Object exports)
 NapiDtlsTransport::~NapiDtlsTransport()
 {
     RTC_DLOG(LS_INFO) << __FUNCTION__;
+
+    // Mirror NapiSctpTransport: if this JS wrapper is collected before the
+    // PeerConnection closes, the native transport must not keep dispatching
+    // to a dangling observer. Thread::BlockingCall already returns early when
+    // the network thread has stopped (IsQuitting), so teardown is safe.
+    if (factory_ && dtlsTransport_) {
+        factory_->GetNetworkThread()->BlockingCall([this] { dtlsTransport_->UnregisterObserver(); });
+    }
 }
 
 Napi::Object NapiDtlsTransport::NewInstance(

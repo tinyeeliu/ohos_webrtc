@@ -2,7 +2,7 @@
 
 ## 简介
 
-此目录为 OpenHarmony/HarmonyOS 应用示例工程，其中 ohos_webrtc 模块使用编译生成的 `libohos_webrtc.so` 及相关接口文件构建 HAR 包，entry 模块依赖 ohos_webrtc 并提供应用示例。当前本地 `build-profile.json5` 的目标和兼容 SDK 均为 `6.0.1(21)`，请使用配套的 DevEco Studio/SDK，并配置自己的调试签名。
+此目录为 OpenHarmony/HarmonyOS 应用示例工程，其中 ohos_webrtc 模块使用编译生成的 `libohos_webrtc.so` 及相关接口文件构建 HAR 包，entry 模块依赖 ohos_webrtc 并提供应用示例。当前本地 `build-profile.json5` 的 compileSdkVersion/compatibleSdkVersion 均为 15（与 CHANGELOG 1.0.5 同步），请使用配套的 DevEco Studio/SDK，并配置自己的调试签名。
 
 ## 准备
 

@@ -39,8 +39,8 @@ struct StaticObjectContainer {
 
 StaticObjectContainer& GetStaticObjects()
 {
-    static StaticObjectContainer* static_objects = new StaticObjectContainer();
-    return *static_objects;
+    static StaticObjectContainer static_objects;
+    return static_objects;
 }
 
 thread_local FunctionReference NapiNativeLogging::constructor_;
@@ -58,6 +58,25 @@ void NapiNativeLogging::Init(class Env env, Object exports)
             StaticMethod<&NapiNativeLogging::Log>(kMethodNameLog),
         });
     exports.Set(kClassName, func);
+
+    // Env-level safety net: the static sinks hold TSFNs tied to this env. If
+    // the env is torn down while a Loggable is still injected (host forgot
+    // deleteInjectedLoggable), detach the sinks from LogMessage so a dead
+    // TSFN is never invoked afterwards, and release the Persistent(loggable)
+    // reference held by the LogSink TSFN context.
+    exports.AddFinalizer(
+        [](Napi::Env, void*) {
+            auto& sinks = GetStaticObjects();
+            if (sinks.logSink) {
+                rtc::LogMessage::RemoveLogToStream(sinks.logSink.get());
+                sinks.logSink.reset();
+            }
+            if (sinks.hilogSink) {
+                rtc::LogMessage::RemoveLogToStream(sinks.hilogSink.get());
+                sinks.hilogSink.reset();
+            }
+        },
+        static_cast<void*>(nullptr));
 
     constructor_ = Persistent(func);
     constructor_.SuppressDestruct();
@@ -82,6 +101,12 @@ Napi::Value NapiNativeLogging::InjectLoggable(const Napi::CallbackInfo& info)
 
     auto loggable = info[0].As<Object>();
     auto severity = info[1].As<Number>().Int32Value();
+    // Compatibility: out-of-range values are ignored silently, matching the
+    // pre-validation behavior (no exception ever escaped this method); the
+    // previously injected Loggable, if any, is left untouched.
+    if (severity < rtc::LS_VERBOSE || severity > rtc::LS_NONE) {
+        return info.Env().Undefined();
+    }
 
     auto newLogSink = std::make_unique<LogSink>(info.Env(), loggable);
 

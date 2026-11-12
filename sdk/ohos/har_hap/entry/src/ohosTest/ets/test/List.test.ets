@@ -13,6 +13,8 @@
  * limitations under the License.
  */
  
+/** 测试类型： integration（集成测试） */
+
 import abilityTest from './Ability.test';
 import PeerConnectionTest from './PeerConnection.test';
 import RTCPeerConnectionGetStatsTest from './RTCPeerConnection-getStats.test';
@@ -37,9 +39,13 @@ import LoggingTest from './Logging.test';
 import RTCSessionDescriptionTest from './RTCSessionDescription.test';
 import VideoSourceTest from './VideoSource.test';
 import VideoRenderControllerTest from './VideoRenderController.test';
+import CameraPreviewSessionTest from './CameraPreviewSession.test';
 import VideoEncoderFactoryTest from './VideoEncoderFactory.test';
 import X86EmulatorFallbackTest from './X86EmulatorFallback.test';
 import CameraZoomTest from './CameraZoom.test';
+import DisplayAndPermissionTest from './DisplayAndPermission.test';
+import MultiDeviceAdaptationTest from './MultiDeviceAdaptation.test';
+import PeerConnectionLoopbackE2ETest from './PeerConnectionLoopbackE2E.test';
 import TrackEventsTest from './TrackEvents.test';
 
 export default function testsuite() {
@@ -67,8 +73,12 @@ export default function testsuite() {
   RTCSessionDescriptionTest();
   VideoSourceTest();
   VideoRenderControllerTest();
+  CameraPreviewSessionTest();
   VideoEncoderFactoryTest();
   X86EmulatorFallbackTest();
   CameraZoomTest();
+  DisplayAndPermissionTest();
+  MultiDeviceAdaptationTest();
+  PeerConnectionLoopbackE2ETest();
   TrackEventsTest();
 }

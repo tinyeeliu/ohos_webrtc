@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 
+/** 测试类型： unit（单元测试） */
+
 import { describe, beforeAll, it, expect } from '@ohos/hypium'
 import webrtc, { Logging, LoggingSeverity } from '@ohos/webrtc';
 
@@ -25,22 +27,22 @@ export default function VideoEncoderFactoryTest() {
     })
 
     describe('HardwareVideoEncoderFactory', () => {
-      it('constructWithDefaultOptions', 0, () => {
+      it('shouldConstructWithDefaultOptions', 0, () => {
         let factory = new webrtc.HardwareVideoEncoderFactory();
         expect(factory).not().assertNull();
       })
 
-      it('constructWithH264HighProfileTrue', 0, () => {
+      it('shouldConstructWithH264HighProfileTrue', 0, () => {
         let factory = new webrtc.HardwareVideoEncoderFactory(true);
         expect(factory.enableH264HighProfile).assertTrue();
       })
 
-      it('constructWithH264HighProfileFalse', 0, () => {
+      it('shouldConstructWithH264HighProfileFalse', 0, () => {
         let factory = new webrtc.HardwareVideoEncoderFactory(false);
         expect(factory.enableH264HighProfile).assertFalse();
       })
 
-      it('hardwareEncoderProducesOfferWithVideoMline', 0, async () => {
+      it('shouldProduceOfferWithVideoMlineUsingHardwareEncoder', 0, async () => {
         let encoderFactory = new webrtc.HardwareVideoEncoderFactory();
         let factory = new webrtc.PeerConnectionFactory({ videoEncoderFactory: encoderFactory });
         let videoSource = factory.createVideoSource();
@@ -59,12 +61,12 @@ export default function VideoEncoderFactoryTest() {
     })
 
     describe('SoftwareVideoEncoderFactory', () => {
-      it('construct', 0, () => {
+      it('shouldConstructSoftwareVideoEncoderFactory', 0, () => {
         let factory = new webrtc.SoftwareVideoEncoderFactory();
         expect(factory).not().assertNull();
       })
 
-      it('softwareEncoderProducesOfferWithVideoMline', 0, async () => {
+      it('shouldProduceOfferWithVideoMlineUsingSoftwareEncoder', 0, async () => {
         let encoderFactory = new webrtc.SoftwareVideoEncoderFactory();
         let factory = new webrtc.PeerConnectionFactory({ videoEncoderFactory: encoderFactory });
         let videoSource = factory.createVideoSource();
@@ -83,21 +85,21 @@ export default function VideoEncoderFactoryTest() {
     })
 
     describe('HardwareVideoDecoderFactory', () => {
-      it('construct', 0, () => {
+      it('shouldConstructHardwareVideoDecoderFactory', 0, () => {
         let factory = new webrtc.HardwareVideoDecoderFactory();
         expect(factory).not().assertNull();
       })
     })
 
     describe('SoftwareVideoDecoderFactory', () => {
-      it('construct', 0, () => {
+      it('shouldConstructSoftwareVideoDecoderFactory', 0, () => {
         let factory = new webrtc.SoftwareVideoDecoderFactory();
         expect(factory).not().assertNull();
       })
     })
 
     describe('AudioProcessingFactory', () => {
-      it('constructAndCreate', 0, () => {
+      it('shouldConstructAndCreateAudioProcessingFactory', 0, () => {
         let factory = new webrtc.AudioProcessingFactory();
         expect(factory).not().assertNull();
         let ap = factory.create();

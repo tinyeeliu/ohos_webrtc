@@ -181,6 +181,16 @@ NapiDataChannel::NapiDataChannel(const CallbackInfo& info)
 NapiDataChannel::~NapiDataChannel()
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    // Stop the event target first so late native callbacks are dropped instead
+    // of being delivered to a dying object, then detach this observer and close
+    // the channel so its resources (buffers/SCTP association) are released.
+    ShutdownEventTarget();
+    if (dataChannel_) {
+        dataChannel_->UnregisterObserver();
+        dataChannel_->Close();
+        dataChannel_ = nullptr;
+    }
 }
 
 rtc::scoped_refptr<DataChannelInterface> NapiDataChannel::Get() const

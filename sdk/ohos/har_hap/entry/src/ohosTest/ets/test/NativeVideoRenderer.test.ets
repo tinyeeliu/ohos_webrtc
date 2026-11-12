@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 
+/** 测试类型： unit（单元测试） */
+
 import { describe, beforeAll, it, expect } from '@ohos/hypium'
 import webrtc, { Logging, LoggingSeverity } from '@ohos/webrtc';
 
@@ -26,7 +28,7 @@ export default function NativeVideoRendererTest() {
       Logging.enableLogToDebugOutput(LoggingSeverity.VERBOSE);
     })
 
-    it('setVideoTrackWithAudioTrackHandled', 0, () => {
+    it('shouldHandleAudioTrackWhenSetVideoTrack', 0, () => {
       let renderer = new webrtc.NativeVideoRenderer();
       let audioSource = pcf.createAudioSource();
       let audioTrack = pcf.createAudioTrack('audio', audioSource);
@@ -38,7 +40,7 @@ export default function NativeVideoRendererTest() {
       audioSource.release();
     })
 
-    it('initWithEmptyStringThrows', 0, () => {
+    it('shouldThrowWhenInitWithEmptyString', 0, () => {
       let renderer = new webrtc.NativeVideoRenderer();
       try {
         renderer.init('');
@@ -48,7 +50,7 @@ export default function NativeVideoRendererTest() {
       }
     })
 
-    it('initWithNonNumericStringThrows', 0, () => {
+    it('shouldThrowWhenInitWithNonNumericString', 0, () => {
       let renderer = new webrtc.NativeVideoRenderer();
       try {
         renderer.init('not-a-number');
@@ -58,7 +60,7 @@ export default function NativeVideoRendererTest() {
       }
     })
 
-    it('initWithPartialNumericStringThrows', 0, () => {
+    it('shouldThrowWhenInitWithPartialNumericString', 0, () => {
       let renderer = new webrtc.NativeVideoRenderer();
       try {
         renderer.init('123abc');
@@ -68,32 +70,52 @@ export default function NativeVideoRendererTest() {
       }
     })
 
-    it('setVideoTrackAfterReleaseDoesNotCrash', 0, () => {
+    it('shouldNotCrashWhenSetVideoTrackAfterRelease', 0, () => {
       let renderer = new webrtc.NativeVideoRenderer();
       let videoSource = pcf.createVideoSource();
       let videoTrack = pcf.createVideoTrack('video', videoSource);
-      renderer.release();
-      renderer.setVideoTrack(videoTrack);
+      try {
+        renderer.release();
+        renderer.setVideoTrack(videoTrack);
+        expect(true).assertTrue();
+      } catch (e) {
+        expect(false).assertTrue();
+      }
       videoSource.release();
     })
 
-    it('setMirrorDoesNotCrash', 0, () => {
+    it('shouldNotCrashWhenSetMirror', 0, () => {
       let renderer = new webrtc.NativeVideoRenderer();
-      renderer.setMirror(true);
-      renderer.setMirror(false);
+      try {
+        renderer.setMirror(true);
+        renderer.setMirror(false);
+        expect(true).assertTrue();
+      } catch (e) {
+        expect(false).assertTrue();
+      }
     })
 
-    it('setMirrorVerticallyDoesNotCrash', 0, () => {
+    it('shouldNotCrashWhenSetMirrorVertically', 0, () => {
       let renderer = new webrtc.NativeVideoRenderer();
-      renderer.setMirrorVertically(true);
-      renderer.setMirrorVertically(false);
+      try {
+        renderer.setMirrorVertically(true);
+        renderer.setMirrorVertically(false);
+        expect(true).assertTrue();
+      } catch (e) {
+        expect(false).assertTrue();
+      }
     })
 
-    it('setScalingModeAllValuesDoesNotCrash', 0, () => {
+    it('shouldNotCrashWhenSetScalingModeAllValues', 0, () => {
       let renderer = new webrtc.NativeVideoRenderer();
-      renderer.setScalingMode(0);
-      renderer.setScalingMode(1);
-      renderer.setScalingMode(2);
+      try {
+        renderer.setScalingMode(0);
+        renderer.setScalingMode(1);
+        renderer.setScalingMode(2);
+        expect(true).assertTrue();
+      } catch (e) {
+        expect(false).assertTrue();
+      }
     })
   })
 }

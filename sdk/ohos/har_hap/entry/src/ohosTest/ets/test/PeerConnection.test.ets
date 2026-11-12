@@ -13,9 +13,27 @@
  * limitations under the License.
  */
  
+/** 测试类型： integration（集成测试） */
+
 import { describe, beforeAll, beforeEach, afterEach, afterAll, it, expect } from '@ohos/hypium'
 import webrtc, { Logging, LoggingSeverity } from '@ohos/webrtc';
 import { sleep, isX86 } from './Helper';
+import {
+  AUDIO_ONLY_SESSION_SDP,
+  INVALID_SDP_BOGUS,
+  INVALID_SDP_MARKED_CONTENT,
+  INVALID_SDP_PLAIN_TEXT,
+  ICE_CANDIDATE_POOL_SIZE,
+  DATA_CHANNEL_PROTOCOL,
+  DATA_CHANNEL_MAX_PACKET_LIFETIME_MS,
+  DATA_CHANNEL_TEST_LABEL,
+  DATA_CHANNEL_TEST_MESSAGE,
+  createOfferInit,
+  createAnswerInit,
+  createTransceiverInit,
+  createDataChannelInit,
+  createStunServerConfiguration
+} from './TestFixtures';
 
 const DEFAULT = 0
 const TAG: string = '[PeerConnectionTest]';
@@ -24,50 +42,6 @@ const pcf = new webrtc.PeerConnectionFactory();
 
 let caller: webrtc.RTCPeerConnection;
 let callee: webrtc.RTCPeerConnection;
-
-
-const sdp = 'v=0\r\n' +
-  'o=- 166855176514521964 2 IN IP4 127.0.0.1\r\n' +
-  's=-\r\n' +
-  't=0 0\r\n' +
-  'a=ice-options:trickle\r\n' +
-  'm=audio 9 UDP/TLS/RTP/SAVPF 111\r\n' +
-  'c=IN IP4 0.0.0.0\r\n' +
-  'a=rtcp:9 IN IP4 0.0.0.0\r\n' +
-  'a=ice-ufrag:someufrag\r\n' +
-  'a=ice-pwd:somelongpwdwithenoughrandomness\r\n' +
-  'a=fingerprint:sha-256 8C:71:B3:8D:A5:38:FD:8F:A4:2E:A2:65:6C:86:52:BC:E0:6E:94:F2:9F:7C:4D:B5:DF:AF:AA:6F:44:90:8D:F4\r\n' +
-  'a=setup:actpass\r\n' +
-  'a=rtcp-mux\r\n' +
-  'a=mid:mid1\r\n' +
-  'a=sendonly\r\n' +
-  'a=msid:stream1 track1\r\n' +
-  'a=ssrc:1001 cname:some\r\n' +
-  'a=rtpmap:111 opus/48000/2\r\n';
-
-let offer = {
-  sdp: "v=0\r\no=- 8926124112408190582 2 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\na=extmap-allow-mixed\r\na=msid-semantic: WMS\r\n",
-  type: "offer"
-} as webrtc.RTCSessionDescriptionInit;
-
-let answer = {
-  sdp: "v=0\r\no=- 1824345164880213868 2 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\na=extmap-allow-mixed\r\na=msid-semantic: WMS\r\n",
-  type: "answer"
-} as webrtc.RTCSessionDescriptionInit;
-
-let transceiverInit = {
-  direction: 'sendrecv',
-  streams: [],
-  sendEncodings: [{
-    maxBitrate: 100000,
-  }],
-} as webrtc.RTCRtpTransceiverInit;
-
-let dataChannel: webrtc.RTCDataChannelInit = {
-  ordered: true,
-  maxPacketLifeTime: 3000,
-  protocol: "sctp-protocol",
-};
 
 async function exchangeOffer(caller: webrtc.RTCPeerConnection, callee: webrtc.RTCPeerConnection) {
   await caller.setLocalDescription(await caller.createOffer());
@@ -192,7 +166,7 @@ export default function PeerConnectionTest() {
       // This API supports only one parameter: clear action function.
     })
 
-    it('addAndRemoveTrack', DEFAULT, () => {
+    it('shouldAddAndRemoveTrack', DEFAULT, () => {
       let audioSource = pcf?.createAudioSource();
       let audioTrack = pcf?.createAudioTrack("audio", audioSource);
       expect(audioTrack.kind).assertEqual("audio");
@@ -211,7 +185,7 @@ export default function PeerConnectionTest() {
       }
     })
 
-    it("addIceCandidate", DEFAULT, async () => {
+    it('shouldAddIceCandidate', DEFAULT, async () => {
       let candidate: webrtc.RTCIceCandidate | undefined = undefined;
       let icePromise = new Promise<void>((resolve) => {
         caller.onicecandidate = (event) => {
@@ -249,13 +223,13 @@ export default function PeerConnectionTest() {
       }
     })
 
-    it("AddTransceiverWithStringNoInit", DEFAULT, () => {
+    it('shouldAddTransceiverWithStringNoInit', DEFAULT, () => {
       let tranSceiver = caller?.addTransceiver("audio");
       console.info(TAG, 'addTransceiver: ' + JSON.stringify(tranSceiver));
       expect(caller.getTransceivers().length).assertEqual(1);
     })
 
-    it("AddTransceiverWithTrackNoInit", DEFAULT, () => {
+    it('shouldAddTransceiverWithTrackNoInit', DEFAULT, () => {
       let audioSource = pcf?.createAudioSource({
         echoCancellation: false
       });
@@ -265,78 +239,78 @@ export default function PeerConnectionTest() {
       expect(caller.getTransceivers().length).assertEqual(1);
     })
 
-    it("AddTransceiverWithTrackAndInit", DEFAULT, () => {
+    it('shouldAddTransceiverWithTrackAndInit', DEFAULT, () => {
       let audioSource = pcf?.createAudioSource({
         echoCancellation: false
       });
       let audioTrack = pcf?.createAudioTrack("audio", audioSource);
-      let tranSceiver = caller?.addTransceiver(audioTrack, transceiverInit);
+      let tranSceiver = caller?.addTransceiver(audioTrack, createTransceiverInit());
       console.info(TAG, 'addTransceiver: ' + JSON.stringify(tranSceiver));
       expect(caller.getTransceivers().length).assertEqual(1);
     })
 
-    it("AddTransceiverWithStringAndInit", DEFAULT, () => {
-      let tranSceiver = caller?.addTransceiver("audio", transceiverInit);
+    it('shouldAddTransceiverWithStringAndInit', DEFAULT, () => {
+      let tranSceiver = caller?.addTransceiver("audio", createTransceiverInit());
       console.info(TAG, 'addTransceiver: ' + JSON.stringify(tranSceiver));
       expect(caller.getTransceivers().length).assertEqual(1);
     })
 
-    it("createOffer", DEFAULT, async () => {
+    it('shouldCreateOffer', DEFAULT, async () => {
       createSetOffer();
     })
 
-    it("createOfferAddOptions", DEFAULT, async () => {
+    it('shouldCreateOfferAddOptions', DEFAULT, async () => {
       let options: webrtc.RTCOfferOptions = {
         iceRestart: true
       }
       createSetOffer(options);
     })
 
-    it("createAnswer", DEFAULT, async () => {
-      await caller?.setRemoteDescription(offer);
+    it('shouldCreateAnswer', DEFAULT, async () => {
+      await caller?.setRemoteDescription(createOfferInit());
       createSetAnswer();
     })
 
-    it("createAnswerAddOptions", DEFAULT, async () => {
-      await caller?.setRemoteDescription(offer);
+    it('shouldCreateAnswerAddOptions', DEFAULT, async () => {
+      await caller?.setRemoteDescription(createOfferInit());
       let options: webrtc.RTCAnswerOptions = {};
       createSetAnswer(options);
     })
 
-    it("setLocalDescriptionWithOffer", DEFAULT, async () => {
-      await caller?.setLocalDescription(offer);
+    it('shouldSetLocalDescriptionWithOffer', DEFAULT, async () => {
+      await caller?.setLocalDescription(createOfferInit());
       expect(caller.signalingState).assertEqual("have-local-offer");
     })
 
-    it("setLocalDescriptionNoOffer", DEFAULT, async () => {
+    it('shouldSetLocalDescriptionWithoutOffer', DEFAULT, async () => {
       await caller?.setLocalDescription();
       expect(caller.signalingState).assertEqual("have-local-offer");
       expect(caller.pendingLocalDescription).not().assertNull();
     })
 
-    it("setLocalDescriptionWithAnswer", DEFAULT, async () => {
-      await caller?.setRemoteDescription(offer);
-      await caller?.setLocalDescription(answer);
+    it('shouldSetLocalDescriptionWithAnswer', DEFAULT, async () => {
+      await caller?.setRemoteDescription(createOfferInit());
+      await caller?.setLocalDescription(createAnswerInit());
       expect(caller.signalingState).assertEqual("stable");
     })
 
-    it("setLocalDescriptionNoAnswer", DEFAULT, async () => {
+    it('shouldSetLocalDescriptionWithoutAnswer', DEFAULT, async () => {
       await callee.setRemoteDescription(await caller.createOffer());
       await callee.setLocalDescription();
       expect(callee.currentLocalDescription).not().assertNull();
       expect(caller.signalingState).assertEqual("stable");
     })
 
-    it("setRemoteDescription", DEFAULT, async () => {
+    it('shouldSetRemoteDescription', DEFAULT, async () => {
       expect(caller.signalingState).assertEqual("stable");
       caller.onsignalingstatechange = () => {
         console.log(TAG, 'Signaling state change: ', caller.signalingState);
       };
-      await caller?.setRemoteDescription(offer);
+      await caller?.setRemoteDescription(createOfferInit());
       expect(caller.signalingState).assertEqual("have-remote-offer");
     })
 
-    it("getReceivers", DEFAULT, () => {
+    it('shouldGetReceivers', DEFAULT, () => {
       let receiver = caller.getReceivers();
       expect(receiver.length).assertEqual(0);
 
@@ -350,16 +324,16 @@ export default function PeerConnectionTest() {
       expect(newReceiver.length).assertEqual(1);
     })
 
-    it("createDataChannelWithInit", DEFAULT, () => {
-      let channel = caller.createDataChannel("1", dataChannel);
+    it('shouldCreateDataChannelWithInit', DEFAULT, () => {
+      let channel = caller.createDataChannel("1", createDataChannelInit());
 
       expect(channel.label).assertEqual("1");
       expect(channel.ordered).assertTrue();
-      expect(channel.maxPacketLifeTime).assertEqual(3000);
-      expect(channel.protocol).assertEqual("sctp-protocol");
+      expect(channel.maxPacketLifeTime).assertEqual(DATA_CHANNEL_MAX_PACKET_LIFETIME_MS);
+      expect(channel.protocol).assertEqual(DATA_CHANNEL_PROTOCOL);
     })
 
-    it("createDataChannelNoInit", DEFAULT, () => {
+    it('shouldCreateDataChannelWithoutInit', DEFAULT, () => {
       let channel = caller.createDataChannel("1");
 
       console.info(TAG, 'channel: ', JSON.stringify(channel));
@@ -368,22 +342,19 @@ export default function PeerConnectionTest() {
       expect(channel.ordered).assertTrue();
     })
 
-    it("setAndGetConfiguration", DEFAULT, async () => {
+    it('shouldSetAndGetConfiguration', DEFAULT, async () => {
       expect(caller.getConfiguration().iceCandidatePoolSize).assertEqual(0)
       caller.setConfiguration();
       let config = caller.getConfiguration();
 
       expect(config.iceCandidatePoolSize).assertEqual(0);
 
-      let newConfig: webrtc.RTCConfiguration = {
-        iceServers: [{ urls: 'stun:stun.example.com:19302' }],
-        iceCandidatePoolSize: 10
-      };
+      let newConfig: webrtc.RTCConfiguration = createStunServerConfiguration();
       caller.setConfiguration(newConfig);
 
       let updatedConfig = caller.getConfiguration();
       expect(updatedConfig.iceServers!.length).assertEqual(1);
-      expect(updatedConfig.iceCandidatePoolSize).assertEqual(10);
+      expect(updatedConfig.iceCandidatePoolSize).assertEqual(ICE_CANDIDATE_POOL_SIZE);
 
       try {
         let stat = await caller.getStats();
@@ -394,7 +365,7 @@ export default function PeerConnectionTest() {
       }
     })
 
-    it("restartIce", DEFAULT, async () => {
+    it('shouldRestartIce', DEFAULT, async () => {
       let flag = false;
       let promise = new Promise<void>((resolve) => {
         caller.onnegotiationneeded = async () => {
@@ -407,7 +378,7 @@ export default function PeerConnectionTest() {
       expect(flag).assertTrue();
     })
 
-    it("afterCloseCallerSetConfigurationWillFail", DEFAULT, () => {
+    it('shouldThrowWhenSetConfigurationAfterClose', DEFAULT, () => {
       caller.close();
       try {
         caller.setConfiguration();
@@ -417,7 +388,7 @@ export default function PeerConnectionTest() {
       }
     })
 
-    it("directionWillChanged", DEFAULT, async () => {
+    it('shouldChangeTransceiverDirection', DEFAULT, async () => {
       let calleePromise = callee.createOffer().then((offer) => {
         return caller.setRemoteDescription(offer);
       }).then(() => {
@@ -434,7 +405,7 @@ export default function PeerConnectionTest() {
       expect(caller.getTransceivers()[0].direction).assertEqual('inactive');
     })
 
-    it("transceiverSenderTrackDoesNotRevertToAnOldState", DEFAULT, async () => {
+    it('shouldNotRevertTransceiverSenderTrackToOldState', DEFAULT, async () => {
       let offer = await callee.createOffer();
       await caller.setRemoteDescription(offer);
       let answer = await caller.createAnswer();
@@ -447,10 +418,10 @@ export default function PeerConnectionTest() {
       expect(caller.getSenders()[0].track!.id).assertEqual(caller.getReceivers()[0].track.id);
     })
 
-    it("inValidSdp", DEFAULT, async () => {
+    it('shouldRejectSetRemoteDescriptionWithBogusSdp', DEFAULT, async () => {
       try {
         await caller.setRemoteDescription({
-          sdp: 'bogus', type: 'offer'
+          sdp: INVALID_SDP_BOGUS, type: 'offer'
         });
       } catch (e) {
         console.error(TAG, "e: ", e);
@@ -458,13 +429,13 @@ export default function PeerConnectionTest() {
       }
     })
 
-    it("rollbackInvalidSdp", DEFAULT, async () => {
+    it('shouldRejectRollbackWithInvalidSdp', DEFAULT, async () => {
       try {
         const offer = await generateAudioReceiveOnlyOffer(caller);
         await caller.setRemoteDescription(offer);
         await caller.setRemoteDescription({
           type: 'rollback',
-          sdp: '!<Invalid SDP Content>;'
+          sdp: INVALID_SDP_MARKED_CONTENT
         });
       } catch (e) {
         console.error(TAG, "e: ", e);
@@ -472,7 +443,7 @@ export default function PeerConnectionTest() {
       }
     });
 
-    it("localOfferCreatedBeforeSetRemoteDescriptionThenRollbackShouldStillBeUsable", DEFAULT, async () => {
+    it('shouldReuseLocalOfferAfterSetRemoteDescriptionRollback', DEFAULT, async () => {
       caller.addTransceiver('audio', {
         direction: 'recvonly'
       });
@@ -493,7 +464,7 @@ export default function PeerConnectionTest() {
       }
     })
 
-    it("removeTrackWithASenderBeingRolledBackDoesNotCrashOrThrow", DEFAULT, async () => {
+    it('shouldNotThrowWhenRemoveTrackAfterRollback', DEFAULT, async () => {
       callee.addTransceiver('audio');
       let offer = await callee.createOffer();
       await caller.setRemoteDescription(offer);
@@ -504,7 +475,7 @@ export default function PeerConnectionTest() {
       caller.removeTrack(transceiver[0].sender);
     })
 
-    it("setRemoteDescriptionPranswerWhenStable", DEFAULT, async () => {
+    it('shouldRejectSetRemoteDescriptionPranswerWhenStable', DEFAULT, async () => {
       let offer = await caller.createOffer();
       console.info(TAG, "signalingState: ", caller.signalingState);
       try {
@@ -517,7 +488,7 @@ export default function PeerConnectionTest() {
       }
     })
 
-    it("setRemoteDescriptionWithValidOfferShouldSucceed", DEFAULT, async () => {
+    it('shouldSetRemoteDescriptionWithValidOffer', DEFAULT, async () => {
       caller.createDataChannel('datachannel');
       let states: webrtc.RTCSignalingState[] = [];
       let promise = new Promise<void>((resolve) => {
@@ -535,11 +506,11 @@ export default function PeerConnectionTest() {
       expect(states).assertDeepEquals(['have-remote-offer']);
     })
 
-    it("setRemoteDescriptionWithInvalidSdp", DEFAULT, async () => {
+    it('shouldRejectSetRemoteDescriptionWithInvalidSdp', DEFAULT, async () => {
       try {
         await caller.setRemoteDescription({
           type: 'offer',
-          sdp: 'Invalid SDP'
+          sdp: INVALID_SDP_PLAIN_TEXT
         });
         console.error(TAG, 'Expect promise to be rejected');
         expect().assertFail();
@@ -548,7 +519,7 @@ export default function PeerConnectionTest() {
       }
     });
 
-    it("onsignalingstatechangeBeforeSetLocalDescription", DEFAULT, async () => {
+    it('shouldTriggerOnsignalingstatechangeBeforeSetLocalDescription', DEFAULT, async () => {
       const offer = await caller.createOffer();
       let eventSequence = '';
 
@@ -566,7 +537,7 @@ export default function PeerConnectionTest() {
       expect(eventSequence).assertEqual('onsignalingstatechange;setLocalDescription;');
     });
 
-    it("setLocalDescriptionRollbackFromLocalOffer", DEFAULT, async () => {
+    it('shouldRollbackFromLocalOffer', DEFAULT, async () => {
       let states: webrtc.RTCSignalingState [] = [];
       let promise1 = new Promise<void>((resolve) => {
         caller.onsignalingstatechange = () => {
@@ -598,8 +569,7 @@ export default function PeerConnectionTest() {
       expect(states).assertDeepEquals(['have-local-offer', 'stable']);
     })
 
-
-    it("setLocalDescriptionRollbackFromState", DEFAULT, async () => {
+    it('shouldRejectRollbackWhenStable', DEFAULT, async () => {
       try {
         await caller.setLocalDescription({
           type: 'rollback'
@@ -610,7 +580,7 @@ export default function PeerConnectionTest() {
       }
     })
 
-    it("setLocalDescriptionRollbackAfterSettingAnswerDescriptionShouldRejectWithInvalidStateError", DEFAULT,
+    it('shouldRejectRollbackAfterSettingAnswerDescription', DEFAULT,
       async () => {
         let offer = await generateAudioReceiveOnlyOffer(caller);
         await caller.setRemoteDescription(offer);
@@ -626,20 +596,20 @@ export default function PeerConnectionTest() {
         }
       })
 
-    it("setLocalDescriptionRollbackIgnoreInvalidSdp", DEFAULT, async () => {
+    it('shouldIgnoreInvalidSdpOnRollback', DEFAULT, async () => {
       let offer = await caller.createOffer()
       caller.setLocalDescription(offer)
       try {
         caller.setLocalDescription({
           type: 'rollback',
-          sdp: '!<Invalid SDP Content>;'
+          sdp: INVALID_SDP_MARKED_CONTENT
         });
       } catch (e) {
         expect().assertFail();
       }
     })
 
-    it("setLocalDescriptionRollbackShouldUpdateInternalStateWithAQueuedTaskInTheRightOrder", DEFAULT, async () => {
+    it('shouldUpdateInternalStateWithQueuedTaskOnRollback', DEFAULT, async () => {
       caller.addTransceiver('audio', {
         direction: 'recvonly'
       });
@@ -664,7 +634,7 @@ export default function PeerConnectionTest() {
       await sldPromise;
     })
 
-    it("setLocalDescriptionPranswerFromStable", DEFAULT, async () => {
+    it('shouldRejectSetLocalDescriptionPranswerFromStable', DEFAULT, async () => {
       let offer = await caller.createOffer();
       try {
         await caller.setLocalDescription({
@@ -676,14 +646,14 @@ export default function PeerConnectionTest() {
       }
     })
 
-    it("ParameterlessSldStable", DEFAULT, async () => {
+    it('shouldSetLocalDescriptionWithoutArgumentsWhenStable', DEFAULT, async () => {
       let transceiver = caller.addTransceiver('audio');
       expect(transceiver.mid).assertNull();
       await caller.setLocalDescription();
       expect(transceiver.mid).not().assertNull();
     })
 
-    it("ParameterlessRemoteoffer", DEFAULT, async () => {
+    it('shouldSetLocalDescriptionWithoutArgumentsWhenHaveRemoteOffer', DEFAULT, async () => {
       caller.addTransceiver('audio');
 
       let promise = new Promise<void>((resolve) => {
@@ -698,7 +668,7 @@ export default function PeerConnectionTest() {
       expect(callee.getTransceivers()[0].currentDirection).assertEqual('recvonly');
     })
 
-    it("exchangeOA", DEFAULT, async () => {
+    it('shouldExchangeOfferAndAnswer', DEFAULT, async () => {
       try {
         await caller.setLocalDescription();
         await callee.setRemoteDescription(caller.pendingLocalDescription);
@@ -711,7 +681,7 @@ export default function PeerConnectionTest() {
       }
     })
 
-    it("setLocalDescriptionWithValidOfferShouldSucceed", DEFAULT, async () => {
+    it('shouldSetLocalDescriptionWithValidOffer', DEFAULT, async () => {
       let states: String = "";
       let promise = new Promise<void>((resolve) => {
         caller.onsignalingstatechange = () => {
@@ -728,7 +698,7 @@ export default function PeerConnectionTest() {
       expect(states).assertEqual('have-local-offer');
     })
 
-    it("localOfferCreatedBeforeSetRemoteDescriptionRemoteOfferThenRollbackShouldStillBeUsable", DEFAULT, async () => {
+    it('shouldReuseLocalOfferAfterRemoteOfferRollback', DEFAULT, async () => {
       try {
         caller.addTransceiver('audio', {
           direction: 'recvonly'
@@ -750,7 +720,7 @@ export default function PeerConnectionTest() {
       }
     })
 
-    it("offerSetRepeatedly", DEFAULT, async () => {
+    it('shouldSetOfferRepeatedly', DEFAULT, async () => {
       caller.addTransceiver('audio', {
         direction: 'recvonly'
       });
@@ -769,7 +739,7 @@ export default function PeerConnectionTest() {
       expect(callee.getTransceivers()[0].receiver.track.kind).assertEqual("audio");
     })
 
-    it("setLocalDescriptionAnswerStateInvalidStateError", DEFAULT, async () => {
+    it('shouldRejectSetLocalDescriptionAnswerFromStable', DEFAULT, async () => {
       let offer = await caller.createOffer()
       console.info(TAG, "signalingState: ", caller.signalingState);
       try {
@@ -782,7 +752,7 @@ export default function PeerConnectionTest() {
       }
     })
 
-    it("setLocalDescriptionAnswerWhenLocalOffer", DEFAULT, async () => {
+    it('shouldRejectSetLocalDescriptionAnswerWhenHaveLocalOffer', DEFAULT, async () => {
       let offer = await caller.createOffer();
       await caller.setLocalDescription(offer);
       let answer = await generateAnswer(offer);
@@ -795,7 +765,7 @@ export default function PeerConnectionTest() {
       }
     })
 
-    it("setPreviouslyAnswerCreateOfferShouldWork", DEFAULT, async () => {
+    it('shouldReuseAnswerAfterRollbackAndReOffer', DEFAULT, async () => {
       try {
         caller.addTransceiver('audio', {
           direction: 'recvonly'
@@ -818,7 +788,7 @@ export default function PeerConnectionTest() {
       }
     })
 
-    it("setTransceiverInactive", DEFAULT, async () => {
+    it('shouldMarkTransceiverInactiveWhenRemoteStops', DEFAULT, async () => {
       caller.addTransceiver('audio');
       const offer = await caller.createOffer();
       await caller.setLocalDescription(offer);
@@ -832,7 +802,7 @@ export default function PeerConnectionTest() {
       expect(caller.getTransceivers()[0].currentDirection).assertEqual('inactive');
     })
 
-    it("negotiationNeededWhenReturningToStableDoesNotFireTooEarly", DEFAULT, async () => {
+    it('shouldNotFireOnnegotiationneededTooEarlyWhenReturningToStable', DEFAULT, async () => {
       caller.addTransceiver("audio");
       await caller.setLocalDescription(await caller.createOffer());
       caller.restartIce();
@@ -847,7 +817,7 @@ export default function PeerConnectionTest() {
       await promise;
     })
 
-    it("addTransceiverWithInactiveDirectionNotCauseOntrack", DEFAULT, async () => {
+    it('shouldNotTriggerOntrackWhenAddTransceiverWithInactiveDirection', DEFAULT, async () => {
       caller.addTransceiver('audio', {
         direction: 'inactive'
       });
@@ -860,7 +830,7 @@ export default function PeerConnectionTest() {
       expect(flag).assertEqual(false);
     })
 
-    it("negotiationneededFireWhenSignalingBackStateAfterSetRemoteDescription", DEFAULT, async () => {
+    it('shouldFireOnnegotiationneededAfterSetRemoteDescriptionReturnsToStable', DEFAULT, async () => {
       caller.addTransceiver('audio');
       const offer = await caller.createOffer();
       await caller.setLocalDescription(offer);
@@ -877,7 +847,7 @@ export default function PeerConnectionTest() {
       expect(flag).assertTrue();
     })
 
-    it("negotiationneededFireWhenSignalingBackStateAfterSetLocalDescription", DEFAULT, async () => {
+    it('shouldFireOnnegotiationneededAfterSetLocalDescriptionReturnsToStable', DEFAULT, async () => {
       caller.addTransceiver('audio');
       let flag = false;
       let promise = new Promise<void>((resolve) => {
@@ -894,7 +864,7 @@ export default function PeerConnectionTest() {
       expect(flag).assertTrue();
     })
 
-    it("UpdatingDirectionTransceiverShouldCauseNegotiationneeded", DEFAULT, async () => {
+    it('shouldFireOnnegotiationneededWhenTransceiverDirectionUpdated', DEFAULT, async () => {
       let transceiver = caller.addTransceiver('audio', {
         direction: 'sendrecv'
       });
@@ -914,7 +884,7 @@ export default function PeerConnectionTest() {
       expect(event).assertEqual('recvonly');
     })
 
-    it("setStreamsShouldCauseNegotiationneeded", DEFAULT, async () => {
+    it('shouldFireOnnegotiationneededWhenSenderSetStreams', DEFAULT, async () => {
       let transceiver = caller.addTransceiver('audio', {
         direction: 'sendrecv'
       });
@@ -936,7 +906,7 @@ export default function PeerConnectionTest() {
       expect(flag).assertTrue();
     })
 
-    it("setStreamsDifferentStreamShouldCauseNegotiationneeded", DEFAULT, async () => {
+    it('shouldFireOnnegotiationneededWhenSenderChangesToDifferentStream', DEFAULT, async () => {
       let transceiver = caller.addTransceiver('audio', {
         direction: 'sendrecv'
       });
@@ -961,7 +931,7 @@ export default function PeerConnectionTest() {
       expect(flag).assertTrue();
     })
 
-    it("setStreamsWithAdditionalStreamShouldCauseNegotiationneeded", DEFAULT, async () => {
+    it('shouldFireOnnegotiationneededWhenSenderAddsAdditionalStream', DEFAULT, async () => {
       let transceiver = caller.addTransceiver('audio', {
         direction: 'sendrecv'
       });
@@ -986,9 +956,9 @@ export default function PeerConnectionTest() {
       expect(flag).assertTrue();
     })
 
-    it("OnDataChannel1", DEFAULT, async () => {
+    it('shouldSendDataInOndatachannelEventHandler', DEFAULT, async () => {
       // Should be able to send data in a datachannel event handler.
-      let message = 'meow meow!';
+      let message = DATA_CHANNEL_TEST_MESSAGE;
 
       callee.ondatachannel = (event) => {
         console.info(TAG, "send data");
@@ -996,7 +966,7 @@ export default function PeerConnectionTest() {
         dc2.send(message);
       };
 
-      const dc1 = caller.createDataChannel('fire-me!');
+      const dc1 = caller.createDataChannel(DATA_CHANNEL_TEST_LABEL);
       let data: string = "";
       let promise = new Promise<void>((resolve) => {
         dc1.onmessage = (event: webrtc.MessageEvent<string>) => {
@@ -1010,7 +980,7 @@ export default function PeerConnectionTest() {
       expect(data).assertEqual(message);
     })
 
-    it("OnDataChannel2", DEFAULT, async () => {
+    it('shouldNotFireOnopenWhenCloseChannelInOndatachannelEvent', DEFAULT, async () => {
       // Open event should not be raised when closing the channel in the datachannel event.
       let flag = false;
       let promise = new Promise<void>((resolve) => {
@@ -1026,7 +996,7 @@ export default function PeerConnectionTest() {
           resolve();
         };
       })
-      caller.createDataChannel('fire-me!');
+      caller.createDataChannel(DATA_CHANNEL_TEST_LABEL);
 
       exchangeIceCandidates(caller, callee);
       await exchangeOfferAnswer(caller, callee);
@@ -1034,7 +1004,7 @@ export default function PeerConnectionTest() {
       expect(flag).assertEqual(false);
     })
 
-    it("OnDataChannel3", DEFAULT, async () => {
+    it('shouldFireOnopenWhenCloseChannelAfterEnqueuedTask', DEFAULT, async () => {
       // Open event should be raised when closing the channel in the datachannel event after enqueuing a task.
       let flag = false;
       let promise = new Promise<void>((resolve) => {
@@ -1053,7 +1023,7 @@ export default function PeerConnectionTest() {
           }, 1);
         };
       })
-      caller.createDataChannel('fire-me!');
+      caller.createDataChannel(DATA_CHANNEL_TEST_LABEL);
 
       exchangeIceCandidates(caller, callee);
       await exchangeOfferAnswer(caller, callee);
@@ -1061,8 +1031,8 @@ export default function PeerConnectionTest() {
       expect(flag).assertTrue();
     })
 
-    it("closeChannelWhenSendNotCauseOnopenInDataChannelEvent", DEFAULT, async () => {
-      let message = 'meow meow!';
+    it('shouldNotFireOnopenWhenSendAndCloseChannelInOndatachannelEvent', DEFAULT, async () => {
+      let message = DATA_CHANNEL_TEST_MESSAGE;
       callee.ondatachannel = async (event) => {
         let dc2 = event.channel;
         dc2.onopen = () => {
@@ -1071,7 +1041,7 @@ export default function PeerConnectionTest() {
         dc2.send(message);
         dc2.close();
       };
-      let dc1 = caller.createDataChannel('fire-me!');
+      let dc1 = caller.createDataChannel(DATA_CHANNEL_TEST_LABEL);
       let res = "";
       let promise = new Promise<void>((resolve) => {
         dc1.onmessage = (event: webrtc.MessageEvent<string>) => {
@@ -1086,7 +1056,7 @@ export default function PeerConnectionTest() {
       expect(res).assertEqual(message);
     })
 
-    it("inBandNegotiatedChannelMatchSameConfigurationAsLocalPeer", DEFAULT, async () => {
+    it('shouldMatchInBandNegotiatedChannelConfigurationWithLocalPeer', DEFAULT, async () => {
       let dc1 = caller.createDataChannel('test', {
         ordered: false,
         maxRetransmits: 1,
@@ -1118,7 +1088,7 @@ export default function PeerConnectionTest() {
       await promise;
     })
 
-    it("inBandNegotiatedChannelMatchSameDefaultConfigurationAsLocalPeer", DEFAULT, async () => {
+    it('shouldMatchInBandNegotiatedChannelDefaultConfigurationWithLocalPeer', DEFAULT, async () => {
       let dc1 = caller.createDataChannel('');
 
       expect(dc1.label).assertEqual('');
@@ -1147,7 +1117,7 @@ export default function PeerConnectionTest() {
       await promise;
     })
 
-    it("negotiatedChannelShouldNotFireDatachannelEventOnRemotePeer", DEFAULT, async () => {
+    it('shouldNotFireOndatachannelForNegotiatedChannelOnRemotePeer', DEFAULT, async () => {
       callee.ondatachannel = () => {
         console.error(TAG, "datachannel event should not be fired");
         expect().assertFail();
@@ -1163,17 +1133,17 @@ export default function PeerConnectionTest() {
       await sleep(1000);
     })
 
-    it("initialIceGatheringStateShouldBeNew", DEFAULT, () => {
+    it('shouldHaveInitialIceGatheringStateNew', DEFAULT, () => {
       expect(caller.iceGatheringState).assertEqual('new');
     })
 
-    it("stateInIceConnectionState", DEFAULT, () => {
+    it('shouldReportClosedIceConnectionStateAfterClose', DEFAULT, () => {
       expect(caller.iceConnectionState).assertEqual('new');
       caller.close();
       expect(caller.iceConnectionState).assertEqual('closed');
     })
 
-    it("initialPeerConnectionShouldHaveListOfZeroSendersReceiversTransceivers", DEFAULT, async () => {
+    it('shouldHaveEmptySendersReceiversAndTransceiversInitially', DEFAULT, async () => {
       let senders = caller.getSenders();
       expect(senders).assertDeepEquals([]);
       let receivers = caller.getReceivers();
@@ -1182,7 +1152,7 @@ export default function PeerConnectionTest() {
       expect(transceivers).assertDeepEquals([]);
     })
 
-    it("pendingLocalDescriptionIsSurfacedAtTheRightTime", DEFAULT, async () => {
+    it('shouldSurfacePendingLocalDescriptionAtRightTime', DEFAULT, async () => {
       let offer = await caller.createOffer();
       expect(caller.pendingLocalDescription).assertUndefined();
       await caller.setLocalDescription(offer);
@@ -1190,7 +1160,7 @@ export default function PeerConnectionTest() {
       expect(caller.pendingLocalDescription).assertDeepEquals(caller.localDescription);
     })
 
-    it("pendingRemoteDescriptionIsSurfacedAtTheRightTime", DEFAULT, async () => {
+    it('shouldSurfacePendingRemoteDescriptionAtRightTime', DEFAULT, async () => {
       let offer = await caller.createOffer();
       expect(caller.pendingRemoteDescription).assertUndefined();
       await caller.setRemoteDescription(offer);
@@ -1198,7 +1168,7 @@ export default function PeerConnectionTest() {
       expect(caller.pendingRemoteDescription).assertDeepEquals(caller.remoteDescription);
     })
 
-    it("currentLocalDescriptionIsSurfacedAtTheRightTime", DEFAULT, async () => {
+    it('shouldSurfaceCurrentLocalDescriptionAtRightTime', DEFAULT, async () => {
       let offer = await caller.createOffer();
       await caller.setLocalDescription(offer);
       await callee.setRemoteDescription(offer);
@@ -1210,7 +1180,7 @@ export default function PeerConnectionTest() {
       expect(callee.currentLocalDescription).assertDeepEquals(callee.localDescription);
     })
 
-    it("currentRemoteDescriptionIsSurfacedAtTheRightTime", DEFAULT, async () => {
+    it('shouldSurfaceCurrentRemoteDescriptionAtRightTime', DEFAULT, async () => {
       let offer = await caller.createOffer();
       await caller.setLocalDescription(offer);
       await callee.setRemoteDescription(offer);
@@ -1222,7 +1192,7 @@ export default function PeerConnectionTest() {
       expect(caller.currentRemoteDescription).assertDeepEquals(caller.remoteDescription);
     })
 
-    it("createDataChannelAttributeDefaultValues", DEFAULT, () => {
+    it('shouldCreateDataChannelWithAttributeDefaultValues', DEFAULT, () => {
       let dc = caller.createDataChannel('');
 
       expect(dc instanceof webrtc.RTCDataChannel).assertTrue();
@@ -1239,7 +1209,7 @@ export default function PeerConnectionTest() {
       expect(dc.binaryType).assertEqual('blob');
     })
 
-    it("createDataChannelWithProvidedParametersShouldInitializeAttributesToProvidedValues", DEFAULT, async () => {
+    it('shouldInitializeDataChannelAttributesToProvidedValues', DEFAULT, async () => {
       let dc = caller.createDataChannel('test', {
         ordered: false,
         maxRetransmits: 1,
@@ -1271,28 +1241,28 @@ export default function PeerConnectionTest() {
       expect(dc2.maxRetransmits).assertUndefined();
     })
 
-    it("createDataChannelWithOrderedUndefinedShouldSucceed", DEFAULT, () => {
+    it('shouldCreateDataChannelWithOrderedUndefined', DEFAULT, () => {
       let dc2 = caller.createDataChannel('', {
         ordered: undefined
       });
       expect(dc2.ordered).assertTrue();
     })
 
-    it("createDataChannelWithMaxPacketLifeTime0ShouldSucceed", DEFAULT, () => {
+    it('shouldCreateDataChannelWithMaxPacketLifeTime0', DEFAULT, () => {
       let dc = caller.createDataChannel('', {
         maxPacketLifeTime: 0
       });
       expect(dc.maxPacketLifeTime).assertEqual(0);
     })
 
-    it("createDataChannelWithMaxRetransmits0ShouldSucceed", DEFAULT, () => {
+    it('shouldCreateDataChannelWithMaxRetransmits0', DEFAULT, () => {
       const dc = caller.createDataChannel('', {
         maxRetransmits: 0
       });
       expect(dc.maxRetransmits).assertEqual(0);
     })
 
-    it("createDataChannelWithBothMaxPacketLifeTimeAndMaxRetransmitsUndefinedShouldSucceed", DEFAULT, () => {
+    it('shouldCreateDataChannelWithMaxPacketLifeTimeAndMaxRetransmitsBothUndefined', DEFAULT, () => {
       try {
         caller.createDataChannel('', {
           maxPacketLifeTime: undefined,
@@ -1303,7 +1273,7 @@ export default function PeerConnectionTest() {
       }
     })
 
-    it("channelsCreatedAfterSetRemoteDescriptionShouldHaveIdAssigned", DEFAULT, async () => {
+    it('shouldAssignIdToChannelsCreatedAfterSetRemoteDescription', DEFAULT, async () => {
       let negotiatedDc = caller.createDataChannel('negotiated-channel', {
         negotiated: true,
         id: 42,
@@ -1333,7 +1303,7 @@ export default function PeerConnectionTest() {
       expect(negotiatedDc.id).assertEqual(42);
     })
 
-    it("createAnswerReturnsRTCSessionDescriptionInit", DEFAULT, async () => {
+    it('shouldReturnRTCSessionDescriptionInitWhenCreateAnswer', DEFAULT, async () => {
       let offer = await caller.createOffer();
       await caller.setRemoteDescription(offer);
       let answer = await caller.createAnswer();
@@ -1341,14 +1311,14 @@ export default function PeerConnectionTest() {
       expect(answer instanceof webrtc.RTCSessionDescription).assertFalse();
     })
 
-    it("canTrickleIceCandidatesPropertyIsTrueAfterSetRemoteDescriptionWithA", DEFAULT, () => {
+    it('shouldHaveCanTrickleIceCandidatesTrueAfterSetRemoteDescription', DEFAULT, () => {
       caller.setRemoteDescription(new webrtc.RTCSessionDescription({
-        type: 'offer', sdp: sdp
+        type: 'offer', sdp: AUDIO_ONLY_SESSION_SDP
       }));
       expect(caller.canTrickleIceCandidates).assertTrue();
     })
 
-    it("addTransceiverAudioShouldReturnAnAudioTransceiver", DEFAULT, () => {
+    it('shouldReturnAudioTransceiverWhenAddTransceiverAudio', DEFAULT, () => {
       let transceiver = caller.addTransceiver('audio');
       expect(transceiver instanceof webrtc.RTCRtpTransceiver).assertTrue();
 
@@ -1374,18 +1344,34 @@ export default function PeerConnectionTest() {
       expect([receiver]).assertDeepEquals(caller.getReceivers());
     })
 
-    it("setAudioRecordingDoesNotCrash", DEFAULT, () => {
-      caller.setAudioRecording(true);
-      caller.setAudioRecording(false);
+    it('shouldNotCrashWhenSetAudioRecording', DEFAULT, async () => {
+      try {
+        caller.setAudioRecording(true);
+        caller.setAudioRecording(false);
+        expect(true).assertTrue();
+      } catch (e) {
+        expect(false).assertTrue();
+      }
+      // toggle 后连接仍可正常协商，验证调用未破坏内部状态
+      const offer = await caller.createOffer();
+      expect(offer.type).assertEqual('offer');
     })
 
-    it("setAudioPlayoutDoesNotCrash", DEFAULT, () => {
-      caller.setAudioPlayout(true);
-      caller.setAudioPlayout(false);
+    it('shouldNotCrashWhenSetAudioPlayout', DEFAULT, async () => {
+      try {
+        caller.setAudioPlayout(true);
+        caller.setAudioPlayout(false);
+        expect(true).assertTrue();
+      } catch (e) {
+        expect(false).assertTrue();
+      }
+      const offer = await caller.createOffer();
+      expect(offer.type).assertEqual('offer');
     })
 
     // audio-only 端到端 ICE：x86 模拟器仅验证协商 stable，真机严格断言 ICE connected
-    it("audioOnly_call_shouldConnectICE", DEFAULT, async () => {
+
+    it('shouldConnectIceForAudioOnlyCall', DEFAULT, async () => {
       const audioSource = pcf.createAudioSource();
       const audioTrack = pcf.createAudioTrack('audio', audioSource);
       caller.addTrack(audioTrack);

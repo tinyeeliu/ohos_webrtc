@@ -518,6 +518,10 @@ Napi::Value NapiPeerConnectionFactory::StartAecDump(const Napi::CallbackInfo& in
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
 
+    if (info.Length() < 2 || !info[0].IsNumber() || !info[1].IsNumber()) {
+        NAPI_THROW(TypeError::New(info.Env(), "First and second arguments must be numbers"), info.Env().Undefined());
+    }
+
     auto fd = info[0].As<Number>().Int32Value();
     auto max_size_bytes = info[1].As<Number>().Int32Value();
 

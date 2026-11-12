@@ -13,6 +13,8 @@
  * limitations under the License.
  */
  
+/** 测试类型： unit（单元测试） */
+
 import { describe, beforeAll, beforeEach, afterEach, afterAll, it, expect } from '@ohos/hypium';
 import webrtc, { Logging, LoggingSeverity } from '@ohos/webrtc';
 import { validateRtpCapabilities } from './RTCRtpCapabilitiesHelper';
@@ -124,38 +126,38 @@ export default function RTCRtpReceiverTest() {
       // This API supports only one parameter: clear action function.
     })
 
-    it('getCapabilitiesWithAudioKind', 0, () => {
+    it('shouldGetCapabilitiesWithAudioKind', 0, () => {
       let capabilities = webrtc.RTCRtpReceiver.getCapabilities('audio');
       console.debug(TAG, "getCapabilities: " + JSON.stringify(capabilities));
       // expect(capabilities).not().assertNull();
       validateRtpCapabilities(capabilities!);
     })
 
-    it('getCapabilitiesWithVideoKind', 0, () => {
+    it('shouldGetCapabilitiesWithVideoKind', 0, () => {
       let capabilities = webrtc.RTCRtpReceiver.getCapabilities('video');
       console.debug(TAG, "getCapabilities: " + JSON.stringify(capabilities));
       // expect(capabilities).assertNull();
       validateRtpCapabilities(capabilities!);
     })
 
-    it('getCapabilitiesWithInvalidKind', 0, () => {
+    it('shouldReturnNullWhenGetCapabilitiesWithInvalidKind', 0, () => {
       let capabilities = webrtc.RTCRtpReceiver.getCapabilities('whatever');
       console.debug(TAG, "getCapabilities: " + JSON.stringify(capabilities));
       expect(capabilities).assertNull();
     })
 
-    it('getTransportInitially', 0, () => {
+    it('shouldHaveNullTransportInitially', 0, () => {
       const transceiver = caller.addTransceiver('audio', { direction: 'recvonly' });
       expect(transceiver.receiver!.transport).assertNull();
     })
 
-    it('getTransportAfterSetLocalDescription', 0, async () => {
+    it('shouldHaveDtlsTransportAfterSetLocalDescription', 0, async () => {
       const transceiver = caller.addTransceiver('audio', { direction: 'recvonly' });
       await caller.setLocalDescription();
       expect(transceiver.receiver!.transport instanceof webrtc.RTCDtlsTransport).assertTrue();
     })
 
-    it('getParametersWithAudioReceiver', 0, async () => {
+    it('shouldGetParametersWithAudioReceiver', 0, async () => {
       caller.addTransceiver('audio');
 
       await doOfferAnswerExchange();
@@ -171,7 +173,7 @@ export default function RTCRtpReceiverTest() {
       expect(param.codecs.length).assertLarger(0);
     })
 
-    it('getParametersWithVideoReceiver', 0, async () => {
+    it('shouldGetParametersWithVideoReceiver', 0, async () => {
       caller.addTransceiver('video');
 
       await doOfferAnswerExchange();
@@ -187,7 +189,7 @@ export default function RTCRtpReceiverTest() {
       expect(param.codecs.length).assertLarger(0);
     })
 
-    it('getParametersWithSimulcastVideoReceiver', 0, async () => {
+    it('shouldGetParametersWithSimulcastVideoReceiver', 0, async () => {
       caller.addTransceiver('audio', {
         sendEncodings: [
           {
@@ -212,7 +214,7 @@ export default function RTCRtpReceiverTest() {
       expect(param.codecs.length).assertLarger(0);
     })
 
-    it('getStats', 0, async () => {
+    it('shouldGetStatsFromReceiver', 0, async () => {
       const stream = await getMediaStream();
       const tracks = stream.getTracks();
       callee.addTrack(tracks[0], stream);

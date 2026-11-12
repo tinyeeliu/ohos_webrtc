@@ -13,6 +13,8 @@
  * limitations under the License.
  */
  
+/** 测试类型： unit（单元测试） */
+
 import { describe, beforeAll, beforeEach, afterEach, afterAll, it, expect } from '@ohos/hypium'
 import webrtc, { Logging, LoggingSeverity } from '@ohos/webrtc';
 
@@ -42,7 +44,7 @@ export default function RTCCertificateTest() {
       // This API supports only one parameter: clear action function.
     })
 
-    it("generateCertificateWithString", DEFAULT, async () => {
+    it('shouldGenerateCertificateWithString', DEFAULT, async () => {
       let Certificate = await webrtc.RTCPeerConnection.generateCertificate("RSA");
       expect(Certificate.expires).not().assertUndefined();
       expect(Certificate.getFingerprints()[0].algorithm).not().assertUndefined();
@@ -50,7 +52,7 @@ export default function RTCCertificateTest() {
       expect(Certificate.getFingerprints().length).assertEqual(1);
     })
 
-    it("generateCertificateWithObject", DEFAULT, async () => {
+    it('shouldGenerateCertificateWithObject', DEFAULT, async () => {
       const keygenAlgorithm: webrtc.AlgorithmIdentifier = {
         name: "RSA",
       };
@@ -62,7 +64,7 @@ export default function RTCCertificateTest() {
       }
     })
 
-    it("generateCertificateWithErrorString", DEFAULT, async () => {
+    it('shouldGenerateCertificateWithErrorString', DEFAULT, async () => {
       let Certificate = await webrtc.RTCPeerConnection.generateCertificate("1");
       expect(Certificate.expires).not().assertUndefined();
       expect(Certificate.getFingerprints()[0].algorithm).not().assertUndefined();

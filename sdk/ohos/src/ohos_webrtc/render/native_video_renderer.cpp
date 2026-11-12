@@ -76,6 +76,9 @@ NapiNativeVideoRenderer::NapiNativeVideoRenderer(const Napi::CallbackInfo& info)
 NapiNativeVideoRenderer::~NapiNativeVideoRenderer()
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+    // Break the Ref/Unref cycle if release() was never called: releasing the
+    // event handler TSFNs triggers their finalizers, which Unref() the object.
+    RemoveAllEventHandlers();
     RemoveSink();
 }
 
@@ -387,6 +390,12 @@ Napi::Value NapiNativeVideoRenderer::SetScalingMode(const Napi::CallbackInfo& in
     }
 
     auto mode = info[0].As<Number>().Int32Value();
+    // Compatibility: out-of-range values are ignored silently, matching the
+    // pre-validation behavior (no exception ever escaped this method).
+    if (mode < static_cast<int>(NativeWindowRenderer::ScalingMode::FILL) ||
+        mode > static_cast<int>(NativeWindowRenderer::ScalingMode::ASPECT_FIT)) {
+        return info.Env().Undefined();
+    }
     if (renderer_) {
         renderer_->SetScalingMode(static_cast<NativeWindowRenderer::ScalingMode>(mode));
     }

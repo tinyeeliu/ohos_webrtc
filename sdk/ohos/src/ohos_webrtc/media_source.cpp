@@ -201,6 +201,10 @@ NapiVideoSource::~NapiVideoSource()
         source_->SetCapturerObserver(nullptr);
         source_ = nullptr;
     }
+    // Mirror NapiNativeVideoRenderer: release the event-handler TSFNs
+    // explicitly before the object finishes destruction, instead of relying
+    // on the eventHandlers_ map destructor.
+    RemoveAllEventHandlers();
 }
 
 Napi::Value NapiVideoSource::GetState(const Napi::CallbackInfo& info)

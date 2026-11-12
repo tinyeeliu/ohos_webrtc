@@ -30,6 +30,8 @@ OpenHarmony API 版本 ≥ 15。
 
 打开 `entry/src/main/module.json5`，根据实际功能需求添加以下权限：
 
+> **说明**：HAR 模块已预声明 `ohos.permission.INTERNET`、`ohos.permission.CAMERA`、`ohos.permission.MICROPHONE` 三个权限。`ohos.permission.CAPTURE_SCREEN` 仅在使用屏幕采集（`getDisplayMedia`）时需要，且必须由宿主应用在自己的 `module.json5` 中声明；HAR 未预声明此权限，因为它是系统授予型权限，仅应用可申请。
+
 ```json
 "requestPermissions": [
   {
@@ -122,7 +124,7 @@ await peerConnection.setLocalDescription(offer);
 // 通过信令通道将 SDP offer 发送给远程端点
 ```
 
-更多使用示例请查看 `har_hap` 目录下的示例工程，动态库的编译方法请参阅[编译文档](../../docs/ohos/webrtc_build.md)，编译过程中遇到问题请参阅[编译常见问题](../../docs/ohos/webrtc_adapter_questions.md)。
+更多使用示例请查看 `har_hap` 目录下的示例工程，动态库的编译方法请参阅[编译文档](../../docs/ohos/webrtc_build.md)，编译过程中遇到问题请参阅[编译常见问题](../../docs/ohos/webrtc_adapter_questions.md)。与上游 WebRTC 的鸿蒙化适配差异详见[适配说明](../../docs/ohos/webrtc_adapter_ohos.md)。
 
 实现代码在 `src/ohos_webrtc` 目录下，其中 NAPI 接口的使用借助了开源项目 [node-addon-api](https://github.com/nodejs/node-addon-api)。
 
@@ -218,7 +220,7 @@ sdk/ohos/
         ├── async_work      # 异步任务辅助类
         ├── audio_device    # 音频相关模块
         ├── camera          # 相机相关模块
-        ├── desktop_capture # 桌面采集
+        ├── screen_capture  # 屏幕采集
         ├── helper          # NDK 接口辅助类
         ├── logging         # 日志接口适配
         ├── render          # 视频渲染相关模块

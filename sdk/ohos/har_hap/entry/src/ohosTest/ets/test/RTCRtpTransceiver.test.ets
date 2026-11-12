@@ -13,6 +13,8 @@
  * limitations under the License.
  */
  
+/** 测试类型： unit（单元测试） */
+
 import { describe, beforeAll, beforeEach, afterEach, afterAll, it, expect } from '@ohos/hypium';
 import webrtc, { Logging, LoggingSeverity } from '@ohos/webrtc';
 import * as helper from './Helper';
@@ -122,7 +124,7 @@ export default function RTCRtpTransceiverTest() {
       // This API supports only one parameter: clear action function.
     })
 
-    it('addTransceiverNoTrack', 0, async () => {
+    it('shouldAddTransceiverWithoutTrack', 0, async () => {
       expect(caller.getTransceivers().length).assertEqual(0);
 
       caller.addTransceiver("audio");
@@ -142,7 +144,7 @@ export default function RTCRtpTransceiverTest() {
       expect(transceiver.receiver.track.readyState).assertEqual("live");
     })
 
-    it('addTransceiverWithTrack', 0, async () => {
+    it('shouldAddTransceiverWithTrack', 0, async () => {
       let audioSource = pcf.createAudioSource();
       let audioTrack = pcf.createAudioTrack("audio", audioSource);
 
@@ -163,7 +165,7 @@ export default function RTCRtpTransceiverTest() {
       expect(transceiver.receiver.track.kind).assertEqual("audio");
     })
 
-    it('addTransceiverWithAddTrack', 0, async () => {
+    it('shouldCreateTransceiverWhenAddTrack', 0, async () => {
       let audioSource = pcf.createAudioSource();
       let audioTrack = pcf.createAudioTrack("audio", audioSource);
 
@@ -184,7 +186,7 @@ export default function RTCRtpTransceiverTest() {
       expect(transceiver.receiver.track.kind).assertEqual("audio");
     })
 
-    it('addTransceiverWithDirection', 0, async () => {
+    it('shouldAddTransceiverWithDirection', 0, async () => {
       caller.addTransceiver("audio", {
         direction: "recvonly"
       });
@@ -203,7 +205,7 @@ export default function RTCRtpTransceiverTest() {
       expect(transceiver.receiver.track.kind).assertEqual("audio");
     })
 
-    it('addTransceiverWithBadKind', 0, async () => {
+    it('shouldThrowWhenAddTransceiverWithBadKind', 0, async () => {
       try {
         caller.addTransceiver("other");
         expect().assertFail();
@@ -212,7 +214,7 @@ export default function RTCRtpTransceiverTest() {
       }
     })
 
-    it('setDirection', 0, async () => {
+    it('shouldSetAndGetDirection', 0, async () => {
       caller.addTransceiver("audio");
       expect(caller.getTransceivers().length).assertEqual(1);
 
@@ -226,7 +228,7 @@ export default function RTCRtpTransceiverTest() {
       expect(caller.getTransceivers()[0].direction).assertEqual("sendrecv");
     })
 
-    it('setDirection2', 0, async () => {
+    it('shouldNegotiateCurrentDirectionViaOfferAnswer', 0, async () => {
       const transceiver = caller.addTransceiver('audio', {
         direction: 'recvonly'
       });
@@ -246,7 +248,7 @@ export default function RTCRtpTransceiverTest() {
       expect(transceiver.currentDirection).assertEqual("inactive");
     })
 
-    it('createOfferAfterStop', 0, async () => {
+    it('shouldExcludeStoppedTransceiverFromOffer', 0, async () => {
       caller.addTransceiver("audio", { direction: "sendonly" });
       caller.addTransceiver("video");
       caller.getTransceivers()[0].stop();
@@ -259,7 +261,7 @@ export default function RTCRtpTransceiverTest() {
       expect(offer.sdp!.includes("m=video")).assertTrue();
     })
 
-    it('createOfferAfterStopSendOnlyTransceiver', 0, async () => {
+    it('shouldMarkStoppedSendOnlyTransceiverInactiveInOffer', 0, async () => {
       caller.addTransceiver("audio");
 
       await exchangeOfferAnswer(caller, callee);
@@ -273,7 +275,7 @@ export default function RTCRtpTransceiverTest() {
       expect(offer.sdp!.includes("a=inactive")).assertTrue();
     })
 
-    it('getTransportAfterStop', 0, async () => {
+    it('shouldHaveNullTransportAfterStop', 0, async () => {
       caller.addTransceiver("audio", { direction: "sendonly" });
       caller.addTransceiver("video");
 
@@ -284,7 +286,7 @@ export default function RTCRtpTransceiverTest() {
       expect(transceiver.receiver.transport).assertNull();
     })
 
-    it('setCodecPreferences', 0, () => {
+    it('shouldSetCodecPreferences', 0, () => {
       const transceiver1 = caller.addTransceiver('audio');
       const capabilities1 = webrtc.RTCRtpReceiver.getCapabilities('audio');
       expect(capabilities1).not().assertNull();
@@ -296,12 +298,12 @@ export default function RTCRtpTransceiverTest() {
       transceiver2.setCodecPreferences(capabilities2!.codecs);
     })
 
-    it('setCodecPreferencesWithEmptyCodecs', 0, () => {
+    it('shouldSetCodecPreferencesWithEmptyCodecs', 0, () => {
       const transceiver = caller.addTransceiver('audio');
       transceiver.setCodecPreferences([]);
     })
 
-    it('setCodecPreferencesOnAudioTransceiverWithVideoCodecs', 0, () => {
+    it('shouldThrowWhenSetCodecPreferencesWithMismatchedKind', 0, () => {
       const transceiver = caller.addTransceiver('audio');
       const capabilities = webrtc.RTCRtpReceiver.getCapabilities('video');
       expect(capabilities).not().assertNull();
@@ -314,7 +316,7 @@ export default function RTCRtpTransceiverTest() {
       }
     })
 
-    it('setCodecPreferencesWithInvalidMimeType', 0, () => {
+    it('shouldThrowWhenSetCodecPreferencesWithInvalidMimeType', 0, () => {
       const transceiver = caller.addTransceiver('audio');
       const codecs: webrtc.RTCRtpCodec[] = [{
         mimeType: 'data',
@@ -331,7 +333,7 @@ export default function RTCRtpTransceiverTest() {
       }
     })
 
-    it('setCodecPreferencesWithUserDefinedCodec', 0, () => {
+    it('shouldThrowWhenSetCodecPreferencesWithUserDefinedCodec', 0, () => {
       const transceiver = caller.addTransceiver('audio');
       const codecs: webrtc.RTCRtpCodec[] = [{
         mimeType: 'audio/piepiper',
@@ -348,7 +350,7 @@ export default function RTCRtpTransceiverTest() {
       }
     })
 
-    it('setCodecPreferencesWithModifiedCodecs', 0, () => {
+    it('shouldThrowWhenSetCodecPreferencesWithModifiedCodecs', 0, () => {
       const transceiver = caller.addTransceiver('audio');
       const capabilities = webrtc.RTCRtpReceiver.getCapabilities('audio');
 

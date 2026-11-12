@@ -22,6 +22,7 @@
 #include "../video/video_frame_receiver.h"
 #include "../helper/screen_capture.h"
 #include "../helper/display_manager.h"
+#include "../helper/native_window.h"
 
 #include <atomic>
 #include <chrono>
@@ -126,6 +127,12 @@ private:
     std::atomic<uint32_t> displayRotation_{0};
 
     ohos::AVScreenCapture screenCapture_;
+
+    // Native window handle created from the surface id in Start(); kept for the
+    // whole capture session and released in Stop()/Release(). The screen capture
+    // service holds its own surface reference, so destroying this handle after
+    // stop is safe.
+    ohos::NativeWindow captureWindow_;
 
     std::unique_ptr<VideoFrameReceiver> dataReceiver_;
 

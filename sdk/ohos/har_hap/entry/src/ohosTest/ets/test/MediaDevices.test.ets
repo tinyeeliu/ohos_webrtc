@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 
+/** 测试类型： integration（集成测试） */
+
 import { describe, beforeAll, it, expect } from '@ohos/hypium'
 import webrtc, { Logging, LoggingSeverity } from '@ohos/webrtc';
 
@@ -24,7 +26,7 @@ export default function MediaDevicesTest() {
       Logging.enableLogToDebugOutput(LoggingSeverity.VERBOSE);
     })
 
-    it('enumerateDevicesReturnsArrayOfMediaDeviceInfo', 0, async () => {
+    it('shouldReturnArrayOfMediaDeviceInfoWhenEnumerateDevices', 0, async () => {
       let mediaDevices = new webrtc.MediaDevices();
       let devices = await mediaDevices.enumerateDevices();
       expect(Array.isArray(devices)).assertTrue();
@@ -36,7 +38,7 @@ export default function MediaDevicesTest() {
       }
     })
 
-    it('getUserMediaWithNoAudioAndVideoRejects', 0, async () => {
+    it('shouldRejectGetUserMediaWithNoAudioAndVideo', 0, async () => {
       let mediaDevices = new webrtc.MediaDevices();
       try {
         await mediaDevices.getUserMedia({ audio: false, video: false });
@@ -46,7 +48,7 @@ export default function MediaDevicesTest() {
       }
     })
 
-    it('getUserMediaWithAudioReturnsMediaStream', 0, async () => {
+    it('shouldReturnMediaStreamWhenGetUserMediaWithAudio', 0, async () => {
       let mediaDevices = new webrtc.MediaDevices();
       let stream = await mediaDevices.getUserMedia({ audio: true });
       let track: webrtc.MediaStreamTrack | null = null;
@@ -69,7 +71,7 @@ export default function MediaDevicesTest() {
       }
     })
 
-    it('getSupportedConstraintsReturnsValidObject', 0, () => {
+    it('shouldReturnValidObjectWhenGetSupportedConstraints', 0, () => {
       let mediaDevices = new webrtc.MediaDevices();
       let constraints = mediaDevices.getSupportedConstraints();
       expect(constraints).not().assertNull();

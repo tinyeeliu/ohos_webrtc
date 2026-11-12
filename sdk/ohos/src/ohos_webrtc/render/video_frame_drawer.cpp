@@ -26,6 +26,14 @@ constexpr int32_t kYuvTextureArrayLength = 3;
 
 namespace webrtc {
 
+VideoFrameDrawer::~VideoFrameDrawer()
+{
+    if (!yuvTextures_.empty()) {
+        glDeleteTextures(yuvTextures_.size(), yuvTextures_.data());
+        yuvTextures_.clear();
+    }
+}
+
 void VideoFrameDrawer::DrawFrame(const VideoFrame& frame, GlDrawer& drawer, const Matrix& additionalRenderMatrix)
 {
     DrawFrame(frame, drawer, additionalRenderMatrix, 0, 0, frame.width(), frame.height());

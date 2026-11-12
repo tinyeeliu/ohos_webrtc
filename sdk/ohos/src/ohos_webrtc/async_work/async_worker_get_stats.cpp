@@ -42,6 +42,13 @@ class GetStatsCallback : public RTCStatsCollectorCallback {
 public:
     explicit GetStatsCallback(AsyncWorkerGetStats* asyncWorker) : asyncWorker_(asyncWorker) {}
 
+    ~GetStatsCallback() override
+    {
+        // If stats were never delivered (e.g. the PeerConnection was closed
+        // first), the worker was never queued and would leak; release it here.
+        delete asyncWorker_;
+    }
+
 protected:
     void OnStatsDelivered(const rtc::scoped_refptr<const RTCStatsReport>& report) override
     {

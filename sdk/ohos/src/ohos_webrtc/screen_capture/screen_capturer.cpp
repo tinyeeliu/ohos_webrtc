@@ -151,6 +151,7 @@ void ScreenCapturer::Release()
     }
 
     screenCapture_.Reset();
+    captureWindow_.Reset();
     dataReceiver_.reset();
 
     {
@@ -210,9 +211,13 @@ void ScreenCapturer::Start()
         return;
     }
 
-    ret = OH_AVScreenCapture_StartScreenCaptureWithSurface(screenCapture_.Raw(), window);
+    // Hold the window handle for the whole capture session; released in Stop()/Release().
+    captureWindow_ = ohos::NativeWindow::TakeOwnership(window);
+
+    ret = OH_AVScreenCapture_StartScreenCaptureWithSurface(screenCapture_.Raw(), captureWindow_.Raw());
     if (ret != AV_SCREEN_CAPTURE_ERR_OK) {
         RTC_LOG(LS_ERROR) << "Failed to start screen capture width surface: " << ret;
+        captureWindow_.Reset();
         NotifyCaptureStart(false);
         return;
     }
@@ -248,6 +253,7 @@ void ScreenCapturer::Stop()
             [this] { return stopConfirmed_.load(); });
     }
     screenCapture_.Reset();
+    captureWindow_.Reset();
 
     if (!stopConfirmed_.load()) {
         // No state change callback, notify manually.

@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 
+/** 测试类型： unit（单元测试） */
+
 import { describe, beforeAll, it, expect } from '@ohos/hypium'
 import webrtc, { Logging, LoggingSeverity } from '@ohos/webrtc';
 
@@ -28,7 +30,8 @@ export default function VideoSourceTest() {
 
     // A nonexistent mandatory ID must reach device selection and throw a
     // catchable error, rather than aborting in Napi::String::CheckCast.
-    it('exactDeviceIdStringRejectsWithoutNativeCrash', 0, () => {
+
+    it('shouldRejectExactDeviceIdStringWithoutNativeCrash', 0, () => {
       let message = '';
       try {
         pcf.createVideoSource({ deviceId: { exact: '__missing_camera_regression__' } });
@@ -38,7 +41,7 @@ export default function VideoSourceTest() {
       expect(message).assertEqual('Unsatisfied constraint: deviceId');
     })
 
-    it('exactDeviceIdArrayRejectsWithoutNativeCrash', 0, () => {
+    it('shouldRejectExactDeviceIdArrayWithoutNativeCrash', 0, () => {
       let message = '';
       try {
         pcf.createVideoSource({ deviceId: { exact: ['__missing_camera_regression__'] } });
@@ -48,7 +51,7 @@ export default function VideoSourceTest() {
       expect(message).assertEqual('Unsatisfied constraint: deviceId');
     })
 
-    it('idealDeviceIdStringParsesBeforeExactSelection', 0, () => {
+    it('shouldParseIdealDeviceIdStringBeforeExactSelection', 0, () => {
       let message = '';
       try {
         pcf.createVideoSource({ deviceId: {
@@ -60,7 +63,7 @@ export default function VideoSourceTest() {
       expect(message).assertEqual('Unsatisfied constraint: deviceId');
     })
 
-    it('idealDeviceIdArrayParsesBeforeExactSelection', 0, () => {
+    it('shouldParseIdealDeviceIdArrayBeforeExactSelection', 0, () => {
       let message = '';
       try {
         pcf.createVideoSource({ deviceId: {
@@ -72,7 +75,7 @@ export default function VideoSourceTest() {
       expect(message).assertEqual('Unsatisfied constraint: deviceId');
     })
 
-    it('releaseChangesStateToEnded', 0, () => {
+    it('shouldChangeStateToEndedAfterRelease', 0, () => {
       let videoSource = pcf.createVideoSource();
       expect(videoSource.state === 'live' || videoSource.state === 'initializing' || videoSource.state === 'ended' || videoSource.state === 'muted').assertTrue();
       try {
@@ -87,7 +90,7 @@ export default function VideoSourceTest() {
       }
     })
 
-    it('releaseThenCreateNewSourceDoesNotConflict', 0, () => {
+    it('shouldCreateNewSourceAfterReleaseWithoutConflict', 0, () => {
       let source1 = pcf.createVideoSource();
       try {
         source1.release();
@@ -101,7 +104,7 @@ export default function VideoSourceTest() {
       }
     })
 
-    it('eventPropertiesExist', 0, () => {
+    it('shouldHaveNullCapturerEventCallbacks', 0, () => {
       let videoSource = pcf.createVideoSource();
       expect(videoSource.oncapturerstarted).assertNull();
       expect(videoSource.oncapturerstopped).assertNull();

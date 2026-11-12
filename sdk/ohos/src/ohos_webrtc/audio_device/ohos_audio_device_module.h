@@ -16,6 +16,7 @@
 #ifndef WEBRTC_OHOS_AUDIO_DEVICE_MODULE_H
 #define WEBRTC_OHOS_AUDIO_DEVICE_MODULE_H
 
+#include <atomic>
 #include <map>
 #include <list>
 #include <string>
@@ -224,6 +225,14 @@ protected:
     void OnAudioOutputStateChange(AudioOutput* output, AudioStateType newState) override;
 
 private:
+    // Releases all event handler TSFNs; their finalizers Unref() the object,
+    // breaking the Ref/Unref cycle. Safe to call from the destructor.
+    void RemoveAllEventHandlers();
+
+    // Shared with the env-teardown finalizer registered in the constructor;
+    // the destructor stores false to disarm it.
+    std::shared_ptr<std::atomic<bool>> finalizerGuard_;
+
     static thread_local Napi::FunctionReference constructor_;
 
     rtc::scoped_refptr<OhosAudioDeviceModule> adm_;

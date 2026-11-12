@@ -404,6 +404,17 @@ NapiPeerConnection::NapiPeerConnection(const CallbackInfo& info) : NapiEventTarg
 NapiPeerConnection::~NapiPeerConnection()
 {
     RTC_DLOG(LS_VERBOSE) << __FUNCTION__;
+
+    // Stop the event target first so observer callbacks fired by Close() below
+    // are dropped instead of being delivered to a dying object.
+    ShutdownEventTarget();
+    if (pc_) {
+        // Mirror the JS close() path: closing releases native connections and
+        // triggers OnSignalingChange(kClosed). BlockingCall is safe here
+        // because the factory threads outlive this member.
+        pc_->signaling_thread()->BlockingCall([pc = pc_] { pc->Close(); });
+        pc_ = nullptr;
+    }
 }
 
 Napi::Value NapiPeerConnection::GetCanTrickleIceCandidates(const Napi::CallbackInfo& info)
@@ -1631,15 +1642,21 @@ void NapiPeerConnection::OnDataChannel(rtc::scoped_refptr<DataChannelInterface> 
         return;
     }
 
-    auto observer = std::make_unique<DataChannelObserverTemp>(factory_, channel);
-    Dispatch(CallbackEvent<NapiPeerConnection>::Create([this, obs = observer.release()](NapiPeerConnection& target) {
+    // Shared holder keeps the observer alive if this event is dropped before
+    // processing (e.g. queue destroyed after Stop()); processing transfers
+    // ownership into NapiDataChannel via std::move.
+    struct ObserverHolder {
+        std::unique_ptr<DataChannelObserverTemp> observer;
+    };
+    auto holder = std::make_shared<ObserverHolder>(ObserverHolder{std::make_unique<DataChannelObserverTemp>(factory_, channel)});
+    Dispatch(CallbackEvent<NapiPeerConnection>::Create([this, holder](NapiPeerConnection& target) {
         RTC_DCHECK_EQ(this, &target);
 
         auto env = target.Env();
         Napi::HandleScope scope(env);
         auto jsEvent = Object::New(env);
         jsEvent.Set("type", String::New(env, kEventDataChannel));
-        jsEvent.Set("channel", NapiDataChannel::NewInstance(env, std::unique_ptr<DataChannelObserverTemp>(obs)));
+        jsEvent.Set("channel", NapiDataChannel::NewInstance(env, std::move(holder->observer)));
         target.MakeCallback(kEventDataChannel, {jsEvent});
     }));
 }

@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 
+/** 测试类型： unit（单元测试） */
+
 import { describe, beforeAll, it, expect } from '@ohos/hypium'
 import webrtc, { Logging, LoggingSeverity } from '@ohos/webrtc';
 
@@ -26,7 +28,7 @@ export default function RTCSessionDescriptionTest() {
       Logging.enableLogToDebugOutput(LoggingSeverity.VERBOSE);
     })
 
-    it('sdpFromRealOfferMatchesLocalDescription', 0, async () => {
+    it('shouldMatchSdpFromRealOfferToLocalDescription', 0, async () => {
       let pc = pcf.createPeerConnection({});
       let audioSource = pcf.createAudioSource();
       let audioTrack = pcf.createAudioTrack('audio', audioSource);
@@ -42,7 +44,7 @@ export default function RTCSessionDescriptionTest() {
       audioSource.release();
     })
 
-    it('setRemoteDescriptionWithRTCSessionDescriptionObject', 0, async () => {
+    it('shouldSetRemoteDescriptionWithRTCSessionDescriptionObject', 0, async () => {
       let caller = pcf.createPeerConnection({});
       let callee = pcf.createPeerConnection({});
 
@@ -80,7 +82,7 @@ export default function RTCSessionDescriptionTest() {
       audioSource.release();
     })
 
-    it('toJSONProducesValidRTCSessionDescriptionInit', 0, async () => {
+    it('shouldReturnValidRTCSessionDescriptionInitFromToJSON', 0, async () => {
       let pc = pcf.createPeerConnection({});
       let audioSource = pcf.createAudioSource();
       let audioTrack = pcf.createAudioTrack('audio', audioSource);

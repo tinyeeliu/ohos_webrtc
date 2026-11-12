@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 
+/** 测试类型： integration（集成测试） */
+
 import { describe, beforeAll, afterEach, it, expect } from '@ohos/hypium';
 import webrtc, { Logging, LoggingSeverity } from '@ohos/webrtc';
 import { isX86, pollUntil, sleep } from './Helper';
@@ -78,7 +80,8 @@ export default function X86EmulatorFallbackTest() {
 
     // 场景 1：默认 PeerConnectionFactory 视频编解码协商成功（含软件回退）。
     // 注：getParameters().codecs 需完成 offer/answer 交换后才有值，此处用 SDP + getCapabilities 验证。
-    it('defaultFactoryVideoRecvNegotiationSucceeds', 0, async () => {
+
+    it('shouldNegotiateVideoRecvWithDefaultFactory', 0, async () => {
       const capabilities = webrtc.RTCRtpReceiver.getCapabilities('video');
       expect(capabilities).not().assertNull();
       expect(capabilities!.codecs.length).assertLarger(0);
@@ -94,7 +97,8 @@ export default function X86EmulatorFallbackTest() {
     });
 
     // 场景 2：后置摄像头不可用时回退为不限定 facingMode，能创建 VideoSource 且不抛异常。
-    it('createVideoSourceEnvironmentFacingModeFallback', 0, () => {
+
+    it('shouldCreateVideoSourceWithEnvironmentFacingModeFallback', 0, () => {
       const videoSource = createVideoSourceWithFallback(640, 480);
       if (videoSource) {
         expect(isLiveVideoSourceState(videoSource.state)).assertTrue();
@@ -103,7 +107,8 @@ export default function X86EmulatorFallbackTest() {
     });
 
     // 场景 3：摄像头完全不可用时降级 audio-only，setLocalDescription 仅含音频 m-line。
-    it('audioOnlyModeWhenCameraUnavailable', 0, async () => {
+
+    it('shouldDegradeToAudioOnlyWhenCameraUnavailable', 0, async () => {
       const videoSource = createVideoSourceWithFallback(640, 480);
       if (videoSource) {
         releaseVideoSource(videoSource);
@@ -122,7 +127,8 @@ export default function X86EmulatorFallbackTest() {
     });
 
     // 场景 4：x86 CPU 渲染路径（NativeWindowRendererRaster）下 setVideoTrack/镜像设置不崩溃。
-    it('nativeVideoRendererSetVideoTrackOnX86', 0, () => {
+
+    it('shouldSetVideoTrackWithNativeVideoRendererOnX86', 0, () => {
       if (!isX86()) {
         return;
       }
@@ -144,7 +150,8 @@ export default function X86EmulatorFallbackTest() {
 
     // 场景 5：x86 CPU 采集路径（VideoFrameReceiverNative）下摄像头可用时 capturer 能启动。
     // 无摄像头或采集不可用时跳过，避免 enumerateDevices 误报 videoinput 导致超时 fail。
-    it('videoSourceCapturerStartedOnX86', 0, async () => {
+
+    it('shouldStartVideoSourceCapturerOnX86', 0, async () => {
       if (!isX86()) {
         return;
       }
@@ -170,7 +177,8 @@ export default function X86EmulatorFallbackTest() {
     });
 
     // 场景 6：CPU 渲染路径下镜像/旋转相关设置不崩溃（对应 UpdateRotation + I420Buffer::Rotate 链路）。
-    it('nativeVideoRendererMirrorSettingsOnX86', 0, () => {
+
+    it('shouldApplyMirrorSettingsWithNativeVideoRendererOnX86', 0, () => {
       if (!isX86()) {
         return;
       }
@@ -185,7 +193,8 @@ export default function X86EmulatorFallbackTest() {
     });
 
     // 场景 7：帧尺寸/旋转变化回调 onFrameResolutionChanged 可注册（对应 frameSizeChangeCallback_）。
-    it('nativeVideoRendererFrameResolutionCallbackRegistered', 0, () => {
+
+    it('shouldRegisterOnFrameResolutionChangedCallback', 0, () => {
       const renderer = new webrtc.NativeVideoRenderer();
       renderer.onFrameResolutionChanged = () => {
       };
@@ -193,7 +202,8 @@ export default function X86EmulatorFallbackTest() {
     });
 
     // 场景 8：x86 上仅指定硬件编解码工厂时，接收方向 codec 列表为空或 setLocalDescription 失败（负向回归）。
-    it('hardwareOnlyFactoryRecvNegotiationFailsOnX86', 0, async () => {
+
+    it('shouldFailRecvNegotiationWithHardwareOnlyFactoryOnX86', 0, async () => {
       if (!isX86()) {
         return;
       }
@@ -224,7 +234,8 @@ export default function X86EmulatorFallbackTest() {
     });
 
     // 场景 9：存在 videoinput 设备时（API18+ 宿主机摄像头），createVideoSourceWithFallback 能创建 VideoSource。
-    it('videoSourceCreatedWhenVideoInputExists', 0, async () => {
+
+    it('shouldCreateVideoSourceWhenVideoInputExists', 0, async () => {
       const hasVideo = await hasVideoInputDevice();
       if (!hasVideo) {
         return;
@@ -238,7 +249,8 @@ export default function X86EmulatorFallbackTest() {
     });
 
     // 场景 10：无 videoinput 时回退 audio-only，与 API18 以下模拟器行为一致。
-    it('audioOnlyFallbackWhenNoVideoInput', 0, async () => {
+
+    it('shouldFallBackToAudioOnlyWhenNoVideoInput', 0, async () => {
       const hasVideo = await hasVideoInputDevice();
       if (hasVideo) {
         return;

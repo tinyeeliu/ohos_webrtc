@@ -59,8 +59,6 @@ NapiCertificate::NapiCertificate(const Napi::CallbackInfo& info) : Napi::ObjectW
     if (info[0].IsExternal()) {
         auto certificate = info[0].As<External<rtc::RTCCertificate>>().Data();
         certificate_ = rtc::scoped_refptr<rtc::RTCCertificate>(certificate);
-        auto status = certificate->Release();
-        RTC_LOG(LS_VERBOSE) << "RtpSenderInterface release status=" << status;
     }
 }
 

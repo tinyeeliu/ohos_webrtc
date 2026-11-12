@@ -13,6 +13,8 @@
  * limitations under the License.
  */
  
+/** 测试类型： unit（单元测试） */
+
 import { describe, beforeAll, beforeEach, afterEach, afterAll, it, expect } from '@ohos/hypium';
 import webrtc, { Logging, LoggingSeverity } from '@ohos/webrtc';
 
@@ -46,7 +48,7 @@ export default function RTCPeerConnectionGetStatsTest() {
       // This API supports only one parameter: clear action function.
     })
 
-    it('getStatsWithNoArgument', 0, async () => {
+    it('shouldGetStatsWithNoArgument', 0, async () => {
       await caller.getStats().then((statsReport) => {
         let found = false;
         statsReport.stats.forEach((value: webrtc.RTCStats, _key: string) => {
@@ -60,21 +62,21 @@ export default function RTCPeerConnectionGetStatsTest() {
       });
     })
 
-    it('getStatsWithNull', 0, async () => {
+    it('shouldGetStatsWithNull', 0, async () => {
       await caller.getStats(null).then(() => {
       }).catch(() => {
         expect().assertFail();
       });
     })
 
-    it('getStatsWithUndefined', 0, async () => {
+    it('shouldGetStatsWithUndefined', 0, async () => {
       await caller.getStats(undefined).then(() => {
       }).catch(() => {
         expect().assertFail();
       });
     })
 
-    it('getStatsWithNotAddedTrack', 0, async () => {
+    it('shouldThrowWhenGetStatsWithNotAddedTrack', 0, async () => {
       let audioSource = pcf.createAudioSource();
       let audioTrack = pcf.createAudioTrack("audio", audioSource);
 
@@ -86,7 +88,7 @@ export default function RTCPeerConnectionGetStatsTest() {
       });
     })
 
-    it('getStatsWithAddedTrack', 0, async () => {
+    it('shouldGetStatsWithAddedTrack', 0, async () => {
       let audioSource = pcf.createAudioSource();
       let audioTrack = pcf.createAudioTrack("audio", audioSource);
 
@@ -98,7 +100,7 @@ export default function RTCPeerConnectionGetStatsTest() {
       });
     })
 
-    it('getStatsWithTrackViaAddTransceiver', 0, async () => {
+    it('shouldGetStatsWithTrackViaAddTransceiver', 0, async () => {
       let audioSource = pcf.createAudioSource();
       let audioTrack = pcf.createAudioTrack("audio", audioSource);
 
@@ -110,7 +112,7 @@ export default function RTCPeerConnectionGetStatsTest() {
       });
     })
 
-    it('getStatsWithTrackAssociatedWithBothSenderAndReceiver', 0, async () => {
+    it('shouldThrowWhenGetStatsWithTrackAssociatedWithBothSenderAndReceiver', 0, async () => {
 
       const transceiver1 = caller.addTransceiver('audio');
 

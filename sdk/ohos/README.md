@@ -30,6 +30,8 @@ OpenHarmony API version >= 15.
 
 Open `entry/src/main/module.json5` and add the following permissions as needed:
 
+> **NOTE**: The HAR module pre-declares `ohos.permission.INTERNET`, `ohos.permission.CAMERA`, and `ohos.permission.MICROPHONE`. `ohos.permission.CAPTURE_SCREEN` is required only when using screen capture (`getDisplayMedia`) and must be declared by the host application in its own `module.json5`; the HAR does not pre-declare it because it is a system-granted permission that only applications can request.
+
 ```json
 "requestPermissions": [
   {
@@ -122,7 +124,7 @@ await peerConnection.setLocalDescription(offer);
 // Send the SDP offer to the remote peer via the signaling channel
 ```
 
-For more examples, see the demo project in the `har_hap` directory. For instructions on compiling the dynamic library, see the [Build Documentation](../../docs/ohos/webrtc_build.md). For common issues during compilation, see the [Build FAQ](../../docs/ohos/webrtc_adapter_questions.md).
+For more examples, see the demo project in the `har_hap` directory. For instructions on compiling the dynamic library, see the [Build Documentation](../../docs/ohos/webrtc_build.md). For common issues during compilation, see the [Build FAQ](../../docs/ohos/webrtc_adapter_questions.md). For the detailed OpenHarmony adaptation differences from upstream WebRTC, see the [Adaptation Notes](../../docs/ohos/webrtc_adapter_ohos.md).
 
 The implementation code is in the `src/ohos_webrtc` directory. NAPI interface bindings are built with the open-source project [node-addon-api](https://github.com/nodejs/node-addon-api).
 
@@ -136,7 +138,7 @@ The current local changes add `CameraPreviewSession` to manage camera selection,
 
 ### Integration and Lifecycle
 
-Grant camera permission first and attach the same `VideoRenderController` to your XComponent. The host supplies `context`, `factory`, and `hostWindow` below:
+Grant camera permission first, then create the session; attach the same `VideoRenderController` to your XComponent. The host supplies `context`, `factory`, and `hostWindow` below:
 
 ```typescript
 import { CameraPreviewSession, VideoRenderController } from '@ohos/webrtc';
@@ -174,7 +176,7 @@ session.setActive(true);
 
 The current Native source declares version 2. To use frame-stall monitoring, rebuild the entire Native library from the current source and replace `libohos_webrtc.so` for the target ABI. Updating ArkTS files alone does not provide this capability. Explicitly requesting monitoring without the frame-count method reports `incompatible`.
 
-The low-level `VideoSource` API remains available. `applyDisplayRotation(0/90/180/270)` enables host-supplied rotation; `-1` restores automatic default-display rotation. `CameraPreviewSession` synchronizes the angle. The controller handles Surface sizing and aspect-preserving rendering, while Native probes installation-angle support and handles HAL rotation fallback.
+The low-level `VideoSource` API remains available. `applyDisplayRotation(0/90/180/270)` enables host-supplied rotation; `-1` restores automatic default-display rotation. `CameraPreviewSession` synchronizes the angle, so no duplicate compensation is needed on the page side. The controller handles Surface sizing and aspect-preserving rendering, while Native probes installation-angle support and handles HAL rotation fallback.
 
 ### Demo and Validation
 
@@ -194,6 +196,8 @@ To prevent `@ohos/webrtc` from being obfuscated, add the following exclusion rul
 ```
 
 ## Directory Structure
+
+The SDK directory structure and descriptions are as follows:
 
 ```shell
 sdk/ohos/
@@ -216,7 +220,7 @@ sdk/ohos/
         ├── async_work      # Async task helpers
         ├── audio_device    # Audio module
         ├── camera          # Camera module
-        ├── desktop_capture # Desktop/screen capture
+        ├── screen_capture  # Screen capture
         ├── helper          # NDK interface helpers
         ├── logging         # Logging adapter
         ├── render          # Video rendering module
@@ -234,4 +238,4 @@ Feel free to open an [Issue](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc/
 
 ## License
 
-This project is licensed under the [BSD License](../../LICENSE).
+This project is licensed under the [BSD License](../../LICENSE), please feel free to enjoy and participate in open source.
