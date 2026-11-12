@@ -230,6 +230,24 @@ struct Index {
                 this.pc?.setAudioRecording(!this.micOFF);
               })
               .margin({ left: 6, right: 6 })
+
+            // 轨道 ended 事件实测入口：停止底层视频采集源（非 track.stop()），
+            // 应触发 localVideoTrack.onended 且只派发一次。
+            Button('停视频源')
+              .layoutWeight(1)
+              .height(54)
+              .fontSize(15)
+              .fontWeight(FontWeight.Bold)
+              .onClick(() => {
+                if (!this.localVideoSource) {
+                  promptAction.showToast({ message: '当前无视频源(audio-only)' });
+                  return;
+                }
+                console.info(TAG, 'stopCapture clicked');
+                this.localVideoSource.stopCapture();
+                promptAction.showToast({ message: '已停止视频源，观察轨道事件(ended)' });
+              })
+              .margin({ left: 6 })
           }
           .width('100%')
           .justifyContent(FlexAlign.SpaceBetween)
@@ -546,6 +564,17 @@ struct Index {
     console.info(TAG, 'trackEvent: ' + line);
   }
 
+  // 视频轨道事件注册：摄像头与屏幕共享两条创建路径共用（getVideoTracks 返回基类类型）。
+  // stopCapture() 属于"非主动结束"（非 track.stop()），应派发 onended——实测入口。
+  registerVideoTrackEvents(track: webrtc.MediaStreamTrack) {
+    track.onended = (ev: webrtc.Event) => {
+      console.info(TAG, 'localVideoTrack.onended: ' + ev.type);
+      this.pushTrackEvent('ended(video)');
+      this.setStatus('本地视频轨道结束(自然)');
+      this.canChangeResolution = false;
+    };
+  }
+
   // 轮询当前轨道状态，独立于事件通道——事件没派发时这里也能看到 muted 变化
   startTrackStatePoll() {
     this.stopTrackStatePoll();
@@ -680,6 +709,7 @@ struct Index {
       console.info(TAG, 'videoTrack: ' + JSON.stringify(this.localVideoTrack));
 
       if (this.localVideoTrack) {
+        this.registerVideoTrackEvents(this.localVideoTrack);
         this.mXComponentController1.setVideoTrack(this.localVideoTrack);
         this.canChangeResolution = true;
       }
@@ -708,6 +738,7 @@ struct Index {
       console.info(TAG, 'videoTrack: ' + JSON.stringify(this.localVideoTrack));
 
       if (this.localVideoTrack) {
+        this.registerVideoTrackEvents(this.localVideoTrack);
         let videoSource = this.localVideoTrack.getSource();
         if (videoSource) {
           this.localVideoSource = videoSource as webrtc.VideoSource;

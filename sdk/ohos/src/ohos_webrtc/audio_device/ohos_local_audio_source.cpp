@@ -161,6 +161,17 @@ void OhosLocalAudioSource::OnAudioInputError(AudioInput* input, AudioErrorType t
 {
     (void)input;
     RTC_LOG(LS_ERROR) << __FUNCTION__ << " type=" << type << ", message=" << message;
+
+    // A device-level failure means the source can no longer provide media: end
+    // the source so the track fires onended (mirrors the video camera-lost path).
+    // This is the only non-user path to audio ended. Stop() is thread-safe from
+    // the audio callback thread (state exchange is atomic; notifications are
+    // posted to signalingThread_). STATE_MISMATCH is a programming error, not a
+    // device failure — keep the track alive so the defect stays observable.
+    if (type == AudioErrorType::START_STATE_MISMATCH) {
+        return;
+    }
+    Stop();
 }
 
 void OhosLocalAudioSource::OnAudioInputStateChange(AudioInput* input, AudioStateType newState)

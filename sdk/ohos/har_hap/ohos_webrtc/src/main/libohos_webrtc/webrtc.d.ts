@@ -808,6 +808,10 @@ export interface VideoSource extends MediaSource {
   oncameraswitchdone: ((this: VideoSource, ev: CameraSwitchDoneEvent) => any) | null;
   oncameraswitcherror: ((this: VideoSource, ev: CameraSwitchErrorEvent) => any) | null;
 
+  // 底层采集停止（非 track.stop()）时所属视频轨道进入 ended 并派发 onended，可用于实测。
+  startCapture(): void;
+  stopCapture(): void;
+
   // 切换到下一个可用摄像头; 设备仅一个摄像头时触发 oncameraswitcherror。
   switchCamera(): void;
   // 切换到指定 cameraId 的摄像头; cameraId 不存在时触发 oncameraswitcherror。
