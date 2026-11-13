@@ -930,7 +930,7 @@ export interface NativeVideoRenderer {
    * 视频帧尺寸或旋转角度变化时触发，事件内容见 FrameResolutionChangedEvent。
    * 使用 VideoRenderController 时可通过 onFrameSizeChanged 获取旋转后的显示宽高。
    */
-  onFrameResolutionChanged: ((this: NativeVideoRenderer, ev: Event) => any) | null;
+  onFrameResolutionChanged: ((this: NativeVideoRenderer, ev: FrameResolutionChangedEvent) => any) | null;
 }
 
 declare var NativeVideoRenderer: {
@@ -1096,11 +1096,15 @@ export interface PeerConnectionFactoryOptions {
   audioProcessing?: AudioProcessing;
 }
 
+export interface ExternalVideoConstraints extends MediaTrackConstraints {
+  ohosExternalFrames?: boolean;
+}
+
 export interface PeerConnectionFactory {
   createPeerConnection(config: RTCConfiguration): RTCPeerConnection;
   createAudioSource(constraints?: MediaTrackConstraints): AudioSource;
   createAudioTrack(id: string, source: AudioSource): AudioTrack;
-  createVideoSource(constraints?: MediaTrackConstraints & { ohosExternalFrames?: boolean }, isScreencast?: boolean): VideoSource;
+  createVideoSource(constraints?: ExternalVideoConstraints, isScreencast?: boolean): VideoSource;
   createVideoTrack(id: string, source: VideoSource): VideoTrack;
   startAecDump(fd: number, max_size_bytes: number): boolean;
   stopAecDump(): void;
