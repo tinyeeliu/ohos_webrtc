@@ -87,6 +87,7 @@ public:
     NAPI_METHOD_NAME_DECLARE(SwitchCamera, switchCamera);
     NAPI_METHOD_NAME_DECLARE(ApplyDisplayRotation, applyDisplayRotation);
     NAPI_METHOD_NAME_DECLARE(GetCaptureFrameCount, getCaptureFrameCount);
+    Napi::Value PushRgbaFrame(const Napi::CallbackInfo& info);
 
     static void Init(Napi::Env env, Napi::Object exports);
 

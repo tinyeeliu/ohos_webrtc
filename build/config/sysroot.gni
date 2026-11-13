@@ -28,4 +28,8 @@ declare_args() {
 if (is_ohos) {
     import("//build/config/clang/clang.gni")
     sysroot = "${ohos_sdk_native_root}/sysroot"
+} else if (is_mac && target_os == "ohos" && sysroot == "") {
+    # The host protoc and other generators need the macOS SDK, not OHOS.
+    import("//build/config/mac/mac_sdk.gni")
+    sysroot = mac_sdk_path
 }

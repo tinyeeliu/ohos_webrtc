@@ -65,6 +65,8 @@ public:
     void RegisterOutputObserver(AudioOutput::Observer* obs);
     void UnregisterOutputObserver(AudioOutput::Observer* obs);
 
+    PlayoutObservation GetPlayoutObservation() const { return output_->GetPlayoutObservation(); }
+
 protected:
     enum class InitStatus {
         OK = 0,
@@ -138,6 +140,7 @@ protected:
     int32_t GetPlayoutUnderrunCount() const override;
     absl::optional<Stats> GetStats() const override;
 
+
     // AudioInput::Observer implementation.
     void OnAudioInputError(AudioInput* input, AudioErrorType type, const std::string& message) override;
     void OnAudioInputStateChange(AudioInput* input, AudioStateType newState) override;
@@ -204,6 +207,7 @@ protected:
     void SetEventHandler(const Napi::CallbackInfo& info, const Napi::Value& value);
 
     Napi::Value SetSpeakerMute(const Napi::CallbackInfo& info);
+    Napi::Value GetPlayoutSnapshot(const Napi::CallbackInfo& info);
     Napi::Value SetMicrophoneMute(const Napi::CallbackInfo& info);
     Napi::Value SetNoiseSuppressorEnabled(const Napi::CallbackInfo& info);
     Napi::Value Release(const Napi::CallbackInfo& info);

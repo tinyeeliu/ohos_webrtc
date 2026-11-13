@@ -7,6 +7,14 @@ import("//build/toolchain/toolchain.gni")
 
 default_clang_base_path = "//third_party/llvm-build/Release+Asserts"
 
+declare_args() {
+  # Optional native macOS compiler for host generators in an OHOS cross-build.
+  ohos_mac_host_clang_path = ""
+}
+if (is_mac && target_os == "ohos" && ohos_mac_host_clang_path != "") {
+  default_clang_base_path = ohos_mac_host_clang_path
+}
+
 if (is_ohos) {
   declare_args() {
     ohos_sdk_native_root = "//buildtools/ohos-sdk/linux/native"

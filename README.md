@@ -9,6 +9,44 @@ remain in place.
 
 ---
 
+## Academy native extensions
+
+The fork adds `AudioDeviceModule.getPlayoutSnapshot()`: bounded output-frame
+metadata measured at the native renderer, including the OS playback position
+and last non-silent submitted frame. It exposes no PCM and does not equate
+provider response completion with audible completion. Missing OS timing reports
+`available: false`.
+
+External sources created with `{ ohosExternalFrames: true }` accept bounded
+`pushRgbaFrame(buffer, width, height)` input for board/still video. These sources
+open no camera or microphone. Camera sources retain the existing SDK path.
+
+On an Apple Silicon Mac with Xcode and the Harmony API21 native SDK installed:
+
+```sh
+python3 tools/academy/build_har.py
+```
+
+The script pins GN and the upstream third-party revision, separates macOS host
+tools from Harmony target compilation, and writes downloads/builds/HARs beneath
+ignored `out/`. The resulting package is `out/academy-webrtc-1.0.5-sm.1.har`, with
+source/compiler/SDK identity and integrity in its adjacent JSON manifest. If the
+GitCode dependency clone is unavailable, its original author mirror is
+`https://gitee.com/zhong-luping/webrtc_third_party.git`; only the pinned revision
+`8bc95681d66c67b16516023758213df89774a825` is accepted. A prepared checkout can be
+linked as `third_party`.
+
+The renderer observation unit can run without a device:
+
+```sh
+c++ -std=c++17 -pthread sdk/ohos/src/ohos_webrtc/audio_device/playout_observation_test.cc -o out/playout-observation-test
+out/playout-observation-test
+```
+
+Build and unit-test success alone do not establish audible completion, Qwen
+visual understanding or camera behavior. Those require application/device
+qualification. SpeakerGuard and custom echo-processing changes are excluded.
+
 **WebRTC is a free, open software project** that provides browsers and mobile
 applications with Real-Time Communications (RTC) capabilities via simple APIs.
 The WebRTC components have been optimized to best serve this purpose.

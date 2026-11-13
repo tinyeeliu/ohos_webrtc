@@ -802,6 +802,10 @@ export interface AudioSource extends MediaSource {
 }
 
 export interface VideoSource extends MediaSource {
+  /** Fork extension: only external sources accept bounded RGBA frames. */
+  pushRgbaFrame(data: ArrayBuffer, width: number, height: number): boolean;
+  startCapture(): void;
+  stopCapture(): void;
   oncapturerstarted: ((this: VideoSource, ev: VideoCapturerStartedEvent) => any) | null;
   oncapturerstopped: ((this: VideoSource, ev: Event) => any) | null;
   oncameraswitchdone: ((this: VideoSource, ev: CameraSwitchDoneEvent) => any) | null;
@@ -1000,7 +1004,21 @@ export interface AudioSamples {
   readonly data: ArrayBuffer;
 }
 
+/** Fork extension v1: native output observation, with no retained audio payload. */
+export interface AudioPlayoutSnapshot {
+  readonly available: boolean;
+  readonly muted: boolean;
+  readonly sequence: number;
+  readonly sampleRate: number;
+  readonly submittedFrames: number;
+  readonly playedFrames: number;
+  readonly lastNonSilentFrame: number;
+  readonly lastAudibleFrame: number;
+  readonly observedAtNs: number;
+}
+
 export interface AudioDeviceModule {
+  getPlayoutSnapshot(): AudioPlayoutSnapshot;
   oncapturererror: ((this: AudioDeviceModule, event: AudioErrorEvent) => void) | null;
   oncapturerstatechange: ((this: AudioDeviceModule, event: AudioStateChangeEvent) => void) | null;
   // Called when new audio samples are ready. This should only be set for debug purposes
@@ -1082,7 +1100,7 @@ export interface PeerConnectionFactory {
   createPeerConnection(config: RTCConfiguration): RTCPeerConnection;
   createAudioSource(constraints?: MediaTrackConstraints): AudioSource;
   createAudioTrack(id: string, source: AudioSource): AudioTrack;
-  createVideoSource(constraints?: MediaTrackConstraints, isScreencast?: boolean): VideoSource;
+  createVideoSource(constraints?: MediaTrackConstraints & { ohosExternalFrames?: boolean }, isScreencast?: boolean): VideoSource;
   createVideoTrack(id: string, source: VideoSource): VideoTrack;
   startAecDump(fd: number, max_size_bytes: number): boolean;
   stopAecDump(): void;

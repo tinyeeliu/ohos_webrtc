@@ -41,6 +41,7 @@ public:
     ~OhosVideoTrackSource() override;
 
     void Start();
+    bool PushRgbaFrame(const uint8_t* bytes, size_t length, int width, int height);
     void Stop();
 
     // 切换摄像头: 投递到 capturer 线程执行, 保证 StopInternal/StartInternal 不与运行中的采集竞态。

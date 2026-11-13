@@ -22,6 +22,8 @@
 
 #include "api/video/i420_buffer.h"
 #include "rtc_base/logging.h"
+#include "rtc_base/time_utils.h"
+#include "third_party/libyuv/include/libyuv/convert.h"
 
 namespace webrtc {
 
@@ -59,6 +61,10 @@ OhosVideoTrackSource::OhosVideoTrackSource(
     thread_->Start();
     thread_->PostTask(
         [this, capturer = capturer_, sharedContext = sharedContext_] {
+            if (capturer->IsExternal()) {
+                capturer->Init(nullptr, this);
+                return;
+            }
 #if defined(__x86_64__)
             // x86_64 模拟器的 dgles 不支持外部纹理(EGLImage)零拷贝，
             // 只能走 CPU(ImageReceiver -> I420) 采集路径。
@@ -86,6 +92,26 @@ OhosVideoTrackSource::~OhosVideoTrackSource()
         }
     });
     thread_->Stop();
+}
+
+bool OhosVideoTrackSource::PushRgbaFrame(const uint8_t* bytes, size_t length, int width, int height)
+{
+    if (!bytes || width < 1 || height < 1 || width > 1920 || height > 1080 ||
+        length != static_cast<size_t>(width) * height * 4 || !capturer_->IsExternal() ||
+        is_destroying_.load() || state_.load() == kEnded) return false;
+    auto frame = I420Buffer::Create(width, height);
+    if (libyuv::ABGRToI420(bytes, width * 4, frame->MutableDataY(), frame->StrideY(),
+        frame->MutableDataU(), frame->StrideU(), frame->MutableDataV(), frame->StrideV(), width, height) != 0) return false;
+    bool accepted = false;
+    // Blocking delivery is bounded and gives the caller backpressure, rather
+    // than creating an unbounded queue of full-size frame copies.
+    thread_->BlockingCall([&] {
+        if (state_.load() == kLive && !is_destroying_.load()) {
+            OnFrameCaptured(frame, rtc::TimeMicros(), kVideoRotation_0);
+            accepted = true;
+        }
+    });
+    return accepted;
 }
 
 void OhosVideoTrackSource::Start()

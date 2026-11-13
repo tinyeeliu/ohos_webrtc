@@ -952,6 +952,7 @@ void NapiAudioDeviceModule::Init(Napi::Env env, Napi::Object exports)
     Function func = DefineClass(
         env, kClassName,
         {
+            InstanceMethod<&NapiAudioDeviceModule::GetPlayoutSnapshot>("getPlayoutSnapshot"),
             InstanceAccessor<&NapiAudioDeviceModule::GetEventHandler, &NapiAudioDeviceModule::SetEventHandler>(
                 kAttributeNameOnCapturerError, napi_default, (void*)kEventNameCapturerError),
             InstanceAccessor<&NapiAudioDeviceModule::GetEventHandler, &NapiAudioDeviceModule::SetEventHandler>(
@@ -1158,6 +1159,22 @@ void NapiAudioDeviceModule::SetEventHandler(const Napi::CallbackInfo& info, cons
 
     std::lock_guard<std::mutex> lock(mutex_);
     eventHandlers_[type] = std::move(handler);
+}
+
+Napi::Value NapiAudioDeviceModule::GetPlayoutSnapshot(const Napi::CallbackInfo& info)
+{
+    const auto value = adm_ ? adm_->GetPlayoutObservation() : PlayoutObservation{};
+    auto result = Object::New(info.Env());
+    result.Set("available", Boolean::New(info.Env(), value.available));
+    result.Set("muted", Boolean::New(info.Env(), value.muted));
+    result.Set("sequence", Number::New(info.Env(), value.sequence));
+    result.Set("sampleRate", Number::New(info.Env(), value.sampleRate));
+    result.Set("submittedFrames", Number::New(info.Env(), value.submittedFrames));
+    result.Set("playedFrames", Number::New(info.Env(), value.playedFrames));
+    result.Set("lastNonSilentFrame", Number::New(info.Env(), value.lastNonSilentFrame));
+    result.Set("lastAudibleFrame", Number::New(info.Env(), value.lastAudibleFrame));
+    result.Set("observedAtNs", Number::New(info.Env(), value.observedAtNs));
+    return result;
 }
 
 Napi::Value NapiAudioDeviceModule::SetSpeakerMute(const Napi::CallbackInfo& info)

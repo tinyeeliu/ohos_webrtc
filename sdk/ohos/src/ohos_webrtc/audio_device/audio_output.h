@@ -22,6 +22,7 @@
 #include "modules/audio_device/include/audio_device.h"
 
 #include "audio_common.h"
+#include "playout_observation.h"
 
 namespace webrtc {
 
@@ -60,6 +61,8 @@ public:
     virtual int32_t SetMute(bool mute) = 0;
     virtual int32_t PlayoutDelay(uint16_t* delayMs) const = 0;
     virtual int GetPlayoutUnderrunCount() = 0;
+
+    virtual PlayoutObservation GetPlayoutObservation() const { return {}; }
 
     virtual absl::optional<AudioDeviceModule::Stats> GetStats() const
     {

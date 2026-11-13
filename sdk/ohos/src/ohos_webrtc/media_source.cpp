@@ -14,6 +14,7 @@
  */
 
 #include "media_source.h"
+#include <cmath>
 
 #include "rtc_base/logging.h"
 
@@ -161,6 +162,7 @@ void NapiVideoSource::Init(Napi::Env env, Napi::Object exports)
             InstanceMethod<&NapiVideoSource::SwitchCamera>(kMethodNameSwitchCamera),
             InstanceMethod<&NapiVideoSource::ApplyDisplayRotation>(kMethodNameApplyDisplayRotation),
             InstanceMethod<&NapiVideoSource::GetCaptureFrameCount>(kMethodNameGetCaptureFrameCount),
+            InstanceMethod<&NapiVideoSource::PushRgbaFrame>("pushRgbaFrame"),
             InstanceMethod<&NapiVideoSource::ToJson>(kMethodNameToJson),
         });
     exports.Set(kClassName, func);
@@ -400,6 +402,20 @@ Napi::Value NapiVideoSource::ApplyDisplayRotation(const Napi::CallbackInfo& info
     int displayDegrees = static_cast<int>(degrees);
     source_->ApplyDisplayRotation(displayDegrees);
     return info.Env().Undefined();
+}
+
+Napi::Value NapiVideoSource::PushRgbaFrame(const Napi::CallbackInfo& info)
+{
+    if (!source_ || info.Length() != 3 || !info[0].IsArrayBuffer() || !info[1].IsNumber() || !info[2].IsNumber()) {
+        NAPI_THROW(TypeError::New(info.Env(), "Expected an active external source and RGBA buffer, width, height"), info.Env().Undefined());
+    }
+    auto data = info[0].As<ArrayBuffer>();
+    const double width = info[1].As<Number>().DoubleValue(), height = info[2].As<Number>().DoubleValue();
+    if (!std::isfinite(width) || !std::isfinite(height) || width < 1 || height < 1 || width > 1920 || height > 1080 || width != static_cast<int>(width) || height != static_cast<int>(height)) {
+        NAPI_THROW(TypeError::New(info.Env(), "Invalid RGBA frame dimensions"), info.Env().Undefined());
+    }
+    return Boolean::New(info.Env(), source_->PushRgbaFrame(static_cast<const uint8_t*>(data.Data()),
+        data.ByteLength(), static_cast<int>(width), static_cast<int>(height)));
 }
 
 Napi::Value NapiVideoSource::GetCaptureFrameCount(const Napi::CallbackInfo& info)

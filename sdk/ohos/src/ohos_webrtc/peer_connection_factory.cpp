@@ -14,6 +14,7 @@
  */
 
 #include "peer_connection_factory.h"
+#include "video/external_video_capturer.h"
 
 #include "api/audio_codecs/builtin_audio_decoder_factory.h"
 #include "api/audio_codecs/builtin_audio_encoder_factory.h"
@@ -444,7 +445,12 @@ Napi::Value NapiPeerConnectionFactory::CreateVideoSource(const CallbackInfo& inf
     }
 
     std::unique_ptr<VideoCapturer> videoCapturer;
-    if (isScreencast) {
+    const bool externalFrames = info.Length() > 0 && info[0].As<Object>().Has("ohosExternalFrames") &&
+        info[0].As<Object>().Get("ohosExternalFrames").IsBoolean() &&
+        info[0].As<Object>().Get("ohosExternalFrames").As<Boolean>().Value();
+    if (externalFrames) {
+        videoCapturer = std::make_unique<ExternalVideoCapturer>();
+    } else if (isScreencast) {
         ScreenCaptureOptions options;
         GetScreenCaptureOptionsFromConstraints(video, options);
         RTC_DLOG(LS_INFO) << "Screen capture options: " << options.ToString();

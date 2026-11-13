@@ -56,6 +56,8 @@ public:
     int32_t PlayoutDelay(uint16_t* delayMs) const override;
     int GetPlayoutUnderrunCount() override;
 
+    PlayoutObservation GetPlayoutObservation() const override { return playoutObserver_.Read(); }
+
     void RegisterObserver(Observer* obs) override;
     void UnregisterObserver(Observer* obs) override;
 
@@ -96,6 +98,8 @@ private:
     // Samples to be played are replaced by zeros if `mute_` is set to true.
     // Can be used to ensure that the speaker is fully muted.
     std::atomic<bool> mute_{false};
+
+    PlayoutObserver playoutObserver_;
 
     bool initialized_{false};
     bool playing_{false};

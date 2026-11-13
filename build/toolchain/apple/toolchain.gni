@@ -157,6 +157,9 @@ template("single_apple_toolchain") {
     }
 
     prefix = rebase_path("$clang_base_path/bin/", root_build_dir)
+    if (target_os == "ohos" && ohos_mac_host_clang_path != "") {
+      prefix = rebase_path("$ohos_mac_host_clang_path/bin/", root_build_dir)
+    }
     _cc = "${prefix}clang"
     _cxx = "${prefix}clang++"
 

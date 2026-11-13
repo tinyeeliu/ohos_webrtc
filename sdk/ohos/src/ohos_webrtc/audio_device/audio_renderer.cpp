@@ -109,6 +109,7 @@ int32_t AudioRenderer::Init()
 
 int32_t AudioRenderer::Terminate()
 {
+    playoutObserver_.Invalidate();
     RTC_DLOG(LS_INFO) << __FUNCTION__;
 
     RTC_DCHECK(threadChecker_.IsCurrent());
@@ -259,6 +260,7 @@ int32_t AudioRenderer::StartPlayout()
 
 int32_t AudioRenderer::StopPlayout()
 {
+    playoutObserver_.Invalidate();
     RTC_LOG(LS_INFO) << __FUNCTION__;
 
     RTC_DCHECK(threadChecker_.IsCurrent());
@@ -378,7 +380,15 @@ int32_t AudioRenderer::OnWriteData(OH_AudioRenderer* renderer, void* buffer, int
         rtc::MakeArrayView(static_cast<int16_t*>(buffer), length / sizeof(int16_t)),
         static_cast<int>(latencyMillis + kHalfSec));
 
-    if (mute_) {
+    int64_t playedFrames = 0, timestampNs = 0, writtenFrames = 0;
+    const bool clockValid =
+        OH_AudioRenderer_GetTimestamp(renderer, CLOCK_MONOTONIC, &playedFrames, &timestampNs) == AUDIOSTREAM_SUCCESS &&
+        OH_AudioRenderer_GetFramesWritten(renderer, &writtenFrames) == AUDIOSTREAM_SUCCESS;
+    const bool muted = mute_.load();
+    playoutObserver_.Observe(static_cast<const int16_t*>(buffer), length / sizeof(int16_t),
+        GetChannelCount(), GetSampleRate(), writtenFrames, playedFrames, timestampNs, clockValid, muted);
+
+    if (muted) {
         auto it = static_cast<uint8_t*>(buffer);
         std::fill(it, it + length, 0);
     }
