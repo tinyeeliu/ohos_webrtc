@@ -26,6 +26,7 @@
 
 #include "api/peer_connection_interface.h"
 #include "rtc_base/socket_server.h"
+#include "video/video_frame_rate_gate.h"
 
 namespace webrtc {
 
@@ -125,6 +126,7 @@ protected:
     static Napi::Value SetDefault(const Napi::CallbackInfo& info);
 
     Napi::Value GetPlayoutSnapshot(const Napi::CallbackInfo& info);
+    Napi::Value SetVideoFrameRateLimit(const Napi::CallbackInfo& info);
     Napi::Value CreatePeerConnection(const Napi::CallbackInfo& info);
     Napi::Value CreateAudioSource(const Napi::CallbackInfo& info);
     Napi::Value CreateAudioTrack(const Napi::CallbackInfo& info);
@@ -144,6 +146,7 @@ private:
     }
 
     std::shared_ptr<PeerConnectionFactoryWrapper> wrapper_;
+    std::shared_ptr<VideoFrameRateLimit> videoRateLimit_ = std::make_shared<VideoFrameRateLimit>();
 };
 
 } // namespace webrtc

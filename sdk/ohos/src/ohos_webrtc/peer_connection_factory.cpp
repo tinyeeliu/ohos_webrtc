@@ -15,6 +15,7 @@
 
 #include "peer_connection_factory.h"
 #include "video/external_video_capturer.h"
+#include "video/video_frame_rate_factory.h"
 
 #include "api/audio_codecs/builtin_audio_decoder_factory.h"
 #include "api/audio_codecs/builtin_audio_encoder_factory.h"
@@ -296,6 +297,8 @@ NapiPeerConnectionFactory::NapiPeerConnectionFactory(const CallbackInfo& info)
         }
     }
 
+    if (!videoEncoderFactory) videoEncoderFactory = CreateDefaultVideoEncoderFactory();
+    videoEncoderFactory = std::make_unique<FrameRateLimitedEncoderFactory>(std::move(videoEncoderFactory), videoRateLimit_);
     wrapper_ = PeerConnectionFactoryWrapper::Create(
         adm, std::move(videoEncoderFactory), std::move(videoDecoderFactory), audioProcessing);
 }
@@ -310,6 +313,7 @@ void NapiPeerConnectionFactory::Init(Napi::Env env, Object exports)
             StaticMethod<&NapiPeerConnectionFactory::SetDefault>(kMethodNameSetDefault),
             InstanceMethod<&NapiPeerConnectionFactory::CreatePeerConnection>(kMethodNameCreatePeerConnection),
             InstanceMethod<&NapiPeerConnectionFactory::GetPlayoutSnapshot>("getPlayoutSnapshot"),
+            InstanceMethod<&NapiPeerConnectionFactory::SetVideoFrameRateLimit>("setVideoFrameRateLimit"),
             InstanceMethod<&NapiPeerConnectionFactory::CreateAudioSource>(kMethodNameCreateAudioSource),
             InstanceMethod<&NapiPeerConnectionFactory::CreateAudioTrack>(kMethodNameCreateAudioTrack),
             InstanceMethod<&NapiPeerConnectionFactory::CreateVideoSource>(kMethodNameCreateVideoSource),
@@ -322,6 +326,19 @@ void NapiPeerConnectionFactory::Init(Napi::Env env, Object exports)
 
     constructor_ = Persistent(func);
     constructor_.SuppressDestruct();
+}
+
+Napi::Value NapiPeerConnectionFactory::SetVideoFrameRateLimit(const Napi::CallbackInfo& info)
+{
+    if (info.Length() != 1 || !info[0].IsNumber()) {
+        NAPI_THROW(TypeError::New(info.Env(), "Expected a finite FPS limit"), info.Env().Undefined());
+    }
+    const double fps = info[0].As<Number>().DoubleValue();
+    if (!std::isfinite(fps) || fps < 0 || fps > 120) {
+        NAPI_THROW(RangeError::New(info.Env(), "FPS limit must be between 0 and 120"), info.Env().Undefined());
+    }
+    videoRateLimit_->fps.store(fps, std::memory_order_release);
+    return Number::New(info.Env(), fps);
 }
 
 Napi::Value NapiPeerConnectionFactory::SetDefault(const Napi::CallbackInfo& info)

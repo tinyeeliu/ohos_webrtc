@@ -29,7 +29,7 @@ python3 tools/academy/build_har.py
 
 The script pins GN and the upstream third-party revision, separates macOS host
 tools from Harmony target compilation, and writes downloads/builds/HARs beneath
-ignored `out/`. The resulting package is `out/academy-webrtc-1.0.5-sm.1.har`, with
+ignored `out/`. The resulting package is `out/academy-webrtc-1.0.5-sm.2.har`, with
 source/compiler/SDK identity and integrity in its adjacent JSON manifest. If the
 GitCode dependency clone is unavailable, its original author mirror is
 `https://gitee.com/zhong-luping/webrtc_third_party.git`; only the pinned revision
@@ -86,3 +86,21 @@ native API header files.
  * [Documentation](g3doc/sitemap.md).
 
 [native-dev]: https://webrtc.googlesource.com/src/+/main/docs/native-code/
+
+
+`PeerConnectionFactory.setVideoFrameRateLimit(fps)` is an optional, factory-scoped
+encode gate: zero blocks encoding and positive rates (including fractional FPS)
+are enforced before the selected hardware encoder or its software fallback.
+Unconfigured factories retain the SDK's default behavior. Each encoder has its
+own monotonic clock; there is no process-global rate setting. Local native
+preview remains attached to the full-rate source. This gate is necessary because
+MateBook hardware accepted an RTP `maxFramerate` setting but encoded at 30 FPS.
+The Harmony app creates one factory per owned realtime session and combines the
+gate with sender deactivation and owned capture cleanup.
+
+The standalone rate-gate check needs only a C++17 compiler:
+
+```sh
+c++ -std=c++17 -pthread sdk/ohos/src/ohos_webrtc/video/video_frame_rate_gate_test.cc -o out/video-frame-rate-test
+out/video-frame-rate-test
+```

@@ -1082,6 +1082,8 @@ export interface PeerConnectionFactoryOptions {
 }
 
 export interface PeerConnectionFactory {
+  /** Optional per-factory encode gate. 0 blocks; positive FPS also applies to software fallback. Preview is unaffected. */
+  setVideoFrameRateLimit(fps: number): number;
   createPeerConnection(config: RTCConfiguration): RTCPeerConnection;
   createAudioSource(constraints?: MediaTrackConstraints): AudioSource;
   createAudioTrack(id: string, source: AudioSource): AudioTrack;

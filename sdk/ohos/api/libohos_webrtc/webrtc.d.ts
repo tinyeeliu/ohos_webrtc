@@ -1101,6 +1101,8 @@ export interface ExternalVideoConstraints extends MediaTrackConstraints {
 }
 
 export interface PeerConnectionFactory {
+  /** Optional per-factory encode gate. 0 blocks; positive FPS also applies to software fallback. Preview is unaffected. */
+  setVideoFrameRateLimit(fps: number): number;
   getPlayoutSnapshot(): AudioPlayoutSnapshot;
   createPeerConnection(config: RTCConfiguration): RTCPeerConnection;
   createAudioSource(constraints?: MediaTrackConstraints): AudioSource;

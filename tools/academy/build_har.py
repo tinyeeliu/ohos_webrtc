@@ -104,9 +104,9 @@ def main():
     shutil.copy2(library, package / 'libs/arm64-v8a/libohos_webrtc.so')
     shutil.copy2(ROOT / 'sdk/ohos/api/libohos_webrtc/webrtc.d.ts', package / 'src/main/libohos_webrtc/webrtc.d.ts')
     info = json.loads((package / 'oh-package.json5').read_text())
-    info.update(version='1.0.5-sm.1', repository='https://github.com/tinyeeliu/ohos_webrtc', homepage='https://github.com/tinyeeliu/ohos_webrtc')
+    info.update(version='1.0.5-sm.2', repository='https://github.com/tinyeeliu/ohos_webrtc', homepage='https://github.com/tinyeeliu/ohos_webrtc')
     (package / 'oh-package.json5').write_text(json.dumps(info, indent=2) + '\n')
-    artifact = ROOT / 'out/academy-webrtc-1.0.5-sm.1.har'
+    artifact = ROOT / 'out/academy-webrtc-1.0.5-sm.2.har'
     def normalized(member):
         member.mtime = 0
         member.uid = member.gid = 0
@@ -122,7 +122,7 @@ def main():
                 'sdkIdentity': sdk_key, 'compiler': compiler.strip(), 'gnRevision': GN_REVISION,
                 'thirdPartyRevision': THIRD_PARTY_REVISION, 'sha256': hashlib.sha256(data).hexdigest(),
                 'integrity': 'sha512-' + base64.b64encode(hashlib.sha512(data).digest()).decode(),
-                'abi': 'arm64-v8a', 'minimumApi': 21, 'extensions': ['native-playout-v1', 'external-rgba-v1']}
+                'abi': 'arm64-v8a', 'minimumApi': 21, 'extensions': ['native-playout-v1', 'external-rgba-v1', 'encoder-fps-v1']}
     artifact.with_suffix('.json').write_text(json.dumps(manifest, indent=2) + '\n')
     print(json.dumps({'artifact': str(artifact), **manifest}, indent=2))
 
