@@ -1,3 +1,14 @@
+# HarmonyOS WebRTC fork
+
+This repository is a fork of
+[CPF-ApplicationTPC/ohos_webrtc](https://gitcode.com/CPF-ApplicationTPC/ohos_webrtc),
+imported from GitCode with its upstream commit history and tags preserved.
+Our GitHub copy is [tinyeeliu/ohos_webrtc](https://github.com/tinyeeliu/ohos_webrtc).
+The original project documentation follows; upstream licenses and attribution
+remain in place.
+
+---
+
 **WebRTC is a free, open software project** that provides browsers and mobile
 applications with Real-Time Communications (RTC) capabilities via simple APIs.
 The WebRTC components have been optimized to best serve this purpose.
