@@ -990,7 +990,8 @@ bool GetOption(const Object& obj, const char* key, std::optional<int32_t>* value
         *valueOut = val.As<Number>().Int32Value();
         return true;
     }
-    return false;
+    // Missing optional settings retain their documented defaults.
+    return true;
 }
 
 bool GetOption(const Object& obj, const char* key, std::optional<bool>* valueOut)
@@ -1004,7 +1005,8 @@ bool GetOption(const Object& obj, const char* key, std::optional<bool>* valueOut
         *valueOut = val.As<Boolean>().Value();
         return true;
     }
-    return false;
+    // Missing optional settings retain their documented defaults.
+    return true;
 }
 
 bool ParseAudioOptions(const Napi::CallbackInfo& info, AudioInputOptions& inputOptions,
