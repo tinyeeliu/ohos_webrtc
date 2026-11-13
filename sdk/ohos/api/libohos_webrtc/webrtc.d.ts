@@ -1116,6 +1116,7 @@ export interface PeerConnectionFactory {
 declare var PeerConnectionFactory: {
   prototype: PeerConnectionFactory;
   new(options?: PeerConnectionFactoryOptions): PeerConnectionFactory;
+  new(adm: AudioDeviceModule, audioProcessing: AudioProcessing): PeerConnectionFactory;
   getDefault(): PeerConnectionFactory;
   setDefault(factory: PeerConnectionFactory): void;
 };

@@ -262,7 +262,20 @@ NapiPeerConnectionFactory::NapiPeerConnectionFactory(const CallbackInfo& info)
     std::unique_ptr<VideoEncoderFactory> videoEncoderFactory;
     std::unique_ptr<VideoDecoderFactory> videoDecoderFactory;
     rtc::scoped_refptr<AudioProcessing> audioProcessing;
-    if (info.Length() > 0 && info[0].IsObject()) {
+    // Explicit native references avoid ArkTS object-option serialization dropping
+    // the ADM/APM and silently constructing an unrelated default audio device.
+    if (info.Length() == 2) {
+        if (!info[0].IsObject() || !info[1].IsObject()) {
+            NAPI_THROW_VOID(TypeError::New(info.Env(), "Expected AudioDeviceModule and AudioProcessing"));
+        }
+        auto nativeAdm = NapiAudioDeviceModule::Unwrap(info[0].As<Object>());
+        auto nativeApm = NapiAudioProcessing::Unwrap(info[1].As<Object>());
+        if (!nativeAdm || !nativeApm) {
+            NAPI_THROW_VOID(TypeError::New(info.Env(), "Invalid native audio owner"));
+        }
+        adm = nativeAdm->Get();
+        audioProcessing = nativeApm->Get();
+    } else if (info.Length() > 0 && info[0].IsObject()) {
         auto jsOptions = info[0].As<Object>();
         if (jsOptions.Has(NapiPeerConnectionFactoryOptions::kAttributeNameAdm)) {
             auto jsAdm = jsOptions.Get(NapiPeerConnectionFactoryOptions::kAttributeNameAdm).As<Object>();
