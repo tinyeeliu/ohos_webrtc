@@ -1163,19 +1163,24 @@ void NapiAudioDeviceModule::SetEventHandler(const Napi::CallbackInfo& info, cons
 
 Napi::Value NapiAudioDeviceModule::GetPlayoutSnapshot(const Napi::CallbackInfo& info)
 {
-    const auto value = adm_ ? adm_->GetPlayoutObservation() : PlayoutObservation{};
-    auto result = Object::New(info.Env());
-    result.Set("available", Boolean::New(info.Env(), value.available));
-    result.Set("deviceInitialized", Boolean::New(info.Env(), adm_ && rtc::scoped_refptr<AudioDeviceModule>(adm_)->Initialized()));
-    result.Set("devicePlaying", Boolean::New(info.Env(), adm_ && rtc::scoped_refptr<AudioDeviceModule>(adm_)->Playing()));
-    result.Set("muted", Boolean::New(info.Env(), value.muted));
-    result.Set("sequence", Number::New(info.Env(), value.sequence));
-    result.Set("sampleRate", Number::New(info.Env(), value.sampleRate));
-    result.Set("submittedFrames", Number::New(info.Env(), value.submittedFrames));
-    result.Set("playedFrames", Number::New(info.Env(), value.playedFrames));
-    result.Set("lastNonSilentFrame", Number::New(info.Env(), value.lastNonSilentFrame));
-    result.Set("lastAudibleFrame", Number::New(info.Env(), value.lastAudibleFrame));
-    result.Set("observedAtNs", Number::New(info.Env(), value.observedAtNs));
+    return Snapshot(info.Env(), adm_);
+}
+
+Napi::Value NapiAudioDeviceModule::Snapshot(Napi::Env env, rtc::scoped_refptr<OhosAudioDeviceModule> adm)
+{
+    const auto value = adm ? adm->GetPlayoutObservation() : PlayoutObservation{};
+    auto result = Object::New(env);
+    result.Set("available", Boolean::New(env, value.available));
+    result.Set("deviceInitialized", Boolean::New(env, adm && rtc::scoped_refptr<AudioDeviceModule>(adm)->Initialized()));
+    result.Set("devicePlaying", Boolean::New(env, adm && rtc::scoped_refptr<AudioDeviceModule>(adm)->Playing()));
+    result.Set("muted", Boolean::New(env, value.muted));
+    result.Set("sequence", Number::New(env, value.sequence));
+    result.Set("sampleRate", Number::New(env, value.sampleRate));
+    result.Set("submittedFrames", Number::New(env, value.submittedFrames));
+    result.Set("playedFrames", Number::New(env, value.playedFrames));
+    result.Set("lastNonSilentFrame", Number::New(env, value.lastNonSilentFrame));
+    result.Set("lastAudibleFrame", Number::New(env, value.lastAudibleFrame));
+    result.Set("observedAtNs", Number::New(env, value.observedAtNs));
     return result;
 }
 

@@ -124,6 +124,7 @@ public:
 protected:
     static Napi::Value SetDefault(const Napi::CallbackInfo& info);
 
+    Napi::Value GetPlayoutSnapshot(const Napi::CallbackInfo& info);
     Napi::Value CreatePeerConnection(const Napi::CallbackInfo& info);
     Napi::Value CreateAudioSource(const Napi::CallbackInfo& info);
     Napi::Value CreateAudioTrack(const Napi::CallbackInfo& info);

@@ -1103,6 +1103,7 @@ export interface ExternalVideoConstraints extends MediaTrackConstraints {
 }
 
 export interface PeerConnectionFactory {
+  getPlayoutSnapshot(): AudioPlayoutSnapshot;
   createPeerConnection(config: RTCConfiguration): RTCPeerConnection;
   createAudioSource(constraints?: MediaTrackConstraints): AudioSource;
   createAudioTrack(id: string, source: AudioSource): AudioTrack;

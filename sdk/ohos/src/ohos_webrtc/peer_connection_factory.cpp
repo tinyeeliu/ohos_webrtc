@@ -306,6 +306,7 @@ void NapiPeerConnectionFactory::Init(Napi::Env env, Object exports)
         {
             StaticMethod<&NapiPeerConnectionFactory::SetDefault>(kMethodNameSetDefault),
             InstanceMethod<&NapiPeerConnectionFactory::CreatePeerConnection>(kMethodNameCreatePeerConnection),
+            InstanceMethod<&NapiPeerConnectionFactory::GetPlayoutSnapshot>("getPlayoutSnapshot"),
             InstanceMethod<&NapiPeerConnectionFactory::CreateAudioSource>(kMethodNameCreateAudioSource),
             InstanceMethod<&NapiPeerConnectionFactory::CreateAudioTrack>(kMethodNameCreateAudioTrack),
             InstanceMethod<&NapiPeerConnectionFactory::CreateVideoSource>(kMethodNameCreateVideoSource),
@@ -340,6 +341,11 @@ Napi::Value NapiPeerConnectionFactory::SetDefault(const Napi::CallbackInfo& info
     PeerConnectionFactoryWrapper::SetDefault(nativeFactory->GetWrapper());
 
     return info.Env().Undefined();
+}
+
+Napi::Value NapiPeerConnectionFactory::GetPlayoutSnapshot(const CallbackInfo& info)
+{
+    return NapiAudioDeviceModule::Snapshot(info.Env(), wrapper_->GetAudioDeviceModule());
 }
 
 Napi::Value NapiPeerConnectionFactory::CreatePeerConnection(const CallbackInfo& info)

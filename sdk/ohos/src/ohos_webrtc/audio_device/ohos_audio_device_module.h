@@ -190,6 +190,7 @@ class NapiAudioDeviceModule : public Napi::ObjectWrap<NapiAudioDeviceModule>,
                               public AudioOutput::Observer {
 public:
     static void Init(Napi::Env env, Napi::Object exports);
+    static Napi::Value Snapshot(Napi::Env env, rtc::scoped_refptr<OhosAudioDeviceModule> adm);
 
     ~NapiAudioDeviceModule() override;
 
