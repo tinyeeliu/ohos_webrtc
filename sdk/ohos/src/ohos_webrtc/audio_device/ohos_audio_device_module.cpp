@@ -1173,8 +1173,6 @@ Napi::Value NapiAudioDeviceModule::Snapshot(Napi::Env env, rtc::scoped_refptr<Oh
     const auto value = adm ? adm->GetPlayoutObservation() : PlayoutObservation{};
     auto result = Object::New(env);
     result.Set("available", Boolean::New(env, value.available));
-    result.Set("deviceInitialized", Boolean::New(env, adm && rtc::scoped_refptr<AudioDeviceModule>(adm)->Initialized()));
-    result.Set("devicePlaying", Boolean::New(env, adm && rtc::scoped_refptr<AudioDeviceModule>(adm)->Playing()));
     result.Set("muted", Boolean::New(env, value.muted));
     result.Set("sequence", Number::New(env, value.sequence));
     result.Set("sampleRate", Number::New(env, value.sampleRate));
