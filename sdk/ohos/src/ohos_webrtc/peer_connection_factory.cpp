@@ -445,9 +445,14 @@ Napi::Value NapiPeerConnectionFactory::CreateVideoSource(const CallbackInfo& inf
     }
 
     std::unique_ptr<VideoCapturer> videoCapturer;
-    const bool externalFrames = info.Length() > 0 && info[0].As<Object>().Has("ohosExternalFrames") &&
-        info[0].As<Object>().Get("ohosExternalFrames").IsBoolean() &&
-        info[0].As<Object>().Get("ohosExternalFrames").As<Boolean>().Value();
+    bool externalFrames = false;
+    if (info.Length() > 0 && info[0].As<Object>().Has("ohosExternalFrames")) {
+        const auto flag = info[0].As<Object>().Get("ohosExternalFrames");
+        if (!flag.IsBoolean()) {
+            NAPI_THROW(TypeError::New(info.Env(), "ohosExternalFrames must be boolean"), info.Env().Undefined());
+        }
+        externalFrames = flag.As<Boolean>().Value();
+    }
     if (externalFrames) {
         videoCapturer = std::make_unique<ExternalVideoCapturer>();
     } else if (isScreencast) {

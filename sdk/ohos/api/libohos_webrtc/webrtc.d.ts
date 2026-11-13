@@ -1006,6 +1006,8 @@ export interface AudioSamples {
 
 /** Fork extension v1: native output observation, with no retained audio payload. */
 export interface AudioPlayoutSnapshot {
+  readonly deviceInitialized: boolean;
+  readonly devicePlaying: boolean;
   readonly available: boolean;
   readonly muted: boolean;
   readonly sequence: number;

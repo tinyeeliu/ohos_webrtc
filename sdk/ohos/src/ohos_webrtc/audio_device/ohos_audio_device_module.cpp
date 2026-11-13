@@ -1166,6 +1166,8 @@ Napi::Value NapiAudioDeviceModule::GetPlayoutSnapshot(const Napi::CallbackInfo& 
     const auto value = adm_ ? adm_->GetPlayoutObservation() : PlayoutObservation{};
     auto result = Object::New(info.Env());
     result.Set("available", Boolean::New(info.Env(), value.available));
+    result.Set("deviceInitialized", Boolean::New(info.Env(), adm_ && adm_->Initialized()));
+    result.Set("devicePlaying", Boolean::New(info.Env(), adm_ && adm_->Playing()));
     result.Set("muted", Boolean::New(info.Env(), value.muted));
     result.Set("sequence", Number::New(info.Env(), value.sequence));
     result.Set("sampleRate", Number::New(info.Env(), value.sampleRate));
